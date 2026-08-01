@@ -1,0 +1,58 @@
+sessions:
+  - date: "2026-08-03"
+    sport: running
+    title: Easy run
+    description: Easy aerobic run, conversational pace.
+
+  - date: "2026-08-05"
+    sport: running
+    title: Interval session
+    description: 5x400m hard with jog recovery
+    steps:
+      - type: warmup
+        duration_type: time
+        duration_value: 10
+      - type: interval
+        duration_type: distance
+        duration_value: 0.4
+        target_pace: "4:00-3:50"
+      - type: recovery
+        duration_type: time
+        duration_value: 2
+        target_pace: "6:30-6:00"
+      - type: interval
+        duration_type: distance
+        duration_value: 0.4
+        target_pace: "4:00-3:50"
+      - type: recovery
+        duration_type: time
+        duration_value: 2
+        target_pace: "6:30-6:00"
+      - type: cooldown
+        duration_type: time
+        duration_value: 10
+
+  - date: "2026-08-06"
+    sport: running
+    title: Threshold run
+    description: 5 km at threshold pace
+    steps:
+      - type: warmup
+        duration_type: time
+        duration_value: 15
+      - type: interval
+        duration_type: distance
+        duration_value: 5
+        target_pace: "4:30"
+      - type: cooldown
+        duration_type: time
+        duration_value: 10
+
+  - date: "2026-08-07"
+    sport: cycling
+    title: Long ride
+    description: Steady endurance ride.
+
+  - date: "2026-08-08"
+    sport: strength_training
+    title: Gym - full body

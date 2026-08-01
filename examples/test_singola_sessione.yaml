@@ -1,0 +1,20 @@
+# File di prova: una sola sessione, per verificare su Garmin Connect che
+# i target di passo vengano importati correttamente prima di caricare un piano intero.
+sessions:
+  - date: "2026-08-01"
+    sport: running
+    title: "TEST - verifica target passo"
+    description: Sessione di prova, da cancellare dopo la verifica.
+    steps:
+      - type: warmup
+        duration_type: time
+        duration_value: 10
+        target_pace: "6:00"
+      - type: interval
+        duration_type: distance
+        duration_value: 1
+        target_pace: "4:45-4:35"
+      - type: cooldown
+        duration_type: time
+        duration_value: 10
+        target_pace: "6:00"

@@ -15,6 +15,44 @@ The system SHALL authenticate to Garmin Connect using the `garminconnect` Python
 - **WHEN** login to Garmin Connect fails (invalid credentials or Garmin rejects the request)
 - **THEN** the system reports a clear authentication error and stops before attempting any calendar changes
 
+#### Scenario: Two-factor authentication
+- **WHEN** the Garmin account requires an MFA code to log in
+- **THEN** the system prompts the user for the code and completes the login with it
+
+### Requirement: Minimize login attempts against Garmin's rate limiter
+Garmin rate-limits login attempts by IP address, and a single login fans out into several HTTP requests inside the underlying library. The system SHALL therefore avoid spending login attempts that cannot succeed, SHALL never retry a failed login automatically, and SHALL refuse further login attempts for a cooldown period after a failure.
+
+#### Scenario: Missing credentials
+- **WHEN** the required credentials are not configured
+- **THEN** the system reports the missing configuration and makes no login request to Garmin at all
+
+#### Scenario: Garmin reports rate limiting
+- **WHEN** Garmin rejects the login with an HTTP 429 rate-limit response
+- **THEN** the system reports a rate-limit error distinct from an authentication error, and records a cooldown before any further login may be attempted
+
+#### Scenario: Login attempted during an active cooldown
+- **WHEN** a login is attempted while a cooldown from a previous failure is still active and no cached session exists
+- **THEN** the system refuses locally, states how long remains, and makes no login request to Garmin
+
+#### Scenario: Repeated authentication failures back off
+- **WHEN** successive login attempts fail with an authentication error
+- **THEN** the system applies a progressively longer cooldown after each failure
+
+#### Scenario: Cached session bypasses the cooldown
+- **WHEN** a login is attempted during an active cooldown but a cached session token exists
+- **THEN** the system proceeds, since reusing the cached session needs no login request
+
+#### Scenario: Successful login clears the record
+- **WHEN** a login succeeds
+- **THEN** the system clears any recorded failure count and cooldown
+
+### Requirement: Standalone credential verification
+The system SHALL provide a way to verify credentials on their own, without parsing a training plan or making any calendar changes, so authentication problems are not discovered part-way through a large import.
+
+#### Scenario: Verifying credentials
+- **WHEN** the user runs the credential-verification command
+- **THEN** the system attempts a single login, reports success or failure, and makes no workout or calendar changes
+
 ### Requirement: Workout creation from a training-plan entry
 For each parsed and validated training-plan entry, the system SHALL build a Garmin workout definition matching that entry's sport, title, description, and steps (if any), and SHALL create it in the user's Garmin Connect account via the API before scheduling it.
 
@@ -26,12 +64,50 @@ For each parsed and validated training-plan entry, the system SHALL build a Garm
 - **WHEN** a training-plan entry has one or more `steps`
 - **THEN** the system creates a Garmin workout whose step sequence, types, and durations/distances match the entry's `steps` in order
 
+### Requirement: Pace targets on created workout steps
+For any step carrying a `target_pace`, the system SHALL set that step's Garmin target type to Garmin's pace-zone target and SHALL send the two pace bounds converted to speeds in metres per second, with the slower bound first. Steps without a `target_pace` SHALL be sent with Garmin's no-target type.
+
+#### Scenario: Step with a pace target
+- **WHEN** a step carries a pace target of 8:30/km to 8:00/km
+- **THEN** the created Garmin workout step uses the pace-zone target type and carries the bounds as speeds of approximately 1.96 m/s and 2.08 m/s respectively
+
+#### Scenario: Step without a pace target
+- **WHEN** a step carries no pace target
+- **THEN** the created Garmin workout step uses the no-target type and carries no pace bound values
+
 ### Requirement: Calendar scheduling
 The system SHALL schedule each created workout onto the Garmin Connect calendar on the entry's `date`.
 
 #### Scenario: Successful scheduling
 - **WHEN** a workout is created for an entry
 - **THEN** the system schedules that workout on the Garmin Connect calendar for the entry's `date` and the workout becomes visible on that day in Garmin Connect
+
+### Requirement: Diff a plan against the calendar before importing
+Importing a training-plan file SHALL, by default, first compare the file against the workouts already scheduled on the Garmin calendar over the plan's own date range, and SHALL create only the sessions that are not already there. Sessions SHALL be matched on date plus title, ignoring case and surrounding whitespace. The system SHALL display the comparison before writing anything, and SHALL provide an explicit option to skip the comparison and import every session.
+
+#### Scenario: Re-importing an edited plan
+- **WHEN** a plan file containing both already-scheduled and new sessions is imported
+- **THEN** the system creates only the new sessions and reports the already-scheduled ones as skipped
+
+#### Scenario: Re-importing an unchanged plan
+- **WHEN** a plan file whose sessions are all already on the calendar is imported
+- **THEN** the system creates nothing and reports that the calendar already matches the file
+
+#### Scenario: Calendar entries missing from the file
+- **WHEN** the calendar contains workouts within the plan's date range that the file does not list
+- **THEN** the system reports them and leaves them untouched, since importing only ever adds
+
+#### Scenario: Title matching tolerance
+- **WHEN** a file session's title differs from the scheduled one only by letter case or surrounding whitespace
+- **THEN** the system treats them as the same session and does not create a duplicate
+
+#### Scenario: Skipping the comparison
+- **WHEN** the user explicitly requests import without the comparison
+- **THEN** the system creates every session in the file, without reading the calendar
+
+#### Scenario: Previewing the comparison
+- **WHEN** the user requests a dry run
+- **THEN** the system displays the comparison and writes nothing to Garmin Connect
 
 ### Requirement: Per-entry result reporting
 The system SHALL process all entries in a training-plan file even if one entry fails, and SHALL report, per entry, whether creation and scheduling succeeded or failed (including the Garmin API error message on failure), plus a final summary count of successes and failures.

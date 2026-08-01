@@ -8,8 +8,31 @@ The system SHALL define a YAML training-plan file format consisting of a top-lev
 - **THEN** the system treats it as a valid simple (single-block) workout with no structured steps
 
 #### Scenario: Structured entry with steps
-- **WHEN** a session entry includes a `steps` list, each with `type` (`warmup`, `interval`, `recovery`, `cooldown`), a `duration_type` (`time` or `distance`), and a `duration_value`
+- **WHEN** a session entry includes a `steps` list, each with `type` (`warmup`, `interval`, `recovery`, `cooldown`), a `duration_type` (`time` or `distance`), a `duration_value`, and an optional `target_pace`
 - **THEN** the system treats it as a structured multi-step workout preserving step order
+
+### Requirement: Target pace on steps
+The system SHALL support an optional `target_pace` field on each step, expressed in minutes:seconds per kilometre, accepting either an explicit range (`"4:30-4:20"`) or a single pace (`"4:30"`). A single pace SHALL be widened into a range, since Garmin stores pace targets as a range rather than an exact value. A range SHALL be accepted in either order, with the slower and faster bounds normalized by the system.
+
+#### Scenario: Explicit pace range
+- **WHEN** a step declares `target_pace: "4:30-4:20"`
+- **THEN** the system records a pace target whose slower bound is 4:30/km and whose faster bound is 4:20/km
+
+#### Scenario: Range given in reversed order
+- **WHEN** a step declares `target_pace: "4:20-4:30"`
+- **THEN** the system normalizes it to the same target as `"4:30-4:20"`
+
+#### Scenario: Single pace value
+- **WHEN** a step declares `target_pace: "4:30"`
+- **THEN** the system records a pace target widened by a fixed tolerance in each direction around 4:30/km
+
+#### Scenario: Step without a pace target
+- **WHEN** a step omits `target_pace`
+- **THEN** the system records no pace target for that step
+
+#### Scenario: Malformed pace value
+- **WHEN** a step's `target_pace` is not a valid `M:SS` pace or `M:SS-M:SS` range, or its two bounds are identical
+- **THEN** the system reports a validation error identifying the entry, the step position, and the offending value, and does not proceed to sync any entries
 
 ### Requirement: File parsing produces structured entries
 The system SHALL parse a training-plan YAML file into an in-memory list of workout entry objects, each carrying the normalized date, sport, title, description, and steps (if any), preserving the order entries appear in the file.

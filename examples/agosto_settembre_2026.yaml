@@ -1,0 +1,956 @@
+sessions:
+- date: '2026-08-01'
+  sport: running
+  title: Lungo con 3x4' veloce
+  description: Corsa lunga con 3x4' a ritmo più sostenuto. Recupero tra le ripetute stimato in 2' (non indicato sul piano originale).
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: time
+    duration_value: 4
+    target_pace: '5:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: time
+    duration_value: 4
+    target_pace: '5:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: time
+    duration_value: 4
+    target_pace: '5:40'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-08-03'
+  sport: running
+  title: Corsa 40' ritmo costante
+  description: 40' a ritmo costante 6'00"/km.
+  steps:
+  - type: interval
+    duration_type: time
+    duration_value: 40
+    target_pace: '6:00'
+- date: '2026-08-04'
+  sport: running
+  title: Vo2 Max 2x1000m + 4x500m
+  description: 'Vo2 Max: 2x1000m + 4x500m. Recupero dei 500m stimato in 2'' jogging come per i 1000m (non indicato sul piano originale).'
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: distance
+    duration_value: 1.0
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 1.0
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-08-06'
+  sport: running
+  title: Ritmo 4km
+  description: 'Ritmo: 4km a passo costante.'
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: distance
+    duration_value: 4.0
+    target_pace: '5:00'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-08-08'
+  sport: running
+  title: Lungo con 3x5' veloce
+  description: Corsa lunga con 3x5' a ritmo più sostenuto. Recupero tra le ripetute stimato in 2' (non indicato sul piano originale).
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: time
+    duration_value: 5
+    target_pace: '5:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: time
+    duration_value: 5
+    target_pace: '5:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: time
+    duration_value: 5
+    target_pace: '5:40'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-08-10'
+  sport: running
+  title: Corsa 40' ritmo costante
+  description: 40' a ritmo costante 6'00"/km.
+  steps:
+  - type: interval
+    duration_type: time
+    duration_value: 40
+    target_pace: '6:00'
+- date: '2026-08-11'
+  sport: running
+  title: Ritmo costante + allunghi
+  description: 30' a ritmo costante con 10x50m allunghi. Recupero tra gli allunghi stimato in 1' (non indicato sul piano originale).
+  steps:
+  - type: interval
+    duration_type: time
+    duration_value: 30
+    target_pace: '5:40'
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+- date: '2026-08-13'
+  sport: running
+  title: Ritmo costante 30'
+  description: 30' a ritmo costante.
+  steps:
+  - type: interval
+    duration_type: time
+    duration_value: 30
+    target_pace: '5:40'
+- date: '2026-08-15'
+  sport: running
+  title: Lungo 15km
+  description: Corsa lunga di 15km a passo costante 6'00"/km.
+- date: '2026-08-17'
+  sport: running
+  title: Corsa 40' ritmo costante
+  description: 40' a ritmo costante 6'00"/km.
+  steps:
+  - type: interval
+    duration_type: time
+    duration_value: 40
+    target_pace: '6:00'
+- date: '2026-08-18'
+  sport: running
+  title: Vo2 Max 4x1000m
+  description: 'Vo2 Max: 4x1000m con recupero 2'' jogging.'
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: distance
+    duration_value: 1.0
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 1.0
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 1.0
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 1.0
+    target_pace: '4:40'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-08-20'
+  sport: running
+  title: Ritmo 5km
+  description: 'Ritmo: 5km a passo costante.'
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: distance
+    duration_value: 5.0
+    target_pace: '5:00'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-08-22'
+  sport: running
+  title: Lungo con 3x5' veloce
+  description: Corsa lunga con 3x5' a ritmo più sostenuto. Recupero tra le ripetute stimato in 2' (non indicato sul piano originale).
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: time
+    duration_value: 5
+    target_pace: '5:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: time
+    duration_value: 5
+    target_pace: '5:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: time
+    duration_value: 5
+    target_pace: '5:40'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-08-24'
+  sport: running
+  title: Corsa 40' ritmo costante
+  description: 40' a ritmo costante 6'00"/km.
+  steps:
+  - type: interval
+    duration_type: time
+    duration_value: 40
+    target_pace: '6:00'
+- date: '2026-08-25'
+  sport: running
+  title: Vo2 Max 2x1000m + 4x500m
+  description: 'Vo2 Max: 2x1000m + 4x500m. Recupero dei 500m stimato in 2'' jogging come per i 1000m (non indicato sul piano originale).'
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: distance
+    duration_value: 1.0
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 1.0
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-08-27'
+  sport: running
+  title: Ritmo 5km
+  description: 'Ritmo: 5km a passo costante.'
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: distance
+    duration_value: 5.0
+    target_pace: '5:00'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-08-29'
+  sport: running
+  title: Lungo con 3x6' veloce
+  description: Corsa lunga con 3x6' a ritmo più sostenuto. Recupero tra le ripetute stimato in 2' (non indicato sul piano originale).
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: time
+    duration_value: 6
+    target_pace: '5:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: time
+    duration_value: 6
+    target_pace: '5:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: time
+    duration_value: 6
+    target_pace: '5:40'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-08-31'
+  sport: running
+  title: Corsa 40' ritmo costante
+  description: 40' a ritmo costante 6'00"/km.
+  steps:
+  - type: interval
+    duration_type: time
+    duration_value: 40
+    target_pace: '6:00'
+- date: '2026-09-01'
+  sport: running
+  title: Ritmo costante + allunghi
+  description: 30' a ritmo costante con 10x50m allunghi. Recupero tra gli allunghi stimato in 1' (non indicato sul piano originale).
+  steps:
+  - type: interval
+    duration_type: time
+    duration_value: 30
+    target_pace: '5:40'
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+- date: '2026-09-03'
+  sport: running
+  title: Ritmo costante 30'
+  description: 30' a ritmo costante.
+  steps:
+  - type: interval
+    duration_type: time
+    duration_value: 30
+    target_pace: '5:40'
+- date: '2026-09-05'
+  sport: running
+  title: Lungo 18km
+  description: Corsa lunga di 18km a passo costante 6'00"/km.
+- date: '2026-09-07'
+  sport: running
+  title: Corsa 40' ritmo costante
+  description: 40' a ritmo costante 6'00"/km.
+  steps:
+  - type: interval
+    duration_type: time
+    duration_value: 40
+    target_pace: '6:00'
+- date: '2026-09-08'
+  sport: running
+  title: Vo2 Max 4x500m + 8x200m
+  description: 'Vo2 Max: 4x500m + 8x200m. Recupero degli 8x200m stimato in 2'' jogging come per i 500m (non indicato sul piano originale).'
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-09-10'
+  sport: running
+  title: Ritmo 5km, ultimo km veloce
+  description: 'Ritmo: 5km, con l''ultimo km più veloce.'
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: distance
+    duration_value: 4.0
+    target_pace: '5:00'
+  - type: interval
+    duration_type: distance
+    duration_value: 1.0
+    target_pace: '4:50'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-09-12'
+  sport: running
+  title: Lungo con 3x6' veloce
+  description: Corsa lunga con 3x6' a ritmo più sostenuto. Recupero tra le ripetute stimato in 2' (non indicato sul piano originale).
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: time
+    duration_value: 6
+    target_pace: '5:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: time
+    duration_value: 6
+    target_pace: '5:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: time
+    duration_value: 6
+    target_pace: '5:40'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-09-14'
+  sport: running
+  title: Corsa 40' ritmo costante
+  description: 40' a ritmo costante 6'00"/km.
+  steps:
+  - type: interval
+    duration_type: time
+    duration_value: 40
+    target_pace: '6:00'
+- date: '2026-09-15'
+  sport: running
+  title: Vo2 Max 4x500m + 8x200m
+  description: 'Vo2 Max: 4x500m + 8x200m. Recupero degli 8x200m stimato in 2'' jogging come per i 500m (non indicato sul piano originale).'
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.5
+    target_pace: '4:20'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 0.2
+    target_pace: '4:10'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-09-17'
+  sport: running
+  title: Ritmo 20', ultimo km veloce
+  description: 'Ritmo: 20'' a passo costante, con l''ultimo km più veloce.'
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: time
+    duration_value: 20
+    target_pace: '5:00'
+  - type: interval
+    duration_type: distance
+    duration_value: 1.0
+    target_pace: '4:50'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-09-19'
+  sport: running
+  title: Lungo con 3x6' veloce, ultimo km veloce
+  description: Corsa lunga con 3x6' a ritmo più sostenuto e ultimo km più veloce. Recupero tra le ripetute stimato in 2' (non indicato sul piano originale).
+  steps:
+  - type: warmup
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+  - type: interval
+    duration_type: time
+    duration_value: 6
+    target_pace: '5:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: time
+    duration_value: 6
+    target_pace: '5:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: time
+    duration_value: 6
+    target_pace: '5:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 2
+  - type: interval
+    duration_type: distance
+    duration_value: 1.0
+    target_pace: '5:20'
+  - type: cooldown
+    duration_type: time
+    duration_value: 10
+    target_pace: '6:00'
+- date: '2026-09-21'
+  sport: running
+  title: Corsa 40' ritmo costante
+  description: 40' a ritmo costante 6'00"/km.
+  steps:
+  - type: interval
+    duration_type: time
+    duration_value: 40
+    target_pace: '6:00'
+- date: '2026-09-22'
+  sport: running
+  title: Ritmo costante + allunghi
+  description: 30' a ritmo costante con 10x50m allunghi. Recupero tra gli allunghi stimato in 1' (non indicato sul piano originale).
+  steps:
+  - type: interval
+    duration_type: time
+    duration_value: 30
+    target_pace: '5:40'
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+  - type: recovery
+    duration_type: time
+    duration_value: 1
+  - type: interval
+    duration_type: distance
+    duration_value: 0.05
+    target_pace: '4:40'
+- date: '2026-09-24'
+  sport: running
+  title: Ritmo costante 30'
+  description: 30' a ritmo costante.
+  steps:
+  - type: interval
+    duration_type: time
+    duration_value: 30
+    target_pace: '5:40'
+- date: '2026-09-26'
+  sport: running
+  title: Lungo 20km
+  description: Corsa lunga di 20km a passo costante 6'00"/km.
