@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from training_plan import cli
+from training_plan import cli, service
 from training_plan.garmin_sync import DeleteResult, ScheduledWorkout
 
 
@@ -50,7 +50,7 @@ def test_sync_only_adds_sessions_missing_from_the_calendar(tmp_path, capsys, mon
         def replace_all(self, changes):
             return []
 
-    monkeypatch.setattr(cli, "GarminSync", lambda *a, **k: DiffSync())
+    monkeypatch.setattr(service, "GarminSync", lambda *a, **k: DiffSync())
 
     exit_code = cli.main(["sync", "--file", str(path)])
 
@@ -87,7 +87,7 @@ def test_sync_does_nothing_when_calendar_already_matches(tmp_path, capsys, monke
         def replace_all(self, changes):
             return []
 
-    monkeypatch.setattr(cli, "GarminSync", lambda *a, **k: NoopSync())
+    monkeypatch.setattr(service, "GarminSync", lambda *a, **k: NoopSync())
 
     assert cli.main(["sync", "--file", str(path)]) == 0
     assert "Nothing to do" in capsys.readouterr().out
@@ -119,7 +119,7 @@ def test_sync_no_diff_flag_imports_everything(tmp_path, capsys, monkeypatch):
         def replace_all(self, changes):
             return []
 
-    monkeypatch.setattr(cli, "GarminSync", lambda *a, **k: ForceSync())
+    monkeypatch.setattr(service, "GarminSync", lambda *a, **k: ForceSync())
 
     assert cli.main(["sync", "--file", str(path), "--no-diff"]) == 0
     assert "1 succeeded" in capsys.readouterr().out
@@ -151,7 +151,7 @@ def test_sync_dry_run_shows_diff_without_writing(tmp_path, capsys, monkeypatch):
         def replace_all(self, changes):
             raise AssertionError("dry run must not write to Garmin")
 
-    monkeypatch.setattr(cli, "GarminSync", lambda *a, **k: DryRunSync())
+    monkeypatch.setattr(service, "GarminSync", lambda *a, **k: DryRunSync())
 
     assert cli.main(["sync", "--file", str(path), "--dry-run"]) == 0
     out = capsys.readouterr().out
@@ -173,7 +173,7 @@ def test_sync_dry_run_prints_preview_without_calling_garmin(tmp_path, capsys, mo
     def fail_if_called(*args, **kwargs):
         raise AssertionError("GarminSync should not be constructed during an offline dry-run")
 
-    monkeypatch.setattr(cli, "GarminSync", fail_if_called)
+    monkeypatch.setattr(service, "GarminSync", fail_if_called)
 
     # --dry-run alone now reads the calendar to build a diff; pairing it with
     # --no-diff is the fully offline preview.
@@ -229,7 +229,7 @@ class FakeSync:
 
 
 def test_delete_prompts_for_confirmation_and_aborts_on_decline(monkeypatch, capsys):
-    monkeypatch.setattr(cli, "GarminSync", FakeSync)
+    monkeypatch.setattr(service, "GarminSync", FakeSync)
     monkeypatch.setattr("builtins.input", lambda prompt: "n")
 
     exit_code = cli.main(["delete", "--from", "2026-08-01", "--to", "2026-08-31"])
@@ -240,7 +240,7 @@ def test_delete_prompts_for_confirmation_and_aborts_on_decline(monkeypatch, caps
 
 
 def test_delete_yes_flag_skips_confirmation(monkeypatch, capsys):
-    monkeypatch.setattr(cli, "GarminSync", FakeSync)
+    monkeypatch.setattr(service, "GarminSync", FakeSync)
 
     def fail_if_prompted(prompt):
         raise AssertionError("should not prompt when --yes is passed")
@@ -255,7 +255,7 @@ def test_delete_yes_flag_skips_confirmation(monkeypatch, capsys):
 
 
 def test_delete_filters_by_sport_and_title(monkeypatch, capsys):
-    monkeypatch.setattr(cli, "GarminSync", FakeSync)
+    monkeypatch.setattr(service, "GarminSync", FakeSync)
 
     exit_code = cli.main(
         ["delete", "--from", "2026-08-01", "--to", "2026-08-31", "--sport", "running", "--yes"]

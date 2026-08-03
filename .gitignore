@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 .env
 .garmin_training_tokens
+*.egg-info/

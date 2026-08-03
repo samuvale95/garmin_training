@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "garmin-training"
+version = "0.1.0"
+description = "Import a training plan into Garmin Connect, and read it back, via the private Garmin Connect API."
+requires-python = ">=3.11"
+dependencies = [
+    "garminconnect==0.3.2",
+    "PyYAML==6.0.3",
+    "python-dotenv==1.2.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "pytest-mock==3.15.1",
+]
+
+[project.scripts]
+garmin-training-import = "training_plan.cli:main"
+
+[tool.setuptools]
+packages = ["training_plan"]

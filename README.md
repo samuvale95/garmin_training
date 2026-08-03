@@ -7,14 +7,16 @@ A CLI script that reads a training plan from a YAML file and creates/schedules t
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e .
 ```
 
 For running the tests too:
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -e ".[dev]"
 ```
+
+This installs the project as an editable package (`pyproject.toml` is the single source of dependency versions) and adds a `garmin-training-import` console script alongside the usual `python import_training_plan.py` invocation — the two behave identically; use whichever fits your workflow.
 
 ## Credentials
 
@@ -202,7 +204,14 @@ Combine `--dry-run --no-diff` for a fully offline preview of the file that never
 
 The script processes every entry even if one fails, then prints a per-entry result and a final `N succeeded, M failed` summary. It exits non-zero if any entry failed.
 
-**Matching caveat:** the diff compares date and title only, not the contents of a session. If you change the *steps* of a session but keep its date and title, `sync` will consider it already present and skip it. To push such a change, delete that session first and re-run `sync`.
+**Matching caveat:** by default, the diff compares date and title only, not the contents of a session. If you change the *steps* of a session but keep its date and title, `sync` will consider it already present and skip it — unless you opt into a deeper check:
+
+```bash
+python import_training_plan.py sync --file plan.yaml --deep     # also reports content changes, doesn't act on them
+python import_training_plan.py sync --file plan.yaml --update   # deletes and recreates sessions whose contents changed
+```
+
+`--deep` fetches and content-hashes each already-scheduled, matched session (one extra read per session) and reports any whose contents no longer match the file, without changing anything. `--update` implies `--deep` and additionally rewrites those sessions on Garmin (delete + recreate, since Garmin workouts can't be edited in place) — this prompts for confirmation unless `--yes` is also passed.
 
 ### List existing calendar workouts
 
@@ -227,6 +236,16 @@ python import_training_plan.py delete --from 2026-08-01 --to 2026-08-31 --title-
 ## Running the tests
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -e ".[dev]"
 pytest
 ```
+
+## Architecture
+
+The project is split into a presentation-independent core and a thin CLI on top of it, so the core can be called directly by something other than the CLI later:
+
+- **`training_plan/models.py`, `parser.py`, `garmin_sync.py`** — pure logic: data models, YAML parsing/validation, and the Garmin Connect integration (auth, rate-limit guards, workout payload construction, diff/list/delete). No printing, no prompting.
+- **`training_plan/service.py`** — the orchestration seam: one function per operation (`preview_plan_sync`/`apply_plan_sync`, `list_workouts`, `preview_deletion`/`apply_deletion`, `verify_login`), each taking plain arguments and returning plain dataclasses (or raising `GarminSyncError`/`TrainingPlanValidationError`). Nothing here prints, prompts, or calls `sys.exit` — **this is the module a future consumer should import and call directly**, whether that's a web backend, a script, or something else. Write operations are split into a `preview_*` step (computes what would happen, writes nothing) and an `apply_*` step (performs the write), so a caller can show a preview and decide whether to proceed before anything touches Garmin.
+- **`training_plan/cli.py`** — argument parsing and presentation only: it calls `service.py` and turns the result into printed output, interactive confirmation prompts, and process exit codes. If you're building something that isn't a terminal UI, this is the one module you don't need.
+
+**What this project is not, yet:** there is no web framework, no hosting target, no database, and no authentication layer here, and none of those are decided. This refactor only prepares the ground (a clean, presentation-independent service layer, proper packaging) so that whatever gets built around it later doesn't have to fight the CLI's argparse/print/input plumbing to reuse the Garmin integration.

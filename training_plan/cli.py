@@ -6,7 +6,8 @@ from datetime import date, datetime
 
 from dotenv import load_dotenv
 
-from .garmin_sync import GarminRateLimitError, GarminSync, GarminSyncError
+from . import service
+from .garmin_sync import GarminSyncError
 from .models import Step, TrainingSession
 from .parser import TrainingPlanValidationError, parse_training_plan
 
@@ -40,17 +41,10 @@ def _prompt_mfa() -> str:
     return input("Garmin MFA code: ").strip()
 
 
-def _authenticate() -> GarminSync:
-    """Log in, raising GarminSyncError (or GarminRateLimitError) on failure."""
-    sync = GarminSync(prompt_mfa=_prompt_mfa)
-    sync.login()
-    return sync
-
-
 def _login(args: argparse.Namespace) -> int:
     """Verify credentials on their own, so auth problems don't surface mid-import."""
     try:
-        _authenticate()
+        service.verify_login(prompt_mfa=_prompt_mfa)
     except GarminSyncError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
@@ -110,33 +104,35 @@ def _sync(args: argparse.Namespace) -> int:
         _print_dry_run(sessions)
         return 0
 
+    check_content = args.deep or args.update
+    on_authenticated = None
+    if not args.no_diff and check_content:
+        on_authenticated = lambda: print(  # noqa: E731
+            "Comparing session contents (one extra read per scheduled session)..."
+        )
+
     try:
-        sync = _authenticate()
+        preview = service.preview_plan_sync(
+            sessions,
+            no_diff=args.no_diff,
+            check_content=check_content,
+            prompt_mfa=_prompt_mfa,
+            on_authenticated=on_authenticated,
+        )
     except GarminSyncError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
     changed = []
-    if args.no_diff:
-        to_create = sessions
-    else:
-        check_content = args.deep or args.update
-        if check_content:
-            print("Comparing session contents (one extra read per scheduled session)...")
-        try:
-            diff = sync.diff_plan(sessions, check_content=check_content)
-        except GarminSyncError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
-            return 1
-
+    if not args.no_diff:
+        diff = preview.diff
         _print_diff(diff)
-        to_create = diff.to_create
         changed = diff.changed if args.update else []
 
         if diff.changed and not args.update:
             print("\nRe-run with --update to rewrite the changed session(s) on Garmin.")
 
-        if not to_create and not changed:
+        if not preview.to_create and not changed:
             print("\nNothing to do - the calendar already matches this file.")
             return 0
 
@@ -151,7 +147,7 @@ def _sync(args: argparse.Namespace) -> int:
             return 0
 
     print()
-    results = sync.replace_all(changed) + sync.sync_all(to_create)
+    results = service.apply_plan_sync(preview, changed=changed)
 
     succeeded = 0
     for result in results:
@@ -173,13 +169,7 @@ def _parse_date(value: str) -> date:
 
 def _list(args: argparse.Namespace) -> int:
     try:
-        sync = _authenticate()
-    except GarminSyncError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
-
-    try:
-        workouts = sync.list_scheduled_workouts(_parse_date(args.frm), _parse_date(args.to))
+        workouts = service.list_workouts(_parse_date(args.frm), _parse_date(args.to), prompt_mfa=_prompt_mfa)
     except GarminSyncError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
@@ -195,18 +185,18 @@ def _list(args: argparse.Namespace) -> int:
 
 def _delete(args: argparse.Namespace) -> int:
     try:
-        sync = _authenticate()
+        preview = service.preview_deletion(
+            _parse_date(args.frm),
+            _parse_date(args.to),
+            sport=args.sport,
+            title_match=args.title_match,
+            prompt_mfa=_prompt_mfa,
+        )
     except GarminSyncError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
-    try:
-        workouts = sync.list_scheduled_workouts(_parse_date(args.frm), _parse_date(args.to))
-    except GarminSyncError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
-
-    selected = sync.select_workouts(workouts, sport=args.sport, title_match=args.title_match)
+    selected = preview.selected
 
     if not selected:
         print("No workouts match the given filters. Nothing to delete.")
@@ -222,7 +212,7 @@ def _delete(args: argparse.Namespace) -> int:
             print("Aborted. Nothing was deleted.")
             return 0
 
-    results = sync.delete_all(selected)
+    results = service.apply_deletion(preview)
 
     succeeded = 0
     for result in results:
