@@ -1,0 +1,31 @@
+## Why
+
+The project has a working Python CLI and a presentation-independent service layer (`training_plan/service.py`), but no way for a human to use it except by running commands in a terminal with a YAML file. A high-fidelity design ("Passo", 15 screens, motion-led identity, full design tokens) already exists for the intended product experience — importing a plan, previewing the diff against Garmin's calendar, confirming destructive rewrites, watching the sync run, and reading the body's morning signals against tomorrow's session. Building the web app now turns the existing service layer into something a real user can actually operate, and gives the already-designed UI a home.
+
+## What Changes
+
+- Add a new FastAPI HTTP layer (`training_plan/api.py` + supporting modules) that exposes the existing `training_plan/service.py` functions (`verify_login`, `preview_plan_sync`, `apply_plan_sync`, `list_workouts`, `preview_deletion`, `apply_deletion`) as JSON endpoints, so a browser-based frontend can call them. The service layer's functions and signatures are unchanged; the API is a thin adapter, not a rewrite.
+- Model the Garmin write operation (screen 06, potentially tens of seconds, one session at a time) as an async job: an endpoint starts it, a status endpoint reports progress and can be polled, and the job keeps running server-side even if the client disconnects.
+- Add a new Next.js web application implementing all 15 screens of the Passo design, at high fidelity: exact color/typography/spacing tokens, the full motion system (single easing curve, named keyframe gestures, the "max 3 concurrent animated elements" rule, the three still screens, the reduced-motion toggle), and the seven provided illustrations via `next/image`.
+- **Deviate from the design in exactly one place**: screen "01 Accesso" (Google sign-in) is replaced by a minimal welcome screen with a single "Inizia" button — no account, no OAuth, no user identity anywhere in the app. Screen "02 Collega Garmin" (email/password to link the real Garmin account) is kept as designed, reached after "Inizia" (or skippable, as the design already allows), because it is the only way to actually authenticate against Garmin Connect through the backend.
+- Application state (imported plan, computed diff, write-job history, preferences, cooldown) lives entirely on the device — no server-side database, no user accounts — but persists across browser reloads via `localStorage`/`IndexedDB`, so a user doesn't lose their imported plan on refresh. The Garmin session token is the one thing that never touches the browser: it stays server-side, held by the FastAPI process.
+- Use TanStack Query for all server-state (API calls to the FastAPI backend: diff preview, write-job polling, calendar listing) and a persisted client-state store (see design.md for the chosen library) for on-device-only state that never touches the network.
+
+## Capabilities
+
+### New Capabilities
+- `passo-training-api`: A FastAPI HTTP layer exposing the existing `training_plan/service.py` operations (Garmin login/verify, plan diff preview, applying a plan sync as a pollable async job, listing scheduled workouts, previewing/applying deletions) as JSON endpoints for a web frontend. Owns the Garmin session token server-side; never returns Garmin credentials to the client.
+- `passo-body-insights-api`: A read-only Garmin body/wellness data capability (morning readiness, sleep phases, HRV trend, resting heart rate, battery/stress, weekly training load, acute:chronic ratio, VO₂max) needed for screens 11–13. This does not exist in `training_plan/garmin_sync.py` today (which only covers workout diff/sync/list/delete) — it is new, additive logic built on the `garminconnect` library's existing wellness endpoints, exposed through `passo-training-api`.
+- `passo-web-app`: The Next.js implementation of the Passo design — all 15 screens (with "01 Accesso" replaced by a single "Inizia" entry button and no account/OAuth), the full motion system from `MOTION.md`, on-device-persisted app state (plan/diff/prefs/write-job history) with no server-side user data store, and TanStack Query-driven data fetching against `passo-training-api`.
+
+### Modified Capabilities
+- None. `openspec/specs/` has no existing specs yet (the prior `web-platform-migration` and `import-garmin-calendar-events` changes have not been archived into `openspec/specs/`). The existing behavior of `training_plan/service.py`, `garmin_sync.py`, `parser.py`, and `models.py` is unchanged — this change only adds new, additive functions (for body/wellness data) alongside the existing ones, plus a new HTTP adapter layer that calls all of it.
+
+## Impact
+
+- **New code**: `training_plan/api.py` (or a small `training_plan/api/` package) — FastAPI app, request/response schemas, and an in-process job store for the async write operation. New dependency: `fastapi` + an ASGI server (`uvicorn`).
+- **Additive changes to `training_plan/garmin_sync.py`/`service.py`**: new read-only methods/functions for body/wellness data (screens 11–13), sourced from the `garminconnect` library's existing endpoints (e.g. user summary, sleep, HRV, training status/load, max metrics for VO₂max). Existing functions and signatures are untouched; this is new surface, not a rewrite.
+- **New project**: a Next.js application (new top-level directory, e.g. `web/`) with its own `package.json`, using TanStack Query, a persisted client-state library (chosen in design.md), and the design assets copied in from `/Users/samuevalente/Downloads/design_handoff_passo/illustrazioni/`.
+- **Backend/frontend boundary**: the FastAPI process must run for the Next.js app to do anything beyond viewing already-persisted local state; this is a two-process local setup (documented in design.md and tasks.md), not a single deployable unit, at least for this change.
+- **Security**: Garmin credentials are submitted once (screen 02) over HTTPS/local network to the FastAPI backend and are never persisted in the browser; the backend's existing token-store/cooldown behavior (`training_plan/garmin_sync.py`) is reused unchanged.
+- **No auth/account system introduced**: no login database, no session cookies tied to a user identity, no multi-tenancy — this is explicitly a single-user, single-device local tool wrapped in a web UI, consistent with the CLI it replaces.

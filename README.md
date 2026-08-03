@@ -240,12 +240,56 @@ pip install -e ".[dev]"
 pytest
 ```
 
+## Web API (FastAPI)
+
+A thin HTTP layer wraps `service.py` (plus a new read-only body/wellness capability) for the Next.js web app in `web/` — see `openspec/changes/passo-nextjs-web-app/` for the full design. Run it locally:
+
+```bash
+pip install -e ".[dev]"
+uvicorn training_plan.api:app --reload
+```
+
+By default it listens on `http://127.0.0.1:8000` and allows CORS from `http://localhost:3000` (the Next.js dev server); override the allowed frontend origin with `PASSO_WEB_ORIGIN` (comma-separated for multiple origins). Interactive API docs are served at `/docs`.
+
+Endpoints, grouped by capability:
+
+- **Plan** — `POST /plan/parse` (file or pasted YAML), `POST /plan/diff` (preview vs. the calendar, writes nothing), `POST /plan/sync` (starts a background write job, returns a `job_id`), `GET /plan/sync/{job_id}` (poll progress), `POST /plan/sync/{job_id}/cancel`.
+- **Garmin** — `POST /garmin/connect`, `GET /garmin/status` (connected / cooldown + remaining seconds), `GET /garmin/workouts`, `POST /garmin/deletions/preview`, `POST /garmin/deletions/apply`.
+- **Body** (read-only) — `GET /body/today` (readiness/sleep/HRV/RHR/battery/stress), `GET /body/load` (weekly training load, acute:chronic ratio, VO₂max), `POST /body/conflict` (compares today's snapshot against a submitted next-planned-session and returns concrete resolution options).
+
+The Garmin write job in `/plan/sync` runs one session at a time on a background thread and keeps going even if the client disconnects — matching the CLI's existing sequential `sync_all`/`replace_all` behavior, just with per-item progress exposed for polling. Job state is in-memory only (lost on process restart); this is a local, single-user tool, not a production job queue.
+
+Body/wellness data (`training_plan/body_insights.py`) reads readiness/sleep/HRV/load/VO₂max via the `garminconnect` client's existing wellness endpoints. Those endpoints are undocumented and their exact response shapes haven't been verified against a live account yet (every field extraction is defensive and degrades to "unavailable" rather than raising) — treat the numbers as provisional until checked against real data, the same caveat `models.py` already carries for Garmin's workout condition-type IDs.
+
+No accounts, no server-side database: the API holds only the Garmin session token (via the existing tokenstore/cooldown files below) and in-memory job state. Everything else — the imported plan, preferences, write-job history — lives in the browser.
+
+## Web app (Next.js)
+
+The `web/` directory is a separate Next.js (App Router, TypeScript) project implementing the 15-screen "Passo" design — see `openspec/changes/passo-nextjs-web-app/` for the proposal/design/specs this was built from. It has no account system: a single "Inizia" button replaces the design's Google sign-in, and app state (imported plan, preferences, write-job history) lives entirely in the browser (`localStorage` via a persisted Zustand store) — there is no server-side user database. TanStack Query handles every call to the FastAPI backend above (diff preview, the sync-job poll, body/wellness reads); Framer Motion drives screen-to-screen transitions; the rest of the motion system (entrance cascades, the brand mark, button fills, pulse rings, progress rings) is plain CSS, with every keyframe ported verbatim from the design bundle's reference HTML.
+
+Run it locally (two processes — the backend above must be running for anything beyond viewing already-persisted local state to work):
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Serves on `http://localhost:3000` and expects the API at `http://127.0.0.1:8000` by default; override with a `web/.env.local` containing `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000` (or another host) if needed.
+
+```bash
+npm run build   # production build + type-check
+npm run lint    # ESLint
+```
+
+**Known gaps, called out rather than silently left out** (see `openspec/changes/passo-nextjs-web-app/tasks.md` for the full list): no offline banner, no custom pull-to-refresh gesture (native browser overscroll only), Garmin body/wellness field shapes are not yet verified against a live account (`training_plan/body_insights.py`'s module docstring explains why and how this degrades safely), and the Settings screen's Garmin card doesn't yet support disconnecting or showing last-sync time (no backend endpoint for either exists yet). The build and lint are clean and the backend has test coverage, but the frontend has not been click-tested end-to-end in a real browser in an automated way — do that before treating this as production-ready.
+
 ## Architecture
 
-The project is split into a presentation-independent core and a thin CLI on top of it, so the core can be called directly by something other than the CLI later:
+The project is split into a presentation-independent core, a thin CLI, and a thin HTTP API, so the core can be called directly by anything:
 
 - **`training_plan/models.py`, `parser.py`, `garmin_sync.py`** — pure logic: data models, YAML parsing/validation, and the Garmin Connect integration (auth, rate-limit guards, workout payload construction, diff/list/delete). No printing, no prompting.
-- **`training_plan/service.py`** — the orchestration seam: one function per operation (`preview_plan_sync`/`apply_plan_sync`, `list_workouts`, `preview_deletion`/`apply_deletion`, `verify_login`), each taking plain arguments and returning plain dataclasses (or raising `GarminSyncError`/`TrainingPlanValidationError`). Nothing here prints, prompts, or calls `sys.exit` — **this is the module a future consumer should import and call directly**, whether that's a web backend, a script, or something else. Write operations are split into a `preview_*` step (computes what would happen, writes nothing) and an `apply_*` step (performs the write), so a caller can show a preview and decide whether to proceed before anything touches Garmin.
-- **`training_plan/cli.py`** — argument parsing and presentation only: it calls `service.py` and turns the result into printed output, interactive confirmation prompts, and process exit codes. If you're building something that isn't a terminal UI, this is the one module you don't need.
-
-**What this project is not, yet:** there is no web framework, no hosting target, no database, and no authentication layer here, and none of those are decided. This refactor only prepares the ground (a clean, presentation-independent service layer, proper packaging) so that whatever gets built around it later doesn't have to fight the CLI's argparse/print/input plumbing to reuse the Garmin integration.
+- **`training_plan/body_insights.py`** — read-only Garmin wellness data (readiness, sleep, HRV, training load, VO₂max) and the derived body/plan conflict assessment. Same no-printing, no-prompting discipline as `garmin_sync.py`.
+- **`training_plan/service.py`** — the orchestration seam: one function per operation (`preview_plan_sync`/`apply_plan_sync`, `list_workouts`, `preview_deletion`/`apply_deletion`, `verify_login`), each taking plain arguments and returning plain dataclasses (or raising `GarminSyncError`/`TrainingPlanValidationError`). Nothing here prints, prompts, or calls `sys.exit`. Write operations are split into a `preview_*` step (computes what would happen, writes nothing) and an `apply_*` step (performs the write), so a caller can show a preview and decide whether to proceed before anything touches Garmin.
+- **`training_plan/cli.py`** — argument parsing and presentation only: it calls `service.py` and turns the result into printed output, interactive confirmation prompts, and process exit codes.
+- **`training_plan/api/`** — the FastAPI adapter: request/response schemas (`schemas.py`), the async write-job store (`jobs.py`), and route handlers (`routes_plan.py`, `routes_garmin.py`, `routes_body.py`) that call `service.py`/`garmin_sync.py`/`body_insights.py` on a thread pool and shape the result to JSON. Like `cli.py`, it adds no business logic of its own.

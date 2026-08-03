@@ -246,6 +246,28 @@ class GarminSync:
         self._clear_state()
         self._client = client
 
+    def connection_status(self) -> dict:
+        """Report cached-session/cooldown state without making a network call.
+
+        Additive, read-only helper for a status endpoint: lets a caller show whether
+        Garmin is connected (or why not, and for how much longer) without attempting,
+        and risking, a real login.
+        """
+        if self._has_cached_tokens():
+            return {"connected": True, "cooldown_active": False, "retry_after_seconds": 0, "reason": None}
+
+        remaining = self._cooldown_remaining()
+        if remaining:
+            reason = self._read_state().get("reason", "auth_failed")
+            return {
+                "connected": False,
+                "cooldown_active": True,
+                "retry_after_seconds": remaining,
+                "reason": reason,
+            }
+
+        return {"connected": False, "cooldown_active": False, "retry_after_seconds": 0, "reason": None}
+
     @property
     def client(self) -> Garmin:
         if self._client is None:

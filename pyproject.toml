@@ -11,12 +11,16 @@ dependencies = [
     "garminconnect==0.3.2",
     "PyYAML==6.0.3",
     "python-dotenv==1.2.2",
+    "fastapi==0.121.2",
+    "uvicorn[standard]==0.38.0",
+    "python-multipart==0.0.20",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest==9.1.1",
     "pytest-mock==3.15.1",
+    "httpx==0.28.1",
 ]
 
 [project.scripts]

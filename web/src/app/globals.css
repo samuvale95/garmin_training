@@ -1,0 +1,460 @@
+/* Design tokens -- see openspec/changes/passo-nextjs-web-app/ and the design handoff
+   README for the source of truth. Values are copied verbatim, not approximated. */
+:root {
+  --crema: #f6eeda;
+  --crema-card: #fffbf0;
+  --sabbia: #efe7d2;
+  --sabbia-bordo: #e4dac0;
+  --sabbia-scura: #e8dcbe;
+  --sabbia-chip: #efe4c8;
+  --inchiostro: #1c1a16;
+  --inchiostro-70: #6e6553;
+  --inchiostro-50: #8a8272;
+  --inchiostro-35: #a79e88;
+  --inchiostro-su-scuro: #a19a88;
+  --corallo: #f79470;
+  --corallo-testo: #3a1a0c;
+  --corallo-chiaro: #f2b69b;
+  --rosa-avviso: #fdede4;
+  --rosso-avviso: #b34a20;
+  --rosso-forte: #8a3313;
+  --rosso-testo: #5a2410;
+  --rosa-testo-50: #a87c64;
+  --verde: #c6e3a3;
+  --verde-testo: #1f3310;
+  --verde-chiaro: #e4f1d2;
+  --verde-tratto: #8fbf6a;
+  --verde-tratto-scuro: #4c7a2a;
+  --azzurro: #a9c6ee;
+  --azzurro-testo: #10254a;
+  --giallo: #f7dc86;
+  --giallo-testo: #3b3208;
+  --lilla: #d6c7ee;
+  --lilla-testo: #2c1d4a;
+  --neutro-barra: #e0d5b8;
+
+  /* the one curve, per MOTION.md */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --radius-pill: 100px;
+  --radius-card-lg: 27px;
+  --radius-card: 22px;
+  --radius-row: 18px;
+  --radius-chip: 14px;
+
+  --frame-max-width: 430px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  background: var(--crema);
+  color: var(--inchiostro);
+  font-family: var(--font-outfit), Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--rosso-avviso);
+}
+a:hover {
+  color: var(--rosso-forte);
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Mobile-first centered shell: full-bleed on narrow viewports, a phone-width column
+   on wider ones (design.md decision #6). */
+.app-shell {
+  max-width: var(--frame-max-width);
+  margin: 0 auto;
+  min-height: 100dvh;
+  position: relative;
+  background: var(--crema);
+  overflow-x: hidden;
+}
+
+.font-serif-italic {
+  font-family: var(--font-instrument-serif), serif;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.font-mono {
+  font-family: var(--font-dm-mono), monospace;
+}
+
+/* ---- keyframes, ported verbatim from the reference HTML's <style> block ------------- */
+
+@keyframes mkStretch {
+  0%,
+  100% {
+    transform: scaleY(1) translateY(0);
+  }
+  45% {
+    transform: scaleY(0.52) translateY(6px);
+  }
+}
+@keyframes mkWordIn {
+  0% {
+    transform: translateY(100%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+@keyframes mkSlideUp {
+  0% {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes mkSweep {
+  0% {
+    transform: translateX(-105%);
+  }
+  55%,
+  100% {
+    transform: translateX(0);
+  }
+}
+@keyframes mkBarGrow {
+  0% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+@keyframes mkBarGrowY {
+  0% {
+    transform: scaleY(0);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+@keyframes mkTrace {
+  0% {
+    stroke-dashoffset: var(--from, 521);
+  }
+  100% {
+    stroke-dashoffset: var(--to, 140);
+  }
+}
+@keyframes mkPulseRing {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.55;
+  }
+  80%,
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+@keyframes mkNudge {
+  0%,
+  88%,
+  100% {
+    transform: translateX(0);
+  }
+  92% {
+    transform: translateX(4px);
+  }
+  96% {
+    transform: translateX(0);
+  }
+}
+@keyframes mkChev {
+  0%,
+  86%,
+  100% {
+    transform: translateX(0);
+  }
+  92% {
+    transform: translateX(3px);
+  }
+}
+@keyframes mkLand {
+  0% {
+    transform: translateY(26px) scaleY(1.1) scaleX(0.94);
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  72% {
+    transform: translateY(0) scaleY(0.9) scaleX(1.06);
+  }
+  100% {
+    transform: translateY(0) scaleY(1) scaleX(1);
+    opacity: 1;
+  }
+}
+@keyframes mkCount {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+@keyframes mkBreath {
+  0%,
+  100% {
+    transform: scaleY(1) scaleX(1);
+  }
+  50% {
+    transform: scaleY(0.988) scaleX(1.006);
+  }
+}
+@keyframes mkSheen {
+  0%,
+  72% {
+    transform: translateX(-140%) skewX(-12deg);
+  }
+  100% {
+    transform: translateX(240%) skewX(-12deg);
+  }
+}
+@keyframes mkDotPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.62);
+    opacity: 0.55;
+  }
+}
+@keyframes mkTick {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.2;
+  }
+}
+@keyframes mkTipGrow {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.86);
+  }
+}
+@keyframes mkCreep {
+  0% {
+    width: 56%;
+  }
+  100% {
+    width: 59.5%;
+  }
+}
+@keyframes mkCaret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  95% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes mkSpinSlow {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+@keyframes mkArrowUp {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(-7px);
+    opacity: 0;
+  }
+  71% {
+    transform: translateY(5px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes mkBarSettle {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.94);
+  }
+}
+
+/* ---- utility animation classes -------------------------------------------------------- */
+
+.anim-word-in {
+  animation: mkWordIn 0.7s var(--ease) both;
+}
+.anim-slide-up {
+  animation: mkSlideUp 0.7s var(--ease) both;
+}
+.anim-slide-up-row {
+  animation: mkSlideUp 0.6s var(--ease) both;
+}
+.anim-bar-grow {
+  animation: mkBarGrow 0.9s var(--ease) both;
+}
+.anim-bar-grow-y {
+  animation: mkBarGrowY 0.9s var(--ease) both;
+}
+.anim-land {
+  animation: mkLand 1s var(--ease) both;
+}
+.anim-breath {
+  animation: mkBreath 5s ease-in-out infinite;
+}
+.anim-sweep-once {
+  animation: mkSweep 1.3s var(--ease) both;
+}
+.anim-sweep-loop {
+  animation: mkSweep 1.4s var(--ease) infinite;
+}
+.anim-sheen {
+  animation: mkSheen 5.6s var(--ease) infinite;
+}
+.anim-nudge {
+  animation: mkNudge 3.6s var(--ease) infinite;
+}
+.anim-chev {
+  animation: mkChev 3.6s var(--ease) infinite;
+}
+.anim-pulse-ring {
+  animation: mkPulseRing 2.2s var(--ease) infinite;
+}
+.anim-dot-pulse {
+  animation: mkDotPulse 2.8s var(--ease) infinite;
+}
+.anim-count {
+  animation: mkCount 3s ease-in-out infinite;
+}
+.anim-tick {
+  animation: mkTick 1s steps(1) infinite;
+}
+.anim-caret {
+  animation: mkCaret 1.1s steps(1) infinite;
+}
+.anim-spin-slow {
+  animation: mkSpinSlow 9s linear infinite;
+}
+.anim-arrow-up {
+  animation: mkArrowUp 3.6s var(--ease) infinite;
+}
+.anim-creep {
+  animation: mkCreep 9s linear infinite;
+}
+.anim-tip-grow {
+  animation: mkTipGrow 3.2s ease-in-out infinite;
+}
+.anim-bar-settle {
+  animation: mkBarSettle 5.4s ease-in-out infinite;
+}
+.anim-stretch {
+  animation: mkStretch 1.5s ease-in-out infinite;
+}
+
+.word-in-clip {
+  overflow: hidden;
+}
+
+/* ---- reduced motion: system preference is the default signal, the in-app "Meno
+   movimento" toggle is applied via [data-motion="reduced"] on the shell (design.md
+   decision #5 / MOTION.md §9). Both collapse to the same behavior. */
+@media (prefers-reduced-motion: reduce) {
+  .anim-word-in,
+  .anim-slide-up,
+  .anim-slide-up-row,
+  .anim-bar-grow,
+  .anim-bar-grow-y,
+  .anim-land,
+  .anim-breath,
+  .anim-sweep-once,
+  .anim-sheen,
+  .anim-nudge,
+  .anim-chev,
+  .anim-stretch {
+    animation: none !important;
+  }
+}
+
+.app-shell[data-motion='reduced'] .anim-word-in,
+.app-shell[data-motion='reduced'] .anim-slide-up,
+.app-shell[data-motion='reduced'] .anim-slide-up-row,
+.app-shell[data-motion='reduced'] .anim-bar-grow,
+.app-shell[data-motion='reduced'] .anim-bar-grow-y,
+.app-shell[data-motion='reduced'] .anim-land,
+.app-shell[data-motion='reduced'] .anim-breath,
+.app-shell[data-motion='reduced'] .anim-sweep-once,
+.app-shell[data-motion='reduced'] .anim-sheen,
+.app-shell[data-motion='reduced'] .anim-nudge,
+.app-shell[data-motion='reduced'] .anim-chev,
+.app-shell[data-motion='reduced'] .anim-stretch {
+  animation: none !important;
+}
+
+/* still screens (04, 05, 14): zero animation, brand mark frozen -- enforced by not
+   applying any .anim-* entrance classes in those routes, not just by this toggle.
+   Not scoped to .app-shell specifically: data-still is set on the route-transition
+   wrapper nested inside it, so this matches any ancestor carrying the flag. */
+[data-still='true'] .anim-word-in,
+[data-still='true'] .anim-slide-up,
+[data-still='true'] .anim-slide-up-row,
+[data-still='true'] .anim-bar-grow,
+[data-still='true'] .anim-bar-grow-y,
+[data-still='true'] .anim-land,
+[data-still='true'] .anim-breath,
+[data-still='true'] .anim-sweep-once,
+[data-still='true'] .anim-sheen,
+[data-still='true'] .anim-nudge,
+[data-still='true'] .anim-chev,
+[data-still='true'] .anim-stretch {
+  animation: none !important;
+}
+
+/* touch targets: MOTION.md requires >=44x44px hit areas even on visually smaller marks */
+.tap-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
