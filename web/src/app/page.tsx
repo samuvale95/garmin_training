@@ -7,19 +7,26 @@ import { Illustration } from "@/components/Illustration";
 import { PrimaryButton, WordIn, SlideUp } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { usePassoStore } from "@/lib/store";
+import { useGarminStatus } from "@/lib/queries";
 
 export default function EntryPage() {
   const router = useRouter();
   const plan = usePassoStore((s) => s.plan);
+  const status = useGarminStatus();
+  const garminConnected = status.data?.connected ?? false;
   const animate = useMountOnce("entry");
 
-  // A device that already has a plan skips the welcome screen entirely -- there is
-  // no account to "log into," so there is nothing to gate a returning visit on.
+  // A device that already has a plan, or an already-connected Garmin session (e.g.
+  // opening the app on a new device/browser while the server-side session is still
+  // valid), skips the welcome screen entirely -- there is no account to "log into,"
+  // so there is nothing to gate a returning visit on.
   useEffect(() => {
-    if (plan) router.replace("/today");
-  }, [plan, router]);
+    if (plan || garminConnected) router.replace("/today");
+  }, [plan, garminConnected, router]);
 
-  if (plan) return null;
+  // Wait for the first status check before deciding to show "Inizia" -- otherwise an
+  // already-connected user briefly sees the welcome screen while it loads.
+  if (plan || garminConnected || status.isLoading) return null;
 
   return (
     <div style={{ padding: "30px 22px 0", display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
@@ -54,7 +61,7 @@ export default function EntryPage() {
             overflow: "hidden",
           }}
         >
-          <Illustration name="corsa" width={196} height={212} right={12} bottom={0} active={animate} delayMs={900} />
+          <Illustration name="corsa" width={196} height={212} right={12} bottom={0} active={animate} delayMs={900} priority />
         </div>
       </SlideUp>
 

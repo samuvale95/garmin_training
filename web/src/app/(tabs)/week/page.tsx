@@ -6,26 +6,32 @@ import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { useRequirePlan } from "@/lib/guards";
-import { classifySession, sessionDistanceKm, toDateKey, weekBounds } from "@/lib/sessionVisuals";
+import { useCalendarAccess } from "@/lib/guards";
+import { useWorkouts } from "@/lib/queries";
+import { classifySession, sessionDistanceKm, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
 
 export default function WeekPage() {
-  const plan = useRequirePlan();
+  const access = useCalendarAccess();
   const animate = useMountOnce("week");
   const [offset, setOffset] = useState(0);
-
-  if (!plan) return null;
+  const liveMode = !access.plan && access.garminConnected;
 
   const reference = new Date();
   reference.setDate(reference.getDate() + offset * 7);
   const { start, end } = weekBounds(reference);
+  const workoutsQuery = useWorkouts(toDateKey(start), toDateKey(end), liveMode);
+
+  if (!access.ready || (!access.plan && !access.garminConnected)) return null;
+
+  const sessions: DisplaySession[] = access.plan ? access.plan.sessions : workoutsQuery.data?.workouts ?? [];
 
   const days = Array.from({ length: 7 }).map((_, i) => {
     const date = new Date(start);
     date.setDate(start.getDate() + i);
     const key = toDateKey(date);
-    const index = plan.sessions.findIndex((s) => s.date === key);
-    return { date, key, session: index >= 0 ? plan.sessions[index] : null, index };
+    const index = access.plan ? access.plan.sessions.findIndex((s) => s.date === key) : -1;
+    const session = index >= 0 ? sessions[index] : sessions.find((s) => s.date === key) ?? null;
+    return { date, key, session, index };
   });
 
   const weekSessions = days.map((d) => d.session).filter((s): s is NonNullable<typeof s> => !!s);
@@ -52,8 +58,19 @@ export default function WeekPage() {
         <BarGrow value={completedFraction} height={4} active={animate} />
       </div>
       <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", marginTop: 8 }}>
-        {weekKm.toFixed(0)} km · {weekSessions.length} sedute
+        {liveMode ? `${weekSessions.length} sedute (calendario Garmin)` : `${weekKm.toFixed(0)} km · ${weekSessions.length} sedute`}
       </p>
+
+      {liveMode && (
+        <Link href="/import" style={{ textDecoration: "none", color: "inherit" }}>
+          <SlideUp active={animate} delayMs={140} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
+            <p className="font-serif-italic" style={{ fontSize: 14, margin: 0, flex: 1 }}>
+              Importa un piano per vedere step e passi di ogni seduta.
+            </p>
+            <span className="anim-chev" aria-hidden="true">→</span>
+          </SlideUp>
+        </Link>
+      )}
 
       <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
         {days.map((day, i) => {
@@ -92,7 +109,7 @@ export default function WeekPage() {
                 {day.date.toLocaleDateString("it-IT", { weekday: "short" })}
               </span>
               <div style={{ flex: 1 }}>
-                {day.session ? <Link href={`/session/${day.index}`} style={{ textDecoration: "none", color: "inherit" }}>{card}</Link> : card}
+                {day.session && day.index >= 0 ? <Link href={`/session/${day.index}`} style={{ textDecoration: "none", color: "inherit" }}>{card}</Link> : card}
               </div>
             </div>
           );

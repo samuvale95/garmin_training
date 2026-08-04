@@ -141,9 +141,46 @@ def test_missing_credentials_never_reaches_garmin(monkeypatch, tmp_path):
     monkeypatch.delenv("GARMIN_EMAIL", raising=False)
     monkeypatch.delenv("GARMIN_PASSWORD", raising=False)
 
-    sync = GarminSync(email=None, password=None, state_path=str(tmp_path / "state.json"))
+    # No cached tokens either (isolated tokenstore path), so credentials are required.
+    sync = GarminSync(
+        email=None,
+        password=None,
+        tokenstore=str(tmp_path / "tokens"),
+        state_path=str(tmp_path / "state.json"),
+    )
     with pytest.raises(GarminSyncError, match="Missing Garmin credentials"):
         sync.login()
+
+
+def test_cached_tokens_allow_login_without_credentials(monkeypatch, tmp_path):
+    """A cached session (e.g. from an earlier web /garmin/connect call, whose
+    email/password this process never sees again) must resume via tokenstore alone --
+    GET /garmin/workouts and friends construct GarminSync() with no credentials and
+    rely on exactly this."""
+    tokenstore = tmp_path / "tokens"
+    tokenstore.mkdir()
+    (tokenstore / "oauth1_token.json").write_text("{}")
+
+    class FakeGarmin:
+        def __init__(self, email, password, prompt_mfa=None):
+            assert email is None
+            assert password is None
+
+        def login(self, tokenstore=None):
+            self.tokenstore_used = tokenstore
+
+    monkeypatch.setattr("training_plan.garmin_sync.Garmin", FakeGarmin)
+    monkeypatch.delenv("GARMIN_EMAIL", raising=False)
+    monkeypatch.delenv("GARMIN_PASSWORD", raising=False)
+
+    sync = GarminSync(
+        email=None,
+        password=None,
+        tokenstore=str(tokenstore),
+        state_path=str(tmp_path / "state.json"),
+    )
+    sync.login()
+    assert isinstance(sync.client, FakeGarmin)
 
 
 def test_rate_limit_raises_dedicated_error_and_sets_cooldown(monkeypatch, tmp_path):

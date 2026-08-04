@@ -20,7 +20,7 @@ export default function ConnectGarminPage() {
     setError(null);
     try {
       await connect.mutateAsync({ email, password });
-      router.push("/import");
+      router.push("/today");
     } catch (err) {
       if (err instanceof ApiError && err.category === "rate_limited") {
         router.push("/rate-limit");

@@ -198,7 +198,14 @@ class GarminSync:
     def login(self) -> None:
         # Everything below the network call is checked first, so a run that cannot
         # possibly succeed costs Garmin zero login requests.
-        if not self._email or not self._password:
+        has_cached_tokens = self._has_cached_tokens()
+
+        # Credentials are only required to establish a *new* session. A cached one
+        # (e.g. from an earlier web-form /garmin/connect call, whose email/password
+        # this process never sees again) must resume via tokenstore alone -- callers
+        # like GET /garmin/workouts intentionally construct GarminSync() with no
+        # credentials and rely on exactly this.
+        if not has_cached_tokens and (not self._email or not self._password):
             raise GarminSyncError(
                 "Missing Garmin credentials: set GARMIN_EMAIL and GARMIN_PASSWORD "
                 "in your environment or in a local .env file."
@@ -206,7 +213,7 @@ class GarminSync:
 
         # A cached session usually needs no login request at all, so the cooldown only
         # guards the case where we would actually hit Garmin's SSO.
-        if not self._has_cached_tokens():
+        if not has_cached_tokens:
             remaining = self._cooldown_remaining()
             if remaining:
                 reason = self._read_state().get("reason", "auth_failed")

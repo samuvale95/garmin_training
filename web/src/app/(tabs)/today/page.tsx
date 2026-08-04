@@ -5,26 +5,30 @@ import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { BarGrow, PulseRing, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { useRequirePlan } from "@/lib/guards";
-import { usePlanDiff, useBodyToday } from "@/lib/queries";
-import { classifySession, isoWeekNumber, sessionDistanceKm, toDateKey, weekBounds } from "@/lib/sessionVisuals";
+import { useCalendarAccess } from "@/lib/guards";
+import { usePlanDiff, useBodyToday, useWorkouts } from "@/lib/queries";
+import { classifySession, isoWeekNumber, sessionDistanceKm, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
 
 export default function TodayPage() {
-  const plan = useRequirePlan();
+  const access = useCalendarAccess();
   const animate = useMountOnce("today");
-  const diffQuery = usePlanDiff(plan?.sessions ?? null);
+  const today = new Date();
+  const { start, end } = weekBounds(today);
+  const liveMode = !access.plan && access.garminConnected;
+  const workoutsQuery = useWorkouts(toDateKey(start), toDateKey(end), liveMode);
+  const diffQuery = usePlanDiff(access.plan?.sessions ?? null);
   const bodyQuery = useBodyToday();
 
-  if (!plan) return null;
+  if (!access.ready || (!access.plan && !access.garminConnected)) return null;
 
-  const today = new Date();
+  const sessions: DisplaySession[] = access.plan ? access.plan.sessions : workoutsQuery.data?.workouts ?? [];
+
   const todayKey = toDateKey(today);
-  const todaySession = plan.sessions.find((s) => s.date === todayKey) ?? null;
-  const { start, end } = weekBounds(today);
-  const weekSessions = plan.sessions.filter((s) => s.date >= toDateKey(start) && s.date <= toDateKey(end));
+  const todaySession = sessions.find((s) => s.date === todayKey) ?? null;
+  const weekSessions = sessions.filter((s) => s.date >= toDateKey(start) && s.date <= toDateKey(end));
   const weekKm = weekSessions.reduce((sum, s) => sum + sessionDistanceKm(s), 0);
 
-  const restOfWeek = plan.sessions
+  const restOfWeek = sessions
     .filter((s) => s.date > todayKey && s.date <= toDateKey(end))
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 5);
@@ -67,7 +71,7 @@ export default function TodayPage() {
       </SlideUp>
 
       <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
-        <MetricCard label="Volume" value={`${weekKm.toFixed(0)} km`} background="var(--crema-card)" delay={340} active={animate} fraction={Math.min(1, weekKm / 60)} barColor="var(--corallo)" />
+        <MetricCard label="Volume" value={liveMode ? "—" : `${weekKm.toFixed(0)} km`} background="var(--crema-card)" delay={340} active={animate} fraction={liveMode ? 0 : Math.min(1, weekKm / 60)} barColor="var(--corallo)" />
         <MetricCard label="Prontezza" value={readiness != null ? String(readiness) : "—"} background="var(--verde)" delay={420} active={animate} fraction={readiness != null ? readiness / 100 : 0} barColor="var(--verde-tratto-scuro)" />
         <MetricCard
           label="Sonno"
@@ -80,7 +84,16 @@ export default function TodayPage() {
         />
       </div>
 
-      {pendingChanges > 0 ? (
+      {liveMode ? (
+        <Link href="/import" style={{ textDecoration: "none", color: "inherit" }}>
+          <SlideUp active={animate} delayMs={580} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
+            <p className="font-serif-italic" style={{ fontSize: 15, margin: 0, flex: 1 }}>
+              Questo è il calendario Garmin. Importa un piano per i dettagli di ogni seduta.
+            </p>
+            <span className="anim-chev" aria-hidden="true">→</span>
+          </SlideUp>
+        </Link>
+      ) : pendingChanges > 0 ? (
         <Link href="/diff" style={{ textDecoration: "none", color: "inherit" }}>
           <SlideUp active={animate} delayMs={580} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
             <PulseRing size={8} />
@@ -102,7 +115,7 @@ export default function TodayPage() {
           const visual = classifySession(session);
           const km = sessionDistanceKm(session);
           return (
-            <SlideUp key={session.date} active={animate} delayMs={720 + i * 80} row style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px" }}>
+            <SlideUp key={`${session.date}-${i}`} active={animate} delayMs={720 + i * 80} row style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px" }}>
               <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", width: 34 }}>
                 {new Date(session.date).toLocaleDateString("it-IT", { weekday: "short" })}
               </span>

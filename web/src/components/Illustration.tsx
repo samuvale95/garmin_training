@@ -25,6 +25,8 @@ interface IllustrationProps {
   delayMs?: number;
   right?: number;
   bottom?: number;
+  /** True for the above-the-fold hero illustration on a screen's first paint (e.g. the entry screen), so Next avoids the "missing priority on the LCP image" warning. */
+  priority?: boolean;
 }
 
 // mkLand (translate/scale/opacity) and mkBreath (scale) are kept on two nested
@@ -40,6 +42,7 @@ export function Illustration({
   delayMs = 900,
   right = 0,
   bottom = 0,
+  priority = false,
 }: IllustrationProps) {
   const { reduced } = useMotionEnabled();
   const animate = active && !reduced;
@@ -62,7 +65,14 @@ export function Illustration({
         className={animate && breathe ? "anim-breath" : undefined}
         style={{ width: "100%", height: "100%", position: "relative" }}
       >
-        <Image src={SOURCES[name]} alt="" fill sizes={`${width}px`} style={{ objectFit: "contain", objectPosition: "bottom" }} />
+        <Image
+          src={SOURCES[name]}
+          alt=""
+          fill
+          sizes={`${width}px`}
+          priority={priority}
+          style={{ objectFit: "contain", objectPosition: "bottom" }}
+        />
       </div>
     </div>
   );
