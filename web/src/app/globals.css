@@ -81,7 +81,16 @@ button {
   min-height: 100dvh;
   position: relative;
   background: var(--crema);
-  overflow-x: hidden;
+  /* `clip`, not `hidden`: the CSS overflow spec forces the *other* axis's computed
+     value from `visible` to `auto` whenever one axis is non-visible and non-clip --
+     even when that other axis is set explicitly, not just defaulted. `overflow-x:
+     hidden` therefore silently turned .app-shell into a scroll container that never
+     actually scrolls internally, which breaks `position: sticky` for every
+     descendant (TabBar, PageHeader-adjacent sticky headers) since sticky then
+     anchors to this element's static scrollTop instead of the real window scroll.
+     `clip` is explicitly excluded from that coercion rule, so it clips horizontal
+     overflow without the side effect. */
+  overflow-x: clip;
 }
 
 .font-serif-italic {
