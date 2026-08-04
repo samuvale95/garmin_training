@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
+import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton, Skeleton } from "@/components/motion/primitives";
 import { useRequirePlan } from "@/lib/guards";
 import { usePlanDiff, useStartSync } from "@/lib/queries";
@@ -36,7 +37,10 @@ export default function DiffPage() {
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
       <div style={{ padding: "24px 22px 16px", background: "var(--crema)", position: "sticky", top: 0, zIndex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <BrandMark height={22} forceStatic stillZone />
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <PageHeader backHref="/import" />
+            <BrandMark height={22} forceStatic stillZone />
+          </div>
           <span style={{ fontSize: 11, color: "var(--inchiostro-35)", fontWeight: 500 }}>fermo · stai decidendo</span>
         </div>
         <h1 style={{ font: "600 30px/1.04 var(--font-outfit)", letterSpacing: "-.035em", margin: "16px 0 6px" }}>Differenze</h1>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton, ProgressRing, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useRequirePlan } from "@/lib/guards";
@@ -21,8 +22,8 @@ export default function SessionDetailPage() {
   if (!session) {
     return (
       <div style={{ padding: 22 }}>
+        <PageHeader backHref="/week" />
         <p>Sessione non trovata.</p>
-        <button onClick={() => router.back()}>Indietro</button>
       </div>
     );
   }
@@ -39,6 +40,9 @@ export default function SessionDetailPage() {
 
   return (
     <div style={{ minHeight: "100dvh", background: "var(--inchiostro)", color: "var(--crema)", padding: "24px 22px 32px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ alignSelf: "flex-start" }}>
+        <PageHeader backHref="/week" color="var(--crema)" />
+      </div>
       <ProgressRing value={Math.min(1, distanceKm / 20)} size={180} strokeWidth={12} trackColor="rgba(246,238,218,.13)">
         <div style={{ textAlign: "center" }}>
           <p className="font-mono" style={{ fontSize: 28, fontWeight: 500, margin: 0 }}>{distanceKm.toFixed(1)}</p>

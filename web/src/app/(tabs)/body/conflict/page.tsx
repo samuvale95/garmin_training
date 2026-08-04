@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
+import { PageHeader } from "@/components/PageHeader";
 import { useMountOnce } from "@/lib/motion";
 import { useBodyConflict, useBodyToday } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
@@ -46,7 +47,10 @@ export default function ConflictPage() {
   if (!nextSession || !conflictQuery.data?.has_conflict) {
     return (
       <div style={{ padding: "24px 22px" }}>
-        <BrandMark height={22} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <PageHeader backHref="/body" />
+          <BrandMark height={22} />
+        </div>
         <p style={{ marginTop: 20 }}>Nessun conflitto tra il corpo e il piano di domani.</p>
       </div>
     );
@@ -56,7 +60,8 @@ export default function ConflictPage() {
 
   return (
     <div style={{ padding: "24px 22px 32px" }}>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--rosa-avviso)", color: "var(--rosso-testo)", borderRadius: "var(--radius-pill)", padding: "6px 12px", fontSize: 12, fontWeight: 600 }}>
+      <PageHeader backHref="/body" />
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--rosa-avviso)", color: "var(--rosso-testo)", borderRadius: "var(--radius-pill)", padding: "6px 12px", fontSize: 12, fontWeight: 600, marginTop: 14 }}>
         <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--rosso-avviso)" }} className={animate ? "anim-dot-pulse" : undefined} />
         stamattina qualcosa non torna
       </span>

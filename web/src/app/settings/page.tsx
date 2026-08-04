@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
+import { PageHeader } from "@/components/PageHeader";
 import { StatusDot } from "@/components/motion/primitives";
 import { useGarminStatus } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
@@ -17,7 +18,10 @@ export default function SettingsPage() {
 
   return (
     <div style={{ padding: "24px 22px 40px" }}>
-      <BrandMark height={22} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <PageHeader />
+        <BrandMark height={22} />
+      </div>
       <h1 style={{ font: "600 28px/1.06 var(--font-outfit)", letterSpacing: "-.03em", margin: "18px 0 16px" }}>Impostazioni</h1>
 
       <Card>

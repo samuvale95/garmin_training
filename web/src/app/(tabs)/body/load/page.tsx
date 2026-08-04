@@ -1,6 +1,7 @@
 "use client";
 
 import { BrandMark } from "@/components/motion/BrandMark";
+import { PageHeader } from "@/components/PageHeader";
 import { SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useBodyLoad } from "@/lib/queries";
@@ -28,7 +29,10 @@ export default function LoadPage() {
 
   return (
     <div style={{ padding: "22px 20px 12px" }}>
-      <BrandMark height={22} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <PageHeader backHref="/body" />
+        <BrandMark height={22} />
+      </div>
       <div style={{ marginTop: 14 }}>
         <WordIn active={animate} style={{ font: "600 30px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>Stai salendo</WordIn>
       </div>

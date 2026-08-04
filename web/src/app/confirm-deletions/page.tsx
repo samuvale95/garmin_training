@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
+import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton } from "@/components/motion/primitives";
 import { useStartSync } from "@/lib/queries";
 import { useSyncFlowStore } from "@/lib/syncFlowStore";
@@ -29,7 +30,10 @@ export default function ConfirmDeletionsPage() {
   return (
     <div style={{ minHeight: "100dvh", background: "var(--rosa-avviso)", padding: "24px 22px", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <BrandMark height={22} color="var(--rosso-forte)" forceStatic stillZone />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <PageHeader backHref="/diff" color="var(--rosso-forte)" />
+          <BrandMark height={22} color="var(--rosso-forte)" forceStatic stillZone />
+        </div>
         <span style={{ fontSize: 11, color: "var(--rosa-testo-50)", fontWeight: 500 }}>fermo · azione irreversibile</span>
       </div>
 

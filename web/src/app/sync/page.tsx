@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
+import { PageHeader } from "@/components/PageHeader";
 import { StatusDot, WordIn, BarGrow } from "@/components/motion/primitives";
 import { useCancelSync, useSyncJobStatus } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
@@ -35,7 +36,8 @@ function SyncScreenInner() {
   if (!jobId) {
     return (
       <div style={{ minHeight: "100dvh", background: "var(--inchiostro)", color: "var(--crema)", padding: 22 }}>
-        Nessuna scrittura in corso.
+        <PageHeader color="var(--crema)" />
+        <p style={{ marginTop: 14 }}>Nessuna scrittura in corso.</p>
       </div>
     );
   }
@@ -50,7 +52,10 @@ function SyncScreenInner() {
 
   return (
     <div style={{ minHeight: "100dvh", background: "var(--inchiostro)", color: "var(--crema)", padding: "24px 22px", display: "flex", flexDirection: "column" }}>
-      <BrandMark height={26} color="var(--crema)" />
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <PageHeader color="var(--crema)" />
+        <BrandMark height={26} color="var(--crema)" />
+      </div>
 
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 24 }}>
         <WordIn style={{ font: "600 72px/1 var(--font-outfit)", letterSpacing: "-.05em" }}>{completed}</WordIn>

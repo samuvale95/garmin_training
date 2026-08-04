@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
+import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton, WordIn, SlideUp } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useConnectGarmin } from "@/lib/queries";
@@ -32,7 +33,10 @@ export default function ConnectGarminPage() {
 
   return (
     <div style={{ padding: "30px 22px 0", display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
-      <BrandMark height={24} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <PageHeader />
+        <BrandMark height={24} />
+      </div>
 
       <div style={{ marginTop: 24 }}>
         <WordIn active={animate} delayMs={0} style={{ font: "600 34px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>

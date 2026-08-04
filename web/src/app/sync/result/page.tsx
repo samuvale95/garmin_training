@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Illustration } from "@/components/Illustration";
+import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useStartSync, useSyncJobStatus } from "@/lib/queries";
@@ -19,7 +20,14 @@ function ResultScreenInner() {
   const startSync = useStartSync();
 
   const status = liveStatus ?? history.find((h) => h.jobId === jobId);
-  if (!status) return <div style={{ padding: 22 }}>Nessun risultato da mostrare.</div>;
+  if (!status) {
+    return (
+      <div style={{ padding: 22 }}>
+        <PageHeader />
+        <p style={{ marginTop: 14 }}>Nessun risultato da mostrare.</p>
+      </div>
+    );
+  }
 
   const items = status.items;
   const total = status.total;
@@ -48,8 +56,10 @@ function ResultScreenInner() {
 
   return (
     <div style={{ padding: "24px 22px 32px" }}>
+      <PageHeader />
       <div
         style={{
+          marginTop: 14,
           background: "var(--verde)",
           color: "var(--verde-testo)",
           borderRadius: "var(--radius-card-lg)",

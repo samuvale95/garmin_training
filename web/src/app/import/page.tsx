@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
+import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useParsePlanFile, useParsePlanText } from "@/lib/queries";
@@ -48,7 +49,10 @@ export default function ImportPlanPage() {
 
   return (
     <div style={{ padding: "24px 22px 32px" }}>
-      <BrandMark height={24} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <PageHeader />
+        <BrandMark height={24} />
+      </div>
 
       <div style={{ marginTop: 20 }}>
         <WordIn active={animate} style={{ font: "600 34px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>

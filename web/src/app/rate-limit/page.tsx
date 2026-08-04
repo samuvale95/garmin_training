@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BrandMark } from "@/components/motion/BrandMark";
+import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton } from "@/components/motion/primitives";
 import { useGarminStatus } from "@/lib/queries";
 
@@ -32,7 +33,10 @@ export default function RateLimitPage() {
   return (
     <div style={{ minHeight: "100dvh", background: "var(--rosa-avviso)", padding: "24px 22px", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <BrandMark height={22} color="var(--rosso-forte)" forceStatic stillZone />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <PageHeader color="var(--rosso-forte)" />
+          <BrandMark height={22} color="var(--rosso-forte)" forceStatic stillZone />
+        </div>
         <span style={{ fontSize: 11, color: "var(--rosa-testo-50)" }}>fermo · non insisto</span>
       </div>
 
