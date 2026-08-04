@@ -70,7 +70,7 @@ export default function EntryPage() {
         </div>
       </SlideUp>
 
-      <SlideUp active={animate} delayMs={500} style={{ paddingBottom: 22, display: "flex", flexDirection: "column", gap: 13 }}>
+      <SlideUp active={animate} delayMs={500} style={{ marginTop: 16, paddingBottom: 22, display: "flex", flexDirection: "column", gap: 13 }}>
         <PrimaryButton sheen onClick={() => router.push("/connect-garmin")}>
           Continua
         </PrimaryButton>

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Outfit, Instrument_Serif, DM_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -26,6 +26,25 @@ const dmMono = DM_Mono({
 export const metadata: Metadata = {
   title: "Passo",
   description: "Il piano scritto una volta sola.",
+  icons: {
+    icon: "/icon-512.png",
+    apple: "/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Passo",
+    statusBarStyle: "black-translucent",
+  },
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: "#f6eeda",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
