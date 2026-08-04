@@ -17,6 +17,14 @@ export interface Prefs {
   menoMovimento: boolean;
 }
 
+/** Local-only display identity (name/email the user types in Settings). There is no
+ * account system behind this -- Garmin email/password is the only real credential the
+ * app holds -- this just gives the avatar/profile card something to show. */
+export interface Profile {
+  name: string;
+  email: string;
+}
+
 export interface WriteJobHistoryEntry {
   jobId: string;
   finishedAt: string;
@@ -24,18 +32,28 @@ export interface WriteJobHistoryEntry {
   succeeded: number;
   failed: number;
   items: SyncItemResult[];
+  /** Wall-clock time the write took, client-measured (the backend doesn't track job
+   * timing) -- null when the start time wasn't captured (e.g. page reload mid-job). */
+  durationMs: number | null;
 }
 
 interface PassoStore {
   plan: PlanState | null;
   prefs: Prefs;
+  profile: Profile;
   writeJobHistory: WriteJobHistoryEntry[];
+  /** Last Garmin email a connect attempt was made with -- never the password (see
+   * connect-garmin's "mai la password" promise). Lets the rate-limit screen offer an
+   * "update the password" retry without asking for the email again. */
+  lastGarminEmail: string | null;
 
   setPlan: (plan: PlanState) => void;
   clearPlan: () => void;
   updateSession: (index: number, updater: (session: TrainingSession) => TrainingSession) => void;
 
   setPref: <K extends keyof Prefs>(key: K, value: Prefs[K]) => void;
+  setProfile: (profile: Profile) => void;
+  setLastGarminEmail: (email: string) => void;
 
   addJobHistory: (entry: WriteJobHistoryEntry) => void;
 }
@@ -47,12 +65,16 @@ const defaultPrefs: Prefs = {
   menoMovimento: false,
 };
 
+const defaultProfile: Profile = { name: "", email: "" };
+
 export const usePassoStore = create<PassoStore>()(
   persist(
     (set) => ({
       plan: null,
       prefs: defaultPrefs,
+      profile: defaultProfile,
       writeJobHistory: [],
+      lastGarminEmail: null,
 
       setPlan: (plan) => set({ plan }),
       clearPlan: () => set({ plan: null }),
@@ -66,19 +88,23 @@ export const usePassoStore = create<PassoStore>()(
         }),
 
       setPref: (key, value) => set((state) => ({ prefs: { ...state.prefs, [key]: value } })),
+      setProfile: (profile) => set({ profile }),
+      setLastGarminEmail: (email) => set({ lastGarminEmail: email }),
 
       addJobHistory: (entry) =>
         set((state) => ({ writeJobHistory: [entry, ...state.writeJobHistory].slice(0, 20) })),
     }),
     {
       name: "passo-device-state",
-      // Only plan/prefs/history are persisted here -- diff/calendar/body data are
-      // TanStack Query cache only (design.md's state-mapping table), never written
+      // Only plan/prefs/profile/history are persisted here -- diff/calendar/body data
+      // are TanStack Query cache only (design.md's state-mapping table), never written
       // to this store.
       partialize: (state) => ({
         plan: state.plan,
         prefs: state.prefs,
+        profile: state.profile,
         writeJobHistory: state.writeJobHistory,
+        lastGarminEmail: state.lastGarminEmail,
       }),
     }
   )

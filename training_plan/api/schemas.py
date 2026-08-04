@@ -8,6 +8,7 @@ so FastAPI can validate/serialize JSON at the HTTP boundary.
 from __future__ import annotations
 
 from datetime import date as date_type
+from datetime import datetime
 
 from pydantic import BaseModel, Field
 
@@ -249,6 +250,16 @@ class GarminStatusResponse(BaseModel):
     cooldown_active: bool
     retry_after_seconds: int = 0
     reason: str | None = None
+    session_expires_in_days: int | None = None
+
+
+class DeviceInfoResponse(BaseModel):
+    device_name: str | None = None
+    last_synced_at: datetime | None = None
+
+
+class DisconnectResponse(BaseModel):
+    connected: bool
 
 
 class WorkoutsResponse(BaseModel):

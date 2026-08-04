@@ -6,6 +6,7 @@ import type {
   BodySnapshot,
   ConflictAssessment,
   DeleteResult,
+  DeviceInfo,
   GarminStatus,
   LoadSnapshot,
   PlanDiff,
@@ -32,6 +33,26 @@ export function useConnectGarmin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["garmin", "status"] });
     },
+  });
+}
+
+export function useDisconnectGarmin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ connected: boolean }>("/garmin/disconnect"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["garmin", "status"] });
+      queryClient.invalidateQueries({ queryKey: ["garmin", "device"] });
+    },
+  });
+}
+
+export function useGarminDevice(enabled = true) {
+  return useQuery({
+    queryKey: ["garmin", "device"],
+    queryFn: () => apiGet<DeviceInfo>("/garmin/device"),
+    enabled,
+    staleTime: 5 * 60_000,
   });
 }
 

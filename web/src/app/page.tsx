@@ -59,18 +59,23 @@ export default function EntryPage() {
             background: "var(--corallo)",
             borderRadius: "var(--radius-card-lg)",
             overflow: "hidden",
+            boxSizing: "border-box",
+            padding: 18,
           }}
         >
+          <p style={{ font: "600 15px/1.3 var(--font-outfit)", color: "var(--corallo-testo)", margin: 0, maxWidth: 140 }}>
+            nessuna password da ricordare
+          </p>
           <Illustration name="corsa" width={196} height={212} right={12} bottom={0} active={animate} delayMs={900} priority />
         </div>
       </SlideUp>
 
       <SlideUp active={animate} delayMs={500} style={{ paddingBottom: 22, display: "flex", flexDirection: "column", gap: 13 }}>
         <PrimaryButton sheen onClick={() => router.push("/connect-garmin")}>
-          Inizia
+          Continua
         </PrimaryButton>
         <p style={{ font: "500 12px/1.6 var(--font-outfit)", color: "var(--inchiostro-35)", textAlign: "center", margin: 0 }}>
-          Il collegamento a Garmin lo fai dopo, quando importi il primo piano.
+          L&apos;account Garmin lo colleghi dopo, quando importi il primo piano.
         </p>
       </SlideUp>
     </div>

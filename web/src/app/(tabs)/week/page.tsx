@@ -9,6 +9,7 @@ import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import { useWorkouts } from "@/lib/queries";
 import { classifySession, sessionDistanceKm, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
+import { sessionDetailLine } from "@/lib/format";
 
 export default function WeekPage() {
   const access = useCalendarAccess();
@@ -80,6 +81,7 @@ export default function WeekPage() {
           {days.map((day, i) => {
             const visual = classifySession(day.session);
             const height = day.session ? 78 + Math.min(40, sessionDistanceKm(day.session) * 2) : 78;
+            const detail = day.session ? sessionDetailLine(day.session) || visual.label : "e va bene così";
             const card = (
               <SlideUp
                 active={animate}
@@ -100,7 +102,7 @@ export default function WeekPage() {
               >
                 <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{day.session ? day.session.title : "Riposo"}</p>
                 <p className="font-serif-italic" style={{ fontSize: 13, margin: "4px 0 0", opacity: 0.85 }}>
-                  {day.session ? visual.label : "e va bene così"}
+                  {detail}
                 </p>
                 {visual.illustration && (
                   <Illustration name={visual.illustration} width={64} height={70} breathe={false} active={animate} delayMs={200 + i * 80} />

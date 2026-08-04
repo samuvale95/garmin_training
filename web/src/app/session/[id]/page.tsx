@@ -7,6 +7,7 @@ import { useMountOnce } from "@/lib/motion";
 import { useRequirePlan } from "@/lib/guards";
 import { usePassoStore } from "@/lib/store";
 import { sessionDistanceKm } from "@/lib/sessionVisuals";
+import { formatWeekday, groupSteps, stepDistanceKm, stepGroupParts } from "@/lib/format";
 
 export default function SessionDetailPage() {
   const params = useParams<{ id: string }>();
@@ -29,12 +30,16 @@ export default function SessionDetailPage() {
   }
 
   const distanceKm = sessionDistanceKm(session);
-  const keyStepIndex = session.steps.findIndex((s) => s.type === "interval");
+  const groups = groupSteps(session.steps);
 
-  function moveToTomorrow() {
+  function nextDayKey(): string {
     const current = new Date(session.date);
     current.setDate(current.getDate() + 1);
-    updateSession(index, (s) => ({ ...s, date: current.toISOString().slice(0, 10) }));
+    return current.toISOString().slice(0, 10);
+  }
+
+  function moveToTomorrow() {
+    updateSession(index, (s) => ({ ...s, date: nextDayKey() }));
     router.push("/week");
   }
 
@@ -60,11 +65,13 @@ export default function SessionDetailPage() {
       )}
 
       <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
-        {session.steps.length === 0 && (
+        {groups.length === 0 && (
           <p style={{ textAlign: "center", color: "var(--inchiostro-su-scuro)", fontSize: 13 }}>Sessione libera, senza step strutturati.</p>
         )}
-        {session.steps.map((step, i) => {
-          const isKey = i === keyStepIndex;
+        {groups.map((group, i) => {
+          const isKey = group.kind === "interval";
+          const { label, detail } = stepGroupParts(group);
+          const km = group.reps * stepDistanceKm(group.step) + (group.recovery ? group.reps * stepDistanceKm(group.recovery) : 0);
           return (
             <div
               key={i}
@@ -76,13 +83,19 @@ export default function SessionDetailPage() {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                gap: 10,
               }}
               className={isKey ? "anim-breath" : undefined}
             >
-              <span style={{ fontSize: 13, fontWeight: 600, textTransform: "capitalize" }}>{step.type}</span>
-              <span className="font-mono" style={{ fontSize: 12 }}>
-                {step.duration_type === "time" ? `${step.duration_value} min` : `${step.duration_value} km`}
+              <span>
+                <span style={{ display: "block", fontSize: 13, fontWeight: 600 }}>{label}</span>
+                {detail && (
+                  <span className="font-mono" style={{ display: "block", fontSize: 11, opacity: 0.8, marginTop: 2 }}>{detail}</span>
+                )}
               </span>
+              {km > 0 && (
+                <span className="font-mono" style={{ fontSize: 12, flex: "none" }}>{km.toFixed(1).replace(".", ",")} km</span>
+              )}
             </div>
           );
         })}
@@ -98,7 +111,7 @@ export default function SessionDetailPage() {
           className="tap-target"
           style={{ background: "none", border: "none", color: "var(--inchiostro-su-scuro)", fontSize: 13, cursor: "pointer" }}
         >
-          Sposta a domani
+          Sposta a {formatWeekday(nextDayKey())}
         </button>
       </div>
     </div>

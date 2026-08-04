@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
+import shutil
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date as date_type
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from garminconnect import (
@@ -130,6 +132,28 @@ def workout_fingerprint(workout: dict) -> str:
 
 def _round_or_none(value, digits: int):
     return None if value is None else round(float(value), digits)
+
+
+def _decode_jwt_expiry(token: str) -> datetime | None:
+    """Read a JWT's `exp` claim without verifying its signature -- fine here since the
+    token is one this process already trusts (it's what `client.login()` wrote to our
+    own tokenstore), and this is a read-only, best-effort display value.
+    """
+    try:
+        payload_segment = token.split(".")[1]
+        padded = payload_segment + "=" * (-len(payload_segment) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded))
+        exp = payload.get("exp")
+        return datetime.fromtimestamp(exp, tz=timezone.utc) if exp else None
+    except Exception:  # noqa: BLE001 - malformed/unexpected token shape degrades to "unknown"
+        return None
+
+
+def _days_remaining(expires_at: datetime | None) -> int | None:
+    if expires_at is None:
+        return None
+    delta = expires_at - datetime.now(timezone.utc)
+    return max(0, int(delta.total_seconds() // 86400))
 
 
 class GarminSync:
@@ -261,7 +285,13 @@ class GarminSync:
         and risking, a real login.
         """
         if self._has_cached_tokens():
-            return {"connected": True, "cooldown_active": False, "retry_after_seconds": 0, "reason": None}
+            return {
+                "connected": True,
+                "cooldown_active": False,
+                "retry_after_seconds": 0,
+                "reason": None,
+                "session_expires_in_days": _days_remaining(self.session_expires_at()),
+            }
 
         remaining = self._cooldown_remaining()
         if remaining:
@@ -271,9 +301,80 @@ class GarminSync:
                 "cooldown_active": True,
                 "retry_after_seconds": remaining,
                 "reason": reason,
+                "session_expires_in_days": None,
             }
 
-        return {"connected": False, "cooldown_active": False, "retry_after_seconds": 0, "reason": None}
+        return {
+            "connected": False,
+            "cooldown_active": False,
+            "retry_after_seconds": 0,
+            "reason": None,
+            "session_expires_in_days": None,
+        }
+
+    def session_expires_at(self) -> datetime | None:
+        """Best-effort expiry of the cached session token (settings screen 15),
+        decoded straight from the tokenstore -- no network call, no signature check
+        (we already trust this token: it's the one this process itself wrote out).
+        `None` when there's no cached token or its `exp` claim can't be read; this is
+        informational only and never gates whether a session counts as connected.
+        """
+        token = self._read_cached_di_token()
+        return _decode_jwt_expiry(token) if token else None
+
+    def _tokenstore_file(self) -> Path:
+        path = Path(self._tokenstore).expanduser()
+        if path.is_dir() or not path.name.endswith(".json"):
+            path = path / "garmin_tokens.json"
+        return path
+
+    def _read_cached_di_token(self) -> str | None:
+        try:
+            data = json.loads(self._tokenstore_file().read_text())
+        except (OSError, ValueError):
+            return None
+        return data.get("di_token")
+
+    def device_info(self) -> dict:
+        """Best-effort primary-device name + last-sync time (settings screen 15).
+
+        Like body_insights.py's wellness extraction, `garminconnect`'s device
+        endpoints are not officially documented, so an unknown/renamed field degrades
+        to `None` rather than raising.
+        """
+        try:
+            last_used = self.client.get_device_last_used()
+        except Exception:  # noqa: BLE001 - device info is a nice-to-have, never fatal
+            return {"device_name": None, "last_synced_at": None}
+
+        if not isinstance(last_used, dict):
+            return {"device_name": None, "last_synced_at": None}
+
+        name = (
+            last_used.get("productDisplayName")
+            or last_used.get("deviceName")
+            or last_used.get("lastUsedDeviceName")
+        )
+        upload_ms = last_used.get("lastUsedDeviceUploadTime") or last_used.get("imageLastSyncTime")
+        synced_at = (
+            datetime.fromtimestamp(upload_ms / 1000, tz=timezone.utc)
+            if isinstance(upload_ms, (int, float))
+            else None
+        )
+        return {"device_name": name, "last_synced_at": synced_at}
+
+    def disconnect(self) -> None:
+        """Drop the cached Garmin session so the device goes back to "not connected".
+
+        Garmin has no app-initiated "log out" concept here -- this only forgets the
+        locally cached token. The same credentials can always reconnect afterwards.
+        """
+        path = Path(self._tokenstore).expanduser()
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            path.unlink(missing_ok=True)
+        self._client = None
 
     @property
     def client(self) -> Garmin:

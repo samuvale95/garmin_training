@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton, WordIn, SlideUp } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useConnectGarmin } from "@/lib/queries";
+import { usePassoStore } from "@/lib/store";
 import { ApiError } from "@/lib/apiClient";
 
 export default function ConnectGarminPage() {
@@ -16,9 +18,13 @@ export default function ConnectGarminPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const connect = useConnectGarmin();
+  const profile = usePassoStore((s) => s.profile);
+
+  const setLastGarminEmail = usePassoStore((s) => s.setLastGarminEmail);
 
   async function handleConnect() {
     setError(null);
+    setLastGarminEmail(email);
     try {
       await connect.mutateAsync({ email, password });
       router.push("/today");
@@ -33,9 +39,17 @@ export default function ConnectGarminPage() {
 
   return (
     <div style={{ padding: "30px 22px 0", display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <PageHeader />
-        <BrandMark height={24} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <PageHeader />
+          <BrandMark height={24} />
+        </div>
+        {profile.email && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Avatar size={30} />
+            <span style={{ fontSize: 13, color: "var(--inchiostro-70)" }}>{profile.email}</span>
+          </div>
+        )}
       </div>
 
       <div style={{ marginTop: 24 }}>
@@ -56,16 +70,16 @@ export default function ConnectGarminPage() {
         delayMs={300}
         style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 20, display: "flex", flexDirection: "column", gap: 16 }}
       >
-        <Field label="Email Garmin" value={email} onChange={setEmail} type="email" />
+        <Field label="Email Garmin" value={email} onChange={setEmail} type="email" placeholder="luca@example.com" />
         <Field label="Password" value={password} onChange={setPassword} type="password" />
         <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
-          🔒 Salviamo solo il token di sessione, mai la password.
+          🔒 Resta sul telefono. Salvo solo il token, mai la password.
         </p>
       </SlideUp>
 
       <SlideUp active={animate} delayMs={400} style={{ display: "flex", gap: 10, marginTop: 16 }}>
-        <WarningCard title="3 tentativi">Oltre, Garmin blocca l&apos;indirizzo IP per 15 minuti.</WarningCard>
-        <WarningCard title="Codice a 6 cifre">Se hai la verifica in due passaggi, te lo chiediamo qui.</WarningCard>
+        <WarningCard title="Tre tentativi">poi Garmin blocca l&apos;IP per 15 minuti. Non insisto io al posto tuo.</WarningCard>
+        <WarningCard title="Codice a 6 cifre">se hai la verifica in due passaggi, te lo chiedo dopo.</WarningCard>
       </SlideUp>
 
       {error && (
@@ -96,7 +110,7 @@ export default function ConnectGarminPage() {
   );
 }
 
-function Field({ label, value, onChange, type }: { label: string; value: string; onChange: (v: string) => void; type: string }) {
+function Field({ label, value, onChange, type, placeholder }: { label: string; value: string; onChange: (v: string) => void; type: string; placeholder?: string }) {
   return (
     <label style={{ display: "block" }}>
       <span style={{ display: "block", fontSize: 11, fontWeight: 500, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--inchiostro-50)", marginBottom: 8 }}>
@@ -106,6 +120,7 @@ function Field({ label, value, onChange, type }: { label: string; value: string;
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
         style={{
           width: "100%",
           border: "none",

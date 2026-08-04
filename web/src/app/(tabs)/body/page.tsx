@@ -1,26 +1,37 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { ProgressRing, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useBodyToday } from "@/lib/queries";
+import { usePassoStore } from "@/lib/store";
+import { toDateKey } from "@/lib/sessionVisuals";
+import { formatFullDate, hrvCaption, stressCaption } from "@/lib/format";
 
 export default function RecoveryPage() {
   const animate = useMountOnce("body-recovery");
   const { data, isLoading } = useBodyToday();
+  const plan = usePassoStore((s) => s.plan);
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowSession = plan?.sessions.find((s) => s.date === toDateKey(tomorrow)) ?? null;
 
   return (
     <div style={{ padding: "22px 20px 12px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <BrandMark height={22} />
-        <span style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
-          {data ? new Date(data.date).toLocaleDateString("it-IT", { weekday: "long" }) : ""}
-        </span>
+        <Avatar size={32} />
       </div>
 
-      <div style={{ marginTop: 14 }}>
+      <div style={{ marginTop: 14, display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
         <WordIn active={animate} style={{ font: "600 30px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>Come stai</WordIn>
+        {data && (
+          <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{formatFullDate(data.date)}</span>
+        )}
       </div>
 
       {isLoading ? (
@@ -54,6 +65,11 @@ export default function RecoveryPage() {
                     {Math.floor((data.sleep.total_minutes ?? 0) / 60)}h{String((data.sleep.total_minutes ?? 0) % 60).padStart(2, "0")}
                   </p>
                   <SleepBar phases={data.sleep} />
+                  {data.sleep.deep_minutes != null && (
+                    <p style={{ fontSize: 11, margin: "8px 0 0" }}>
+                      profondo {Math.floor(data.sleep.deep_minutes / 60)}h{String(data.sleep.deep_minutes % 60).padStart(2, "0")}
+                    </p>
+                  )}
                 </>
               ) : (
                 <p style={{ fontSize: 12 }}>Non disponibile</p>
@@ -61,6 +77,9 @@ export default function RecoveryPage() {
             </SlideUp>
             <SlideUp active={animate} delayMs={340} style={{ flex: 1, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14 }}>
               <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", margin: "0 0 8px", color: "var(--inchiostro-50)" }}>Variabilità</p>
+              {data.hrv_last_night_ms != null && (
+                <p className="font-mono" style={{ fontSize: 18, margin: "0 0 8px" }}>{data.hrv_last_night_ms}<span style={{ fontSize: 12 }}>ms</span></p>
+              )}
               <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 40 }}>
                 {data.hrv_seven_day.map((point, i) => {
                   const isLast = i === data.hrv_seven_day.length - 1;
@@ -75,20 +94,37 @@ export default function RecoveryPage() {
                   );
                 })}
               </div>
+              {hrvCaption(data.hrv_last_night_ms, data.hrv_seven_day) && (
+                <p style={{ fontSize: 10, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>{hrvCaption(data.hrv_last_night_ms, data.hrv_seven_day)}</p>
+              )}
             </SlideUp>
           </div>
 
           <div style={{ display: "flex", gap: 9, marginTop: 9 }}>
-            <SmallMetric label="Cuore a riposo" value={data.resting_heart_rate != null ? `${data.resting_heart_rate}` : "—"} background="var(--crema-card)" />
-            <SmallMetric label="Batteria" value={data.battery_percent != null ? `${data.battery_percent}%` : "—"} background="var(--giallo)" />
-            <SmallMetric label="Stress" value={data.stress_level != null ? `${data.stress_level}` : "—"} background="var(--crema-card)" />
+            <SmallMetric
+              label="Cuore a riposo"
+              value={data.resting_heart_rate != null ? `${data.resting_heart_rate}` : "—"}
+              caption={data.resting_heart_rate_delta != null ? `${data.resting_heart_rate_delta > 0 ? "+" : ""}${data.resting_heart_rate_delta} sulla settimana` : undefined}
+              background="var(--crema-card)"
+            />
+            <SmallMetric label="Batteria" value={data.battery_percent != null ? `${data.battery_percent}%` : "—"} background="var(--giallo)">
+              {data.battery_percent != null && (
+                <div style={{ height: 3, borderRadius: 100, background: "rgba(31,51,16,.15)", marginTop: 8, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${data.battery_percent}%`, background: "var(--giallo-testo)", borderRadius: 100 }} />
+                </div>
+              )}
+            </SmallMetric>
+            <SmallMetric label="Stress" value={data.stress_level != null ? `${data.stress_level}` : "—"} caption={stressCaption(data.stress_level) ?? undefined} background="var(--crema-card)" />
           </div>
 
           <SlideUp active={animate} delayMs={460} style={{ background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14 }}>
+            {tomorrowSession && (
+              <p style={{ fontWeight: 700, fontSize: 14, margin: "0 0 6px" }}>Domani: {tomorrowSession.title.toLowerCase()}</p>
+            )}
             <p className="font-serif-italic" style={{ fontSize: 15, margin: 0 }}>
               {(data.readiness_score ?? 100) < 60
                 ? "I numeri di oggi meritano attenzione: guarda cosa dice il piano di domani."
-                : "I numeri sono con te: il piano di domani può restare com&apos;è."}
+                : "I numeri sono con te: il piano di domani può restare com'è."}
             </p>
           </SlideUp>
         </>
@@ -118,11 +154,25 @@ function SleepBar({ phases }: { phases: { deep_minutes: number | null; light_min
   );
 }
 
-function SmallMetric({ label, value, background }: { label: string; value: string; background: string }) {
+function SmallMetric({
+  label,
+  value,
+  caption,
+  background,
+  children,
+}: {
+  label: string;
+  value: string;
+  caption?: string;
+  background: string;
+  children?: ReactNode;
+}) {
   return (
     <div style={{ flex: 1, background, borderRadius: "var(--radius-chip)", padding: 12 }}>
       <p className="font-mono" style={{ fontSize: 16, margin: "0 0 2px" }}>{value}</p>
       <p style={{ fontSize: 10, color: "var(--inchiostro-50)", margin: 0 }}>{label}</p>
+      {caption && <p style={{ fontSize: 10, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>{caption}</p>}
+      {children}
     </div>
   );
 }

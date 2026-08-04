@@ -12,13 +12,19 @@ import type { ChangedSession, TrainingSession } from "./types";
 interface SyncFlowStore {
   toCreate: TrainingSession[];
   changed: ChangedSession[];
+  /** Wall-clock start of the in-flight write job, so /sync can hand a duration to
+   * writeJobHistory when the job finishes -- the backend doesn't track job timing. */
+  startedAt: number | null;
   setSelection: (toCreate: TrainingSession[], changed: ChangedSession[]) => void;
+  markStarted: () => void;
   clear: () => void;
 }
 
 export const useSyncFlowStore = create<SyncFlowStore>((set) => ({
   toCreate: [],
   changed: [],
+  startedAt: null,
   setSelection: (toCreate, changed) => set({ toCreate, changed }),
-  clear: () => set({ toCreate: [], changed: [] }),
+  markStarted: () => set({ startedAt: Date.now() }),
+  clear: () => set({ toCreate: [], changed: [], startedAt: null }),
 }));

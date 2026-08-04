@@ -9,6 +9,7 @@ import { useMountOnce } from "@/lib/motion";
 import { useStartSync, useSyncJobStatus } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
 import { useSyncFlowStore } from "@/lib/syncFlowStore";
+import { capitalize, formatDuration, formatShortDate, numberToItalianWords } from "@/lib/format";
 
 function ResultScreenInner() {
   const router = useRouter();
@@ -35,11 +36,13 @@ function ResultScreenInner() {
   const failed = items.filter((i) => i.status === "failed");
   const created = items.filter((i) => i.kind === "create" && i.status === "ok").length;
   const replaced = items.filter((i) => i.kind === "replace" && i.status === "ok").length;
+  const durationMs = "durationMs" in status ? status.durationMs : null;
 
   async function retryFailed() {
     const failedKeys = new Set(failed.map((f) => `${f.date}|${f.title}`));
     const toCreate = flow.toCreate.filter((s) => failedKeys.has(`${s.date}|${s.title}`));
     const changed = flow.changed.filter((c) => failedKeys.has(`${c.session.date}|${c.session.title}`));
+    flow.markStarted();
     const { job_id } = await startSync.mutateAsync({
       to_create: toCreate,
       changed: changed.map((c) => ({
@@ -70,22 +73,28 @@ function ResultScreenInner() {
           boxSizing: "border-box",
         }}
       >
-        <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", margin: 0 }}>Esito</p>
+        <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", margin: 0 }}>scritte sul calendario</p>
         <WordIn active={animate} delayMs={300} style={{ font: "600 52px/1 var(--font-outfit)", letterSpacing: "-.045em", marginTop: 8 }}>
           {succeeded}
           <span style={{ fontSize: 24, opacity: 0.5 }}>/{total}</span>
         </WordIn>
+        <p className="font-serif-italic" style={{ fontSize: 15, margin: "8px 0 0" }}>
+          {failed.length === 0 ? "Il blocco è pronto." : "Quasi tutto pronto."}
+        </p>
         <Illustration name="esultanza" width={172} height={186} right={8} bottom={0} active={animate} delayMs={700} />
       </div>
 
       {failed.length > 0 && (
         <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 18, marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
           <p style={{ fontWeight: 600, margin: 0 }}>
-            {failed.length === 1 ? "Una è rimasta indietro" : `${failed.length} sono rimaste indietro`}
+            {failed.length === 1 ? "Una è rimasta indietro" : `${capitalize(numberToItalianWords(failed.length))} sono rimaste indietro`}
           </p>
           {failed.map((item, i) => (
             <div key={i} style={{ borderLeft: "3px solid var(--corallo)", paddingLeft: 10 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 2px" }}>{item.title}</p>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+                <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 2px" }}>{item.title}</p>
+                <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>{formatShortDate(item.date)}</span>
+              </div>
               <p style={{ fontSize: 12, color: "var(--inchiostro-70)", margin: 0 }}>{item.error ?? "Motivo non specificato."}</p>
             </div>
           ))}
@@ -93,6 +102,7 @@ function ResultScreenInner() {
       )}
 
       <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
+        {durationMs != null && <Metric label="durata" value={formatDuration(durationMs)} />}
         <Metric label="cancellate" value={replaced} />
         <Metric label="create" value={created} />
       </div>
@@ -100,7 +110,7 @@ function ResultScreenInner() {
       <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
         {failed.length > 0 && (
           <PrimaryButton state={startSync.isPending ? "loading" : "idle"} onClick={retryFailed}>
-            Riprova solo queste {failed.length}
+            Riprova solo queste {numberToItalianWords(failed.length)}
           </PrimaryButton>
         )}
         <button
@@ -116,7 +126,7 @@ function ResultScreenInner() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({ label, value }: { label: string; value: number | string }) {
   return (
     <div style={{ flex: 1, background: "var(--sabbia-chip)", borderRadius: "var(--radius-chip)", padding: "10px 12px" }}>
       <p className="font-mono" style={{ fontSize: 16, fontWeight: 500, margin: "0 0 2px" }}>{value}</p>

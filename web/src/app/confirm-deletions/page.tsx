@@ -6,13 +6,16 @@ import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton } from "@/components/motion/primitives";
 import { useStartSync } from "@/lib/queries";
 import { useSyncFlowStore } from "@/lib/syncFlowStore";
+import { capitalize, formatShortDate, numberToItalianWords } from "@/lib/format";
 
 export default function ConfirmDeletionsPage() {
   const router = useRouter();
   const changed = useSyncFlowStore((s) => s.changed);
+  const markStarted = useSyncFlowStore((s) => s.markStarted);
   const startSync = useStartSync();
 
   async function confirmRewrite() {
+    markStarted();
     const { job_id } = await startSync.mutateAsync({
       to_create: [],
       changed: changed.map((c) => ({
@@ -38,9 +41,9 @@ export default function ConfirmDeletionsPage() {
       </div>
 
       <h1 style={{ font: "600 28px/1.1 var(--font-outfit)", color: "var(--rosso-testo)", letterSpacing: "-.03em", margin: "20px 0 8px" }}>
-        Per cambiarle,
-        <br />
-        devo cancellarle
+        {changed.length > 0
+          ? `${capitalize(numberToItalianWords(changed.length))} ${changed.length === 1 ? "sessione va" : "sessioni vanno"} cancellate`
+          : "Nessuna sessione da cancellare"}
       </h1>
 
       {changed.length === 0 ? (
@@ -50,8 +53,10 @@ export default function ConfirmDeletionsPage() {
           <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 8, display: "flex", flexDirection: "column", gap: 10 }}>
             {changed.map((change, i) => (
               <div key={i} style={{ borderBottom: i < changed.length - 1 ? "1px solid var(--sabbia-bordo)" : "none", paddingBottom: 10 }}>
-                <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "0 0 2px" }}>{change.session.date}</p>
-                <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{change.session.title}</p>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+                  <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{change.session.title}</p>
+                  <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{formatShortDate(change.session.date)}</span>
+                </div>
                 <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>mai eseguita</p>
               </div>
             ))}
@@ -59,7 +64,7 @@ export default function ConfirmDeletionsPage() {
 
           <div style={{ background: "var(--corallo-chiaro)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 12 }}>
             <p style={{ fontSize: 13, color: "var(--corallo-testo)", margin: 0, lineHeight: 1.5 }}>
-              Nessuna di queste è mai stata svolta, quindi non perdi nulla. Le attività già registrate non vengono mai toccate.
+              Nessuna delle {numberToItalianWords(changed.length)} è stata svolta, quindi non perdi nessun dato di attività. Le attività già registrate non le tocco mai.
             </p>
           </div>
 
@@ -77,7 +82,7 @@ export default function ConfirmDeletionsPage() {
               textColor="var(--crema)"
               fillColor="var(--rosso-forte)"
             >
-              Cancella e ricrea le {changed.length}
+              Cancella e ricrea
             </PrimaryButton>
             <button
               type="button"
@@ -85,7 +90,7 @@ export default function ConfirmDeletionsPage() {
               className="tap-target"
               style={{ background: "var(--crema-card)", border: "none", borderRadius: "var(--radius-pill)", padding: "14px 22px", fontSize: 15, fontWeight: 600, cursor: "pointer" }}
             >
-              Annulla
+              Lasciale come sono
             </button>
           </div>
         </>

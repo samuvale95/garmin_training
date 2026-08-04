@@ -32,6 +32,23 @@ async def status() -> schemas.GarminStatusResponse:
     return schemas.GarminStatusResponse(**result)
 
 
+@router.get("/garmin/device", response_model=schemas.DeviceInfoResponse)
+async def device() -> schemas.DeviceInfoResponse:
+    def _run() -> dict:
+        sync = GarminSync()
+        sync.login()
+        return sync.device_info()
+
+    result = await run_in_threadpool(_run)
+    return schemas.DeviceInfoResponse(**result)
+
+
+@router.post("/garmin/disconnect", response_model=schemas.DisconnectResponse)
+async def disconnect() -> schemas.DisconnectResponse:
+    await run_in_threadpool(lambda: GarminSync().disconnect())
+    return schemas.DisconnectResponse(connected=False)
+
+
 @router.get("/garmin/workouts", response_model=schemas.WorkoutsResponse)
 async def workouts(start: date, end: date) -> schemas.WorkoutsResponse:
     result = await run_in_threadpool(service.list_workouts, start, end)

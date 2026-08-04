@@ -8,6 +8,7 @@ import { useMountOnce } from "@/lib/motion";
 import { useBodyConflict, useBodyToday } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
 import { toDateKey } from "@/lib/sessionVisuals";
+import { hrvCaption, sleepCaption } from "@/lib/format";
 import type { ConflictOption } from "@/lib/types";
 
 export default function ConflictPage() {
@@ -67,11 +68,38 @@ export default function ConflictPage() {
       </span>
 
       <h1 style={{ font: "600 28px/1.1 var(--font-outfit)", letterSpacing: "-.03em", margin: "16px 0 8px" }}>
-        Il corpo dice no
+        Oggi il corpo dice no
       </h1>
       <p className="font-serif-italic" style={{ fontSize: 15.5, color: "var(--inchiostro-70)" }}>
         {signals.join(", ")}: {bodyQuery.data?.readiness_message ?? "i segnali di stamattina non sono dalla tua parte"}.
       </p>
+
+      {bodyQuery.data && (
+        <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
+          <div style={{ flex: 1, background: "var(--rosa-avviso)", borderRadius: "var(--radius-card)", padding: 12 }}>
+            <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--rosso-testo)", margin: "0 0 4px" }}>Prontezza</p>
+            <p className="font-mono" style={{ fontSize: 16, margin: 0, color: "var(--rosso-testo)" }}>{bodyQuery.data.readiness_score ?? "—"}</p>
+          </div>
+          <div style={{ flex: 1, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 12 }}>
+            <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--inchiostro-50)", margin: "0 0 4px" }}>Sonno</p>
+            <p className="font-mono" style={{ fontSize: 16, margin: 0 }}>
+              {bodyQuery.data.sleep?.total_minutes != null
+                ? `${Math.floor(bodyQuery.data.sleep.total_minutes / 60)}h${String(bodyQuery.data.sleep.total_minutes % 60).padStart(2, "0")}`
+                : "—"}
+            </p>
+            {sleepCaption(bodyQuery.data.sleep) && (
+              <p style={{ fontSize: 10, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>{sleepCaption(bodyQuery.data.sleep)}</p>
+            )}
+          </div>
+          <div style={{ flex: 1, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 12 }}>
+            <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--inchiostro-50)", margin: "0 0 4px" }}>HRV</p>
+            <p className="font-mono" style={{ fontSize: 16, margin: 0 }}>{bodyQuery.data.hrv_last_night_ms ?? "—"}</p>
+            {hrvCaption(bodyQuery.data.hrv_last_night_ms, bodyQuery.data.hrv_seven_day) && (
+              <p style={{ fontSize: 10, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>{hrvCaption(bodyQuery.data.hrv_last_night_ms, bodyQuery.data.hrv_seven_day)}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div style={{ background: "var(--corallo)", color: "var(--corallo-testo)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 16, height: 152, position: "relative", overflow: "hidden", boxSizing: "border-box" }}>
         <p style={{ fontSize: 12, margin: "0 0 4px", opacity: 0.8 }}>domani</p>

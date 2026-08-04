@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { BarGrow, PulseRing, SlideUp, WordIn } from "@/components/motion/primitives";
@@ -8,6 +9,7 @@ import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import { usePlanDiff, useBodyToday, useWorkouts } from "@/lib/queries";
 import { classifySession, isoWeekNumber, sessionDistanceKm, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
+import { capitalize, formatFullDate, groupSteps, numberToItalianWords, relativeDayLabel, stepGroupLine } from "@/lib/format";
 
 export default function TodayPage() {
   const access = useCalendarAccess();
@@ -32,6 +34,13 @@ export default function TodayPage() {
     .filter((s) => s.date > todayKey && s.date <= toDateKey(end))
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 5);
+  const remainingKm = restOfWeek.reduce((sum, s) => sum + sessionDistanceKm(s), 0);
+
+  // When today is a rest day, preview the next upcoming session instead of just
+  // saying "nothing today" -- matches the design's "domani · martedì 11" hero card.
+  const heroSession = todaySession ?? sessions.filter((s) => s.date > todayKey).sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
+  const heroGroups = heroSession?.steps ? groupSteps(heroSession.steps).filter((g) => g.kind === "interval" || g.kind === "warmup" || g.kind === "cooldown") : [];
+  const heroMainGroup = heroGroups.find((g) => g.kind === "interval") ?? heroGroups[0] ?? null;
 
   const pendingChanges = (diffQuery.data?.to_create.length ?? 0) + (diffQuery.data?.changed.length ?? 0);
   const readiness = bodyQuery.data?.readiness_score;
@@ -41,13 +50,13 @@ export default function TodayPage() {
     <div style={{ padding: "22px 20px 12px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <BrandMark height={22} />
-        <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--sabbia-scura)" }} />
+        <Avatar size={36} />
       </div>
 
       <div style={{ marginTop: 18 }}>
         <WordIn active={animate} style={{ font: "600 34px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>Settimana</WordIn>
         <WordIn active={animate} delayMs={100} style={{ font: "600 34px/1.04 var(--font-outfit)", letterSpacing: "-.035em", color: "var(--corallo)" }}>
-          {isoWeekNumber(today)}
+          {numberToItalianWords(isoWeekNumber(today))}
         </WordIn>
       </div>
 
@@ -58,10 +67,15 @@ export default function TodayPage() {
       >
         <span aria-hidden="true" className="anim-sweep-once" style={{ position: "absolute", inset: 0, background: "var(--corallo)" }} />
         <div style={{ position: "relative" }}>
-          {todaySession ? (
+          {heroSession ? (
             <>
-              <p className="font-mono" style={{ fontSize: 12, opacity: 0.7, margin: "0 0 6px" }}>{todaySession.date}</p>
-              <p style={{ font: "600 22px/1.15 var(--font-outfit)", margin: 0, maxWidth: 200 }}>{todaySession.title}</p>
+              <p className="font-mono" style={{ fontSize: 12, opacity: 0.7, margin: "0 0 6px" }}>
+                {relativeDayLabel(heroSession.date, today)} · {formatFullDate(heroSession.date)}
+              </p>
+              <p style={{ font: "600 22px/1.15 var(--font-outfit)", margin: "0 0 8px", maxWidth: 200 }}>{heroSession.title}</p>
+              {heroMainGroup && (
+                <p className="font-mono" style={{ fontSize: 13, opacity: 0.85, margin: 0, maxWidth: 200 }}>{stepGroupLine(heroMainGroup)}</p>
+              )}
             </>
           ) : (
             <p className="font-serif-italic" style={{ fontSize: 17, maxWidth: 200 }}>Oggi è un giorno di riposo. E va bene così.</p>
@@ -97,10 +111,18 @@ export default function TodayPage() {
         <Link href="/diff" style={{ textDecoration: "none", color: "inherit" }}>
           <SlideUp active={animate} delayMs={580} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
             <PulseRing size={8} />
-            <p className="font-serif-italic" style={{ fontSize: 15, margin: 0, flex: 1 }}>
-              {pendingChanges} {pendingChanges === 1 ? "differenza" : "differenze"} tra file e calendario.
-            </p>
-            <span className="anim-chev" aria-hidden="true">→</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontWeight: 600, fontSize: 15, margin: "0 0 2px" }}>
+                {capitalize(numberToItalianWords(pendingChanges))} {pendingChanges === 1 ? "differenza" : "differenze"}
+              </p>
+              <p className="font-serif-italic" style={{ fontSize: 14, margin: 0 }}>Il file non combacia col calendario.</p>
+            </div>
+            <span
+              aria-hidden="true"
+              style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--inchiostro)", color: "var(--crema)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}
+            >
+              →
+            </span>
           </SlideUp>
         </Link>
       ) : (
@@ -110,7 +132,13 @@ export default function TodayPage() {
         </SlideUp>
       )}
 
-      <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 8 }}>
+      {restOfWeek.length > 0 && !liveMode && (
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 20 }}>
+          <span style={{ fontSize: 11, color: "var(--inchiostro-50)", textTransform: "uppercase", letterSpacing: ".06em" }}>resto della settimana</span>
+          <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{remainingKm.toFixed(1).replace(".0", "")} km</span>
+        </div>
+      )}
+      <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
         {restOfWeek.map((session, i) => {
           const visual = classifySession(session);
           const km = sessionDistanceKm(session);
@@ -120,6 +148,9 @@ export default function TodayPage() {
                 {new Date(session.date).toLocaleDateString("it-IT", { weekday: "short" })}
               </span>
               <span style={{ fontSize: 13, flex: 1 }}>{session.title}</span>
+              {km > 0 && (
+                <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{km.toFixed(0)} km</span>
+              )}
               <div style={{ width: 48, height: 4 }}>
                 <BarGrow value={Math.min(1, km / 20)} height={4} color={visual.background} trackColor="var(--sabbia-chip)" active={animate} delayMs={800 + i * 80} />
               </div>

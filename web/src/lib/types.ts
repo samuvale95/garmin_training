@@ -73,6 +73,12 @@ export interface GarminStatus {
   cooldown_active: boolean;
   retry_after_seconds: number;
   reason?: string | null;
+  session_expires_in_days: number | null;
+}
+
+export interface DeviceInfo {
+  device_name: string | null;
+  last_synced_at: string | null;
 }
 
 export interface DeleteResult {

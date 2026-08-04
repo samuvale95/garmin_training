@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatusDot, WordIn, BarGrow } from "@/components/motion/primitives";
 import { useCancelSync, useSyncJobStatus } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
+import { useSyncFlowStore } from "@/lib/syncFlowStore";
 
 function SyncScreenInner() {
   const router = useRouter();
@@ -15,6 +16,7 @@ function SyncScreenInner() {
   const { data: status } = useSyncJobStatus(jobId);
   const cancelSync = useCancelSync();
   const addJobHistory = usePassoStore((s) => s.addJobHistory);
+  const startedAt = useSyncFlowStore((s) => s.startedAt);
   const navigatedRef = useRef(false);
 
   useEffect(() => {
@@ -29,9 +31,10 @@ function SyncScreenInner() {
       succeeded: status.items.filter((i) => i.status === "ok").length,
       failed: status.items.filter((i) => i.status === "failed").length,
       items: status.items,
+      durationMs: startedAt != null ? Date.now() - startedAt : null,
     });
     router.push(`/sync/result?job=${status.job_id}`);
-  }, [status, addJobHistory, router]);
+  }, [status, addJobHistory, startedAt, router]);
 
   if (!jobId) {
     return (
@@ -52,9 +55,12 @@ function SyncScreenInner() {
 
   return (
     <div style={{ minHeight: "100dvh", background: "var(--inchiostro)", color: "var(--crema)", padding: "24px 22px", display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <PageHeader color="var(--crema)" />
-        <BrandMark height={26} color="var(--crema)" />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <PageHeader color="var(--crema)" />
+          <BrandMark height={26} color="var(--crema)" />
+        </div>
+        <span style={{ fontSize: 11, color: "var(--inchiostro-su-scuro)", fontWeight: 500 }}>scrivo su Garmin</span>
       </div>
 
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 24 }}>
@@ -72,21 +78,25 @@ function SyncScreenInner() {
         <Count value={queued} label="in coda" color="var(--inchiostro-su-scuro)" />
       </div>
 
-      <div style={{ flex: 1, position: "relative", minHeight: 160, marginTop: 20 }}>
-        <Illustration name="attesa" width={190} height={206} right={14} bottom={0} />
-        <p className="font-serif-italic" style={{ fontSize: 16, color: "var(--inchiostro-su-scuro)", maxWidth: 180 }}>
-          Puoi chiudere: continuo io.
+      <div style={{ flex: 1, position: "relative", minHeight: 160, marginTop: 20, background: "rgba(246,238,218,.05)", borderRadius: "var(--radius-card-lg)", padding: 18, boxSizing: "border-box" }}>
+        <p style={{ fontWeight: 700, fontSize: 15, margin: "0 0 4px" }}>Puoi chiudere</p>
+        <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-su-scuro)", maxWidth: 180, margin: 0 }}>
+          Continuo io. Ti trovo il riepilogo quando torni.
         </p>
+        <Illustration name="attesa" width={190} height={206} right={14} bottom={0} />
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
-        {lastThree.map((item, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <StatusDot kind={item.status === "ok" ? "success" : item.status === "failed" ? "error" : "in_progress"} />
-            <span style={{ fontSize: 13, flex: 1 }}>{item.title}</span>
-            {item.error && <span className="font-mono" style={{ fontSize: 11, color: "var(--corallo-chiaro)" }}>{item.error}</span>}
-          </div>
-        ))}
+        {lastThree.map((item, i) => {
+          const statusLabel = item.status === "ok" ? "ok" : item.status === "failed" ? item.error ?? "errore" : "invio";
+          return (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <StatusDot kind={item.status === "ok" ? "success" : item.status === "failed" ? "error" : "in_progress"} />
+              <span style={{ fontSize: 13, flex: 1 }}>{item.title}</span>
+              <span className="font-mono" style={{ fontSize: 11, color: item.status === "failed" ? "var(--corallo-chiaro)" : "var(--inchiostro-su-scuro)" }}>{statusLabel}</span>
+            </div>
+          );
+        })}
       </div>
 
       <button
