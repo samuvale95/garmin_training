@@ -5,7 +5,7 @@ import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { PageHeader } from "@/components/PageHeader";
 import { useMountOnce } from "@/lib/motion";
-import { useBodyConflict, useBodyToday } from "@/lib/queries";
+import { useBodyConflict, useBodyToday, usePlanQuery, useUpdateSession } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
 import { toDateKey } from "@/lib/sessionVisuals";
 import { hrvCaption, sleepCaption } from "@/lib/format";
@@ -14,8 +14,8 @@ import type { ConflictOption } from "@/lib/types";
 export default function ConflictPage() {
   const router = useRouter();
   const animate = useMountOnce("body-conflict");
-  const plan = usePassoStore((s) => s.plan);
-  const updateSession = usePassoStore((s) => s.updateSession);
+  const { data: plan } = usePlanQuery();
+  const updateSession = useUpdateSession();
   const dismissConflictToday = usePassoStore((s) => s.dismissConflictToday);
   const bodyQuery = useBodyToday();
 

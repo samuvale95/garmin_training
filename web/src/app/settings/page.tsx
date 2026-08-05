@@ -1,12 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusDot } from "@/components/motion/primitives";
-import { useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, useStravaStatus } from "@/lib/queries";
+import { useClearPlan, useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, usePlanQuery, useResetAllLocalData, useStravaStatus } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
 import { downloadPlanYaml } from "@/lib/planYaml";
 import { minutesAgo } from "@/lib/format";
@@ -18,12 +19,26 @@ export default function SettingsPage() {
   const disconnect = useDisconnectGarmin();
   const { data: stravaStatus } = useStravaStatus();
   const disconnectStrava = useDisconnectStrava();
-  const plan = usePassoStore((s) => s.plan);
+  const { data: plan } = usePlanQuery();
   const prefs = usePassoStore((s) => s.prefs);
   const setPref = usePassoStore((s) => s.setPref);
   const profile = usePassoStore((s) => s.profile);
   const setProfile = usePassoStore((s) => s.setProfile);
-  const clearPlan = usePassoStore((s) => s.clearPlan);
+  const clearPlan = useClearPlan();
+  const resetAllLocalData = useResetAllLocalData();
+  const [confirmReset, setConfirmReset] = useState(false);
+
+  function handleReset() {
+    if (!confirmReset) {
+      setConfirmReset(true);
+      return;
+    }
+    resetAllLocalData();
+    // A hard navigation, not router.push: guarantees every in-memory bit of app state
+    // (Zustand's store included) reinitializes from scratch, not just the storage
+    // that backs it -- the whole point of this button is "no doubt left anywhere".
+    window.location.href = "/";
+  }
 
   return (
     <div style={{ padding: "24px 22px 40px" }}>
@@ -163,6 +178,43 @@ export default function SettingsPage() {
         >
           Scarica {plan?.filename ?? "il YAML"}
         </button>
+      </div>
+
+      <div style={{ background: "var(--rosa-avviso)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 20 }}>
+        <p style={{ fontWeight: 600, margin: "0 0 4px", color: "var(--rosso-testo)" }}>Qualcosa non torna?</p>
+        <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--rosso-testo)", margin: "0 0 10px" }}>
+          Cancella piano, preferenze e ogni dato salvato sul telefono. Non tocca Garmin o Strava: dopo il ripristino
+          l&apos;app riparte dal calendario Garmin, senza nulla di locale che possa essere disallineato.
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="tap-target"
+            style={{
+              background: confirmReset ? "var(--rosso-forte)" : "none",
+              color: confirmReset ? "var(--crema)" : "var(--rosso-forte)",
+              border: confirmReset ? "none" : "1.5px solid var(--rosso-forte)",
+              borderRadius: "var(--radius-pill)",
+              padding: "9px 16px",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            {confirmReset ? "Conferma: cancella tutto" : "Ripristina tutto"}
+          </button>
+          {confirmReset && (
+            <button
+              type="button"
+              onClick={() => setConfirmReset(false)}
+              className="tap-target"
+              style={{ background: "none", border: "none", color: "var(--rosso-testo)", fontSize: 12, cursor: "pointer" }}
+            >
+              Annulla
+            </button>
+          )}
+        </div>
       </div>
 
       <button

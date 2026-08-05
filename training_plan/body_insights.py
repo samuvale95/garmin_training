@@ -3,15 +3,16 @@ derived body/plan conflict (design screens 11-13).
 
 Nothing here writes to Garmin. Every extraction from a `garminconnect` response is
 defensive (`_get(...)` with a `None` fallback): these wellness endpoints are not
-officially documented and their exact field names are current as of this writing,
-not verified against a live account (the same kind of gap `models.py` already flags
-for `CONDITION_TYPE_PAYLOAD`). A missing/renamed field degrades to "unavailable"
-rather than raising, which also happens to be the correct behavior for the "no
-overnight sync yet" empty state.
+officially documented and their exact field names can change without notice (the
+same kind of gap `models.py` already flags for `CONDITION_TYPE_PAYLOAD`) -- readiness/
+sleep/HRV/stress/battery/RHR field names here were checked against a live account.
+A missing/renamed field degrades to "unavailable" rather than raising, which also
+happens to be the correct behavior for the "no overnight sync yet" empty state.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date as date_type
@@ -19,6 +20,8 @@ from datetime import timedelta
 
 from .garmin_sync import GarminSync
 from .models import TrainingSession
+
+logger = logging.getLogger(__name__)
 
 READINESS_LOW_THRESHOLD = 60
 HRV_DELTA_ALERT_MS = -15  # a drop of this many ms vs. baseline reads as a meaningful signal
@@ -117,10 +120,12 @@ def fetch_body_snapshot(
     if isinstance(readiness, list):
         readiness = readiness[0] if readiness else None
     sleep = client.get_sleep_data(day_str)
-    rhr = client.get_rhr_day(day_str)
     stress = client.get_stress_data(day_str)
-    battery_series = client.get_body_battery(day_str)
-    battery = battery_series[0] if battery_series else None
+    # `get_body_battery`'s "charged"/"drained" are cumulative deltas over the day, not
+    # a current level, and `get_rhr_day`'s resting-heart-rate fields live nested under
+    # `allMetrics.metricsMap` (not at the root, and without a 7-day average at all) --
+    # the daily user-summary endpoint has correct, flat fields for both instead.
+    stats = client.get_stats(day_str)
 
     sleep_dto = _get(sleep, "dailySleepDTO", default=sleep)
     total_minutes = _seconds_to_minutes(_get(sleep_dto, "sleepTimeSeconds"))
@@ -142,10 +147,19 @@ def fetch_body_snapshot(
         try:
             hrv_seven_day.append((series_day, _fetch_hrv_last_night(client, series_day)))
         except Exception:  # noqa: BLE001 - one missing day must not blank the whole trend
+            logger.warning("HRV fetch failed for %s, degrading to unavailable", series_day, exc_info=True)
             hrv_seven_day.append((series_day, None))
 
     hrv_last_night_ms = hrv_seven_day[-1][1] if hrv_seven_day else None
     has_overnight_data = sleep_phases is not None or hrv_last_night_ms is not None
+
+    resting_heart_rate = _get(stats, "restingHeartRate")
+    resting_heart_rate_avg = _get(stats, "lastSevenDaysAvgRestingHeartRate")
+    resting_heart_rate_delta = (
+        resting_heart_rate - resting_heart_rate_avg
+        if resting_heart_rate is not None and resting_heart_rate_avg is not None
+        else None
+    )
 
     return BodySnapshot(
         date=day,
@@ -155,13 +169,23 @@ def fetch_body_snapshot(
         sleep=sleep_phases,
         hrv_last_night_ms=hrv_last_night_ms,
         hrv_seven_day=hrv_seven_day,
-        resting_heart_rate=_get(rhr, "restingHeartRate"),
-        resting_heart_rate_delta=_get(rhr, "lastSevenDaysAvgRestingHeartRate")
-        and _get(rhr, "restingHeartRate")
-        and _get(rhr, "restingHeartRate") - _get(rhr, "lastSevenDaysAvgRestingHeartRate"),
-        battery_percent=_get(battery, "charged", "bodyBatteryValue"),
+        resting_heart_rate=resting_heart_rate,
+        resting_heart_rate_delta=resting_heart_rate_delta,
+        battery_percent=_get(stats, "bodyBatteryMostRecentValue"),
         stress_level=_get(stress, "avgStressLevel", "overallStressLevel"),
     )
+
+
+def _primary_device_training_status(status) -> dict | None:
+    """The per-device entry inside `get_training_status`'s `mostRecentTrainingStatus.
+    latestTrainingStatusData` map (keyed by a numeric device ID we don't know ahead of
+    time) for whichever device is flagged primary, falling back to the first one.
+    """
+    devices = _get(_get(status, "mostRecentTrainingStatus"), "latestTrainingStatusData")
+    if not isinstance(devices, dict) or not devices:
+        return None
+    primary = next((d for d in devices.values() if isinstance(d, dict) and d.get("primaryTrainingDevice")), None)
+    return primary or next(iter(devices.values()), None)
 
 
 def fetch_load_snapshot(
@@ -170,6 +194,14 @@ def fetch_load_snapshot(
     """Garmin-actual weekly training load for the last `weeks` weeks, plus acute:chronic
     ratio and VO2max. Does not know about the plan (see schemas.WeeklyLoadOut) -- the
     frontend merges this with its own client-computed "planned" series.
+
+    `weeklyTrainingLoad` (the field this used to read) is consistently `null` on a
+    live account regardless of date -- the populated figure `get_training_status`
+    actually carries per device is `acuteTrainingLoadDTO.dailyTrainingLoadAcute`
+    (queried per week-start date, same as the design intended), and
+    `dailyAcuteChronicWorkloadRatio` for the ratio. VO2max is under
+    `mostRecentVO2Max.generic` on the same response -- `get_max_metrics` (queried
+    separately before) returns an empty list on this endpoint and isn't needed.
     """
     sync = _login(prompt_mfa)
     client = sync.client
@@ -180,18 +212,17 @@ def fetch_load_snapshot(
     for i in range(weeks - 1, -1, -1):
         week_start = current_week_start - timedelta(days=7 * i)
         status = client.get_training_status(week_start.isoformat())
-        load = _get(status, "weeklyTrainingLoad", "acuteLoad")
+        device_status = _primary_device_training_status(status)
+        load = _get(_get(device_status, "acuteTrainingLoadDTO"), "dailyTrainingLoadAcute")
         week_records.append(
             WeeklyLoad(week_start=week_start, completed_load=load, in_progress=i == 0)
         )
 
     latest_status = client.get_training_status(today.isoformat())
-    acute_chronic = _get(latest_status, "acuteChronicRatio", "loadRatio")
+    latest_device_status = _primary_device_training_status(latest_status)
+    acute_chronic = _get(_get(latest_device_status, "acuteTrainingLoadDTO"), "dailyAcuteChronicWorkloadRatio")
 
-    max_metrics = client.get_max_metrics(today.isoformat())
-    if isinstance(max_metrics, list):
-        max_metrics = max_metrics[0] if max_metrics else None
-    vo2max_container = _get(max_metrics, "generic", default=max_metrics)
+    vo2max_container = _get(_get(latest_status, "mostRecentVO2Max"), "generic")
     vo2max = _get(vo2max_container, "vo2MaxPreciseValue", "vo2MaxValue")
 
     return LoadSnapshot(weeks=week_records, acute_chronic_ratio=acute_chronic, vo2max=vo2max)

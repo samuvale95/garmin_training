@@ -478,6 +478,15 @@ class StravaActivityMatchResponse(BaseModel):
     gear_name: str | None = None
 
 
+class StravaActivityMatchesRequest(BaseModel):
+    sessions: list[TrainingSessionIn]
+
+
+class StravaActivityMatchesResponse(BaseModel):
+    # Keyed by each session's own ISO date (YYYY-MM-DD).
+    matches: dict[str, StravaActivityMatchResponse]
+
+
 class ShoeOut(BaseModel):
     id: str
     name: str

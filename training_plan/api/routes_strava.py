@@ -47,6 +47,15 @@ async def activity_match(payload: schemas.StravaActivityMatchRequest) -> schemas
     return schemas.StravaActivityMatchResponse(**result)
 
 
+@router.post("/strava/activity-matches", response_model=schemas.StravaActivityMatchesResponse)
+async def activity_matches(payload: schemas.StravaActivityMatchesRequest) -> schemas.StravaActivityMatchesResponse:
+    sessions = [s.to_model() for s in payload.sessions]
+    results = await run_in_threadpool(lambda: StravaSync().find_activity_matches_for_range(sessions))
+    return schemas.StravaActivityMatchesResponse(
+        matches={date_key: schemas.StravaActivityMatchResponse(**match) for date_key, match in results.items()}
+    )
+
+
 @router.get("/strava/shoes", response_model=schemas.ShoesResponse)
 async def shoes() -> schemas.ShoesResponse:
     result = await run_in_threadpool(lambda: StravaSync().shoe_wear())

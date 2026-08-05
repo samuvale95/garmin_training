@@ -1,27 +1,79 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton, ProgressRing, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useRequirePlan } from "@/lib/guards";
-import { usePassoStore } from "@/lib/store";
-import { useStravaActivityMatch, useStravaStatus } from "@/lib/queries";
-import { sessionDistanceKm } from "@/lib/sessionVisuals";
-import { formatWeekday, groupSteps, stepDistanceKm, stepGroupParts } from "@/lib/format";
+import { ApiError } from "@/lib/apiClient";
+import {
+  useApplyDeletion,
+  useRemoveSession,
+  useStartSync,
+  useStravaActivityMatch,
+  useStravaStatus,
+  useSyncJobStatus,
+  useUpdateSession,
+  useWorkouts,
+} from "@/lib/queries";
+import { normalizeTitle, sessionDistanceKm } from "@/lib/sessionVisuals";
+import { formatPaceValue, formatWeekday, groupSteps, stepDistanceKm, stepGroupParts } from "@/lib/format";
+import type { TrainingSession } from "@/lib/types";
 
 export default function SessionDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const plan = useRequirePlan();
   const animate = useMountOnce(`session-${params.id}`);
-  const updateSession = usePassoStore((s) => s.updateSession);
+  const updateSession = useUpdateSession();
+  const removeSession = useRemoveSession();
   const index = Number(params.id);
   const session = plan?.sessions[index] ?? null;
   const stravaStatus = useStravaStatus();
   const matchQuery = useStravaActivityMatch(session, !!stravaStatus.data?.connected);
   const hasStravaMatch = !!stravaStatus.data?.connected && !!matchQuery.data?.matched;
+
+  // The session's identity on the Garmin calendar, if it has ever been synced there --
+  // needed both to move it (delete the old scheduled entry, recreate on the new day)
+  // and to delete it. Absent for a session that only exists in the local plan so far.
+  const workoutsQuery = useWorkouts(session?.date ?? "", session?.date ?? "", !!session);
+  const originalWorkout = session
+    ? workoutsQuery.data?.workouts.find((w) => normalizeTitle(w.title) === normalizeTitle(session.title))
+    : undefined;
+
+  const startSync = useStartSync();
+  const applyDeletion = useApplyDeletion();
+
+  const [moveJobId, setMoveJobId] = useState<string | null>(null);
+  const [movedDate, setMovedDate] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const moveStatus = useSyncJobStatus(moveJobId);
+
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const moveItem = moveStatus.data?.items[0];
+  const moveFailedMessage =
+    moveStatus.data?.status === "failed"
+      ? moveStatus.data.failure ?? "Non sono riuscito a spostare l'allenamento. Riprova."
+      : moveStatus.data?.status === "done" && moveItem?.status === "failed"
+        ? moveItem.error ?? "Non sono riuscito a spostare l'allenamento. Riprova."
+        : null;
+  const moveSucceeded = moveStatus.data?.status === "done" && moveItem?.status !== "failed";
+  const isMoving = startSync.isPending || (!!moveJobId && !moveFailedMessage && !moveSucceeded);
+
+  // Once the Garmin-side move settles successfully, commit the new date locally and
+  // leave for the week screen -- mirrors WorkoutEditor's save-then-navigate effect.
+  useEffect(() => {
+    if (moveJobId && moveSucceeded && movedDate) {
+      updateSession(index, (s) => ({ ...s, date: movedDate }));
+      router.push("/week");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moveJobId, moveSucceeded, movedDate]);
 
   if (!plan) return null;
 
@@ -35,8 +87,9 @@ export default function SessionDetailPage() {
   }
 
   const currentSession = session; // narrows the closures below to non-null, once
+  const steps = currentSession.steps ?? []; // guards a stale localStorage plan saved before `steps` existed
   const distanceKm = sessionDistanceKm(currentSession);
-  const groups = groupSteps(currentSession.steps);
+  const groups = groupSteps(steps);
 
   function nextDayKey(): string {
     const current = new Date(currentSession.date);
@@ -44,19 +97,107 @@ export default function SessionDetailPage() {
     return current.toISOString().slice(0, 10);
   }
 
-  function moveToTomorrow() {
-    updateSession(index, (s) => ({ ...s, date: nextDayKey() }));
-    router.push("/week");
+  async function moveToTomorrow() {
+    setMoveError(null);
+    const newDate = nextDayKey();
+    const movedSession: TrainingSession = { ...currentSession, date: newDate };
+
+    // No Garmin-side copy to move yet -- just update the local plan and go.
+    if (!originalWorkout) {
+      updateSession(index, () => movedSession);
+      router.push("/week");
+      return;
+    }
+
+    // Otherwise, actually move it on the calendar: `changed` deletes the entry
+    // scheduled on the current day and recreates it on the new one (see
+    // GarminSync.replace_session), rather than only updating local state.
+    try {
+      const { job_id } = await startSync.mutateAsync({
+        to_create: [],
+        changed: [
+          {
+            session: movedSession,
+            scheduled_workout_id: originalWorkout.scheduled_workout_id,
+            workout_id: originalWorkout.workout_id,
+            workout_date: originalWorkout.date,
+            workout_sport: originalWorkout.sport,
+            workout_title: originalWorkout.title,
+          },
+        ],
+      });
+      setMovedDate(newDate);
+      setMoveJobId(job_id);
+    } catch (err) {
+      setMoveError(err instanceof ApiError ? err.message : "Non sono riuscito a spostare l'allenamento.");
+    }
   }
+
+  async function handleDelete() {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setDeleteError(null);
+    setIsDeleting(true);
+    try {
+      if (originalWorkout) {
+        await applyDeletion.mutateAsync([originalWorkout]);
+      }
+      removeSession(index);
+      router.push("/week");
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : "Non sono riuscito a cancellare l'allenamento.");
+      setIsDeleting(false);
+    }
+  }
+
+  const displayMoveError = moveError ?? moveFailedMessage;
 
   return (
     <div style={{ minHeight: "100dvh", background: "var(--inchiostro)", color: "var(--crema)", padding: "24px 22px 32px", display: "flex", flexDirection: "column", alignItems: "center" }}>
       <div style={{ alignSelf: "stretch", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <PageHeader backHref="/week" color="var(--crema)" />
-        <Link href={`/session/${index}/edit`} className="tap-target" aria-label="Modifica allenamento" style={{ color: "var(--crema)", fontSize: 18, textDecoration: "none" }}>
-          ✎
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <Link href={`/session/${index}/edit`} className="tap-target" aria-label="Modifica allenamento" style={{ color: "var(--crema)", fontSize: 18, textDecoration: "none" }}>
+            ✎
+          </Link>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="tap-target"
+            aria-label="Elimina allenamento"
+            style={{ background: "none", border: "none", fontSize: 18, color: "var(--rosso-avviso)", cursor: isDeleting ? "default" : "pointer", opacity: isDeleting ? 0.6 : 1 }}
+          >
+            🗑
+          </button>
+        </div>
       </div>
+
+      {confirmDelete && (
+        <div style={{ alignSelf: "stretch", background: "rgba(246,238,218,.1)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
+          <p style={{ fontSize: 13, margin: 0, flex: 1 }}>Eliminare questo allenamento dal piano e dal calendario Garmin?</p>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="tap-target"
+            style={{ background: "var(--rosso-forte)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: isDeleting ? "default" : "pointer" }}
+          >
+            {isDeleting ? "..." : "Elimina"}
+          </button>
+          <button type="button" onClick={() => setConfirmDelete(false)} disabled={isDeleting} className="tap-target" style={{ background: "none", border: "none", fontSize: 12, color: "var(--inchiostro-su-scuro)", cursor: "pointer" }}>
+            Annulla
+          </button>
+        </div>
+      )}
+      {deleteError && (
+        <p style={{ color: "var(--rosso-avviso)", fontSize: 13, marginTop: 10, alignSelf: "stretch" }} role="alert">
+          {deleteError}
+        </p>
+      )}
+
       <ProgressRing value={Math.min(1, distanceKm / 20)} size={180} strokeWidth={12} trackColor="rgba(246,238,218,.13)">
         <div style={{ textAlign: "center" }}>
           <p className="font-mono" style={{ fontSize: 28, fontWeight: 500, margin: 0 }}>{distanceKm.toFixed(1)}</p>
@@ -110,12 +251,16 @@ export default function SessionDetailPage() {
         })}
       </div>
 
-      {hasStravaMatch && (
+      {hasStravaMatch && matchQuery.data && (
         <Link href={`/session/${index}/strava`} style={{ textDecoration: "none", color: "inherit", width: "100%" }}>
           <div style={{ width: "100%", boxSizing: "border-box", background: "rgba(246,238,218,.09)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 20, display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>Svolta ieri, da Strava</p>
-              <p className="font-serif-italic" style={{ fontSize: 12.5, color: "var(--inchiostro-su-scuro)", margin: "3px 0 0" }}>
+              <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>Svolta, da Strava</p>
+              <p className="font-mono" style={{ fontSize: 13, margin: "3px 0 0" }}>
+                {matchQuery.data.distance_km != null ? `${matchQuery.data.distance_km.toFixed(1)} km` : "—"}
+                {matchQuery.data.avg_pace_sec_per_km != null && ` · ${formatPaceValue(matchQuery.data.avg_pace_sec_per_km)}`}
+              </p>
+              <p className="font-serif-italic" style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: "3px 0 0" }}>
                 Confronta pianificato e svolto
               </p>
             </div>
@@ -131,11 +276,17 @@ export default function SessionDetailPage() {
         <button
           type="button"
           onClick={moveToTomorrow}
+          disabled={isMoving}
           className="tap-target"
-          style={{ background: "none", border: "none", color: "var(--inchiostro-su-scuro)", fontSize: 13, cursor: "pointer" }}
+          style={{ background: "none", border: "none", color: "var(--inchiostro-su-scuro)", fontSize: 13, cursor: isMoving ? "default" : "pointer" }}
         >
-          Sposta a {formatWeekday(nextDayKey())}
+          {isMoving ? "Sposto…" : `Sposta a ${formatWeekday(nextDayKey())}`}
         </button>
+        {displayMoveError && (
+          <p style={{ color: "var(--rosso-avviso)", fontSize: 13, textAlign: "center" }} role="alert">
+            {displayMoveError}
+          </p>
+        )}
       </div>
     </div>
   );

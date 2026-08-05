@@ -5,10 +5,9 @@ import { useRouter } from "next/navigation";
 import { Reorder } from "framer-motion";
 import { PrimaryButton, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { usePassoStore } from "@/lib/store";
-import { useApplyDeletion, useStartSync, useSyncJobStatus, useWorkouts } from "@/lib/queries";
+import { useAddSession, useApplyDeletion, usePlanQuery, useRemoveSession, useStartSync, useSyncJobStatus, useUpdateSession, useWorkouts } from "@/lib/queries";
 import { ApiError } from "@/lib/apiClient";
-import { toDateKey } from "@/lib/sessionVisuals";
+import { normalizeTitle, toDateKey } from "@/lib/sessionVisuals";
 import { stepTypeLabel } from "@/lib/format";
 import type { ScheduledWorkout, Sport, Step, TrainingSession } from "@/lib/types";
 
@@ -33,10 +32,6 @@ function newStepId(): string {
 
 type EditableStep = Step & { _id: string };
 
-function normalizeTitle(title: string): string {
-  return title.trim().split(/\s+/).join(" ").toLowerCase();
-}
-
 function stepSummary(step: Step): string {
   const duration = step.duration_type === "distance" ? `${step.duration_value} km` : `${step.duration_value} min`;
   const pace = step.target_pace ? ` · ${step.target_pace.slower_sec_per_km}-${step.target_pace.faster_sec_per_km}s/km` : "";
@@ -54,10 +49,10 @@ export function WorkoutEditor({ mode, sessionIndex }: WorkoutEditorProps) {
   // No `useRequirePlan()` here, deliberately: create mode must work with no plan at
   // all (the whole point of "+" from Settimana is to start one from scratch) --
   // `addSession` below lazily creates an empty plan the first time it's called.
-  const plan = usePassoStore((s) => s.plan);
-  const updateSession = usePassoStore((s) => s.updateSession);
-  const addSession = usePassoStore((s) => s.addSession);
-  const removeSession = usePassoStore((s) => s.removeSession);
+  const { data: plan } = usePlanQuery();
+  const updateSession = useUpdateSession();
+  const addSession = useAddSession();
+  const removeSession = useRemoveSession();
 
   const existing = mode === "edit" && plan && sessionIndex != null ? plan.sessions[sessionIndex] : null;
   // Captured once, at mount: the (date, title) Garmin actually knows this session by,

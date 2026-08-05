@@ -7,9 +7,10 @@ import { Illustration } from "@/components/Illustration";
 import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
-import { useActivities, useWorkouts } from "@/lib/queries";
+import { useActivities, useStravaActivityMatches, useStravaStatus, useWorkouts } from "@/lib/queries";
 import { classifySession, sessionDistanceKm, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
 import { sessionDetailLine } from "@/lib/format";
+import type { ScheduledWorkout, TrainingSession } from "@/lib/types";
 
 function formatWeekRange(start: Date, end: Date): string {
   const startMonth = start.toLocaleDateString("it-IT", { month: "short" });
@@ -36,6 +37,24 @@ export default function WeekPage() {
   // against and a live Garmin connection to pull completed activities from.
   const showProgress = !liveMode && access.garminConnected;
   const activitiesQuery = useActivities(startKey, endKey, showProgress);
+
+  // "Svolto" indicators on day cards: plan sessions already have the shape the batch
+  // endpoint expects; a liveMode ScheduledWorkout (date/sport/title, no steps) is
+  // turned into an equivalent synthetic session with empty steps -- harmless, since
+  // matching only needs date/sport and steps only feed the "planned" side, which a
+  // live Garmin workout doesn't have anyway.
+  const stravaStatus = useStravaStatus();
+  const planSessions: TrainingSession[] = access.plan
+    ? access.plan.sessions.filter((s) => s.date >= startKey && s.date <= endKey)
+    : (workoutsQuery.data?.workouts ?? []).map((w) => ({
+        date: w.date,
+        sport: w.sport as TrainingSession["sport"],
+        title: w.title,
+        description: null,
+        steps: [],
+      }));
+  const stravaEnabled = !!stravaStatus.data?.connected && planSessions.length > 0;
+  const stravaMatches = useStravaActivityMatches(planSessions, stravaEnabled);
 
   if (!access.ready || (!access.plan && !access.garminConnected)) return null;
 
@@ -121,6 +140,7 @@ export default function WeekPage() {
             const height = day.session ? 78 + Math.min(40, sessionDistanceKm(day.session) * 2) : 78;
             const detail = day.session ? sessionDetailLine(day.session) || visual.label : "e va bene così";
             const isToday = day.key === todayKey;
+            const match = stravaMatches.data?.matches[day.key];
             const card = (
               <SlideUp
                 active={animate}
@@ -143,6 +163,11 @@ export default function WeekPage() {
                 <p className="font-serif-italic" style={{ fontSize: 13, margin: "4px 0 0", opacity: 0.85 }}>
                   {detail}
                 </p>
+                {match?.matched && match.distance_km != null && (
+                  <p className="font-mono" style={{ fontSize: 11, margin: "4px 0 0", opacity: 0.75 }}>
+                    svolto {match.distance_km.toFixed(1)} km
+                  </p>
+                )}
                 {visual.illustration && (
                   <Illustration name={visual.illustration} width={64} height={70} breathe={false} active={animate} delayMs={200 + i * 80} />
                 )}
@@ -157,7 +182,20 @@ export default function WeekPage() {
                   <span style={{ fontSize: 13, fontWeight: 700, color: "var(--inchiostro)" }}>{day.date.getDate()}</span>
                 </div>
                 <div style={{ flex: 1 }}>
-                  {day.session && day.index >= 0 ? <Link href={`/session/${day.index}`} style={{ textDecoration: "none", color: "inherit" }}>{card}</Link> : card}
+                  {(() => {
+                    if (day.session && day.index >= 0) {
+                      return <Link href={`/session/${day.index}`} style={{ textDecoration: "none", color: "inherit" }}>{card}</Link>;
+                    }
+                    const workout = liveMode ? (day.session as ScheduledWorkout | null) : null;
+                    if (workout?.scheduled_workout_id != null) {
+                      return (
+                        <Link href={`/workout/${workout.scheduled_workout_id}?date=${day.key}`} style={{ textDecoration: "none", color: "inherit" }}>
+                          {card}
+                        </Link>
+                      );
+                    }
+                    return card;
+                  })()}
                 </div>
               </div>
             );

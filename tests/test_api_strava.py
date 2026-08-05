@@ -33,6 +33,9 @@ class FakeStravaSync:
     def find_activity_match(self, session) -> dict:
         return FakeStravaSync.activity_match_response
 
+    def find_activity_matches_for_range(self, sessions) -> dict:
+        return {s.date.isoformat(): FakeStravaSync.activity_match_response for s in sessions}
+
     def shoe_wear(self) -> list:
         if FakeStravaSync.shoes_should_fail:
             raise StravaAuthError("Strava is not connected.")
@@ -126,6 +129,19 @@ def test_activity_match_found(client, fake_strava):
     assert body["matched"] is True
     assert body["gear_name"] == "Endorphin Speed 3"
     assert body["plan_note"].startswith("Passo un filo")
+
+
+def test_activity_matches_batch_keyed_by_date(client, fake_strava):
+    fake_strava.activity_match_response = {"matched": True, "activity_id": 555}
+    response = client.post(
+        "/strava/activity-matches",
+        json={"sessions": [_session_payload(day=10), _session_payload(day=12)]},
+    )
+    assert response.status_code == 200
+    matches = response.json()["matches"]
+    assert set(matches.keys()) == {"2026-08-10", "2026-08-12"}
+    assert matches["2026-08-10"]["matched"] is True
+    assert matches["2026-08-10"]["activity_id"] == 555
 
 
 def test_shoes_lists_wear(client, fake_strava):

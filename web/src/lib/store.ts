@@ -2,14 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { SyncItemResult, TrainingSession } from "./types";
-
-export interface PlanState {
-  yamlText: string;
-  sessions: TrainingSession[];
-  filename: string | null;
-  importedAt: string | null;
-}
+import type { SyncItemResult } from "./types";
 
 export interface Prefs {
   avvisamiSeIlCorpoNonRegge: boolean;
@@ -38,7 +31,6 @@ export interface WriteJobHistoryEntry {
 }
 
 interface PassoStore {
-  plan: PlanState | null;
   prefs: Prefs;
   profile: Profile;
   writeJobHistory: WriteJobHistoryEntry[];
@@ -50,14 +42,6 @@ interface PassoStore {
    * Today from bouncing straight back to /body/conflict after the user picks
    * "Lascia tutto com'è" or acts on it, for the rest of that day. */
   conflictDismissedDate: string | null;
-
-  setPlan: (plan: PlanState) => void;
-  clearPlan: () => void;
-  updateSession: (index: number, updater: (session: TrainingSession) => TrainingSession) => void;
-  /** Appends a new session (screen 10b, create mode) and returns its index, or null
-   * when there is no active plan to append to. */
-  addSession: (session: TrainingSession) => number | null;
-  removeSession: (index: number) => void;
 
   setPref: <K extends keyof Prefs>(key: K, value: Prefs[K]) => void;
   setProfile: (profile: Profile) => void;
@@ -79,41 +63,11 @@ const defaultProfile: Profile = { name: "", email: "" };
 export const usePassoStore = create<PassoStore>()(
   persist(
     (set) => ({
-      plan: null,
       prefs: defaultPrefs,
       profile: defaultProfile,
       writeJobHistory: [],
       lastGarminEmail: null,
       conflictDismissedDate: null,
-
-      setPlan: (plan) => set({ plan }),
-      clearPlan: () => set({ plan: null }),
-      updateSession: (index, updater) =>
-        set((state) => {
-          if (!state.plan) return state;
-          const sessions = [...state.plan.sessions];
-          if (!sessions[index]) return state;
-          sessions[index] = updater(sessions[index]);
-          return { plan: { ...state.plan, sessions } };
-        }),
-
-      addSession: (session) => {
-        let newIndex: number | null = null;
-        set((state) => {
-          const plan = state.plan ?? { yamlText: "", sessions: [], filename: null, importedAt: new Date().toISOString() };
-          const sessions = [...plan.sessions, session];
-          newIndex = sessions.length - 1;
-          return { plan: { ...plan, sessions } };
-        });
-        return newIndex;
-      },
-
-      removeSession: (index) =>
-        set((state) => {
-          if (!state.plan) return state;
-          const sessions = state.plan.sessions.filter((_, i) => i !== index);
-          return { plan: { ...state.plan, sessions } };
-        }),
 
       setPref: (key, value) => set((state) => ({ prefs: { ...state.prefs, [key]: value } })),
       setProfile: (profile) => set({ profile }),
@@ -125,17 +79,33 @@ export const usePassoStore = create<PassoStore>()(
     }),
     {
       name: "passo-device-state",
-      // Only plan/prefs/profile/history are persisted here -- diff/calendar/body data
-      // are TanStack Query cache only (design.md's state-mapping table), never written
-      // to this store.
+      // Only prefs/profile/history are persisted here. `plan` lives in the TanStack
+      // Query cache instead (see usePlanQuery in queries.ts), and diff/calendar/body
+      // data are TanStack Query cache only too (design.md's state-mapping table),
+      // never written to this store.
       partialize: (state) => ({
-        plan: state.plan,
         prefs: state.prefs,
         profile: state.profile,
         writeJobHistory: state.writeJobHistory,
         lastGarminEmail: state.lastGarminEmail,
         conflictDismissedDate: state.conflictDismissedDate,
       }),
+      // zustand/persist's default merge is a single shallow spread of the persisted
+      // blob over the fresh state -- a `prefs`/`profile` that's partial (an older app
+      // version with fewer fields, hand-edited localStorage, a partly-cleared legacy
+      // key) replaces the whole nested object instead of filling gaps, leaving fields
+      // like `profile.name` `undefined` where code assumes a string (e.g. Avatar.tsx's
+      // `.trim()`). Merge those two nested objects one level deeper so a partial
+      // record still ends up with every default field.
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Partial<PassoStore>;
+        return {
+          ...currentState,
+          ...persisted,
+          prefs: { ...currentState.prefs, ...persisted.prefs },
+          profile: { ...currentState.profile, ...persisted.profile },
+        };
+      },
     }
   )
 );

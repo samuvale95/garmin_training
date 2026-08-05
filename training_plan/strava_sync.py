@@ -239,27 +239,61 @@ class StravaSync:
         return self._get(f"/activities/{activity_id}").json()
 
     def find_activity_match(self, session: TrainingSession) -> dict:
-        """Best-effort match of one Strava activity to a planned session, per design.md
-        decision #3: same date, sport-compatible, and (when more than one candidate
-        exists) closest in duration to the planned session.
+        """Best-effort match of one Strava activity to a planned session -- a single-
+        session case of `find_activity_matches_for_range`.
         """
+        return self.find_activity_matches_for_range([session])[session.date.isoformat()]
+
+    def find_activity_matches_for_range(self, sessions: list[TrainingSession]) -> dict[str, dict]:
+        """Best-effort match of a Strava activity to each of `sessions`, per design.md
+        decision #3: same date, sport-compatible, and (when more than one candidate
+        exists) closest in duration to the planned session. Keyed by each session's own
+        ISO date. Fetches the whole date range in one `list_activities` call (instead
+        of one per session) and only calls `get_activity_detail` for days that actually
+        have a candidate, so a week view costs a handful of Strava calls, not one pair
+        per visible day.
+        """
+        if not sessions:
+            return {}
+
+        dates = [s.date for s in sessions]
+        range_start, range_end = min(dates), max(dates)
+        activities = self.list_activities(range_start, range_end)
+
+        by_date: dict[date_type, list[dict]] = {}
+        if range_start == range_end:
+            # A single-day range is already exactly what `list_activities` filtered
+            # server-side -- no need to also bucket by each activity's own date field.
+            by_date[range_start] = activities
+        else:
+            for activity in activities:
+                start = activity.get("start_date_local") or activity.get("start_date")
+                if not start:
+                    continue
+                activity_date = datetime.fromisoformat(start.replace("Z", "+00:00")).date()
+                by_date.setdefault(activity_date, []).append(activity)
+
+        results: dict[str, dict] = {}
+        for session in sessions:
+            candidates = [
+                a for a in by_date.get(session.date, []) if _sport_compatible(a.get("type"), a.get("sport_type"), session.sport)
+            ]
+            results[session.date.isoformat()] = self._build_match(session, candidates)
+        return results
+
+    def _build_match(self, session: TrainingSession, candidates: list[dict]) -> dict:
         planned_distance_km, planned_duration_min, planned_pace_sec_per_km = _planned_summary(session)
 
-        candidates = [
-            a
-            for a in self.list_activities(session.date, session.date)
-            if _sport_compatible(a.get("type"), a.get("sport_type"), session.sport)
-        ]
         if not candidates:
             return {"matched": False}
 
         if planned_duration_min:
-            candidates.sort(
-                key=lambda a: abs((a.get("moving_time", 0) / 60) - planned_duration_min)
-            )
-        best = candidates[0]
+            candidates = sorted(candidates, key=lambda a: abs((a.get("moving_time", 0) / 60) - planned_duration_min))
+        best_id = candidates[0].get("id")
+        if best_id is None:
+            return {"matched": False}
 
-        detail = self.get_activity_detail(best["id"])
+        detail = self.get_activity_detail(best_id)
         distance_km = round(detail["distance"] / 1000, 2) if detail.get("distance") else None
         duration_min = round(detail["moving_time"] / 60, 1) if detail.get("moving_time") else None
         avg_pace = (
@@ -277,7 +311,7 @@ class StravaSync:
 
         return {
             "matched": True,
-            "activity_id": detail["id"],
+            "activity_id": detail.get("id", best_id),
             "title": detail.get("name"),
             "distance_km": distance_km,
             "duration_min": duration_min,
@@ -349,23 +383,31 @@ def _sport_compatible(strava_type: str | None, strava_sport_type: str | None, pl
     return mapped is None or mapped == planned_sport
 
 
+def _step_distance_km(step) -> float:
+    """Mirrors the frontend's `stepDistanceKm` (format.ts): a step's own distance if
+    it has one, otherwise a pace-derived estimate from its time + target pace, 0 when
+    neither is available.
+    """
+    if step.duration_type == "distance":
+        return step.duration_value
+    if step.target_pace:
+        avg_sec_per_km = (step.target_pace.slower_sec_per_km + step.target_pace.faster_sec_per_km) / 2
+        return (step.duration_value * 60) / avg_sec_per_km
+    return 0.0
+
+
 def _planned_summary(session: TrainingSession) -> tuple[float | None, float | None, float | None]:
     """Planned (distance_km, duration_min, avg_pace_sec_per_km) derived from the
     session's own steps -- there is no separately-stored "planned totals" field, so
     this mirrors what the frontend's `sessionDistanceKm`/step helpers already do.
     """
-    distance_km = 0.0
-    duration_min = 0.0
-    pace_samples: list[float] = []
-    for step in session.steps:
-        if step.duration_type == "distance":
-            distance_km += step.duration_value
-        else:
-            duration_min += step.duration_value
-        if step.target_pace:
-            pace_samples.append(
-                (step.target_pace.slower_sec_per_km + step.target_pace.faster_sec_per_km) / 2
-            )
+    distance_km = sum(_step_distance_km(step) for step in session.steps)
+    duration_min = sum(step.duration_value for step in session.steps if step.duration_type == "time")
+    pace_samples = [
+        (step.target_pace.slower_sec_per_km + step.target_pace.faster_sec_per_km) / 2
+        for step in session.steps
+        if step.target_pace
+    ]
     avg_pace = sum(pace_samples) / len(pace_samples) if pace_samples else None
     return (
         round(distance_km, 2) if distance_km else None,

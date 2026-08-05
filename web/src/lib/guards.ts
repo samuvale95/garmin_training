@@ -2,20 +2,19 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { usePassoStore, type PlanState } from "./store";
-import { useGarminStatus } from "./queries";
+import { useGarminStatus, usePlanQuery, type PlanState } from "./queries";
 
 /** Screens that need an imported plan redirect to /import when there isn't one --
  * matching the "no plan imported -> screen 03 is the home" empty state. */
 export function useRequirePlan(): PlanState | null {
   const router = useRouter();
-  const plan = usePassoStore((s) => s.plan);
+  const { data: plan, isHydrated } = usePlanQuery();
 
   useEffect(() => {
-    if (!plan) router.replace("/import");
-  }, [plan, router]);
+    if (isHydrated && !plan) router.replace("/import");
+  }, [isHydrated, plan, router]);
 
-  return plan;
+  return plan ?? null;
 }
 
 export interface CalendarAccess {
@@ -31,14 +30,14 @@ export interface CalendarAccess {
  * to /import once neither is available. */
 export function useCalendarAccess(): CalendarAccess {
   const router = useRouter();
-  const plan = usePassoStore((s) => s.plan);
+  const { data: plan, isHydrated } = usePlanQuery();
   const status = useGarminStatus();
   const garminConnected = status.data?.connected ?? false;
-  const ready = plan != null || status.isFetched;
+  const ready = (isHydrated && plan != null) || status.isFetched;
 
   useEffect(() => {
     if (ready && !plan && !garminConnected) router.replace("/import");
   }, [ready, plan, garminConnected, router]);
 
-  return { plan, garminConnected, ready };
+  return { plan: plan ?? null, garminConnected, ready };
 }

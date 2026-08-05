@@ -4,8 +4,7 @@ import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
 import { SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { useBodyLoad } from "@/lib/queries";
-import { usePassoStore } from "@/lib/store";
+import { useBodyLoad, usePlanQuery } from "@/lib/queries";
 import { isoWeekNumber, sessionDistanceKm, toDateKey } from "@/lib/sessionVisuals";
 
 const ROW_HEIGHT = 100;
@@ -21,7 +20,7 @@ function loadState(ratio: number | null): { label: string; caption: string } {
 export default function LoadPage() {
   const animate = useMountOnce("body-load");
   const { data, isLoading } = useBodyLoad();
-  const plan = usePassoStore((s) => s.plan);
+  const { data: plan } = usePlanQuery();
 
   function plannedKmForWeek(start: Date): number {
     const end = new Date(start);

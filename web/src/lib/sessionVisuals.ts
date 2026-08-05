@@ -1,4 +1,5 @@
 import type { IllustrationName } from "@/components/Illustration";
+import { stepDistanceKm } from "./format";
 import type { Step } from "./types";
 
 export type SessionKind = "riposo" | "ripetute" | "fondo_lento" | "forza" | "lungo";
@@ -44,11 +45,12 @@ export function classifySession(session: DisplaySession | null): SessionVisual {
 }
 
 /** 0 for sessions with no step detail (e.g. a live Garmin workout, which only
- * carries date/sport/title -- see `DisplaySession`). */
+ * carries date/sport/title -- see `DisplaySession`). Sums every step via
+ * `stepDistanceKm`, so time-based steps (warmup/cooldown/intervals defined in
+ * minutes) contribute their pace-estimated distance too, matching the per-row
+ * total shown in the session-detail step list. */
 export function sessionDistanceKm(session: DisplaySession): number {
-  return (session.steps ?? [])
-    .filter((s) => s.duration_type === "distance")
-    .reduce((sum, s) => sum + s.duration_value, 0);
+  return (session.steps ?? []).reduce((sum, s) => sum + stepDistanceKm(s), 0);
 }
 
 export function weekBounds(reference: Date): { start: Date; end: Date } {
@@ -70,6 +72,12 @@ export function toDateKey(d: Date): string {
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+/** Whitespace/case-normalized title, used to match a local plan session against its
+ * Garmin-side `ScheduledWorkout` (dates alone aren't a unique key -- see callers). */
+export function normalizeTitle(title: string): string {
+  return title.trim().split(/\s+/).join(" ").toLowerCase();
 }
 
 export function isoWeekNumber(d: Date): number {

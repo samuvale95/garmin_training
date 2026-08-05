@@ -6,12 +6,11 @@ import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { PrimaryButton, WordIn, SlideUp } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { usePassoStore } from "@/lib/store";
-import { useGarminStatus } from "@/lib/queries";
+import { useGarminStatus, usePlanQuery } from "@/lib/queries";
 
 export default function EntryPage() {
   const router = useRouter();
-  const plan = usePassoStore((s) => s.plan);
+  const { data: plan } = usePlanQuery();
   const status = useGarminStatus();
   const garminConnected = status.data?.connected ?? false;
   const animate = useMountOnce("entry");

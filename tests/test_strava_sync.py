@@ -203,6 +203,51 @@ def test_find_activity_match_ignores_incompatible_sport(monkeypatch, tmp_path):
     assert result == {"matched": False}
 
 
+def test_find_activity_matches_for_range_buckets_by_date_with_one_list_call(monkeypatch, tmp_path):
+    sync = make_sync(tmp_path, tokens=valid_tokens())
+    monday = TrainingSession(date=date(2026, 8, 10), sport="running", title="Fondo", steps=[])
+    wednesday = TrainingSession(date=date(2026, 8, 12), sport="running", title="Riposo", steps=[])
+    friday = TrainingSession(date=date(2026, 8, 14), sport="running", title="Ripetute", steps=[])
+
+    calls = {"list_activities": 0}
+
+    def fake_get(url, params=None, headers=None, timeout=None):
+        if url.endswith("/athlete/activities"):
+            calls["list_activities"] += 1
+            return FakeResponse(
+                200,
+                [
+                    {
+                        "id": 10,
+                        "type": "Run",
+                        "sport_type": "Run",
+                        "moving_time": 1800,
+                        "start_date_local": "2026-08-10T07:00:00Z",
+                    },
+                    {
+                        "id": 20,
+                        "type": "Run",
+                        "sport_type": "Run",
+                        "moving_time": 2400,
+                        "start_date_local": "2026-08-14T07:00:00Z",
+                    },
+                ],
+            )
+        activity_id = int(url.rsplit("/", 1)[-1])
+        return FakeResponse(200, {"id": activity_id, "distance": 10000, "moving_time": 1800})
+
+    monkeypatch.setattr(strava_sync.httpx, "get", fake_get)
+
+    matches = sync.find_activity_matches_for_range([monday, wednesday, friday])
+
+    assert calls["list_activities"] == 1  # one call for the whole range, not one per session
+    assert matches["2026-08-10"]["matched"] is True
+    assert matches["2026-08-10"]["activity_id"] == 10
+    assert matches["2026-08-12"] == {"matched": False}  # no activity that day
+    assert matches["2026-08-14"]["matched"] is True
+    assert matches["2026-08-14"]["activity_id"] == 20
+
+
 # ---- shoe wear ----------------------------------------------------------------------------------
 
 

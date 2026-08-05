@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import logging
 import os
 import shutil
 import time
@@ -29,6 +30,8 @@ from .models import (
     Step,
     TrainingSession,
 )
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_TOKENSTORE_PATH = str(Path.home() / ".garmin_training_tokens")
 DEFAULT_LOGIN_STATE_PATH = str(Path.home() / ".garmin_training_login_state.json")
@@ -358,6 +361,7 @@ class GarminSync:
         try:
             last_used = self.client.get_device_last_used()
         except Exception:  # noqa: BLE001 - device info is a nice-to-have, never fatal
+            logger.warning("get_device_last_used failed, degrading to unavailable", exc_info=True)
             return {"device_name": None, "last_synced_at": None}
 
         if not isinstance(last_used, dict):

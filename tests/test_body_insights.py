@@ -18,11 +18,26 @@ class FakeGarminClient:
                 "awakeSleepSeconds": 1800,
             }
         }
-        self.rhr = {"restingHeartRate": 48}
         self.stress = {"avgStressLevel": 22}
-        self.battery = [{"charged": 64}]
-        self.training_status = {"weeklyTrainingLoad": 320, "acuteChronicRatio": 1.28}
-        self.max_metrics = [{"generic": {"vo2MaxPreciseValue": 52.3}}]
+        self.stats = {
+            "restingHeartRate": 48,
+            "lastSevenDaysAvgRestingHeartRate": 50,
+            "bodyBatteryMostRecentValue": 64,
+        }
+        self.training_status = {
+            "mostRecentVO2Max": {"generic": {"vo2MaxPreciseValue": 52.3}},
+            "mostRecentTrainingStatus": {
+                "latestTrainingStatusData": {
+                    "1234": {
+                        "primaryTrainingDevice": True,
+                        "acuteTrainingLoadDTO": {
+                            "dailyTrainingLoadAcute": 320,
+                            "dailyAcuteChronicWorkloadRatio": 1.28,
+                        },
+                    }
+                }
+            },
+        }
 
     def get_training_readiness(self, day):
         return self.readiness
@@ -33,20 +48,14 @@ class FakeGarminClient:
     def get_hrv_data(self, day):
         return {"hrvSummary": {"lastNightAvg": 55}}
 
-    def get_rhr_day(self, day):
-        return self.rhr
-
     def get_stress_data(self, day):
         return self.stress
 
-    def get_body_battery(self, day):
-        return self.battery
+    def get_stats(self, day):
+        return self.stats
 
     def get_training_status(self, day):
         return self.training_status
-
-    def get_max_metrics(self, day):
-        return self.max_metrics
 
 
 class EmptyGarminClient(FakeGarminClient):
@@ -91,6 +100,7 @@ def test_fetch_body_snapshot_returns_expected_fields():
     assert snapshot.sleep.total_minutes == 450
     assert snapshot.sleep.deep_minutes == 90
     assert snapshot.resting_heart_rate == 48
+    assert snapshot.resting_heart_rate_delta == -2
     assert snapshot.battery_percent == 64
     assert snapshot.stress_level == 22
     assert len(snapshot.hrv_seven_day) == 7

@@ -9,7 +9,7 @@ import { Illustration } from "@/components/Illustration";
 import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
-import { usePlanDiff, useBodyConflict, useBodyToday, useWorkouts } from "@/lib/queries";
+import { usePlanDiff, useBodyConflict, useBodyToday, useStravaActivityMatches, useStravaStatus, useWorkouts } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
 import { classifySession, isoWeekNumber, sessionDistanceKm, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
 import { capitalize, formatFullDate, groupSteps, numberToItalianWords, relativeDayLabel, stepGroupLine } from "@/lib/format";
@@ -22,9 +22,18 @@ export default function TodayPage() {
   const todayKey = toDateKey(today);
   const { start, end } = weekBounds(today);
   const liveMode = !access.plan && access.garminConnected;
-  const workoutsQuery = useWorkouts(toDateKey(start), toDateKey(end), liveMode);
+  const startKey = toDateKey(start);
+  const endKey = toDateKey(end);
+  const workoutsQuery = useWorkouts(startKey, endKey, liveMode);
   const diffQuery = usePlanDiff(access.plan?.sessions ?? null);
   const bodyQuery = useBodyToday();
+
+  // "Svolto" indicators for the hero card + rest-of-week list, same batch pattern as
+  // Week -- one request for the whole visible week, not one per session.
+  const stravaStatus = useStravaStatus();
+  const planSessionsThisWeek = access.plan ? access.plan.sessions.filter((s) => s.date >= startKey && s.date <= endKey) : [];
+  const stravaEnabled = !!access.plan && !!stravaStatus.data?.connected && planSessionsThisWeek.length > 0;
+  const stravaMatches = useStravaActivityMatches(planSessionsThisWeek, stravaEnabled);
 
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -65,6 +74,8 @@ export default function TodayPage() {
   const heroGroups = heroSession?.steps ? groupSteps(heroSession.steps).filter((g) => g.kind === "interval" || g.kind === "warmup" || g.kind === "cooldown") : [];
   const heroMainGroup = heroGroups.find((g) => g.kind === "interval") ?? heroGroups[0] ?? null;
 
+  const heroMatch = heroSession ? stravaMatches.data?.matches[heroSession.date] : undefined;
+
   const pendingChanges = (diffQuery.data?.to_create.length ?? 0) + (diffQuery.data?.changed.length ?? 0);
   const readiness = bodyQuery.data?.readiness_score;
   const sleepMinutes = bodyQuery.data?.sleep?.total_minutes;
@@ -100,6 +111,11 @@ export default function TodayPage() {
               <p style={{ font: "600 22px/1.15 var(--font-outfit)", margin: "0 0 8px", maxWidth: 200 }}>{heroSession.title}</p>
               {heroMainGroup && (
                 <p className="font-mono" style={{ fontSize: 13, opacity: 0.85, margin: 0, maxWidth: 200 }}>{stepGroupLine(heroMainGroup)}</p>
+              )}
+              {heroMatch?.matched && heroMatch.distance_km != null && (
+                <p className="font-mono" style={{ fontSize: 12, opacity: 0.75, margin: "6px 0 0", maxWidth: 200 }}>
+                  svolto {heroMatch.distance_km.toFixed(1)} km
+                </p>
               )}
             </>
           ) : (
@@ -196,6 +212,7 @@ export default function TodayPage() {
         {restOfWeek.map((session, i) => {
           const visual = classifySession(session);
           const km = sessionDistanceKm(session);
+          const match = stravaMatches.data?.matches[session.date];
           return (
             <SlideUp
               key={`${session.date}-${i}`}
@@ -208,7 +225,11 @@ export default function TodayPage() {
                 {new Date(session.date).toLocaleDateString("it-IT", { weekday: "short" })}
               </span>
               <span style={{ font: "500 13.5px var(--font-outfit)", flex: 1 }}>{session.title}</span>
-              {km > 0 && (
+              {match?.matched && match.distance_km != null ? (
+                <span className="font-mono" style={{ fontSize: 11, color: "var(--verde-tratto-scuro)", width: 60, textAlign: "right", flex: "none" }}>
+                  svolto {match.distance_km.toFixed(0)}
+                </span>
+              ) : km > 0 && (
                 <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", width: 38, textAlign: "right", flex: "none" }}>
                   {km.toFixed(0)} km
                 </span>

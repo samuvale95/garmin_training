@@ -6,15 +6,14 @@ import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { ProgressRing, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { useBodyToday } from "@/lib/queries";
-import { usePassoStore } from "@/lib/store";
+import { useBodyToday, usePlanQuery } from "@/lib/queries";
 import { toDateKey } from "@/lib/sessionVisuals";
 import { formatFullDate, hrvCaption, stressCaption } from "@/lib/format";
 
 export default function RecoveryPage() {
   const animate = useMountOnce("body-recovery");
   const { data, isLoading } = useBodyToday();
-  const plan = usePassoStore((s) => s.plan);
+  const { data: plan } = usePlanQuery();
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);

@@ -6,9 +6,8 @@ import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { useParsePlanFile, useParsePlanText } from "@/lib/queries";
+import { useParsePlanFile, useParsePlanText, usePlanQuery, useSetPlan } from "@/lib/queries";
 import { ApiError } from "@/lib/apiClient";
-import { usePassoStore } from "@/lib/store";
 import { isoWeekNumber } from "@/lib/sessionVisuals";
 
 function daysAgo(isoDate: string): string {
@@ -26,8 +25,8 @@ function weeksSpanned(sessions: { date: string }[]): number {
 export default function ImportPlanPage() {
   const router = useRouter();
   const animate = useMountOnce("import");
-  const plan = usePassoStore((s) => s.plan);
-  const setPlan = usePassoStore((s) => s.setPlan);
+  const { data: plan } = usePlanQuery();
+  const setPlan = useSetPlan();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pastedText, setPastedText] = useState("");
