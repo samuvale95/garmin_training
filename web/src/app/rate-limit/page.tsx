@@ -47,7 +47,7 @@ export default function RateLimitPage() {
     setRetryError(null);
     try {
       await connect.mutateAsync({ email: lastGarminEmail, password });
-      router.push("/today");
+      router.push("/import");
     } catch (err) {
       setRetryError(err instanceof ApiError ? err.message : "Qualcosa non ha funzionato. Riprova.");
     }

@@ -16,8 +16,10 @@ export default function ConflictPage() {
   const animate = useMountOnce("body-conflict");
   const plan = usePassoStore((s) => s.plan);
   const updateSession = usePassoStore((s) => s.updateSession);
+  const dismissConflictToday = usePassoStore((s) => s.dismissConflictToday);
   const bodyQuery = useBodyToday();
 
+  const todayKey = toDateKey(new Date());
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowKey = toDateKey(tomorrow);
@@ -25,6 +27,13 @@ export default function ConflictPage() {
   const nextSession = sessionIndex >= 0 ? plan!.sessions[sessionIndex] : null;
 
   const conflictQuery = useBodyConflict(nextSession);
+
+  function leaveConflict() {
+    // Whatever the user picks, Today shouldn't bounce straight back here for the
+    // rest of the day -- see store.ts's conflictDismissedDate.
+    dismissConflictToday(todayKey);
+    router.push("/today");
+  }
 
   function applyOption(option: ConflictOption) {
     if (sessionIndex < 0) return;
@@ -42,7 +51,7 @@ export default function ConflictPage() {
         return { ...s, steps: s.steps.filter((_, i) => i !== lastInterval) };
       });
     }
-    router.push("/today");
+    leaveConflict();
   }
 
   if (!nextSession || !conflictQuery.data?.has_conflict) {
@@ -128,7 +137,7 @@ export default function ConflictPage() {
         ))}
         <button
           type="button"
-          onClick={() => router.push("/today")}
+          onClick={leaveConflict}
           className="tap-target"
           style={{ background: "none", border: "none", color: "var(--inchiostro-35)", fontSize: 12, cursor: "pointer" }}
         >

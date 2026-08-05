@@ -23,6 +23,10 @@ class FakeClient:
         self.upload_should_fail = False
         self.schedule_should_fail = False
         self.calendar_by_month = {}
+        self.activities_by_range = {}
+
+    def get_activities_by_date(self, startdate, enddate):
+        return self.activities_by_range.get((startdate, enddate), [])
 
     def upload_workout(self, payload):
         if self.upload_should_fail:
@@ -506,6 +510,54 @@ def test_list_scheduled_workouts_empty_range():
     sync, fake = make_sync_with_fake_client()
     workouts = sync.list_scheduled_workouts(date(2026, 8, 1), date(2026, 8, 31))
     assert workouts == []
+
+
+def _activity_item(activity_id, start_local, name, sport="running", distance_m=5000.0, duration_s=1500.0):
+    return {
+        "activityId": activity_id,
+        "startTimeLocal": start_local,
+        "activityName": name,
+        "activityType": {"typeKey": sport},
+        "distance": distance_m,
+        "duration": duration_s,
+    }
+
+
+def test_list_activities_parses_distance_and_duration():
+    sync, fake = make_sync_with_fake_client()
+    fake.activities_by_range[("2026-08-01", "2026-08-02")] = [
+        _activity_item(1, "2026-08-01 08:14:20", "Morning run", distance_m=10000.0, duration_s=3000.0),
+    ]
+
+    activities = sync.list_activities(date(2026, 8, 1), date(2026, 8, 2))
+
+    assert len(activities) == 1
+    activity = activities[0]
+    assert activity.date == date(2026, 8, 1)
+    assert activity.sport == "running"
+    assert activity.title == "Morning run"
+    assert activity.distance_km == 10.0
+    assert activity.duration_min == 50.0
+
+
+def test_list_activities_sorted_and_missing_fields_default_to_none():
+    sync, fake = make_sync_with_fake_client()
+    later = _activity_item(2, "2026-08-02 07:00:00", "Second", distance_m=None, duration_s=None)
+    del later["distance"]
+    del later["duration"]
+    earlier = _activity_item(1, "2026-08-01 07:00:00", "First")
+    fake.activities_by_range[("2026-08-01", "2026-08-03")] = [later, earlier]
+
+    activities = sync.list_activities(date(2026, 8, 1), date(2026, 8, 3))
+
+    assert [a.title for a in activities] == ["First", "Second"]
+    assert activities[1].distance_km is None
+    assert activities[1].duration_min is None
+
+
+def test_list_activities_empty_range():
+    sync, _ = make_sync_with_fake_client()
+    assert sync.list_activities(date(2026, 8, 1), date(2026, 8, 2)) == []
 
 
 def test_select_workouts_combined_filters():

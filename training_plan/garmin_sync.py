@@ -66,6 +66,19 @@ class ScheduledWorkout:
 
 
 @dataclass
+class CompletedActivity:
+    """An actually-completed Garmin activity (distinct from `ScheduledWorkout`,
+    which is a planned/scheduled calendar entry, possibly never done)."""
+
+    activity_id: int
+    date: date_type
+    sport: str
+    title: str
+    distance_km: float | None
+    duration_min: float | None
+
+
+@dataclass
 class DeleteResult:
     workout: ScheduledWorkout
     success: bool
@@ -524,6 +537,20 @@ class GarminSync:
         results.sort(key=lambda w: w.date)
         return results
 
+    def list_activities(self, start: date_type, end: date_type) -> list[CompletedActivity]:
+        """Actually-completed activities in a date range (not the planned calendar --
+        see `list_scheduled_workouts` for that). Used to show real done-vs-planned
+        progress instead of the planned/scheduled state alone.
+        """
+        try:
+            data = self.client.get_activities_by_date(start.isoformat(), end.isoformat())
+        except Exception as exc:  # noqa: BLE001 - surfaced as a clean CLI error
+            raise GarminSyncError(f"Could not read Garmin activities for {start}..{end}: {exc}") from exc
+
+        results = [a for item in data if (a := _parse_activity_item(item)) is not None]
+        results.sort(key=lambda a: a.date)
+        return results
+
     def select_workouts(
         self,
         workouts: list[ScheduledWorkout],
@@ -615,4 +642,34 @@ def _parse_calendar_item(item: dict) -> ScheduledWorkout | None:
         date=parsed_date,
         sport=str(sport_key or "other"),
         title=str(title),
+    )
+
+
+def _parse_activity_item(item: dict) -> CompletedActivity | None:
+    if not isinstance(item, dict):
+        return None
+
+    activity_id = item.get("activityId")
+    raw_start = item.get("startTimeLocal")
+    if activity_id is None or raw_start is None:
+        return None
+
+    try:
+        parsed_date = datetime.strptime(str(raw_start)[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+    activity_type = item.get("activityType")
+    sport_key = activity_type.get("typeKey") if isinstance(activity_type, dict) else None
+
+    distance_m = item.get("distance")
+    duration_s = item.get("duration")
+
+    return CompletedActivity(
+        activity_id=int(activity_id),
+        date=parsed_date,
+        sport=str(sport_key or "other"),
+        title=str(item.get("activityName") or ""),
+        distance_km=round(distance_m / 1000, 2) if isinstance(distance_m, (int, float)) else None,
+        duration_min=round(duration_s / 60, 1) if isinstance(duration_s, (int, float)) else None,
     )

@@ -66,7 +66,7 @@ export default function SettingsPage() {
         {garminStatus?.connected ? (
           <button
             type="button"
-            onClick={() => disconnect.mutate()}
+            onClick={() => disconnect.mutate(undefined, { onSuccess: () => router.push("/connect-garmin") })}
             disabled={disconnect.isPending}
             className="tap-target"
             style={{ marginTop: 10, background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}

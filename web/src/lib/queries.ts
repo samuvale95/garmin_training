@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPostForm } from "./apiClient";
 import type {
   BodySnapshot,
+  CompletedActivity,
   ConflictAssessment,
   DeleteResult,
   DeviceInfo,
@@ -132,6 +133,15 @@ export function useWorkouts(start: string, end: string, enabled = true) {
     queryKey: ["garmin", "workouts", start, end],
     queryFn: () => apiGet<{ workouts: ScheduledWorkout[] }>("/garmin/workouts", { start, end }),
     enabled,
+  });
+}
+
+export function useActivities(start: string, end: string, enabled = true) {
+  return useQuery({
+    queryKey: ["garmin", "activities", start, end],
+    queryFn: () => apiGet<{ activities: CompletedActivity[] }>("/garmin/activities", { start, end }),
+    enabled,
+    staleTime: 5 * 60_000,
   });
 }
 

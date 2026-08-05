@@ -27,7 +27,7 @@ export default function ConnectGarminPage() {
     setLastGarminEmail(email);
     try {
       await connect.mutateAsync({ email, password });
-      router.push("/today");
+      router.push("/import");
     } catch (err) {
       if (err instanceof ApiError && err.category === "rate_limited") {
         router.push("/rate-limit");
@@ -99,7 +99,7 @@ export default function ConnectGarminPage() {
         </PrimaryButton>
         <button
           type="button"
-          onClick={() => router.push("/import")}
+          onClick={() => router.push("/today")}
           className="tap-target"
           style={{ background: "none", border: "none", color: "var(--inchiostro-50)", fontSize: 13, cursor: "pointer" }}
         >

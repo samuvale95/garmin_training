@@ -9,6 +9,7 @@ from training_plan.api import app as fastapi_app
 from training_plan.api import jobs as jobs_module
 from training_plan.api import routes_garmin
 from training_plan.garmin_sync import (
+    CompletedActivity,
     DeleteResult,
     GarminRateLimitError,
     GarminSyncError,
@@ -48,6 +49,9 @@ class FakeGarminSync:
 
     def list_scheduled_workouts(self, start, end):
         return [ScheduledWorkout(1, 10, date(2026, 8, 1), "running", "Easy Run")]
+
+    def list_activities(self, start, end):
+        return [CompletedActivity(1, date(2026, 8, 1), "running", "Morning Run", 10.0, 50.0)]
 
     def select_workouts(self, workouts, sport=None, title_match=None):
         return workouts
@@ -213,6 +217,14 @@ def test_list_workouts(client):
     response = client.get("/garmin/workouts", params={"start": "2026-08-01", "end": "2026-08-31"})
     assert response.status_code == 200
     assert len(response.json()["workouts"]) == 1
+
+
+def test_list_activities(client):
+    response = client.get("/garmin/activities", params={"start": "2026-08-01", "end": "2026-08-31"})
+    assert response.status_code == 200
+    activities = response.json()["activities"]
+    assert len(activities) == 1
+    assert activities[0]["distance_km"] == 10.0
 
 
 def test_deletion_preview_and_apply(client):

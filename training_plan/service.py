@@ -14,6 +14,7 @@ from datetime import date as date_type
 
 from .garmin_sync import (
     ChangedSession,
+    CompletedActivity,
     DeleteResult,
     GarminSync,
     PlanDiff,
@@ -91,6 +92,15 @@ def list_workouts(
     sync = GarminSync(prompt_mfa=prompt_mfa)
     sync.login()
     return sync.list_scheduled_workouts(start, end)
+
+
+def list_activities(
+    start: date_type, end: date_type, prompt_mfa: Callable[[], str] | None = None
+) -> list[CompletedActivity]:
+    """Log in and list actually-completed activities in a date range."""
+    sync = GarminSync(prompt_mfa=prompt_mfa)
+    sync.login()
+    return sync.list_activities(start, end)
 
 
 def preview_deletion(

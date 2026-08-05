@@ -55,6 +55,12 @@ async def workouts(start: date, end: date) -> schemas.WorkoutsResponse:
     return schemas.WorkoutsResponse(workouts=[schemas.ScheduledWorkoutOut.from_model(w) for w in result])
 
 
+@router.get("/garmin/activities", response_model=schemas.ActivitiesResponse)
+async def activities(start: date, end: date) -> schemas.ActivitiesResponse:
+    result = await run_in_threadpool(service.list_activities, start, end)
+    return schemas.ActivitiesResponse(activities=[schemas.CompletedActivityOut.from_model(a) for a in result])
+
+
 @router.post("/garmin/deletions/preview", response_model=schemas.DeletionPreviewResponse)
 async def deletion_preview(payload: schemas.DeletionPreviewRequest) -> schemas.DeletionPreviewResponse:
     preview = await run_in_threadpool(

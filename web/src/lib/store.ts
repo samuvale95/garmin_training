@@ -46,6 +46,10 @@ interface PassoStore {
    * connect-garmin's "mai la password" promise). Lets the rate-limit screen offer an
    * "update the password" retry without asking for the email again. */
   lastGarminEmail: string | null;
+  /** Date key (YYYY-MM-DD) the body-conflict screen was last dismissed on -- keeps
+   * Today from bouncing straight back to /body/conflict after the user picks
+   * "Lascia tutto com'è" or acts on it, for the rest of that day. */
+  conflictDismissedDate: string | null;
 
   setPlan: (plan: PlanState) => void;
   clearPlan: () => void;
@@ -54,6 +58,7 @@ interface PassoStore {
   setPref: <K extends keyof Prefs>(key: K, value: Prefs[K]) => void;
   setProfile: (profile: Profile) => void;
   setLastGarminEmail: (email: string) => void;
+  dismissConflictToday: (dateKey: string) => void;
 
   addJobHistory: (entry: WriteJobHistoryEntry) => void;
 }
@@ -75,6 +80,7 @@ export const usePassoStore = create<PassoStore>()(
       profile: defaultProfile,
       writeJobHistory: [],
       lastGarminEmail: null,
+      conflictDismissedDate: null,
 
       setPlan: (plan) => set({ plan }),
       clearPlan: () => set({ plan: null }),
@@ -90,6 +96,7 @@ export const usePassoStore = create<PassoStore>()(
       setPref: (key, value) => set((state) => ({ prefs: { ...state.prefs, [key]: value } })),
       setProfile: (profile) => set({ profile }),
       setLastGarminEmail: (email) => set({ lastGarminEmail: email }),
+      dismissConflictToday: (dateKey) => set({ conflictDismissedDate: dateKey }),
 
       addJobHistory: (entry) =>
         set((state) => ({ writeJobHistory: [entry, ...state.writeJobHistory].slice(0, 20) })),
@@ -105,6 +112,7 @@ export const usePassoStore = create<PassoStore>()(
         profile: state.profile,
         writeJobHistory: state.writeJobHistory,
         lastGarminEmail: state.lastGarminEmail,
+        conflictDismissedDate: state.conflictDismissedDate,
       }),
     }
   )

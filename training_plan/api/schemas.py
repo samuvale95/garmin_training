@@ -266,6 +266,30 @@ class WorkoutsResponse(BaseModel):
     workouts: list[ScheduledWorkoutOut]
 
 
+class CompletedActivityOut(BaseModel):
+    activity_id: int
+    date: date_type
+    sport: str
+    title: str
+    distance_km: float | None
+    duration_min: float | None
+
+    @classmethod
+    def from_model(cls, activity: garmin_sync.CompletedActivity) -> "CompletedActivityOut":
+        return cls(
+            activity_id=activity.activity_id,
+            date=activity.date,
+            sport=activity.sport,
+            title=activity.title,
+            distance_km=activity.distance_km,
+            duration_min=activity.duration_min,
+        )
+
+
+class ActivitiesResponse(BaseModel):
+    activities: list[CompletedActivityOut]
+
+
 class DeletionPreviewRequest(BaseModel):
     start: date_type
     end: date_type

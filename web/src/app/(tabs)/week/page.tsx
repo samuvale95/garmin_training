@@ -7,20 +7,35 @@ import { Illustration } from "@/components/Illustration";
 import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
-import { useWorkouts } from "@/lib/queries";
+import { useActivities, useWorkouts } from "@/lib/queries";
 import { classifySession, sessionDistanceKm, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
 import { sessionDetailLine } from "@/lib/format";
+
+function formatWeekRange(start: Date, end: Date): string {
+  const startMonth = start.toLocaleDateString("it-IT", { month: "short" });
+  const endMonth = end.toLocaleDateString("it-IT", { month: "short" });
+  if (startMonth === endMonth) return `${start.getDate()} – ${end.getDate()} ${endMonth}`;
+  return `${start.getDate()} ${startMonth} – ${end.getDate()} ${endMonth}`;
+}
 
 export default function WeekPage() {
   const access = useCalendarAccess();
   const animate = useMountOnce("week");
   const [offset, setOffset] = useState(0);
   const liveMode = !access.plan && access.garminConnected;
+  const todayKey = toDateKey(new Date());
 
   const reference = new Date();
   reference.setDate(reference.getDate() + offset * 7);
   const { start, end } = weekBounds(reference);
-  const workoutsQuery = useWorkouts(toDateKey(start), toDateKey(end), liveMode);
+  const startKey = toDateKey(start);
+  const endKey = toDateKey(end);
+  const workoutsQuery = useWorkouts(startKey, endKey, liveMode);
+  // Real done-vs-planned needs actual Garmin activities, not just the scheduled/planned
+  // calendar -- only fetched (and only shown) when there's both a plan to compare
+  // against and a live Garmin connection to pull completed activities from.
+  const showProgress = !liveMode && access.garminConnected;
+  const activitiesQuery = useActivities(startKey, endKey, showProgress);
 
   if (!access.ready || (!access.plan && !access.garminConnected)) return null;
 
@@ -37,34 +52,54 @@ export default function WeekPage() {
 
   const weekSessions = days.map((d) => d.session).filter((s): s is NonNullable<typeof s> => !!s);
   const weekKm = weekSessions.reduce((sum, s) => sum + sessionDistanceKm(s), 0);
-  const completedFraction = 0.5; // real "done vs planned" needs Garmin activity data -- see body-insights follow-up
+  const doneKm = (activitiesQuery.data?.activities ?? []).reduce((sum, a) => sum + (a.distance_km ?? 0), 0);
+  const progressFraction = weekKm > 0 ? Math.min(1, doneKm / weekKm) : 0;
+
+  const summaryText = liveMode
+    ? `${weekSessions.length} sedute (calendario Garmin)`
+    : showProgress
+      ? `${doneKm.toFixed(0)} / ${weekKm.toFixed(0)} km · ${weekSessions.length} sedute`
+      : `${weekKm.toFixed(0)} km · ${weekSessions.length} sedute`;
 
   return (
     <div>
       <div style={{ padding: "22px 20px 0", position: "sticky", top: 0, zIndex: 1, background: "var(--crema)" }}>
-        <BrandMark height={22} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <BrandMark height={22} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <NavButton label="Settimana precedente" onClick={() => setOffset((o) => o - 1)}>
+              ‹
+            </NavButton>
+            <NavButton label="Settimana successiva" onClick={() => setOffset((o) => o + 1)}>
+              ›
+            </NavButton>
+          </div>
+        </div>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
-          <button className="tap-target" onClick={() => setOffset((o) => o - 1)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer" }}>
-            ‹
-          </button>
-          <WordIn active={animate} style={{ font: "600 16px/1 var(--font-outfit)" }}>
-            {start.toLocaleDateString("it-IT", { day: "numeric", month: "short" })} – {end.toLocaleDateString("it-IT", { day: "numeric", month: "short" })}
+        <div style={{ marginTop: 14 }}>
+          <WordIn active={animate} style={{ font: "600 30px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>
+            {formatWeekRange(start, end)}
           </WordIn>
-          <button className="tap-target" onClick={() => setOffset((o) => o + 1)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer" }}>
-            ›
-          </button>
         </div>
 
-        <div style={{ marginTop: 10 }}>
-          <BarGrow value={completedFraction} height={4} active={animate} />
-        </div>
+        {showProgress && (
+          <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <BarGrow value={progressFraction} height={4} active={animate} />
+            </div>
+            <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", flex: "none" }}>
+              {summaryText}
+            </span>
+          </div>
+        )}
       </div>
 
       <div style={{ padding: "0 20px 12px" }}>
-        <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", marginTop: 8 }}>
-          {liveMode ? `${weekSessions.length} sedute (calendario Garmin)` : `${weekKm.toFixed(0)} km · ${weekSessions.length} sedute`}
-        </p>
+        {!showProgress && (
+          <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", marginTop: 8 }}>
+            {summaryText}
+          </p>
+        )}
 
         {liveMode && (
           <Link href="/import" style={{ textDecoration: "none", color: "inherit" }}>
@@ -82,6 +117,7 @@ export default function WeekPage() {
             const visual = classifySession(day.session);
             const height = day.session ? 78 + Math.min(40, sessionDistanceKm(day.session) * 2) : 78;
             const detail = day.session ? sessionDetailLine(day.session) || visual.label : "e va bene così";
+            const isToday = day.key === todayKey;
             const card = (
               <SlideUp
                 active={animate}
@@ -111,9 +147,12 @@ export default function WeekPage() {
             );
             return (
               <div key={day.key} style={{ display: "flex", gap: 10 }}>
-                <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", width: 30, paddingTop: 14 }}>
-                  {day.date.toLocaleDateString("it-IT", { weekday: "short" })}
-                </span>
+                <div className="font-mono" style={{ width: 30, paddingTop: 14, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                  <span style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? "var(--inchiostro)" : "var(--inchiostro-50)" }}>
+                    {day.date.toLocaleDateString("it-IT", { weekday: "short" })}
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--inchiostro)" }}>{day.date.getDate()}</span>
+                </div>
                 <div style={{ flex: 1 }}>
                   {day.session && day.index >= 0 ? <Link href={`/session/${day.index}`} style={{ textDecoration: "none", color: "inherit" }}>{card}</Link> : card}
                 </div>
@@ -123,5 +162,31 @@ export default function WeekPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function NavButton({ label, onClick, children }: { label: string; onClick: () => void; children: string }) {
+  return (
+    <button
+      className="tap-target"
+      aria-label={label}
+      onClick={onClick}
+      style={{
+        width: 30,
+        height: 30,
+        borderRadius: "50%",
+        background: "var(--sabbia-chip)",
+        color: "var(--inchiostro)",
+        border: "none",
+        fontSize: 15,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        flex: "none",
+      }}
+    >
+      {children}
+    </button>
   );
 }

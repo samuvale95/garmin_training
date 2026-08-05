@@ -33,6 +33,15 @@ export interface ScheduledWorkout {
   title: string;
 }
 
+export interface CompletedActivity {
+  activity_id: number;
+  date: string;
+  sport: string;
+  title: string;
+  distance_km: number | null;
+  duration_min: number | null;
+}
+
 export interface ChangedSession {
   session: TrainingSession;
   workout: ScheduledWorkout;
