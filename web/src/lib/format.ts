@@ -66,6 +66,12 @@ function formatPaceMinSec(secondsPerKm: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+/** "4:24/km" -- a single (not ranged) pace, the format screen 17 uses for an actual
+ * (Strava-reported) pace rather than a planned range. */
+export function formatPaceValue(secondsPerKm: number): string {
+  return `${formatPaceMinSec(secondsPerKm)}/km`;
+}
+
 /** "4:20-4:10" -- slower bound first, matching how the design always presents a
  * pace range (and the on-disk YAML convention `formatPace` in planYaml.ts mirrors). */
 export function formatPaceRange(target: PaceTarget): string {

@@ -144,6 +144,51 @@ def test_sync_job_runs_to_completion(client):
     assert all(item["status"] == "ok" for item in status["items"])
 
 
+def test_sync_job_supports_a_single_created_session(client):
+    """The workout-editor screen (10b) create mode drives `/plan/sync` with a
+    one-item `to_create` list -- no dedicated single-session endpoint exists, per
+    design.md decision #5, so this pins that the existing job path already covers it.
+    """
+    response = client.post("/plan/sync", json={"to_create": [_session_payload()], "changed": []})
+    job_id = response.json()["job_id"]
+    status = _poll_until_finished(client, job_id)
+    assert status["status"] == "done"
+    assert status["items"] == [
+        {"date": "2026-08-01", "sport": "running", "title": "Easy run", "kind": "create", "status": "ok", "error": None}
+    ]
+
+
+def test_sync_job_supports_a_single_replaced_session():
+    """10b edit mode drives `/plan/sync` with a one-item `changed` list, using
+    placeholder local/remote hashes -- confirms `ChangedSessionIn.to_model()` accepts
+    them without complaint (they're diff-display-only, per garmin_sync.py)."""
+    from training_plan.api import schemas
+
+    changed_in = schemas.ChangedSessionIn(
+        session=schemas.TrainingSessionIn(**_session_payload(title="Edited title")),
+        scheduled_workout_id=1,
+        workout_id=10,
+        workout_date=date(2026, 8, 1),
+        workout_sport="running",
+        workout_title="Easy run",
+    )
+    model = changed_in.to_model()
+    assert model.local_hash == ""
+    assert model.remote_hash == ""
+    assert model.session.title == "Edited title"
+
+
+def test_deletion_apply_supports_a_single_workout(client):
+    """10b's edit-mode trash icon drives `/garmin/deletions/apply` with exactly the
+    one scheduled workout being edited, reusing the existing deletion-apply path."""
+    workout = {"scheduled_workout_id": 1, "workout_id": 10, "date": "2026-08-01", "sport": "running", "title": "Easy Run"}
+    response = client.post("/garmin/deletions/apply", json={"workouts": [workout]})
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert len(results) == 1
+    assert results[0]["success"] is True
+
+
 def test_sync_status_unknown_job_404(client):
     assert client.get("/plan/sync/does-not-exist").status_code == 404
 

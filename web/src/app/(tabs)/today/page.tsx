@@ -73,7 +73,9 @@ export default function TodayPage() {
     <div style={{ padding: "22px 20px 12px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <BrandMark height={22} />
-        <Avatar size={36} />
+        <Link href="/settings" aria-label="Impostazioni" className="tap-target" style={{ display: "block" }}>
+          <Avatar size={36} />
+        </Link>
       </div>
 
       <div style={{ marginTop: 18 }}>

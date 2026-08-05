@@ -39,6 +39,18 @@ If the account has two-factor authentication enabled, you'll be prompted for the
 
 Only native Garmin email/password login is supported — accounts that only use "Sign in with Google/Facebook/Apple" aren't supported by the underlying library.
 
+### Strava (optional, for the web app's "done vs. planned" and shoe-wear screens)
+
+The web app can compare a planned session against the matching Strava activity and track shoe wear, via a real Strava OAuth connection. This needs a Strava API application (free, register one at <https://www.strava.com/settings/api>), then the same `.env`/environment-variable treatment as Garmin:
+
+```
+STRAVA_CLIENT_ID=your-client-id
+STRAVA_CLIENT_SECRET=your-client-secret
+STRAVA_REDIRECT_URI=http://localhost:3000/connect-strava/callback
+```
+
+The connection is established from the web app's Settings screen ("Collega Strava"), not the CLI. Tokens are cached to `~/.garmin_training_strava_tokens.json` (override with `STRAVA_TOKENSTORE`) — treat that file like a password, same as the Garmin tokenstore. The requested scope is read-only (`activity:read_all,profile:read_all`); nothing is ever written back to Strava.
+
 ### Rate limiting — read this before retrying a failed login
 
 Garmin rate-limits **by IP address**, not just by account, and the thresholds are undocumented. A failed login is expensive: one `login` call fans out into a chain of up to 5 strategies inside `garminconnect`, several of which make more than one HTTP request. So a handful of retries with a wrong password can get your whole network throttled (HTTP 429) for a while, and the resulting error is often reported as `401 Invalid Username or Password` even when the password is correct.

@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusDot } from "@/components/motion/primitives";
-import { useDisconnectGarmin, useGarminDevice, useGarminStatus } from "@/lib/queries";
+import { useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, useStravaStatus } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
 import { downloadPlanYaml } from "@/lib/planYaml";
 import { minutesAgo } from "@/lib/format";
@@ -15,6 +16,8 @@ export default function SettingsPage() {
   const { data: garminStatus } = useGarminStatus();
   const { data: device } = useGarminDevice(garminStatus?.connected ?? false);
   const disconnect = useDisconnectGarmin();
+  const { data: stravaStatus } = useStravaStatus();
+  const disconnectStrava = useDisconnectStrava();
   const plan = usePassoStore((s) => s.plan);
   const prefs = usePassoStore((s) => s.prefs);
   const setPref = usePassoStore((s) => s.setPref);
@@ -92,6 +95,42 @@ export default function SettingsPage() {
             </span>
           </div>
         )}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--sabbia-bordo)" }}>
+          <StatusDot kind={stravaStatus?.connected ? "active" : "error"} />
+          <span style={{ fontSize: 14, flex: 1 }}>Strava</span>
+          <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{stravaStatus?.connected ? "collegato" : "non collegato"}</span>
+        </div>
+        {stravaStatus?.connected ? (
+          <button
+            type="button"
+            onClick={() => disconnectStrava.mutate()}
+            disabled={disconnectStrava.isPending}
+            className="tap-target"
+            style={{ marginTop: 10, background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}
+          >
+            scollega Strava
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => router.push("/connect-strava")}
+            className="tap-target"
+            style={{ marginTop: 10, background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}
+          >
+            collega
+          </button>
+        )}
+      </Card>
+
+      <Card>
+        <Link href="/shoes?from=/settings" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ flex: 1 }}>
+            <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Scarpe</span>
+            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>usura, da Strava</span>
+          </span>
+          <span aria-hidden="true">›</span>
+        </Link>
       </Card>
 
       <Card>

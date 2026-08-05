@@ -73,6 +73,9 @@ export default function WeekPage() {
             <NavButton label="Settimana successiva" onClick={() => setOffset((o) => o + 1)}>
               ›
             </NavButton>
+            <Link href="/week/new" aria-label="Aggiungi allenamento" className="tap-target" style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--inchiostro)", color: "var(--crema)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", textDecoration: "none", fontSize: 16 }}>
+              +
+            </Link>
           </div>
         </div>
 

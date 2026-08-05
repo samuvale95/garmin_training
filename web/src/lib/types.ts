@@ -147,6 +147,37 @@ export interface ConflictAssessment {
   options: ConflictOption[];
 }
 
+export interface StravaStatus {
+  connected: boolean;
+}
+
+export interface StravaActivityMatch {
+  matched: boolean;
+  activity_id?: number | null;
+  title?: string | null;
+  distance_km?: number | null;
+  duration_min?: number | null;
+  avg_pace_sec_per_km?: number | null;
+  planned_distance_km?: number | null;
+  planned_pace_sec_per_km?: number | null;
+  average_heartrate?: number | null;
+  max_heartrate?: number | null;
+  elevation_gain_m?: number | null;
+  felt_note?: string | null;
+  plan_note?: string | null;
+  gear_id?: string | null;
+  gear_name?: string | null;
+}
+
+export interface Shoe {
+  id: string;
+  name: string;
+  distance_km: number;
+  wear_percent: number;
+  weeks_remaining: number | null;
+  retired: boolean;
+}
+
 export interface ApiErrorBody {
   category: "validation_failed" | "auth_failed" | "rate_limited" | "mfa_required" | "server_error";
   message: string;

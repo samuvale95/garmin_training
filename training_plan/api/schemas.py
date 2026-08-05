@@ -433,6 +433,69 @@ class ConflictResponse(BaseModel):
         )
 
 
+# ---- strava -------------------------------------------------------------------------------------
+
+
+class StravaStatusResponse(BaseModel):
+    connected: bool
+
+
+class StravaAuthorizeResponse(BaseModel):
+    authorize_url: str
+
+
+class StravaConnectRequest(BaseModel):
+    code: str
+
+
+class StravaConnectResponse(BaseModel):
+    connected: bool
+
+
+class StravaDisconnectResponse(BaseModel):
+    connected: bool
+
+
+class StravaActivityMatchRequest(BaseModel):
+    session: TrainingSessionIn
+
+
+class StravaActivityMatchResponse(BaseModel):
+    matched: bool
+    activity_id: int | None = None
+    title: str | None = None
+    distance_km: float | None = None
+    duration_min: float | None = None
+    avg_pace_sec_per_km: float | None = None
+    planned_distance_km: float | None = None
+    planned_pace_sec_per_km: float | None = None
+    average_heartrate: float | None = None
+    max_heartrate: float | None = None
+    elevation_gain_m: float | None = None
+    felt_note: str | None = None
+    plan_note: str | None = None
+    gear_id: str | None = None
+    gear_name: str | None = None
+
+
+class ShoeOut(BaseModel):
+    id: str
+    name: str
+    distance_km: float
+    wear_percent: float
+    weeks_remaining: int | None = None
+    retired: bool
+
+
+class ShoesResponse(BaseModel):
+    shoes: list[ShoeOut]
+
+
+class RetireShoeResponse(BaseModel):
+    id: str
+    retired: bool
+
+
 # ---- errors -----------------------------------------------------------------------------------
 
 

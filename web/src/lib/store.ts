@@ -54,6 +54,10 @@ interface PassoStore {
   setPlan: (plan: PlanState) => void;
   clearPlan: () => void;
   updateSession: (index: number, updater: (session: TrainingSession) => TrainingSession) => void;
+  /** Appends a new session (screen 10b, create mode) and returns its index, or null
+   * when there is no active plan to append to. */
+  addSession: (session: TrainingSession) => number | null;
+  removeSession: (index: number) => void;
 
   setPref: <K extends keyof Prefs>(key: K, value: Prefs[K]) => void;
   setProfile: (profile: Profile) => void;
@@ -90,6 +94,24 @@ export const usePassoStore = create<PassoStore>()(
           const sessions = [...state.plan.sessions];
           if (!sessions[index]) return state;
           sessions[index] = updater(sessions[index]);
+          return { plan: { ...state.plan, sessions } };
+        }),
+
+      addSession: (session) => {
+        let newIndex: number | null = null;
+        set((state) => {
+          const plan = state.plan ?? { yamlText: "", sessions: [], filename: null, importedAt: new Date().toISOString() };
+          const sessions = [...plan.sessions, session];
+          newIndex = sessions.length - 1;
+          return { plan: { ...plan, sessions } };
+        });
+        return newIndex;
+      },
+
+      removeSession: (index) =>
+        set((state) => {
+          if (!state.plan) return state;
+          const sessions = state.plan.sessions.filter((_, i) => i !== index);
           return { plan: { ...state.plan, sessions } };
         }),
 

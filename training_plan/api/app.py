@@ -9,16 +9,25 @@ from __future__ import annotations
 
 import os
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from ..garmin_sync import GarminRateLimitError, GarminSyncError
 from ..parser import TrainingPlanValidationError
+from ..strava_sync import StravaAuthError
 from . import schemas
 from .routes_body import router as body_router
 from .routes_garmin import router as garmin_router
 from .routes_plan import router as plan_router
+from .routes_strava import router as strava_router
+
+# The CLI (cli.py) calls this too, but `uvicorn training_plan.api:app` never goes
+# through cli.py -- without this, GARMIN_EMAIL/GARMIN_PASSWORD/STRAVA_* in a local
+# .env file are silently invisible to the server, only to shells that happen to
+# export them some other way.
+load_dotenv()
 
 app = FastAPI(title="Passo training API")
 
@@ -58,6 +67,14 @@ async def _garmin_error_handler(request: Request, exc: GarminSyncError) -> JSONR
     )
 
 
+@app.exception_handler(StravaAuthError)
+async def _strava_auth_error_handler(request: Request, exc: StravaAuthError) -> JSONResponse:
+    return JSONResponse(
+        status_code=401,
+        content=schemas.ErrorResponse(category="auth_failed", message=str(exc)).model_dump(),
+    )
+
+
 @app.exception_handler(Exception)
 async def _unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(
@@ -69,6 +86,7 @@ async def _unhandled_error_handler(request: Request, exc: Exception) -> JSONResp
 app.include_router(plan_router, tags=["plan"])
 app.include_router(garmin_router, tags=["garmin"])
 app.include_router(body_router, tags=["body"])
+app.include_router(strava_router, tags=["strava"])
 
 
 @app.get("/health")

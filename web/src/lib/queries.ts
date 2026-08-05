@@ -12,6 +12,9 @@ import type {
   LoadSnapshot,
   PlanDiff,
   ScheduledWorkout,
+  Shoe,
+  StravaActivityMatch,
+  StravaStatus,
   SyncJobStatus,
   TrainingSession,
 } from "./types";
@@ -182,5 +185,68 @@ export function useBodyConflict(nextSession: TrainingSession | null) {
     queryKey: ["body", "conflict", nextSession],
     queryFn: () => apiPost<ConflictAssessment>("/body/conflict", { next_session: nextSession }),
     staleTime: 5 * 60_000,
+  });
+}
+
+// ---- strava (read-only) --------------------------------------------------------------------
+
+export function useStravaStatus() {
+  return useQuery({
+    queryKey: ["strava", "status"],
+    queryFn: () => apiGet<StravaStatus>("/strava/status"),
+  });
+}
+
+export function useStravaAuthorize() {
+  return useMutation({
+    mutationFn: () => apiGet<{ authorize_url: string }>("/strava/authorize"),
+  });
+}
+
+export function useConnectStrava() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => apiPost<{ connected: boolean }>("/strava/connect", { code }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["strava", "status"] });
+    },
+  });
+}
+
+export function useDisconnectStrava() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ connected: boolean }>("/strava/disconnect"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["strava", "status"] });
+    },
+  });
+}
+
+export function useStravaActivityMatch(session: TrainingSession | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["strava", "activity-match", session],
+    queryFn: () => apiPost<StravaActivityMatch>("/strava/activity-match", { session }),
+    enabled: enabled && !!session,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useShoes(enabled = true) {
+  return useQuery({
+    queryKey: ["strava", "shoes"],
+    queryFn: () => apiGet<{ shoes: Shoe[] }>("/strava/shoes"),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useRetireShoe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (gearId: string) => apiPost<{ id: string; retired: boolean }>(`/strava/shoes/${gearId}/retire`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["strava", "shoes"] });
+    },
   });
 }
