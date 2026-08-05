@@ -316,6 +316,25 @@ export function useWorkouts(start: string, end: string, enabled = true) {
   });
 }
 
+/** The full step structure behind a live Garmin-calendar workout (no local plan) --
+ * lets `/workout/[id]` render the exact same session-detail view as an imported
+ * plan's session, instead of only ever knowing date/sport/title (see
+ * `ScheduledWorkout`). `workout` is the calendar entry from `useWorkouts`, whose
+ * date/sport/title travel along as query params since Garmin's workout definition
+ * itself carries no calendar date. */
+export function useWorkoutSession(workout: ScheduledWorkout | null, enabled = true) {
+  return useQuery({
+    queryKey: ["garmin", "workout-session", workout?.workout_id],
+    queryFn: () =>
+      apiGet<TrainingSession>(`/garmin/workouts/${workout!.workout_id}/session`, {
+        date: workout!.date,
+        sport: workout!.sport,
+        title: workout!.title,
+      }),
+    enabled: enabled && !!workout,
+  });
+}
+
 export function useActivities(start: string, end: string, enabled = true) {
   return useQuery({
     queryKey: ["garmin", "activities", start, end],

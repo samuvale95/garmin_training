@@ -4,10 +4,11 @@ import Link from "next/link";
 import { formatPaceValue } from "@/lib/format";
 import type { StravaActivityMatch } from "@/lib/types";
 
-/** The "svolto" (and, when there's a plan to compare against, "pianificato") panel
- * for a matched Strava activity -- shared by `session/[id]/strava` (a planned session)
- * and `workout/[id]` (a live Garmin-calendar workout with no plan behind it, where
- * `showPlanned` is false and the planned-only fields don't render). */
+/** The "svolto" and "pianificato" panel for a matched Strava activity -- shared by
+ * `session/[id]/strava` (an imported plan's session) and `workout/[id]/strava` (a
+ * live Garmin-calendar workout with no local plan, whose "pianificato" side now comes
+ * from Garmin's own copy of the workout via `useWorkoutSession`). Both pass
+ * `showPlanned`. */
 export function StravaMatchPanel({
   match,
   isLoading,

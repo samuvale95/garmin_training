@@ -55,6 +55,12 @@ async def workouts(start: date, end: date) -> schemas.WorkoutsResponse:
     return schemas.WorkoutsResponse(workouts=[schemas.ScheduledWorkoutOut.from_model(w) for w in result])
 
 
+@router.get("/garmin/workouts/{workout_id}/session", response_model=schemas.TrainingSessionOut)
+async def workout_session(workout_id: int, date: date, sport: str, title: str) -> schemas.TrainingSessionOut:
+    result = await run_in_threadpool(service.get_workout_session, workout_id, date, sport, title)
+    return schemas.TrainingSessionOut.from_model(result)
+
+
 @router.get("/garmin/activities", response_model=schemas.ActivitiesResponse)
 async def activities(start: date, end: date) -> schemas.ActivitiesResponse:
     result = await run_in_threadpool(service.list_activities, start, end)

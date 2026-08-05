@@ -94,6 +94,19 @@ def list_workouts(
     return sync.list_scheduled_workouts(start, end)
 
 
+def get_workout_session(
+    workout_id: int,
+    date: date_type,
+    sport: str,
+    title: str,
+    prompt_mfa: Callable[[], str] | None = None,
+) -> TrainingSession:
+    """Log in and fetch the full step structure Garmin holds for a scheduled workout."""
+    sync = GarminSync(prompt_mfa=prompt_mfa)
+    sync.login()
+    return sync.get_workout_session(workout_id, date, sport, title)
+
+
 def list_activities(
     start: date_type, end: date_type, prompt_mfa: Callable[[], str] | None = None
 ) -> list[CompletedActivity]:

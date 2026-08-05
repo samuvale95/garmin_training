@@ -3,21 +3,27 @@
 import { Suspense, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
-import { WordIn } from "@/components/motion/primitives";
-import { StravaMatchPanel } from "@/components/StravaMatchPanel";
+import { SessionDetailBody } from "@/components/SessionDetailBody";
 import { useMountOnce } from "@/lib/motion";
-import { useApplyDeletion, useStravaActivityMatch, useStravaStatus, useWorkouts } from "@/lib/queries";
+import {
+  useApplyDeletion,
+  useStravaActivityMatch,
+  useStravaStatus,
+  useWorkoutSession,
+  useWorkouts,
+} from "@/lib/queries";
 import { ApiError } from "@/lib/apiClient";
 import { formatFullDate } from "@/lib/format";
-import type { TrainingSession } from "@/lib/types";
 
 /** Detail view for a workout that comes straight from the Garmin calendar (no plan
  * imported -- see `web/src/app/(tabs)/week/page.tsx`'s `liveMode`). Unlike
  * `session/[id]`, there's no local index to key off of (no `plan.sessions` array), so
  * the route is keyed by the workout's own `scheduled_workout_id`, with the date passed
- * as a query param since `useWorkouts` needs a date range to look it up. No "planned"
- * step structure exists for a Garmin-native workout, so this only ever shows the
- * "svolto" (actual, from Strava) side via `StravaMatchPanel`'s `showPlanned={false}`. */
+ * as a query param since `useWorkouts` needs a date range to look it up. The step
+ * structure itself comes from `useWorkoutSession` (Garmin's own copy of the workout,
+ * read back via `get_workout_by_id`), so this renders the exact same
+ * `SessionDetailBody` an imported plan's session does, instead of a thinner
+ * Strava-only stand-in. */
 function WorkoutDetailContent() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -28,12 +34,12 @@ function WorkoutDetailContent() {
   const workoutsQuery = useWorkouts(date, date, !!date);
   const workout = workoutsQuery.data?.workouts.find((w) => String(w.scheduled_workout_id) === params.id) ?? null;
 
-  const syntheticSession: TrainingSession | null = workout
-    ? { date: workout.date, sport: workout.sport as TrainingSession["sport"], title: workout.title, description: null, steps: [] }
-    : null;
+  const sessionQuery = useWorkoutSession(workout);
+  const session = sessionQuery.data ?? null;
 
   const stravaStatus = useStravaStatus();
-  const matchQuery = useStravaActivityMatch(syntheticSession, !!stravaStatus.data?.connected);
+  const matchQuery = useStravaActivityMatch(session, !!stravaStatus.data?.connected);
+  const hasStravaMatch = !!stravaStatus.data?.connected && !!matchQuery.data?.matched;
 
   const applyDeletion = useApplyDeletion();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -68,9 +74,11 @@ function WorkoutDetailContent() {
     );
   }
 
+  if (!session) return null;
+
   return (
-    <div style={{ minHeight: "100dvh", background: "var(--inchiostro)", color: "var(--crema)", padding: "24px 22px 32px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+    <div style={{ minHeight: "100dvh", background: "var(--inchiostro)", color: "var(--crema)", padding: "24px 22px 32px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ alignSelf: "stretch", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <PageHeader backHref="/week" color="var(--crema)" />
           <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)" }}>
@@ -90,7 +98,7 @@ function WorkoutDetailContent() {
       </div>
 
       {confirmDelete && (
-        <div style={{ background: "rgba(246,238,218,.1)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ alignSelf: "stretch", background: "rgba(246,238,218,.1)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
           <p style={{ fontSize: 13, margin: 0, flex: 1 }}>Eliminare questo allenamento dal calendario Garmin?</p>
           <button
             type="button"
@@ -107,20 +115,17 @@ function WorkoutDetailContent() {
         </div>
       )}
       {deleteError && (
-        <p style={{ color: "var(--rosso-avviso)", fontSize: 13, marginTop: 10 }} role="alert">
+        <p style={{ alignSelf: "stretch", color: "var(--rosso-avviso)", fontSize: 13, marginTop: 10 }} role="alert">
           {deleteError}
         </p>
       )}
 
-      <WordIn active={animate} style={{ font: "600 26px/1.1 var(--font-outfit)", marginTop: 16 }}>
-        {workout.title}
-      </WordIn>
-
-      <StravaMatchPanel
-        match={matchQuery.data}
-        isLoading={matchQuery.isLoading}
-        showPlanned={false}
-        shoesFrom={`/workout/${params.id}?date=${date}`}
+      <SessionDetailBody
+        session={session}
+        animate={animate}
+        hasStravaMatch={hasStravaMatch}
+        matchData={matchQuery.data}
+        stravaHref={`/workout/${params.id}/strava?date=${date}`}
       />
 
       <div style={{ marginTop: 28, textAlign: "center" }}>

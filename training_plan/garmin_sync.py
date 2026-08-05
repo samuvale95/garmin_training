@@ -27,6 +27,7 @@ from .models import (
     PACE_TARGET_PAYLOAD,
     SPORT_TYPE_PAYLOAD,
     STEP_TYPE_PAYLOAD,
+    PaceTarget,
     Step,
     TrainingSession,
 )
@@ -541,6 +542,27 @@ class GarminSync:
         results.sort(key=lambda w: w.date)
         return results
 
+    def get_workout_session(self, workout_id: int, date: date_type, sport: str, title: str) -> TrainingSession:
+        """The full step structure Garmin holds for a workout, as a `TrainingSession` --
+        lets a live Garmin-calendar workout (no local plan behind it) be shown with the
+        same step-by-step detail as an imported plan's session (see `web`'s
+        `/workout/[id]` route). `date`/`sport`/`title` come from the caller's own
+        `ScheduledWorkout` (the calendar entry), since a workout definition on its own
+        carries no calendar date -- only `get_workout_by_id`'s structure is read here.
+        """
+        try:
+            remote = self.client.get_workout_by_id(workout_id)
+        except Exception as exc:  # noqa: BLE001 - surfaced as a clean CLI error
+            raise GarminSyncError(f"Could not read workout {workout_id}: {exc}") from exc
+
+        steps: list[Step] = []
+        for segment in remote.get("workoutSegments") or []:
+            steps.extend(_parse_workout_steps(segment.get("workoutSteps") or []))
+
+        return TrainingSession(
+            date=date, sport=sport, title=title, description=remote.get("description"), steps=steps
+        )
+
     def list_activities(self, start: date_type, end: date_type) -> list[CompletedActivity]:
         """Actually-completed activities in a date range (not the planned calendar --
         see `list_scheduled_workouts` for that). Used to show real done-vs-planned
@@ -601,6 +623,62 @@ def _build_step_payload(step: Step, order: int) -> dict:
         payload["targetValueTwo"] = round(faster_mps, 7)
 
     return payload
+
+
+# Reverse of the payload maps above, used to read a workout's step structure back off
+# Garmin (get_workout_by_id) instead of only ever writing it -- see
+# `GarminSync.get_workout_session`.
+_STEP_TYPE_BY_ID = {v["stepTypeId"]: k for k, v in STEP_TYPE_PAYLOAD.items()}
+_CONDITION_TYPE_BY_ID = {v["conditionTypeId"]: k for k, v in CONDITION_TYPE_PAYLOAD.items()}
+_PACE_TARGET_TYPE_ID = PACE_TARGET_PAYLOAD["workoutTargetTypeId"]
+
+
+def _parse_pace_target(raw_step: dict) -> PaceTarget | None:
+    target_type = raw_step.get("targetType") or {}
+    if target_type.get("workoutTargetTypeId") != _PACE_TARGET_TYPE_ID:
+        return None
+    slower_mps = raw_step.get("targetValueOne")
+    faster_mps = raw_step.get("targetValueTwo")
+    if not slower_mps or not faster_mps:
+        return None
+    return PaceTarget(slower_sec_per_km=round(1000 / slower_mps), faster_sec_per_km=round(1000 / faster_mps))
+
+
+def _parse_workout_step(raw_step: dict) -> Step | None:
+    """None for a step this app has no way to represent (e.g. a "press lap button to
+    end" step -- conditionTypeId 1 -- or a stepType/target kind outside `models`'s
+    supported sets, both possible on a workout authored directly in Garmin Connect
+    rather than by this tool). Skipped rather than raising, so one unsupported step
+    doesn't blank out an otherwise-readable workout.
+    """
+    step_type = _STEP_TYPE_BY_ID.get((raw_step.get("stepType") or {}).get("stepTypeId"))
+    duration_type = _CONDITION_TYPE_BY_ID.get((raw_step.get("endCondition") or {}).get("conditionTypeId"))
+    value = raw_step.get("endConditionValue")
+    if step_type is None or duration_type is None or value is None:
+        return None
+    duration_value = value / 60 if duration_type == "time" else value / 1000
+    return Step(
+        type=step_type, duration_type=duration_type, duration_value=duration_value,
+        target_pace=_parse_pace_target(raw_step),
+    )
+
+
+def _parse_workout_steps(raw_steps: list[dict]) -> list[Step]:
+    """Flattens Garmin's `RepeatGroupDTO` (a repeated block of steps, e.g. "5x400m")
+    into repeated `Step` entries -- this app's own file format has no repeat-group
+    concept, only a flat step list where the web UI regroups consecutive identical
+    steps for display (see `web/src/lib/format.ts`'s `groupSteps`).
+    """
+    steps: list[Step] = []
+    for raw in raw_steps:
+        if raw.get("type") == "RepeatGroupDTO":
+            nested = _parse_workout_steps(raw.get("workoutSteps") or [])
+            steps.extend(nested * (raw.get("numberOfIterations") or 1))
+            continue
+        step = _parse_workout_step(raw)
+        if step is not None:
+            steps.append(step)
+    return steps
 
 
 def _extract_calendar_items(data: dict) -> list[dict]:

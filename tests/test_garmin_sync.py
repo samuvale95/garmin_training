@@ -24,6 +24,7 @@ class FakeClient:
         self.schedule_should_fail = False
         self.calendar_by_month = {}
         self.activities_by_range = {}
+        self.workouts_by_id = {}
 
     def get_activities_by_date(self, startdate, enddate):
         return self.activities_by_range.get((startdate, enddate), [])
@@ -49,6 +50,9 @@ class FakeClient:
 
     def delete_workout(self, workout_id):
         self.deleted.append(workout_id)
+
+    def get_workout_by_id(self, workout_id):
+        return self.workouts_by_id[workout_id]
 
 
 def make_sync_with_fake_client():
@@ -434,6 +438,109 @@ def test_mixed_steps_only_targeted_ones_get_pace():
 
     assert steps[0]["targetType"]["workoutTargetTypeKey"] == "no.target"
     assert steps[1]["targetType"]["workoutTargetTypeKey"] == "pace.zone"
+
+
+# ---- get_workout_session (reverse of build_workout_payload) ------------------------------
+
+
+def test_get_workout_session_round_trips_a_flat_workout():
+    sync, fake = make_sync_with_fake_client()
+    session = TrainingSession(
+        date=date(2026, 8, 5),
+        sport="running",
+        title="Vo2 Max",
+        description="2x1000m",
+        steps=[
+            Step(type="warmup", duration_type="time", duration_value=10),
+            Step(
+                type="interval",
+                duration_type="distance",
+                duration_value=1,
+                target_pace=PaceTarget(slower_sec_per_km=285, faster_sec_per_km=275),
+            ),
+            Step(type="recovery", duration_type="time", duration_value=2),
+            Step(type="cooldown", duration_type="time", duration_value=10),
+        ],
+    )
+    payload = sync.build_workout_payload(session)
+    fake.workouts_by_id[42] = payload
+
+    result = sync.get_workout_session(42, date(2026, 8, 5), "running", "Vo2 Max")
+
+    assert result == session
+
+
+def test_get_workout_session_flattens_repeat_groups():
+    sync, fake = make_sync_with_fake_client()
+    fake.workouts_by_id[42] = {
+        "description": None,
+        "workoutSegments": [
+            {
+                "workoutSteps": [
+                    {
+                        "type": "RepeatGroupDTO",
+                        "numberOfIterations": 3,
+                        "workoutSteps": [
+                            {
+                                "type": "ExecutableStepDTO",
+                                "stepType": {"stepTypeId": 3},
+                                "endCondition": {"conditionTypeId": 3},
+                                "endConditionValue": 400.0,
+                                "targetType": {"workoutTargetTypeId": 1},
+                            },
+                            {
+                                "type": "ExecutableStepDTO",
+                                "stepType": {"stepTypeId": 4},
+                                "endCondition": {"conditionTypeId": 2},
+                                "endConditionValue": 60.0,
+                                "targetType": {"workoutTargetTypeId": 1},
+                            },
+                        ],
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = sync.get_workout_session(42, date(2026, 8, 5), "running", "3x400m")
+
+    assert [(s.type, s.duration_type, s.duration_value) for s in result.steps] == [
+        ("interval", "distance", 0.4),
+        ("recovery", "time", 1.0),
+    ] * 3
+
+
+def test_get_workout_session_skips_steps_it_cannot_represent():
+    sync, fake = make_sync_with_fake_client()
+    fake.workouts_by_id[42] = {
+        "description": None,
+        "workoutSegments": [
+            {
+                "workoutSteps": [
+                    # lap-button end condition: no defined duration, can't represent.
+                    {
+                        "type": "ExecutableStepDTO",
+                        "stepType": {"stepTypeId": 3},
+                        "endCondition": {"conditionTypeId": 1},
+                        "endConditionValue": None,
+                        "targetType": {"workoutTargetTypeId": 1},
+                    },
+                    {
+                        "type": "ExecutableStepDTO",
+                        "stepType": {"stepTypeId": 1},
+                        "endCondition": {"conditionTypeId": 2},
+                        "endConditionValue": 300.0,
+                        "targetType": {"workoutTargetTypeId": 1},
+                    },
+                ]
+            }
+        ],
+    }
+
+    result = sync.get_workout_session(42, date(2026, 8, 5), "running", "Easy run")
+
+    assert len(result.steps) == 1
+    assert result.steps[0].type == "warmup"
 
 
 # ---- create & schedule ------------------------------------------------------------------
