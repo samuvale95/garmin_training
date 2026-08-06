@@ -1,5 +1,6 @@
 "use client";
 
+import { useMounted } from "./hydration";
 import { useActivities, useBodyToday, useGarminDevice, useGarminStatus, usePlanQuery, useWeekWorkouts } from "./queries";
 import { toDateKey, weekBounds, type DisplaySession } from "./sessionVisuals";
 
@@ -110,6 +111,7 @@ export interface WatchSyncStatus {
  * round trip on the screens that gate on it.
  */
 export function useWatchSyncStatus(): WatchSyncStatus {
+  const mounted = useMounted();
   const status = useGarminStatus();
   const connected = status.data?.connected ?? false;
   const device = useGarminDevice(connected);
@@ -151,12 +153,18 @@ export function useWatchSyncStatus(): WatchSyncStatus {
   }
   if (pendingSessions > 0) missing.push({ kind: "sessioni", count: pendingSessions });
 
-  const ready = status.isFetched && (!connected || (device.isFetched && body.isFetched));
+  // `mounted` for the same reason as in useCalendarAccess: a cache restored from the
+  // previous page load would otherwise make this true during the hydration render, and
+  // screen 19 renders its "ultimo sync" line off it.
+  const ready = mounted && status.isFetched && (!connected || (device.isFetched && body.isFetched));
 
   return {
     ready,
-    lastSyncedAt,
-    missing,
-    blocking: connected && stale && missing.length > 0,
+    lastSyncedAt: mounted ? lastSyncedAt : null,
+    // Same story: the note under "ultimo sync" is rendered straight from this list, so
+    // it stays empty for the hydration render rather than describing a cache the server
+    // didn't have.
+    missing: mounted ? missing : [],
+    blocking: mounted && connected && stale && missing.length > 0,
   };
 }

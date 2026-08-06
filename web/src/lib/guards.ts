@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useMounted } from "./hydration";
 import { useGarminStatus, usePlanQuery, type PlanState } from "./queries";
 
 /** Screens that need an imported plan redirect to /import when there isn't one --
@@ -36,10 +37,17 @@ export interface CalendarAccess {
  * to /import once neither is available. */
 export function useCalendarAccess(): CalendarAccess {
   const router = useRouter();
+  const mounted = useMounted();
   const { data: plan, isHydrated } = usePlanQuery();
   const status = useGarminStatus();
   const garminConnected = status.data?.connected ?? false;
-  const ready = (isHydrated && plan != null) || status.isFetched;
+  // `mounted` and not just `isFetched`: the Garmin status can already be in the query
+  // cache during the hydration render, restored from localStorage before this segment
+  // hydrated (see useMounted). Answering "ready" then would have the screen render its
+  // content over server HTML that says "loading" -- a hydration mismatch, and a full
+  // client re-render of the tree. `isHydrated` is safe on its own for the same reason
+  // this flag is: it too starts false on the client.
+  const ready = mounted && ((isHydrated && plan != null) || status.isFetched);
 
   useEffect(() => {
     if (ready && !plan && !garminConnected) router.replace("/import");
