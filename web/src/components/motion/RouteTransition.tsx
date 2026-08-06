@@ -11,8 +11,10 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 // a pure cross-fade, never a directional push, and they run no entrance cascade.
 const STILL_ZONE_PATHS = ["/diff", "/confirm-deletions", "/rate-limit"];
 // Oggi / Settimana / Corpo -- tab switches are a cross-fade + slight rise, never a
-// directional push (MOTION.md §3.2's "Cambio di tab" row).
-const TAB_PATHS = ["/today", "/week", "/body"];
+// directional push (MOTION.md §3.2's "Cambio di tab" row). /watch-sync belongs here
+// too: it isn't navigated *to*, it takes Oggi/Come stai's place, so a directional push
+// would read as going somewhere.
+const TAB_PATHS = ["/today", "/week", "/body", "/watch-sync"];
 
 export function isStillZoneRoute(pathname: string): boolean {
   return STILL_ZONE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

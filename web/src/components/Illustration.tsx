@@ -19,6 +19,7 @@ const SOURCES = {
   forza: "/illustrazioni/forza.webp",
   bici: "/illustrazioni/bici.webp",
   crollo: "/illustrazioni/crollo.webp",
+  sync: "/illustrazioni/sync.webp",
 } as const;
 
 export type IllustrationName = keyof typeof SOURCES;

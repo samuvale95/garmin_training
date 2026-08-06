@@ -1,19 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { ProgressRing, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useBodyToday, usePlanQuery } from "@/lib/queries";
+import { useWatchSyncStatus } from "@/lib/watchSync";
 import { toDateKey } from "@/lib/sessionVisuals";
 import { formatFullDate, hrvCaption, stressCaption } from "@/lib/format";
 
 export default function RecoveryPage() {
+  const router = useRouter();
   const animate = useMountOnce("body-recovery");
   const { data, isLoading } = useBodyToday();
   const { data: plan } = usePlanQuery();
+
+  // Same substitution as Oggi: with a watch that hasn't synced in over 24h this screen
+  // is nothing but em dashes, so screen 19 takes its place (see useWatchSyncStatus).
+  const watchSync = useWatchSyncStatus();
+  useEffect(() => {
+    if (watchSync.blocking) router.replace("/watch-sync");
+  }, [watchSync.blocking, router]);
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);

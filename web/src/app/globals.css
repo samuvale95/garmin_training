@@ -27,6 +27,9 @@
   --verde-tratto-scuro: #4c7a2a;
   --azzurro: #a9c6ee;
   --azzurro-testo: #10254a;
+  --azzurro-tratto: #6e92c8;
+  /* the one text color that sits on blu notte (screen 19's CTA) */
+  --azzurro-su-scuro: #eaf1fb;
   --giallo: #f7dc86;
   --giallo-testo: #3b3208;
   --lilla: #d6c7ee;

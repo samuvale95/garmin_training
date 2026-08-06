@@ -10,6 +10,7 @@ import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/mot
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import { usePlanDiff, useBodyConflict, useBodyToday, useStravaActivityMatches, useStravaStatus, useWeekWorkouts } from "@/lib/queries";
+import { useWatchSyncStatus } from "@/lib/watchSync";
 import { SkeletonTodayHero } from "@/components/skeletons";
 import { usePassoStore } from "@/lib/store";
 import { classifySession, isoWeekNumber, sessionDistanceKm, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
@@ -45,16 +46,25 @@ export default function TodayPage() {
   const avvisamiSeIlCorpoNonRegge = usePassoStore((s) => s.prefs.avvisamiSeIlCorpoNonRegge);
   const conflictDismissedDate = usePassoStore((s) => s.conflictDismissedDate);
 
+  // "19 L'orologio non ha ancora parlato" replaces Today when the watch hasn't pushed
+  // to Garmin's cloud in over 24h: with no overnight data there is nothing to interpret,
+  // and half this screen would be em dashes.
+  const watchSync = useWatchSyncStatus();
+  useEffect(() => {
+    if (watchSync.blocking) router.replace("/watch-sync");
+  }, [watchSync.blocking, router]);
+
   // "13 Il corpo dice no" replaces Today when this morning's readiness conflicts with
   // tomorrow's session -- dismissed-today check keeps it from re-triggering the moment
   // the conflict screen sends the user back here (see conflictDismissedDate).
   useEffect(() => {
+    if (watchSync.blocking) return;
     if (!avvisamiSeIlCorpoNonRegge) return;
     if (!nextPlanSession) return;
     if (!conflictQuery.data?.has_conflict) return;
     if (conflictDismissedDate === todayKey) return;
     router.replace("/body/conflict");
-  }, [avvisamiSeIlCorpoNonRegge, nextPlanSession, conflictQuery.data?.has_conflict, conflictDismissedDate, todayKey, router]);
+  }, [watchSync.blocking, avvisamiSeIlCorpoNonRegge, nextPlanSession, conflictQuery.data?.has_conflict, conflictDismissedDate, todayKey, router]);
 
   // Until we know whether there's a plan or a live Garmin connection there is nothing
   // real to show -- but "nothing real" used to mean `return null`, i.e. an empty screen
