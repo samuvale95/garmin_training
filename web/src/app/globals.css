@@ -412,6 +412,99 @@ button {
   overflow: hidden;
 }
 
+/* ---- page transitions: View Transitions API (see RouteTransition.tsx) ----------------
+   The flavor class comes from the `enter`/`exit` props on <ViewTransition>, so the
+   outgoing screen animates with the class its own route had and the incoming one with
+   the class of the route being entered.
+
+   Exits are deliberately shorter than entrances: the outgoing screen gets out of the way
+   while the incoming one is already arriving. Both snapshots are composited by the
+   browser, so nothing here can be stalled by the incoming screen's render work. */
+:root {
+  --vt-exit: 150ms;
+  --vt-enter: 280ms;
+}
+
+@keyframes vtFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* `translate` rather than `transform`: it composites without clobbering any transform
+   the snapshot's own group already carries. */
+@keyframes vtShift {
+  from {
+    translate: var(--vt-x, 0) var(--vt-y, 0);
+  }
+  to {
+    translate: 0 0;
+  }
+}
+
+/* The document's default `root` group would cross-fade everything *outside* the animating
+   screen -- here that's just the shell background, and on a tab switch the TabBar, which
+   must not fade at all. Disabling it also spares the browser a second full-page snapshot
+   per navigation. */
+::view-transition-group(root) {
+  animation: none;
+}
+::view-transition-old(root) {
+  display: none;
+}
+::view-transition-new(root) {
+  animation: none;
+}
+
+/* Going deeper: detail, editor, sync flow. */
+::view-transition-old(.vt-push) {
+  --vt-x: -20px;
+  animation:
+    var(--vt-exit) ease-in both vtFade reverse,
+    var(--vt-enter) var(--ease) both vtShift reverse;
+}
+::view-transition-new(.vt-push) {
+  --vt-x: 26px;
+  animation:
+    var(--vt-enter) ease-out both vtFade,
+    var(--vt-enter) var(--ease) both vtShift;
+}
+
+/* Cambio di tab (MOTION.md §3.2): cross-fade + slight rise, no direction. */
+::view-transition-old(.vt-tab) {
+  --vt-y: -6px;
+  animation:
+    130ms ease-in both vtFade reverse,
+    240ms var(--ease) both vtShift reverse;
+}
+::view-transition-new(.vt-tab) {
+  --vt-y: 8px;
+  animation:
+    240ms ease-out both vtFade,
+    240ms var(--ease) both vtShift;
+}
+
+/* Still zone (screens 04/05/14): opacity only, never movement. */
+::view-transition-old(.vt-fade) {
+  animation: var(--vt-exit) linear both vtFade reverse;
+}
+::view-transition-new(.vt-fade) {
+  animation: var(--vt-enter) linear both vtFade;
+}
+
+/* The in-app "Meno movimento" toggle is handled in RouteTransition (it passes the class
+   `none`, so React skips the transition entirely); this covers the system preference. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 1ms !important;
+    animation-delay: 0s !important;
+  }
+}
+
 /* ---- reduced motion: system preference is the default signal, the in-app "Meno
    movimento" toggle is applied via [data-motion="reduced"] on the shell (design.md
    decision #5 / MOTION.md §9). Both collapse to the same behavior. */

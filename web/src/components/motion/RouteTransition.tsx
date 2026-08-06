@@ -1,85 +1,107 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { ViewTransition, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
 import { useMotionEnabled } from "@/lib/motion";
-
-const EASE = [0.22, 1, 0.36, 1] as const;
 
 // Screens 04, 05, 14 -- the "still zone" (MOTION.md §1.4/§3.2): navigating into them is
 // a pure cross-fade, never a directional push, and they run no entrance cascade.
 const STILL_ZONE_PATHS = ["/diff", "/confirm-deletions", "/rate-limit"];
-// Oggi / Settimana / Corpo -- tab switches are a cross-fade + slight rise, never a
-// directional push (MOTION.md §3.2's "Cambio di tab" row). /watch-sync belongs here
-// too: it isn't navigated *to*, it takes Oggi/Come stai's place, so a directional push
-// would read as going somewhere.
-const TAB_PATHS = ["/today", "/week", "/body", "/watch-sync"];
+
+// Oggi / Settimana / Corpo -- the three routes that share the (tabs) layout and its
+// TabBar. Switching between them is a cross-fade + slight rise, never a directional
+// push (MOTION.md §3.2's "Cambio di tab" row).
+const TAB_GROUP_PATHS = ["/today", "/week", "/body"];
+
+// /watch-sync isn't navigated *to*, it takes Oggi's place, so it gets the tab flavor
+// too -- but it lives outside the (tabs) layout, so it keeps its own transition key.
+const TAB_FLAVOR_PATHS = [...TAB_GROUP_PATHS, "/watch-sync"];
+
+/** Shared key for the three tabs -- see `routeKey`. */
+const TAB_GROUP_KEY = "__tabs__";
 
 export function isStillZoneRoute(pathname: string): boolean {
   return STILL_ZONE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-function isTabRoute(pathname: string): boolean {
-  return TAB_PATHS.some((p) => pathname === p);
+/** True for the three tab routes themselves, not for pages nested under them
+ * (/body/conflict, /week/new): those are pushes that happen to sit inside the layout. */
+export function isTabRoute(pathname: string): boolean {
+  return TAB_GROUP_PATHS.includes(pathname);
 }
 
-// Exits are deliberately shorter than entrances: the outgoing screen gets out of the way
-// while the incoming one is already arriving (see the `mode="popLayout"` note below).
-const pushVariants = {
-  initial: { x: 24, opacity: 0 },
-  animate: { x: 0, opacity: 1, transition: { duration: 0.28, ease: EASE } },
-  exit: { x: -16, opacity: 0, transition: { duration: 0.16, ease: EASE } },
-};
+/**
+ * The three tabs collapse to one key so the *root* transition doesn't fire when you
+ * switch tabs -- otherwise the whole (tabs) layout, TabBar included, would be torn down
+ * and remounted on every tab tap. That both slid the bar around (it should be the one
+ * fixed reference point on screen) and broke the pill's `layoutId` morph, which needs
+ * the old and new TabBar to be the same React instance. Tab-to-tab motion is handled one
+ * level down by `TabContentTransition`, which only wraps the page body.
+ */
+function routeKey(pathname: string): string {
+  return isTabRoute(pathname) ? TAB_GROUP_KEY : pathname;
+}
 
-const fadeVariants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.22, ease: EASE } },
-  exit: { opacity: 0, transition: { duration: 0.14, ease: EASE } },
-};
+/** Class name driving the ::view-transition-old/new rules in globals.css. */
+type Flavor = "none" | "vt-fade" | "vt-tab" | "vt-push";
 
-const tabVariants = {
-  initial: { opacity: 0, y: 8 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.22, ease: EASE } },
-  exit: { opacity: 0, y: -8, transition: { duration: 0.14, ease: EASE } },
-};
+function flavorFor(pathname: string, reduced: boolean): Flavor {
+  if (reduced) return "none";
+  if (isStillZoneRoute(pathname)) return "vt-fade";
+  if (TAB_FLAVOR_PATHS.includes(pathname)) return "vt-tab";
+  return "vt-push";
+}
 
-const reducedVariants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.16 } },
-  exit: { opacity: 0, transition: { duration: 0.16 } },
-};
-
+/**
+ * Root-level page transition.
+ *
+ * This used to be framer-motion's `AnimatePresence`, which had two problems no amount of
+ * tuning fixes. First, keeping the outgoing screen on-screen means keeping it in the DOM,
+ * and `mode="popLayout"` pins it by measuring it (a forced synchronous layout of the whole
+ * document at the exact moment React is mounting the next screen) -- while `mode="wait"`
+ * instead guarantees a blank gap the length of the exit. Second, Next resets the window
+ * scroll on navigation, so an outgoing screen still laid out in the document snaps to its
+ * top mid-animation: from halfway down Settimana, the exit visibly jumped.
+ *
+ * `<ViewTransition>` sidesteps both. The browser captures the outgoing screen as an image
+ * in *viewport* coordinates before React commits, so it stays exactly where the user saw
+ * it regardless of scroll, and both snapshots are animated by the compositor rather than
+ * by JS competing with the incoming screen's render.
+ */
 export function RouteTransition({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { reduced } = useMotionEnabled();
   const stillZone = isStillZoneRoute(pathname);
+  const flavor = flavorFor(pathname, reduced);
 
-  const variants = reduced
-    ? reducedVariants
-    : stillZone
-      ? fadeVariants
-      : isTabRoute(pathname)
-        ? tabVariants
-        : pushVariants;
-
-  // `mode="popLayout"` rather than `mode="wait"`: "wait" refuses to mount the incoming
-  // screen until the outgoing one has finished exiting, so every navigation began with a
-  // guaranteed ~0.3s of nothing on screen *before* the new page even started loading its
-  // data. "popLayout" takes the exiting screen out of the flow so the two overlap -- the
-  // new screen (with its skeletons) is there immediately, and no layout jump.
+  // `default="none"` keeps this boundary out of unrelated transitions -- without it the
+  // root would also animate whenever the nested tab transition runs.
   return (
-    <AnimatePresence mode="popLayout" initial={false}>
-      <motion.div
-        key={pathname}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        variants={variants}
-        data-still={stillZone ? "true" : undefined}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <ViewTransition key={routeKey(pathname)} enter={flavor} exit={flavor} default="none">
+      <div data-still={stillZone ? "true" : undefined}>{children}</div>
+    </ViewTransition>
+  );
+}
+
+/**
+ * Tab-to-tab transition, mounted inside the (tabs) layout so it wraps the page body only
+ * and leaves the TabBar untouched (see `routeKey`). Pages nested under a tab pass straight
+ * through: they're pushes, and the root transition already owns them.
+ */
+export function TabContentTransition({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const { reduced } = useMotionEnabled();
+
+  if (!isTabRoute(pathname)) return <>{children}</>;
+
+  // A shared `name` (plus `share`, and no enter/exit) rather than enter/exit: it means the
+  // only thing that animates here is one tab handing over to another. Navigating *out* of
+  // the tab group -- to /body/conflict, /week/new -- unmounts this boundary, and with no
+  // `exit` class it falls back to `default="none"` and stays still, leaving the push to
+  // the root transition instead of running a second animation underneath it.
+  return (
+    <ViewTransition key={pathname} name="tab-content" share={reduced ? "none" : "vt-tab"} default="none">
+      <div>{children}</div>
+    </ViewTransition>
   );
 }
