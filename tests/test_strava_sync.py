@@ -255,6 +255,43 @@ def test_find_activity_matches_for_range_buckets_by_date_with_one_list_call(monk
     assert matches["2026-08-14"]["activity_id"] == 20
 
 
+# ---- planned totals ------------------------------------------------------------------------
+
+
+def test_planned_summary_estimates_unpaced_time_steps_at_the_session_slowest_pace():
+    """A warmup written as "15 min" with no pace of its own used to count as 0 km, which
+    understated the planned distance the Strava comparison holds the actual run up
+    against. It is now estimated at the slowest pace the session names (5:00/km here)."""
+    steps = [
+        Step(type="warmup", duration_type="time", duration_value=15.0),
+        Step(type="interval", duration_type="distance", duration_value=5.0, target_pace=PaceTarget(240, 230)),
+        Step(type="cooldown", duration_type="time", duration_value=10.0, target_pace=PaceTarget(310, 290)),
+    ]
+    distance_km, duration_min, _ = strava_sync._planned_summary(_session(steps=steps))
+
+    # slowest named pace is the cooldown's 5:00/km average -> warmup 15 min = 3.0 km,
+    # cooldown 10 min at its own pace = 2.0 km, interval 5 km.
+    assert distance_km == 10.0
+    assert duration_min == 25.0
+
+
+def test_planned_summary_falls_back_to_an_easy_pace_when_the_session_names_none():
+    steps = [Step(type="interval", duration_type="time", duration_value=60.0)]
+    distance_km, _, _ = strava_sync._planned_summary(_session(steps=steps))
+    assert distance_km == 10.0  # 60 min at the 6:00/km default
+
+
+def test_planned_summary_counts_rest_steps_as_no_distance():
+    """Standing still is minutes, not metres -- the one step the estimate must not fill in."""
+    steps = [
+        Step(type="interval", duration_type="distance", duration_value=1.0, target_pace=PaceTarget(240, 230)),
+        Step(type="rest", duration_type="time", duration_value=3.0),
+    ]
+    distance_km, duration_min, _ = strava_sync._planned_summary(_session(steps=steps))
+    assert distance_km == 1.0
+    assert duration_min == 3.0
+
+
 # ---- shoe wear ----------------------------------------------------------------------------------
 
 

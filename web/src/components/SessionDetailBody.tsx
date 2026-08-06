@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ProgressRing, WordIn } from "@/components/motion/primitives";
 import { sessionDistanceKm } from "@/lib/sessionVisuals";
-import { formatPaceValue, groupDistanceKm, groupSteps, stepGroupParts } from "@/lib/format";
+import { formatPaceValue, groupDistanceKm, groupSteps, sessionFallbackPaceSecPerKm, stepGroupParts } from "@/lib/format";
 import type { StravaActivityMatch, TrainingSession } from "@/lib/types";
 
 /** The shared "what is this workout" view -- distance ring, title, description, and
@@ -29,6 +29,8 @@ export function SessionDetailBody({
   const steps = session.steps ?? []; // guards a stale localStorage plan saved before `steps` existed
   const distanceKm = sessionDistanceKm(session);
   const groups = groupSteps(steps);
+  // Same stand-in pace the session total above uses, so the rows add up to the ring.
+  const fallbackPace = sessionFallbackPaceSecPerKm(steps);
 
   return (
     <>
@@ -55,7 +57,7 @@ export function SessionDetailBody({
         {groups.map((group, i) => {
           const isKey = group.kind === "interval";
           const { label, detail } = stepGroupParts(group);
-          const km = groupDistanceKm(group);
+          const km = groupDistanceKm(group, fallbackPace);
           return (
             <div
               key={i}

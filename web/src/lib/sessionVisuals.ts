@@ -1,5 +1,5 @@
 import type { IllustrationName } from "@/components/Illustration";
-import { stepDistanceKm } from "./format";
+import { sessionFallbackPaceSecPerKm, stepDistanceKm } from "./format";
 import { flattenSteps } from "./types";
 import type { SessionStep } from "./types";
 
@@ -50,9 +50,13 @@ export function classifySession(session: DisplaySession | null): SessionVisual {
  * `stepDistanceKm` with repeat blocks expanded, so time-based steps
  * (warmup/cooldown/intervals defined in minutes) contribute their pace-estimated
  * distance too and a "6 ×" block counts six times, matching the per-row total shown
- * in the session-detail step list. */
+ * in the session-detail step list. Steps with no pace of their own are estimated at
+ * the session's own slowest pace (see `sessionFallbackPaceSecPerKm`) rather than
+ * dropped. */
 export function sessionDistanceKm(session: DisplaySession): number {
-  return flattenSteps(session.steps ?? []).reduce((sum, s) => sum + stepDistanceKm(s), 0);
+  const steps = session.steps ?? [];
+  const fallbackPace = sessionFallbackPaceSecPerKm(steps);
+  return flattenSteps(steps).reduce((sum, s) => sum + stepDistanceKm(s, fallbackPace), 0);
 }
 
 export function weekBounds(reference: Date): { start: Date; end: Date } {

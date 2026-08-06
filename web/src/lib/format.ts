@@ -1,4 +1,4 @@
-import { isRepeatBlock } from "./types";
+import { flattenSteps, isRepeatBlock } from "./types";
 import type { HrvPoint, PaceTarget, SessionStep, SleepPhases, Step, StepType } from "./types";
 
 // ---- Italian number words --------------------------------------------------------------
@@ -226,10 +226,12 @@ export function groupSteps(items: SessionStep[]): StepGroup[] {
 }
 
 /** The distance a group stands for in total: every step it holds, once per repetition
- * (time-based steps contributing their pace-estimated distance, see `stepDistanceKm`). */
-export function groupDistanceKm(group: StepGroup): number {
+ * (time-based steps contributing their pace-estimated distance, see `stepDistanceKm`).
+ * `fallbackPace` comes from the whole session, not the group, so the per-row numbers
+ * add up to the session total the detail screen shows above them. */
+export function groupDistanceKm(group: StepGroup, fallbackPace?: number): number {
   const perRep = [group.step, ...(group.recovery ? [group.recovery] : []), ...group.extra].reduce(
-    (sum, step) => sum + stepDistanceKm(step),
+    (sum, step) => sum + stepDistanceKm(step, fallbackPace),
     0
   );
   return group.reps * perRep;
@@ -288,16 +290,44 @@ export function planStepsSummary(steps: SessionStep[]): string {
     .join(" → ");
 }
 
+/** Stand-in pace for a time-based step that names none and sits in a session that
+ * names none either. 6:00/km: an unhurried running pace, chosen because the steps
+ * that go unpaced in practice are warmups, cooldowns and jogged recoveries. */
+export const DEFAULT_EASY_PACE_SEC_PER_KM = 360;
+
+function avgPaceSecPerKm(target: PaceTarget): number {
+  return (target.slower_sec_per_km + target.faster_sec_per_km) / 2;
+}
+
+/** The pace to assume for the steps of `steps` that carry no target of their own:
+ * the slowest one the session *does* name. The unpaced steps are the easy parts of
+ * a session, so the session's slowest named pace is the closest honest proxy --
+ * borrowing the interval pace would turn a 15-minute warmup into 3.7 km. Falls back
+ * to `DEFAULT_EASY_PACE_SEC_PER_KM` for a session with no pace anywhere. */
+export function sessionFallbackPaceSecPerKm(steps: SessionStep[]): number {
+  const paces = flattenSteps(steps)
+    .map((s) => (s.target_pace ? avgPaceSecPerKm(s.target_pace) : null))
+    .filter((p): p is number => p != null);
+  return paces.length > 0 ? Math.max(...paces) : DEFAULT_EASY_PACE_SEC_PER_KM;
+}
+
 /** Best-effort km-equivalent of a single step, for screens that show a per-step
  * distance even for time-based warmup/cooldown steps -- derived from the step's own
- * pace target when present (no new backend data needed), 0 when it can't be inferred. */
-export function stepDistanceKm(step: Step): number {
+ * pace target when present (no new backend data needed), and from `fallbackPace`
+ * when absent.
+ *
+ * The fallback matters: a time-based step with no pace used to count as 0 km, which
+ * silently understated every total built on top of this -- the weekly km on Oggi and
+ * Settimana, the "previsto" bars on Carico -- for anyone who writes "riscaldamento:
+ * 15 min" without a target, which is how most plans are written. An estimate the
+ * screens label as planned volume is right; a zero is wrong.
+ *
+ * `rest` is the one step that really is 0 km: it is time spent standing still. */
+export function stepDistanceKm(step: Step, fallbackPace = DEFAULT_EASY_PACE_SEC_PER_KM): number {
   if (step.duration_type === "distance") return step.duration_value;
-  if (step.target_pace) {
-    const avgSecPerKm = (step.target_pace.slower_sec_per_km + step.target_pace.faster_sec_per_km) / 2;
-    return (step.duration_value * 60) / avgSecPerKm;
-  }
-  return 0;
+  if (step.type === "rest") return 0;
+  const secPerKm = step.target_pace ? avgPaceSecPerKm(step.target_pace) : fallbackPace;
+  return (step.duration_value * 60) / secPerKm;
 }
 
 /** "oggi" / "domani" / a weekday name, relative to `today` -- the eyebrow label the
