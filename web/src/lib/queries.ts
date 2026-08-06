@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPostForm } from "./apiClient";
 import { toDateKey, weekBounds } from "./sessionVisuals";
@@ -68,6 +68,34 @@ function persistPlan(plan: PlanState | null): void {
   else localStorage.removeItem(PLAN_STORAGE_KEY);
 }
 
+/** Whether the localStorage read below has already happened, as a tiny external store.
+ * It is a property of the browser tab, not of any one component -- the first
+ * `usePlanQuery` to mount restores the plan for everybody -- and keeping it outside React
+ * is also what lets the effect stay a pure "sync from an external system" step: it writes
+ * the cache and flips this flag in the same tick, so nobody can ever observe
+ * `isHydrated === true` next to a plan that hasn't been restored yet. */
+let planHydrated = false;
+const planHydrationListeners = new Set<() => void>();
+
+function subscribePlanHydration(onChange: () => void): () => void {
+  planHydrationListeners.add(onChange);
+  return () => planHydrationListeners.delete(onChange);
+}
+
+function restorePersistedPlanOnce(queryClient: ReturnType<typeof useQueryClient>): void {
+  if (planHydrated) return;
+  const persisted = readPersistedPlan();
+  if (persisted) {
+    queryClient.setQueryData<PlanState | null>(PLAN_KEY, persisted);
+    // Migrated from the legacy Zustand key (or just a normal re-read) -- writing it
+    // back under the new key makes it the source of truth from here on, so this
+    // fallback only ever does real work once per browser.
+    persistPlan(persisted);
+  }
+  planHydrated = true;
+  for (const listener of planHydrationListeners) listener();
+}
+
 /** The imported plan is "genuinely device-only" (design.md, passo-nextjs-web-app):
  * the backend never stores it, only receives it per-request to diff/sync. It lives in
  * the TanStack Query cache like every other piece of app data, but with no real
@@ -87,21 +115,18 @@ function persistPlan(plan: PlanState | null): void {
  */
 export function usePlanQuery() {
   const queryClient = useQueryClient();
-  const [isHydrated, setIsHydrated] = useState(false);
+  // Server snapshot is pinned to false so the hydration render matches the server's HTML
+  // even when another component restored the plan earlier in this same page load; React
+  // re-renders with the real value immediately afterwards (same shape as `useMounted`).
+  const isHydrated = useSyncExternalStore(
+    subscribePlanHydration,
+    () => planHydrated,
+    () => false
+  );
 
   useEffect(() => {
-    const persisted = readPersistedPlan();
-    if (persisted) {
-      queryClient.setQueryData<PlanState | null>(PLAN_KEY, persisted);
-      // Migrated from the legacy Zustand key (or just a normal re-read) -- writing it
-      // back under the new key makes it the source of truth from here on, so this
-      // fallback only ever does real work once per browser.
-      persistPlan(persisted);
-    }
-    setIsHydrated(true);
-    // Runs once on mount only -- queryClient identity is stable for the app's lifetime.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    restorePersistedPlanOnce(queryClient);
+  }, [queryClient]);
 
   const query = useQuery({
     queryKey: PLAN_KEY,

@@ -1,8 +1,6 @@
-"use strict";
-
-const os = require("os");
-const { spawn } = require("child_process");
-const qrcode = require("qrcode-terminal");
+import os from "node:os";
+import { spawn } from "node:child_process";
+import qrcode from "qrcode-terminal";
 
 function getLanIp() {
   const candidates = [];
