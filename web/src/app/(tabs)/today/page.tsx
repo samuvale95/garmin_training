@@ -10,7 +10,6 @@ import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/mot
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import { usePlanDiff, useBodyConflict, useBodyToday, useStravaActivityMatches, useStravaStatus, useWeekWorkouts } from "@/lib/queries";
-import { RefreshButton } from "@/components/RefreshButton";
 import { SkeletonTodayHero } from "@/components/skeletons";
 import { usePassoStore } from "@/lib/store";
 import { classifySession, isoWeekNumber, sessionDistanceKm, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
@@ -215,10 +214,16 @@ export default function TodayPage() {
         </SlideUp>
       )}
 
-      {restOfWeek.length > 0 && !liveMode && (
+      {/* The list always gets its title -- it's what separates it from the card above.
+          Only the total is conditional: Garmin's calendar entries carry no distance, so
+          in live mode the km would read "0 km", a wrong statement rather than a missing
+          one. */}
+      {restOfWeek.length > 0 && (
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 20, padding: "0 2px 6px" }}>
           <span style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)" }}>resto della settimana</span>
-          <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-35)" }}>{remainingKm.toFixed(1).replace(".0", "")} km</span>
+          {remainingKm > 0 && (
+            <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-35)" }}>{remainingKm.toFixed(1).replace(".0", "")} km</span>
+          )}
         </div>
       )}
       <div style={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -258,18 +263,15 @@ export default function TodayPage() {
   );
 }
 
-/** Brand mark, manual refresh, and the settings avatar -- rendered identically whether
- * or not the screen's data has arrived, so the top of the page never flickers in. */
+/** Brand mark and the settings avatar -- rendered identically whether or not the
+ * screen's data has arrived, so the top of the page never flickers in. */
 function TodayHeader() {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
       <BrandMark height={22} />
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <RefreshButton />
-        <Link href="/settings" aria-label="Impostazioni" className="tap-target" style={{ display: "block" }}>
-          <Avatar size={36} />
-        </Link>
-      </div>
+      <Link href="/settings" aria-label="Impostazioni" className="tap-target" style={{ display: "block" }}>
+        <Avatar size={36} />
+      </Link>
     </div>
   );
 }

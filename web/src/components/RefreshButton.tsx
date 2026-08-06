@@ -8,6 +8,10 @@ import { useRefreshServerData } from "@/lib/queries";
  * backend's own TTL cache -- which is what makes moving between screens instant. That
  * trade needs an escape hatch: this clears both sides and refetches, while the data
  * currently on screen stays put until the new answer arrives.
+ *
+ * It lives in Impostazioni, spelled out in words: as a bare ↻ glyph in the header it
+ * read as a mystery control, since a successful refresh usually redraws the very same
+ * numbers and so looks like nothing happened.
  */
 export function RefreshButton({ color = "var(--inchiostro)" }: { color?: string }) {
   const refresh = useRefreshServerData();
@@ -18,26 +22,24 @@ export function RefreshButton({ color = "var(--inchiostro)" }: { color?: string 
       onClick={() => refresh.mutate()}
       disabled={refresh.isPending}
       className="tap-target"
-      aria-label="Aggiorna i dati"
       style={{
-        width: 30,
-        height: 30,
-        borderRadius: "50%",
-        background: "var(--sabbia-chip)",
-        color,
+        background: "none",
         border: "none",
-        fontSize: 14,
-        display: "flex",
+        color,
+        fontSize: 13,
+        fontWeight: 600,
+        padding: 0,
+        display: "inline-flex",
         alignItems: "center",
-        justifyContent: "center",
+        gap: 8,
         cursor: refresh.isPending ? "default" : "pointer",
-        flex: "none",
         opacity: refresh.isPending ? 0.5 : 1,
       }}
     >
       <span aria-hidden="true" className={refresh.isPending ? "anim-spin" : undefined} style={{ lineHeight: 1 }}>
         ↻
       </span>
+      {refresh.isPending ? "Aggiorno…" : refresh.isSuccess ? "Dati aggiornati" : "Aggiorna i dati"}
     </button>
   );
 }

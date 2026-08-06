@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
+import { RefreshButton } from "@/components/RefreshButton";
 import { StatusDot } from "@/components/motion/primitives";
 import { useClearPlan, useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, usePlanQuery, useResetAllLocalData, useStravaStatus } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
@@ -179,6 +180,15 @@ export default function SettingsPage() {
           Scarica {plan?.filename ?? "il YAML"}
         </button>
       </div>
+
+      <Card>
+        <p style={{ fontWeight: 600, margin: "0 0 4px" }}>Dati da Garmin e Strava</p>
+        <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-50)", margin: "0 0 10px" }}>
+          Li tengo in cache per qualche minuto, così l&apos;app resta immediata. Se sull&apos;orologio vedi qualcosa che
+          qui non c&apos;è ancora, chiedili di nuovo adesso.
+        </p>
+        <RefreshButton />
+      </Card>
 
       <div style={{ background: "var(--rosa-avviso)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 20 }}>
         <p style={{ fontWeight: 600, margin: "0 0 4px", color: "var(--rosso-testo)" }}>Qualcosa non torna?</p>

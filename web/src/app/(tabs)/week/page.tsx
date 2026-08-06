@@ -8,7 +8,6 @@ import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import { useActivities, usePrefetchWorkoutSession, useStravaActivityMatches, useStravaStatus, useWeekWorkouts } from "@/lib/queries";
-import { RefreshButton } from "@/components/RefreshButton";
 import { SkeletonDayCards } from "@/components/skeletons";
 import { classifySession, sessionDistanceKm, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
 import { sessionDetailLine } from "@/lib/format";
@@ -96,7 +95,10 @@ export default function WeekPage() {
 
   return (
     <div>
-      <div style={{ padding: "22px 20px 0", position: "sticky", top: 0, zIndex: 1, background: "var(--crema)" }}>
+      {/* Not sticky: pinned, its opaque crema block (title + the light round buttons)
+          scrolled over the day cards and swallowed whatever line was passing under it.
+          Oggi's header scrolls away too -- the two tabs now behave the same. */}
+      <div style={{ padding: "22px 20px 0" }}>
         <WeekHeaderRow
           start={start}
           end={end}
@@ -243,7 +245,6 @@ function WeekHeaderRow({ start, end, animate, onPrev, onNext }: WeekHeaderProps)
           <NavButton label="Settimana successiva" onClick={onNext}>
             ›
           </NavButton>
-          <RefreshButton />
           <Link href="/week/new" aria-label="Aggiungi allenamento" className="tap-target" style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--inchiostro)", color: "var(--crema)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", textDecoration: "none", fontSize: 16 }}>
             +
           </Link>
@@ -259,10 +260,10 @@ function WeekHeaderRow({ start, end, animate, onPrev, onNext }: WeekHeaderProps)
   );
 }
 
-/** The same header inside its sticky container, for the loading state. */
+/** The same header inside its container, for the loading state. */
 function WeekHeader(props: WeekHeaderProps) {
   return (
-    <div style={{ padding: "22px 20px 0", position: "sticky", top: 0, zIndex: 1, background: "var(--crema)" }}>
+    <div style={{ padding: "22px 20px 0" }}>
       <WeekHeaderRow {...props} />
     </div>
   );
