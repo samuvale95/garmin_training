@@ -9,10 +9,14 @@ import yaml
 
 from .models import (
     DEFAULT_PACE_TOLERANCE_SECONDS,
+    MAX_REPETITIONS,
+    MIN_REPETITIONS,
     SUPPORTED_DURATION_TYPES,
     SUPPORTED_SPORTS,
     SUPPORTED_STEP_TYPES,
     PaceTarget,
+    RepeatBlock,
+    SessionStep,
     Step,
     TrainingSession,
 )
@@ -112,44 +116,88 @@ def parse_target_pace(raw: Any) -> PaceTarget:
     return PaceTarget(slower_sec_per_km=max(first, second), faster_sec_per_km=min(first, second))
 
 
-def _validate_steps(index: int, raw_entry: dict[str, Any], errors: list[str]) -> list[Step]:
+def _validate_step(label: str, raw_step: Any, errors: list[str]) -> Step | None:
+    step_type = raw_step.get("type") if isinstance(raw_step, dict) else None
+    duration_type = raw_step.get("duration_type") if isinstance(raw_step, dict) else None
+    duration_value = raw_step.get("duration_value") if isinstance(raw_step, dict) else None
+
+    if step_type not in SUPPORTED_STEP_TYPES:
+        errors.append(f"{label}: invalid or missing 'type', expected one of {SUPPORTED_STEP_TYPES}")
+        return None
+    if duration_type not in SUPPORTED_DURATION_TYPES:
+        errors.append(
+            f"{label}: invalid or missing 'duration_type', expected one of {SUPPORTED_DURATION_TYPES}"
+        )
+        return None
+    if not isinstance(duration_value, (int, float)) or isinstance(duration_value, bool) or duration_value <= 0:
+        errors.append(f"{label}: 'duration_value' must be a positive number")
+        return None
+
+    target_pace = None
+    raw_target_pace = raw_step.get("target_pace")
+    if raw_target_pace is not None:
+        try:
+            target_pace = parse_target_pace(raw_target_pace)
+        except ValueError as exc:
+            errors.append(f"{label}: {exc}")
+            return None
+
+    return Step(
+        type=step_type,
+        duration_type=duration_type,
+        duration_value=float(duration_value),
+        target_pace=target_pace,
+    )
+
+
+def _validate_repeat_block(label: str, raw_block: dict[str, Any], errors: list[str]) -> RepeatBlock | None:
+    """A `repeat:`/`steps:` mapping as a `RepeatBlock`, or None (having recorded why).
+
+    A block's own steps are validated exactly like top-level ones -- only nesting a
+    block inside a block is refused, since `RepeatBlock` is one level deep by design.
+    """
+    reps = raw_block.get("repeat")
+    if not isinstance(reps, int) or isinstance(reps, bool) or not MIN_REPETITIONS <= reps <= MAX_REPETITIONS:
+        errors.append(
+            f"{label}: 'repeat' must be a whole number between {MIN_REPETITIONS} and {MAX_REPETITIONS}"
+        )
+        return None
+
+    raw_steps = raw_block.get("steps")
+    if not isinstance(raw_steps, list) or not raw_steps:
+        errors.append(f"{label}: a repeat block needs a non-empty 'steps' list")
+        return None
+
     steps: list[Step] = []
+    for step_index, raw_step in enumerate(raw_steps):
+        step_label = f"{label}, step #{step_index + 1}"
+        if isinstance(raw_step, dict) and "repeat" in raw_step:
+            errors.append(f"{step_label}: repeat blocks cannot be nested inside one another")
+            continue
+        step = _validate_step(step_label, raw_step, errors)
+        if step is not None:
+            steps.append(step)
+
+    return RepeatBlock(reps=reps, steps=steps) if steps else None
+
+
+def _validate_steps(index: int, raw_entry: dict[str, Any], errors: list[str]) -> list[SessionStep]:
+    steps: list[SessionStep] = []
     raw_steps = raw_entry.get("steps") or []
     for step_index, raw_step in enumerate(raw_steps):
+        # A repeat block is told apart from a step by its 'repeat' key: a step never
+        # has one, and a block has no 'type'/'duration_*' of its own.
+        if isinstance(raw_step, dict) and "repeat" in raw_step:
+            label = f"{_entry_label(index, raw_entry)}, block #{step_index + 1}"
+            block = _validate_repeat_block(label, raw_step, errors)
+            if block is not None:
+                steps.append(block)
+            continue
+
         label = f"{_entry_label(index, raw_entry)}, step #{step_index + 1}"
-        step_type = raw_step.get("type") if isinstance(raw_step, dict) else None
-        duration_type = raw_step.get("duration_type") if isinstance(raw_step, dict) else None
-        duration_value = raw_step.get("duration_value") if isinstance(raw_step, dict) else None
-
-        if step_type not in SUPPORTED_STEP_TYPES:
-            errors.append(f"{label}: invalid or missing 'type', expected one of {SUPPORTED_STEP_TYPES}")
-            continue
-        if duration_type not in SUPPORTED_DURATION_TYPES:
-            errors.append(
-                f"{label}: invalid or missing 'duration_type', expected one of {SUPPORTED_DURATION_TYPES}"
-            )
-            continue
-        if not isinstance(duration_value, (int, float)) or isinstance(duration_value, bool) or duration_value <= 0:
-            errors.append(f"{label}: 'duration_value' must be a positive number")
-            continue
-
-        target_pace = None
-        raw_target_pace = raw_step.get("target_pace")
-        if raw_target_pace is not None:
-            try:
-                target_pace = parse_target_pace(raw_target_pace)
-            except ValueError as exc:
-                errors.append(f"{label}: {exc}")
-                continue
-
-        steps.append(
-            Step(
-                type=step_type,
-                duration_type=duration_type,
-                duration_value=float(duration_value),
-                target_pace=target_pace,
-            )
-        )
+        step = _validate_step(label, raw_step, errors)
+        if step is not None:
+            steps.append(step)
     return steps
 
 

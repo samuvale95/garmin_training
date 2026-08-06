@@ -9,8 +9,16 @@ from training_plan.garmin_sync import (
     GarminSync,
     GarminSyncError,
     ScheduledWorkout,
+    workout_fingerprint,
 )
-from training_plan.models import SPORT_TYPE_PAYLOAD, PaceTarget, Step, TrainingSession
+from training_plan.models import (
+    SPORT_TYPE_PAYLOAD,
+    PaceTarget,
+    RepeatBlock,
+    SessionStep,
+    Step,
+    TrainingSession,
+)
 
 
 class FakeClient:
@@ -440,6 +448,202 @@ def test_mixed_steps_only_targeted_ones_get_pace():
     assert steps[1]["targetType"]["workoutTargetTypeKey"] == "pace.zone"
 
 
+# ---- repeat blocks ------------------------------------------------------------------------
+
+
+def _session_with_repeat_block(reps: int = 6) -> TrainingSession:
+    return TrainingSession(
+        date=date(2026, 8, 5),
+        sport="running",
+        title="Ripetute",
+        steps=[
+            Step(type="warmup", duration_type="time", duration_value=10),
+            RepeatBlock(
+                reps=reps,
+                steps=[
+                    Step(
+                        type="interval",
+                        duration_type="distance",
+                        duration_value=1,
+                        target_pace=PaceTarget(slower_sec_per_km=285, faster_sec_per_km=275),
+                    ),
+                    Step(type="recovery", duration_type="time", duration_value=2),
+                ],
+            ),
+            Step(type="cooldown", duration_type="time", duration_value=10),
+        ],
+    )
+
+
+def test_repeat_block_becomes_a_repeat_group():
+    sync, _ = make_sync_with_fake_client()
+    steps = sync.build_workout_payload(_session_with_repeat_block())["workoutSegments"][0]["workoutSteps"]
+
+    assert [s["type"] for s in steps] == ["ExecutableStepDTO", "RepeatGroupDTO", "ExecutableStepDTO"]
+    group = steps[1]
+    assert group["stepType"] == {"stepTypeId": 6, "stepTypeKey": "repeat", "displayOrder": 6}
+    assert group["numberOfIterations"] == 6
+    assert group["endCondition"]["conditionTypeKey"] == "iterations"
+    assert group["endConditionValue"] == 6.0
+    assert [s["stepType"]["stepTypeKey"] for s in group["workoutSteps"]] == ["interval", "recovery"]
+    # The block's steps keep their own targets: the recovery has none, the interval does.
+    assert group["workoutSteps"][0]["targetType"]["workoutTargetTypeKey"] == "pace.zone"
+
+
+def test_repeat_group_children_are_marked_as_children():
+    sync, _ = make_sync_with_fake_client()
+    steps = sync.build_workout_payload(_session_with_repeat_block())["workoutSegments"][0]["workoutSteps"]
+
+    assert all(child["childStepId"] == 1 for child in steps[1]["workoutSteps"])
+    assert "childStepId" not in steps[0]
+
+
+def test_step_order_runs_continuously_through_a_repeat_group():
+    sync, _ = make_sync_with_fake_client()
+    steps = sync.build_workout_payload(_session_with_repeat_block())["workoutSegments"][0]["workoutSteps"]
+
+    # warmup 1, group 2, its two steps 3 and 4, cooldown 5 -- Garmin numbers the whole
+    # tree, not each level separately.
+    assert [steps[0]["stepOrder"], steps[1]["stepOrder"], steps[2]["stepOrder"]] == [1, 2, 5]
+    assert [child["stepOrder"] for child in steps[1]["workoutSteps"]] == [3, 4]
+
+
+def test_estimated_duration_counts_every_repetition():
+    sync, _ = make_sync_with_fake_client()
+    payload = sync.build_workout_payload(_session_with_repeat_block())
+
+    # 10' warmup + 6 x 2' recovery + 10' cooldown; the distance-based interval adds none.
+    assert payload["estimatedDurationInSecs"] == (10 + 6 * 2 + 10) * 60
+
+
+def test_repeat_block_survives_a_round_trip_through_garmin():
+    sync, fake = make_sync_with_fake_client()
+    session = _session_with_repeat_block()
+    fake.workouts_by_id[42] = sync.build_workout_payload(session)
+
+    result = sync.get_workout_session(42, date(2026, 8, 5), "running", "Ripetute")
+
+    assert result == session
+
+
+def test_fingerprint_ignores_whether_repeats_are_grouped():
+    """A block and the same steps written out one by one are the same workout.
+
+    This is what keeps every workout uploaded before repeat blocks existed from
+    showing up as "changed" the moment the same session is expressed as a block.
+    """
+    sync, _ = make_sync_with_fake_client()
+    grouped = _session_with_repeat_block(reps=3)
+    flat = TrainingSession(
+        date=grouped.date,
+        sport=grouped.sport,
+        title=grouped.title,
+        steps=[grouped.steps[0], *grouped.steps[1].steps * 3, grouped.steps[2]],
+    )
+
+    assert workout_fingerprint(sync.build_workout_payload(grouped)) == workout_fingerprint(
+        sync.build_workout_payload(flat)
+    )
+
+
+def test_fingerprint_changes_with_the_number_of_repetitions():
+    sync, _ = make_sync_with_fake_client()
+
+    assert workout_fingerprint(
+        sync.build_workout_payload(_session_with_repeat_block(reps=6))
+    ) != workout_fingerprint(sync.build_workout_payload(_session_with_repeat_block(reps=5)))
+
+
+def test_single_iteration_repeat_group_is_read_back_inline():
+    """Nothing this app writes produces one (the editor and the file format both
+    require at least two reps), but a workout authored in Garmin Connect can -- and a
+    "1 ×" block would be noise in the UI."""
+    sync, fake = make_sync_with_fake_client()
+    fake.workouts_by_id[42] = {
+        "description": None,
+        "workoutSegments": [
+            {
+                "workoutSteps": [
+                    {
+                        "type": "RepeatGroupDTO",
+                        "numberOfIterations": 1,
+                        "workoutSteps": [
+                            {
+                                "type": "ExecutableStepDTO",
+                                "stepType": {"stepTypeId": 3},
+                                "endCondition": {"conditionTypeId": 3},
+                                "endConditionValue": 400.0,
+                                "targetType": {"workoutTargetTypeId": 1},
+                            }
+                        ],
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = sync.get_workout_session(42, date(2026, 8, 5), "running", "400m")
+
+    assert result.steps == [Step(type="interval", duration_type="distance", duration_value=0.4)]
+
+
+def test_nested_repeat_groups_are_flattened_one_level():
+    """`RepeatBlock` is one level deep, so an inner group read off Garmin is expanded
+    into the outer block's steps rather than dropped."""
+    sync, fake = make_sync_with_fake_client()
+    inner_step = {
+        "type": "ExecutableStepDTO",
+        "stepType": {"stepTypeId": 3},
+        "endCondition": {"conditionTypeId": 3},
+        "endConditionValue": 200.0,
+        "targetType": {"workoutTargetTypeId": 1},
+    }
+    fake.workouts_by_id[42] = {
+        "description": None,
+        "workoutSegments": [
+            {
+                "workoutSteps": [
+                    {
+                        "type": "RepeatGroupDTO",
+                        "numberOfIterations": 2,
+                        "workoutSteps": [
+                            {
+                                "type": "RepeatGroupDTO",
+                                "numberOfIterations": 3,
+                                "workoutSteps": [inner_step],
+                            }
+                        ],
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = sync.get_workout_session(42, date(2026, 8, 5), "running", "2x(3x200m)")
+
+    assert result.steps == [
+        RepeatBlock(
+            reps=2,
+            steps=[Step(type="interval", duration_type="distance", duration_value=0.2)] * 3,
+        )
+    ]
+
+
+def test_rest_step_type_round_trips():
+    sync, fake = make_sync_with_fake_client()
+    session = TrainingSession(
+        date=date(2026, 8, 5),
+        sport="running",
+        title="Riposo fermo",
+        steps=[Step(type="rest", duration_type="time", duration_value=2)],
+    )
+    payload = sync.build_workout_payload(session)
+    fake.workouts_by_id[42] = payload
+
+    assert payload["workoutSegments"][0]["workoutSteps"][0]["stepType"]["stepTypeKey"] == "rest"
+    assert sync.get_workout_session(42, date(2026, 8, 5), "running", "Riposo fermo") == session
+
+
 # ---- get_workout_session (reverse of build_workout_payload) ------------------------------
 
 
@@ -470,7 +674,7 @@ def test_get_workout_session_round_trips_a_flat_workout():
     assert result == session
 
 
-def test_get_workout_session_flattens_repeat_groups():
+def test_get_workout_session_reads_repeat_groups_as_blocks():
     sync, fake = make_sync_with_fake_client()
     fake.workouts_by_id[42] = {
         "description": None,
@@ -504,10 +708,102 @@ def test_get_workout_session_flattens_repeat_groups():
 
     result = sync.get_workout_session(42, date(2026, 8, 5), "running", "3x400m")
 
-    assert [(s.type, s.duration_type, s.duration_value) for s in result.steps] == [
-        ("interval", "distance", 0.4),
-        ("recovery", "time", 1.0),
-    ] * 3
+    assert result.steps == [
+        RepeatBlock(
+            reps=3,
+            steps=[
+                Step(type="interval", duration_type="distance", duration_value=0.4),
+                Step(type="recovery", duration_type="time", duration_value=1.0),
+            ],
+        )
+    ]
+
+
+def _flat_workout(steps: list[SessionStep]) -> dict:
+    """A Garmin workout payload with `steps` written out one by one -- no repeat group
+    anywhere -- which is what Connect stores for a loop typed in step by step."""
+    sync, _ = make_sync_with_fake_client()
+    session = TrainingSession(date=date(2026, 8, 5), sport="running", title="Ripetute", steps=steps)
+    return sync.build_workout_payload(session)
+
+
+def test_get_workout_session_reads_a_flat_repetition_as_a_block():
+    """A loop written out flat in Garmin Connect describes the same thing as a repeat
+    group, so it comes back as one instead of as six look-alike steps."""
+    sync, fake = make_sync_with_fake_client()
+    interval = Step(
+        type="interval",
+        duration_type="distance",
+        duration_value=1,
+        target_pace=PaceTarget(slower_sec_per_km=285, faster_sec_per_km=275),
+    )
+    recovery = Step(type="recovery", duration_type="time", duration_value=2)
+    warmup = Step(type="warmup", duration_type="time", duration_value=10)
+    cooldown = Step(type="cooldown", duration_type="time", duration_value=10)
+    fake.workouts_by_id[42] = _flat_workout([warmup, *([interval, recovery] * 3), cooldown])
+
+    result = sync.get_workout_session(42, date(2026, 8, 5), "running", "3x1000m")
+
+    assert result.steps == [warmup, RepeatBlock(reps=3, steps=[interval, recovery]), cooldown]
+
+
+def test_flat_repetition_folds_on_the_shortest_repeating_pattern():
+    """Six identical intervals are "6 ×", not "3 × two of them" or "2 × three"."""
+    sync, fake = make_sync_with_fake_client()
+    interval = Step(type="interval", duration_type="distance", duration_value=0.4)
+    fake.workouts_by_id[42] = _flat_workout([interval] * 6)
+
+    result = sync.get_workout_session(42, date(2026, 8, 5), "running", "6x400m")
+
+    assert result.steps == [RepeatBlock(reps=6, steps=[interval])]
+
+
+def test_a_trailing_odd_step_stays_outside_the_folded_block():
+    """The last recovery is often left off in Connect. Only the complete repetitions
+    fold; the leftover interval stays a step of its own rather than being invented a
+    recovery it never had."""
+    sync, fake = make_sync_with_fake_client()
+    interval = Step(type="interval", duration_type="distance", duration_value=0.4)
+    recovery = Step(type="recovery", duration_type="time", duration_value=1)
+    fake.workouts_by_id[42] = _flat_workout([interval, recovery, interval, recovery, interval])
+
+    result = sync.get_workout_session(42, date(2026, 8, 5), "running", "3x400m")
+
+    assert result.steps == [RepeatBlock(reps=2, steps=[interval, recovery]), interval]
+
+
+def test_steps_that_only_look_alike_are_not_folded():
+    """Different distances, different paces: consecutive is not the same as identical."""
+    sync, fake = make_sync_with_fake_client()
+    fast = Step(
+        type="interval",
+        duration_type="distance",
+        duration_value=1,
+        target_pace=PaceTarget(slower_sec_per_km=285, faster_sec_per_km=275),
+    )
+    slow = Step(
+        type="interval",
+        duration_type="distance",
+        duration_value=1,
+        target_pace=PaceTarget(slower_sec_per_km=305, faster_sec_per_km=295),
+    )
+    fake.workouts_by_id[42] = _flat_workout([fast, slow])
+
+    result = sync.get_workout_session(42, date(2026, 8, 5), "running", "1000m + 1000m")
+
+    assert result.steps == [fast, slow]
+
+
+def test_a_flat_run_longer_than_garmin_allows_folds_in_chunks():
+    """Garmin rejects a group of more than 99 iterations, so a longer run becomes a
+    full block plus the remainder rather than one unsendable block."""
+    sync, fake = make_sync_with_fake_client()
+    step = Step(type="rest", duration_type="time", duration_value=1)
+    fake.workouts_by_id[42] = _flat_workout([step] * 101)
+
+    result = sync.get_workout_session(42, date(2026, 8, 5), "running", "Tanti riposi")
+
+    assert result.steps == [RepeatBlock(reps=99, steps=[step]), RepeatBlock(reps=2, steps=[step])]
 
 
 def test_get_workout_session_skips_steps_it_cannot_represent():

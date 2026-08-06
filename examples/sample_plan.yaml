@@ -12,22 +12,18 @@ sessions:
       - type: warmup
         duration_type: time
         duration_value: 10
-      - type: interval
-        duration_type: distance
-        duration_value: 0.4
-        target_pace: "4:00-3:50"
-      - type: recovery
-        duration_type: time
-        duration_value: 2
-        target_pace: "6:30-6:00"
-      - type: interval
-        duration_type: distance
-        duration_value: 0.4
-        target_pace: "4:00-3:50"
-      - type: recovery
-        duration_type: time
-        duration_value: 2
-        target_pace: "6:30-6:00"
+      # The recovery carries its own (slow) pace, so the watch says "jog at
+      # 6:30-6:00" instead of just counting two minutes down.
+      - repeat: 5
+        steps:
+          - type: interval
+            duration_type: distance
+            duration_value: 0.4
+            target_pace: "4:00-3:50"
+          - type: recovery
+            duration_type: time
+            duration_value: 2
+            target_pace: "6:30-6:00"
       - type: cooldown
         duration_type: time
         duration_value: 10

@@ -70,12 +70,37 @@ class StepOut(BaseModel):
         )
 
 
+class RepeatBlockIn(BaseModel):
+    reps: int
+    steps: list[StepIn] = Field(default_factory=list)
+
+    def to_model(self) -> models.RepeatBlock:
+        return models.RepeatBlock(reps=self.reps, steps=[s.to_model() for s in self.steps])
+
+
+class RepeatBlockOut(BaseModel):
+    reps: int
+    steps: list[StepOut] = Field(default_factory=list)
+
+    @classmethod
+    def from_model(cls, block: models.RepeatBlock) -> "RepeatBlockOut":
+        return cls(reps=block.reps, steps=[StepOut.from_model(s) for s in block.steps])
+
+
+# A session's step list is heterogeneous, and the two shapes are told apart by their
+# required fields alone (a block has `reps`, a step has `type`/`duration_*`), so no
+# discriminator field is needed -- but the block must come first, since pydantic tries
+# the members left to right.
+SessionStepIn = RepeatBlockIn | StepIn
+SessionStepOut = RepeatBlockOut | StepOut
+
+
 class TrainingSessionIn(BaseModel):
     date: date_type
     sport: str
     title: str
     description: str | None = None
-    steps: list[StepIn] = Field(default_factory=list)
+    steps: list[SessionStepIn] = Field(default_factory=list)
 
     def to_model(self) -> models.TrainingSession:
         return models.TrainingSession(
@@ -92,7 +117,7 @@ class TrainingSessionOut(BaseModel):
     sport: str
     title: str
     description: str | None = None
-    steps: list[StepOut] = Field(default_factory=list)
+    steps: list[SessionStepOut] = Field(default_factory=list)
 
     @classmethod
     def from_model(cls, session: models.TrainingSession) -> "TrainingSessionOut":
@@ -101,7 +126,10 @@ class TrainingSessionOut(BaseModel):
             sport=session.sport,
             title=session.title,
             description=session.description,
-            steps=[StepOut.from_model(s) for s in session.steps],
+            steps=[
+                RepeatBlockOut.from_model(s) if isinstance(s, models.RepeatBlock) else StepOut.from_model(s)
+                for s in session.steps
+            ],
         )
 
 

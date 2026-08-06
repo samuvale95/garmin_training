@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ProgressRing, WordIn } from "@/components/motion/primitives";
 import { sessionDistanceKm } from "@/lib/sessionVisuals";
-import { formatPaceValue, groupSteps, stepDistanceKm, stepGroupParts } from "@/lib/format";
+import { formatPaceValue, groupDistanceKm, groupSteps, stepGroupParts } from "@/lib/format";
 import type { StravaActivityMatch, TrainingSession } from "@/lib/types";
 
 /** The shared "what is this workout" view -- distance ring, title, description, and
@@ -55,7 +55,7 @@ export function SessionDetailBody({
         {groups.map((group, i) => {
           const isKey = group.kind === "interval";
           const { label, detail } = stepGroupParts(group);
-          const km = group.reps * stepDistanceKm(group.step) + (group.recovery ? group.reps * stepDistanceKm(group.recovery) : 0);
+          const km = groupDistanceKm(group);
           return (
             <div
               key={i}

@@ -24,7 +24,7 @@ from pathlib import Path
 
 import httpx
 
-from .models import TrainingSession
+from .models import TrainingSession, flatten_steps
 
 DEFAULT_TOKENSTORE_PATH = str(Path.home() / ".garmin_training_strava_tokens.json")
 # Retired-shoe flags live in their own file, *not* in the tokenstore: the tokenstore is
@@ -454,11 +454,14 @@ def _planned_summary(session: TrainingSession) -> tuple[float | None, float | No
     session's own steps -- there is no separately-stored "planned totals" field, so
     this mirrors what the frontend's `sessionDistanceKm`/step helpers already do.
     """
-    distance_km = sum(_step_distance_km(step) for step in session.steps)
-    duration_min = sum(step.duration_value for step in session.steps if step.duration_type == "time")
+    # Flattened first: a "6 ×" block is six times the work, and totals that counted it
+    # once would under-report every interval session the moment blocks are used.
+    steps = flatten_steps(session.steps)
+    distance_km = sum(_step_distance_km(step) for step in steps)
+    duration_min = sum(step.duration_value for step in steps if step.duration_type == "time")
     pace_samples = [
         (step.target_pace.slower_sec_per_km + step.target_pace.faster_sec_per_km) / 2
-        for step in session.steps
+        for step in steps
         if step.target_pace
     ]
     avg_pace = sum(pace_samples) / len(pace_samples) if pace_samples else None

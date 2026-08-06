@@ -95,7 +95,7 @@ Each entry in `steps` has:
 
 | Field            | Required | Description                                          |
 |------------------|----------|-------------------------------------------------------|
-| `type`           | yes      | One of: `warmup`, `interval`, `recovery`, `cooldown`  |
+| `type`           | yes      | One of: `warmup`, `interval`, `recovery`, `rest`, `cooldown` |
 | `duration_type`  | yes      | `time` or `distance`                                  |
 | `duration_value` | yes      | **Minutes** if `duration_type: time`, **kilometers** if `duration_type: distance` |
 | `target_pace`    | no       | Target pace in **min:sec per kilometre** — a range (`"4:30-4:20"`) or a single pace (`"4:30"`) |
@@ -110,24 +110,64 @@ sessions:
       - type: warmup
         duration_type: time
         duration_value: 10
-      - type: interval
-        duration_type: distance
-        duration_value: 0.4
-      - type: recovery
-        duration_type: time
-        duration_value: 2
-      - type: interval
-        duration_type: distance
-        duration_value: 0.4
-      - type: recovery
-        duration_type: time
-        duration_value: 2
+      - repeat: 5
+        steps:
+          - type: interval
+            duration_type: distance
+            duration_value: 0.4
+          - type: recovery
+            duration_type: time
+            duration_value: 2
+            target_pace: "6:30-6:00"
       - type: cooldown
         duration_type: time
         duration_value: 10
 ```
 
 Steps are created on Garmin Connect in the order they appear in the file. See [`examples/sample_plan.yaml`](examples/sample_plan.yaml) for a full example.
+
+### What each step type does on the watch
+
+The `type` is not just a label — it is what the watch announces and how Garmin files the step in the workout's statistics. None of them stops the timer or waits for you: **every step ends on its own time/distance condition regardless of type**.
+
+| `type`     | On the watch    | Use it for                                                                 |
+|------------|-----------------|----------------------------------------------------------------------------|
+| `warmup`   | "Warm up"       | Opening block. Excluded from Garmin's interval statistics.                   |
+| `interval` | "Interval"      | The work step.                                                               |
+| `recovery` | "Recovery"      | **Active** recovery — you keep running. Give it a `target_pace` and the watch holds you to that slow pace. |
+| `rest`     | "Rest"          | Standing rest. The clock still runs; a pace target here means nothing.       |
+| `cooldown` | "Cool down"     | Closing block. Excluded from Garmin's interval statistics.                   |
+
+The distinction that actually changes what you do is `recovery` **with** a `target_pace` versus without one: a bare `recovery` step gives the watch nothing to say beyond a countdown, which is why it reads as "stand around for two minutes". Write `target_pace: "6:30-6:00"` on it and it becomes an explicit "jog these two minutes at 6:30–6:00/km".
+
+### Repeat blocks
+
+Instead of writing the same interval out five times, wrap it in a `repeat` block:
+
+```yaml
+steps:
+  - repeat: 6
+    steps:
+      - type: interval
+        duration_type: distance
+        duration_value: 1.0
+        target_pace: "4:40"
+      - type: recovery
+        duration_type: time
+        duration_value: 2
+        target_pace: "6:30-6:00"
+```
+
+| Field    | Required | Description                                                     |
+|----------|----------|------------------------------------------------------------------|
+| `repeat` | yes      | How many times the block runs: a whole number from 2 to 99        |
+| `steps`  | yes      | The steps inside the block, in the same format as a top-level step |
+
+This maps onto Garmin's own repeat groups, so the watch shows "Interval 3/6" rather than six indistinguishable steps, and the block survives a round trip through Garmin Connect. Notes:
+
+- Blocks cannot be nested inside one another. A repeat group read back *from* Garmin that does nest is flattened one level.
+- Blocks and plain steps mix freely at the top level.
+- A workout uploaded before repeat blocks existed is not considered "changed" just because the same session would now be written as a block — `sync --check-content` compares the steps as executed, not as grouped.
 
 ### Target pace
 
@@ -163,7 +203,7 @@ Pace targets are most meaningful for `running`. Garmin models them as a speed ra
 
 - Targets are pace-only: no power, heart-rate-zone, or cadence targets on steps.
 - No swim-specific drills/equipment, and no multi-sport/brick workouts.
-- No repeat/loop blocks — repeated intervals must be written out step by step.
+- Repeat blocks are one level deep — no blocks inside blocks.
 - The tool only creates and deletes; it doesn't update an existing workout in place — delete and re-import instead.
 
 ## Usage

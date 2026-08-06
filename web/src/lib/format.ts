@@ -1,4 +1,5 @@
-import type { HrvPoint, PaceTarget, SleepPhases, Step } from "./types";
+import { isRepeatBlock } from "./types";
+import type { HrvPoint, PaceTarget, SessionStep, SleepPhases, Step, StepType } from "./types";
 
 // ---- Italian number words --------------------------------------------------------------
 // The design spells out small counts in headlines ("Sei differenze", "Settimana
@@ -60,10 +61,36 @@ export function formatDuration(ms: number): string {
 
 // ---- pace / step formatting -------------------------------------------------------------
 
-function formatPaceMinSec(secondsPerKm: number): string {
+/** "4:24" -- minutes per km, the only unit a pace is ever *shown* in. Exported so the
+ * workout editor can seed its pace fields with the same text the rest of the app
+ * displays; `parsePaceMinSec` is its inverse. */
+export function formatPaceMinSec(secondsPerKm: number): string {
   const minutes = Math.floor(secondsPerKm / 60);
   const seconds = Math.round(secondsPerKm % 60);
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+/** Parses a minutes-per-km pace typed by hand back into the seconds/km the plan
+ * format and the API speak, or null if it isn't one.
+ *
+ * Accepts "4:40", plus two spellings that are easier on a phone's numeric keypad:
+ * "4.40" (the ":" key is a keypress away there) and a bare "5" for a round 5:00.
+ * Deliberately stricter than that on the seconds: "4:4" is rejected rather than
+ * silently read as 4:04 or 4:40, since only the typist knows which was meant.
+ * Mirrors `_parse_pace_token` in training_plan/parser.py, which reads the same
+ * M:SS out of the plan file. */
+export function parsePaceMinSec(input: string): number | null {
+  const trimmed = input.trim();
+  if (/^\d{1,2}$/.test(trimmed)) {
+    const minutes = Number(trimmed);
+    return minutes > 0 ? minutes * 60 : null;
+  }
+  const match = /^(\d{1,2})[:.'](\d{2})$/.exec(trimmed);
+  if (!match) return null;
+  const seconds = Number(match[2]);
+  if (seconds > 59) return null;
+  const total = Number(match[1]) * 60 + seconds;
+  return total > 0 ? total : null;
 }
 
 /** "4:24/km" -- a single (not ranged) pace, the format screen 17 uses for an actual
@@ -82,18 +109,41 @@ function formatDistanceValue(km: number): string {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km % 1 === 0 ? km : km.toFixed(1)} km`;
 }
 
-const STEP_LABELS_IT: Record<Step["type"], string> = {
+const STEP_LABELS_IT: Record<StepType, string> = {
   warmup: "Riscaldamento",
   cooldown: "Defaticamento",
-  recovery: "Recupero",
   interval: "Ripetuta",
+  recovery: "Recupero",
+  rest: "Riposo",
 };
 
-export function stepTypeLabel(type: Step["type"]): string {
+/** What each step type actually does on the watch -- shown in the step editor, since
+ * the choice is not cosmetic and picking "Riposo" where "Recupero" was meant is
+ * exactly how a jogged recovery turns into two minutes of standing still. */
+const STEP_HINTS_IT: Record<StepType, string> = {
+  warmup: "Apre la seduta. Escluso dalle statistiche delle ripetute.",
+  cooldown: "Chiude la seduta. Escluso dalle statistiche delle ripetute.",
+  interval: "Il tratto di lavoro.",
+  recovery: "Recupero in movimento: dagli un passo target per correre piano.",
+  rest: "Pausa da fermo. Il tempo scorre comunque.",
+};
+
+export function stepTypeLabel(type: StepType): string {
   return STEP_LABELS_IT[type] ?? type;
 }
 
+export function stepTypeHint(type: StepType): string {
+  return STEP_HINTS_IT[type] ?? "";
+}
+
+/** The two "not the work step" types, which pair with an interval inside a block and
+ * are rendered as its "rec ..." rather than as a row of their own. */
+function isRecoveryLike(step: Step): boolean {
+  return step.type === "recovery" || step.type === "rest";
+}
+
 function sameStep(a: Step, b: Step): boolean {
+  if (a.type !== b.type) return false;
   if (a.duration_type !== b.duration_type || a.duration_value !== b.duration_value) return false;
   if (!a.target_pace !== !b.target_pace) return false;
   if (a.target_pace && b.target_pace) {
@@ -106,63 +156,112 @@ function sameStep(a: Step, b: Step): boolean {
 }
 
 export interface StepGroup {
-  /** null for a lone warmup/cooldown row. */
-  kind: "interval" | "warmup" | "cooldown" | "recovery";
+  /** The type of the group's leading step -- what the row is called and coloured by. */
+  kind: StepType;
   reps: number;
+  /** The group's leading step: the work step of a block, or the lone step itself. */
   step: Step;
+  /** The recovery/rest paired with `step`, shown as its "rec ..." instead of a row. */
   recovery: Step | null;
-  /** Index range in the original steps array this group spans, for React keys. */
+  /** Anything else in a block beyond that pair -- rare, but a block may hold any steps. */
+  extra: Step[];
+  /** Index in the session's step list this group came from, for React keys. */
   startIndex: number;
 }
 
-/** Groups consecutive identical interval(+recovery) pairs into reps, e.g. six
- * `interval 1km @4:20-4:10` + `recovery 400m` pairs in a row become one group with
- * `reps: 6` -- the shape the design always shows ("6 × 1000 m ... rec 400 m"), never
- * six separate rows. */
-export function groupSteps(steps: Step[]): StepGroup[] {
+/** One display row per repeat block or standalone step.
+ *
+ * A `RepeatBlock` maps straight onto a group, reps and all -- that is the whole point
+ * of carrying blocks end to end. Plain steps are still folded together by the old
+ * look-alike heuristic (six identical `interval 1km` + `recovery 400m` pairs become
+ * one `reps: 6` row), because that is what a workout written before blocks existed --
+ * or authored flat in Garmin Connect -- still looks like. */
+export function groupSteps(items: SessionStep[]): StepGroup[] {
   const groups: StepGroup[] = [];
   let i = 0;
-  while (i < steps.length) {
-    const step = steps[i];
-    if (step.type !== "interval") {
-      groups.push({ kind: step.type, reps: 1, step, recovery: null, startIndex: i });
+  while (i < items.length) {
+    const item = items[i];
+
+    if (isRepeatBlock(item)) {
+      const [lead, ...rest] = item.steps;
+      if (lead) {
+        const recovery = rest[0] && isRecoveryLike(rest[0]) ? rest[0] : null;
+        groups.push({
+          kind: lead.type,
+          reps: item.reps,
+          step: lead,
+          recovery,
+          extra: recovery ? rest.slice(1) : rest,
+          startIndex: i,
+        });
+      }
       i += 1;
       continue;
     }
-    const recovery = steps[i + 1]?.type === "recovery" ? steps[i + 1] : null;
+
+    if (item.type !== "interval") {
+      groups.push({ kind: item.type, reps: 1, step: item, recovery: null, extra: [], startIndex: i });
+      i += 1;
+      continue;
+    }
+
+    // A run of plain steps: look ahead for identical interval(+recovery) repeats.
+    const next = items[i + 1];
+    const recovery = next && !isRepeatBlock(next) && isRecoveryLike(next) ? next : null;
     const stride = recovery ? 2 : 1;
     let reps = 1;
     let j = i + stride;
-    while (
-      j < steps.length &&
-      steps[j].type === "interval" &&
-      sameStep(steps[j], step) &&
-      (!recovery || (steps[j + 1]?.type === "recovery" && sameStep(steps[j + 1], recovery)))
-    ) {
+    while (j < items.length) {
+      const candidate = items[j];
+      const candidateRecovery = items[j + 1];
+      if (isRepeatBlock(candidate) || candidate.type !== "interval" || !sameStep(candidate, item)) break;
+      if (recovery && !(candidateRecovery && !isRepeatBlock(candidateRecovery) && sameStep(candidateRecovery, recovery))) break;
       reps += 1;
       j += stride;
     }
-    groups.push({ kind: "interval", reps, step, recovery, startIndex: i });
+    groups.push({ kind: "interval", reps, step: item, recovery, extra: [], startIndex: i });
     i = j;
   }
   return groups;
 }
 
-/** Label ("6 × 1000 m") and detail ("4:20-4:10 · rec 400 m") for a step group,
- * matching the two-line row the session-detail screen uses. */
+/** The distance a group stands for in total: every step it holds, once per repetition
+ * (time-based steps contributing their pace-estimated distance, see `stepDistanceKm`). */
+export function groupDistanceKm(group: StepGroup): number {
+  const perRep = [group.step, ...(group.recovery ? [group.recovery] : []), ...group.extra].reduce(
+    (sum, step) => sum + stepDistanceKm(step),
+    0
+  );
+  return group.reps * perRep;
+}
+
+/** How long a step lasts, in its own unit: "1000 m" or "15 min". */
+export function stepDurationLabel(step: Step): string {
+  return step.duration_type === "distance" ? formatDistanceValue(step.duration_value) : `${step.duration_value} min`;
+}
+
+/** Label ("6 × 1000 m") and detail ("4:20-4:10 · rec 2 min a 6:30-6:00") for a step
+ * group, matching the two-line row the session-detail screen uses. */
 export function stepGroupParts(group: StepGroup): { label: string; detail: string } {
-  const { step, reps, recovery, kind } = group;
+  const { step, reps, recovery, extra, kind } = group;
+  const times = reps > 1 ? `${reps} × ` : "";
+
   if (kind === "interval") {
-    const distance = step.duration_type === "distance" ? formatDistanceValue(step.duration_value) : `${step.duration_value} min`;
-    const label = reps > 1 ? `${reps} × ${distance}` : distance;
     const pace = step.target_pace ? formatPaceRange(step.target_pace) : "";
+    // The recovery's own pace is spelled out too: it is the difference between a
+    // jogged recovery and standing still, and the only place the plan says which.
     const rec = recovery
-      ? `rec ${recovery.duration_type === "distance" ? formatDistanceValue(recovery.duration_value) : `${recovery.duration_value} min`}`
+      ? `${stepTypeLabel(recovery.type).toLowerCase()} ${stepDurationLabel(recovery)}${recovery.target_pace ? ` a ${formatPaceRange(recovery.target_pace)}` : ""}`
       : "";
-    return { label, detail: [pace, rec].filter(Boolean).join(" · ") };
+    const rest = extra.map((s) => `${stepTypeLabel(s.type).toLowerCase()} ${stepDurationLabel(s)}`);
+    return {
+      label: `${times}${stepDurationLabel(step)}`,
+      detail: [pace, rec, ...rest].filter(Boolean).join(" · "),
+    };
   }
-  const duration = step.duration_type === "time" ? `${step.duration_value} min` : formatDistanceValue(step.duration_value);
-  return { label: stepTypeLabel(kind), detail: `${duration} · libero` };
+
+  const pace = step.target_pace ? formatPaceRange(step.target_pace) : "libero";
+  return { label: `${times}${stepTypeLabel(kind)}`, detail: `${stepDurationLabel(step)} · ${pace}` };
 }
 
 /** One line per group: "6 × 1000 m  4:20-4:10 · rec 400 m", "15 min · libero". */
@@ -172,18 +271,19 @@ export function stepGroupLine(group: StepGroup): string {
 }
 
 /** Compact arrow-joined summary for diff/deletion cards: "WU 15' → 6×1km @4:20-4:10 → CD 10'". */
-export function planStepsSummary(steps: Step[]): string {
-  const abbrev: Partial<Record<Step["type"], string>> = { warmup: "WU", cooldown: "CD" };
+export function planStepsSummary(steps: SessionStep[]): string {
+  const abbrev: Partial<Record<StepType, string>> = { warmup: "WU", cooldown: "CD", recovery: "rec", rest: "rip" };
+  const compact = (step: Step) =>
+    step.duration_type === "distance" ? formatDistanceValue(step.duration_value).replace(" ", "") : `${step.duration_value}'`;
+
   return groupSteps(steps)
     .map((group) => {
       const { step, reps, kind } = group;
       if (kind === "interval") {
-        const distance = step.duration_type === "distance" ? formatDistanceValue(step.duration_value).replace(" ", "") : `${step.duration_value}'`;
         const pace = step.target_pace ? ` @${formatPaceRange(step.target_pace)}` : "";
-        return `${reps > 1 ? `${reps}×` : ""}${distance}${pace}`;
+        return `${reps > 1 ? `${reps}×` : ""}${compact(step)}${pace}`;
       }
-      const value = step.duration_type === "time" ? `${step.duration_value}'` : formatDistanceValue(step.duration_value).replace(" ", "");
-      return `${abbrev[kind] ?? kind} ${value}`;
+      return `${reps > 1 ? `${reps}×` : ""}${abbrev[kind] ?? kind} ${compact(step)}`;
     })
     .join(" → ");
 }
@@ -245,7 +345,7 @@ export function sleepCaption(sleep: SleepPhases | null): string | null {
 /** One-line "what's actually in this session" note for the week view's day cards --
  * pace/duration/recovery pulled straight from the plan's own steps, replacing the
  * generic category label ("Ripetute") the day card used to fall back to. */
-export function sessionDetailLine(session: { steps?: Step[]; description?: string | null }): string {
+export function sessionDetailLine(session: { steps?: SessionStep[]; description?: string | null }): string {
   const steps = session.steps ?? [];
   const groups = groupSteps(steps).filter((g) => g.kind !== "warmup" && g.kind !== "cooldown");
   if (groups.length > 0) return groups.map(stepGroupLine).join(" · ");

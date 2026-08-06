@@ -9,7 +9,33 @@ import { useBodyConflict, useBodyToday, usePlanQuery, useUpdateSession } from "@
 import { usePassoStore } from "@/lib/store";
 import { toDateKey } from "@/lib/sessionVisuals";
 import { hrvCaption, sleepCaption } from "@/lib/format";
-import type { ConflictOption } from "@/lib/types";
+import { isRepeatBlock } from "@/lib/types";
+import type { ConflictOption, TrainingSession } from "@/lib/types";
+
+/** "Alleggerisci": one repetition less than planned.
+ *
+ * Taken off the last repeat block when the session has one -- a `6 ×` block becomes
+ * `5 ×`, and a `2 ×` block collapses into its steps written once, since a one-rep
+ * block is not a block. Sessions written without blocks (a flat run of intervals, the
+ * only shape that existed before) fall back to dropping the last interval step. */
+function dropOneRepetition(session: TrainingSession): TrainingSession {
+  const blockIndexes = session.steps.map((step, i) => (isRepeatBlock(step) ? i : -1)).filter((i) => i >= 0);
+  const lastBlockIndex = blockIndexes[blockIndexes.length - 1];
+  const lastBlock = lastBlockIndex == null ? null : session.steps[lastBlockIndex];
+
+  if (lastBlock && isRepeatBlock(lastBlock)) {
+    const steps = [...session.steps];
+    steps.splice(lastBlockIndex, 1, ...(lastBlock.reps > 2 ? [{ ...lastBlock, reps: lastBlock.reps - 1 }] : lastBlock.steps));
+    return { ...session, steps };
+  }
+
+  const intervalIndexes = session.steps
+    .map((step, i) => (!isRepeatBlock(step) && step.type === "interval" ? i : -1))
+    .filter((i) => i >= 0);
+  if (intervalIndexes.length <= 1) return session;
+  const lastInterval = intervalIndexes[intervalIndexes.length - 1];
+  return { ...session, steps: session.steps.filter((_, i) => i !== lastInterval) };
+}
 
 export default function ConflictPage() {
   const router = useRouter();
@@ -44,12 +70,7 @@ export default function ConflictPage() {
         return { ...s, date: toDateKey(d) };
       });
     } else if (option.kind === "soften") {
-      updateSession(sessionIndex, (s) => {
-        const intervalIndexes = s.steps.map((step, i) => (step.type === "interval" ? i : -1)).filter((i) => i >= 0);
-        if (intervalIndexes.length <= 1) return s;
-        const lastInterval = intervalIndexes[intervalIndexes.length - 1];
-        return { ...s, steps: s.steps.filter((_, i) => i !== lastInterval) };
-      });
+      updateSession(sessionIndex, dropOneRepetition);
     }
     leaveConflict();
   }

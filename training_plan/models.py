@@ -4,8 +4,13 @@ from dataclasses import dataclass, field
 from datetime import date as date_type
 
 SUPPORTED_SPORTS = ("running", "cycling", "swimming", "strength_training", "other")
-SUPPORTED_STEP_TYPES = ("warmup", "interval", "recovery", "cooldown")
+SUPPORTED_STEP_TYPES = ("warmup", "interval", "recovery", "rest", "cooldown")
 SUPPORTED_DURATION_TYPES = ("time", "distance")
+
+# Garmin caps a repeat group's iterations; anything outside this range is rejected by
+# the API rather than clamped, so it is validated on the way in instead.
+MIN_REPETITIONS = 2
+MAX_REPETITIONS = 99
 
 # Garmin Connect sportType payload fragments, keyed by our file-format sport value.
 SPORT_TYPE_PAYLOAD = {
@@ -51,11 +56,38 @@ def sport_from_garmin_key(key: str | None) -> str:
 
 
 # Garmin Connect stepType payload fragments, keyed by our file-format step type.
+#
+# What these mean *on the watch*, since the choice is not cosmetic:
+#   warmup / cooldown -- bookend steps, shown as such and excluded from Garmin's
+#     interval statistics.
+#   interval          -- the work step ("Ripetuta").
+#   recovery          -- an *active* recovery ("Recupero"): the watch keeps you moving
+#     and, if the step carries a pace target, holds you to that (slow) pace. This is
+#     the one to use for a jogged recovery.
+#   rest              -- a standing rest ("Riposo"): same timer, but presented as a
+#     pause, and a pace target on it makes no sense.
+# None of them stops the timer or auto-advances: every step ends on its own
+# distance/time condition regardless of type. The difference the athlete actually
+# feels is the label plus whether a pace target is attached (see PACE_TARGET_PAYLOAD).
 STEP_TYPE_PAYLOAD = {
     "warmup": {"stepTypeId": 1, "stepTypeKey": "warmup", "displayOrder": 1},
     "interval": {"stepTypeId": 3, "stepTypeKey": "interval", "displayOrder": 3},
     "recovery": {"stepTypeId": 4, "stepTypeKey": "recovery", "displayOrder": 4},
+    "rest": {"stepTypeId": 5, "stepTypeKey": "rest", "displayOrder": 5},
     "cooldown": {"stepTypeId": 2, "stepTypeKey": "cooldown", "displayOrder": 2},
+}
+
+# A repeat group is itself a step in Garmin's tree (stepTypeId 6), holding the steps it
+# repeats as children rather than an end condition of its own.
+REPEAT_STEP_TYPE_PAYLOAD = {"stepTypeId": 6, "stepTypeKey": "repeat", "displayOrder": 6}
+
+# ...and the "end after N iterations" condition that goes with it. `displayable` is
+# False because the count is already shown by the group itself.
+ITERATIONS_CONDITION_PAYLOAD = {
+    "conditionTypeId": 7,
+    "conditionTypeKey": "iterations",
+    "displayOrder": 7,
+    "displayable": False,
 }
 
 # Garmin Connect endCondition payload fragments, keyed by our file-format duration_type.
@@ -110,9 +142,49 @@ class Step:
 
 
 @dataclass
+class RepeatBlock:
+    """A group of steps performed `reps` times over -- Garmin's own `RepeatGroupDTO`.
+
+    Kept as a real structure rather than expanded into repeated `Step`s, because
+    Garmin supports repeat groups natively: sending one means the watch shows
+    "Ripetuta 3/6" instead of six indistinguishable steps, and the workout survives a
+    round-trip through Garmin Connect looking the way it was written.
+
+    Deliberately one level deep (`steps` holds plain `Step`s, never another block):
+    Garmin allows nesting, but nothing in this app's file format or its editor offers
+    it, and a workout read back with nested groups is flattened one level on the way
+    in (see `garmin_sync._parse_workout_steps`).
+    """
+
+    reps: int
+    steps: list[Step] = field(default_factory=list)
+
+
+# What a session's `steps` list may hold: plain steps, repeat blocks, or a mix.
+SessionStep = Step | RepeatBlock
+
+
+def flatten_steps(steps: list[SessionStep]) -> list[Step]:
+    """Every step in execution order, with repeat blocks expanded out.
+
+    For the many read-only consumers that only ever ask "how far / how long / at what
+    pace is this session" (planned totals, distance rings, content hashing) and have
+    no interest in how the steps are grouped. The `Step`s are shared, not copied --
+    callers must not mutate them.
+    """
+    flat: list[Step] = []
+    for item in steps:
+        if isinstance(item, RepeatBlock):
+            flat.extend(item.steps * item.reps)
+        else:
+            flat.append(item)
+    return flat
+
+
+@dataclass
 class TrainingSession:
     date: date_type
     sport: str
     title: str
     description: str | None = None
-    steps: list[Step] = field(default_factory=list)
+    steps: list[SessionStep] = field(default_factory=list)

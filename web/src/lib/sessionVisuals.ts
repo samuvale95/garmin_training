@@ -1,6 +1,7 @@
 import type { IllustrationName } from "@/components/Illustration";
 import { stepDistanceKm } from "./format";
-import type { Step } from "./types";
+import { flattenSteps } from "./types";
+import type { SessionStep } from "./types";
 
 export type SessionKind = "riposo" | "ripetute" | "fondo_lento" | "forza" | "lungo";
 
@@ -12,7 +13,7 @@ export interface DisplaySession {
   date: string;
   sport: string;
   title: string;
-  steps?: Step[];
+  steps?: SessionStep[];
 }
 
 export interface SessionVisual {
@@ -39,18 +40,19 @@ export function classifySession(session: DisplaySession | null): SessionVisual {
   if (!session) return { kind: "riposo", ...VISUALS.riposo };
   if (session.sport === "strength_training") return { kind: "forza", ...VISUALS.forza };
   if (session.sport === "cycling") return { kind: "lungo", ...VISUALS.lungo };
-  const hasIntervals = session.steps?.some((s) => s.type === "interval") ?? false;
+  const hasIntervals = flattenSteps(session.steps ?? []).some((s) => s.type === "interval");
   if (hasIntervals) return { kind: "ripetute", ...VISUALS.ripetute };
   return { kind: "fondo_lento", ...VISUALS.fondo_lento };
 }
 
 /** 0 for sessions with no step detail (e.g. a live Garmin workout, which only
  * carries date/sport/title -- see `DisplaySession`). Sums every step via
- * `stepDistanceKm`, so time-based steps (warmup/cooldown/intervals defined in
- * minutes) contribute their pace-estimated distance too, matching the per-row
- * total shown in the session-detail step list. */
+ * `stepDistanceKm` with repeat blocks expanded, so time-based steps
+ * (warmup/cooldown/intervals defined in minutes) contribute their pace-estimated
+ * distance too and a "6 ×" block counts six times, matching the per-row total shown
+ * in the session-detail step list. */
 export function sessionDistanceKm(session: DisplaySession): number {
-  return (session.steps ?? []).reduce((sum, s) => sum + stepDistanceKm(s), 0);
+  return flattenSteps(session.steps ?? []).reduce((sum, s) => sum + stepDistanceKm(s), 0);
 }
 
 export function weekBounds(reference: Date): { start: Date; end: Date } {

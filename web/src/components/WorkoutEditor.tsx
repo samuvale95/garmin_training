@@ -8,8 +8,9 @@ import { useMountOnce } from "@/lib/motion";
 import { useAddSession, useApplyDeletion, useInvalidateCalendarData, usePlanQuery, useRemoveSession, useStartSync, useSyncJobStatus, useUpdateSession, useWorkoutsForDate } from "@/lib/queries";
 import { ApiError } from "@/lib/apiClient";
 import { normalizeTitle, toDateKey } from "@/lib/sessionVisuals";
-import { stepTypeLabel } from "@/lib/format";
-import type { ScheduledWorkout, Sport, Step, TrainingSession } from "@/lib/types";
+import { formatPaceMinSec, formatPaceRange, parsePaceMinSec, stepTypeHint, stepTypeLabel } from "@/lib/format";
+import { isRepeatBlock } from "@/lib/types";
+import type { ScheduledWorkout, SessionStep, Sport, Step, StepType, TrainingSession } from "@/lib/types";
 
 const SPORT_CHIPS: { value: Sport; label: string }[] = [
   { value: "running", label: "Corsa" },
@@ -22,7 +23,12 @@ const SPORT_CHIPS: { value: Sport; label: string }[] = [
 // Rest days have no dedicated sport in the file format (training_plan.models.SUPPORTED_SPORTS
 // has no "rest" value) -- the "Riposo" chip is stored as sport "other", same fallback the
 // week screen already treats as a rest-like day when there is no session at all.
-const STEP_TYPES: Step["type"][] = ["warmup", "interval", "recovery", "cooldown"];
+const STEP_TYPES: StepType[] = ["warmup", "interval", "recovery", "rest", "cooldown"];
+
+// Garmin's own bounds on a repeat group; the file format enforces the same range
+// (training_plan.models.MIN_REPETITIONS/MAX_REPETITIONS).
+const MIN_REPS = 2;
+const MAX_REPS = 99;
 
 let stepIdCounter = 0;
 function newStepId(): string {
@@ -30,12 +36,53 @@ function newStepId(): string {
   return `step-${stepIdCounter}`;
 }
 
+/** The editor's working copy of a session's steps.
+ *
+ * Everything the list renders carries an `_id`, including the blocks themselves, so
+ * dragging and per-row edits address a stable identity rather than a position that
+ * shifts under them. Stripped back out by `plainSteps` on save. */
 type EditableStep = Step & { _id: string };
+type EditableBlock = { _id: string; reps: number; steps: EditableStep[] };
+type EditableItem = EditableStep | EditableBlock;
+
+function isEditableBlock(item: EditableItem): item is EditableBlock {
+  return "reps" in item;
+}
+
+function toEditable(items: SessionStep[]): EditableItem[] {
+  return items.map((item) =>
+    isRepeatBlock(item)
+      ? { _id: newStepId(), reps: item.reps, steps: item.steps.map((s) => ({ ...s, _id: newStepId() })) }
+      : { ...item, _id: newStepId() }
+  );
+}
 
 function stepSummary(step: Step): string {
   const duration = step.duration_type === "distance" ? `${step.duration_value} km` : `${step.duration_value} min`;
-  const pace = step.target_pace ? ` · ${step.target_pace.slower_sec_per_km}-${step.target_pace.faster_sec_per_km}s/km` : "";
+  const pace = step.target_pace ? ` · ${formatPaceRange(step.target_pace)}/km` : "";
   return `${duration}${pace}`;
+}
+
+/** A new step's starting point, by type. A recovery is born with a slow pace target
+ * on purpose: a recovery step with no target is what turns "due minuti di corsa
+ * lenta" into two minutes of standing around on the watch. */
+function blankStep(type: StepType): EditableStep {
+  if (type === "recovery") {
+    return {
+      _id: newStepId(),
+      type,
+      duration_type: "time",
+      duration_value: 2,
+      target_pace: { slower_sec_per_km: 420, faster_sec_per_km: 360 },
+    };
+  }
+  if (type === "rest") {
+    return { _id: newStepId(), type, duration_type: "time", duration_value: 2 };
+  }
+  if (type === "warmup" || type === "cooldown") {
+    return { _id: newStepId(), type, duration_type: "time", duration_value: 10 };
+  }
+  return { _id: newStepId(), type, duration_type: "distance", duration_value: 1 };
 }
 
 /** The three things this form can be editing.
@@ -86,7 +133,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   const [sport, setSport] = useState<Sport>((existing?.sport as Sport) ?? "running");
   const [title, setTitle] = useState(existing?.title ?? "");
   const [description, setDescription] = useState(existing?.description ?? "");
-  const [steps, setSteps] = useState<EditableStep[]>(() => (existing?.steps ?? []).map((s) => ({ ...s, _id: newStepId() })));
+  const [steps, setSteps] = useState<EditableItem[]>(() => toEditable(existing?.steps ?? []));
   const [editingStep, setEditingStep] = useState<EditableStep | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -159,8 +206,21 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   const displayError = saveError ?? jobFailedMessage;
   const isSaving = startSync.isPending || (!!jobId && !jobFailedMessage && !jobSucceeded);
 
-  function plainSteps(): Step[] {
-    return steps.map((s) => ({ type: s.type, duration_type: s.duration_type, duration_value: s.duration_value, target_pace: s.target_pace }));
+  function plainSteps(): SessionStep[] {
+    const strip = (s: EditableStep): Step => ({
+      type: s.type,
+      duration_type: s.duration_type,
+      duration_value: s.duration_value,
+      target_pace: s.target_pace,
+    });
+    return steps.flatMap((item): SessionStep[] => {
+      if (!isEditableBlock(item)) return [strip(item)];
+      // An emptied block would be rejected by the backend, and a block is only a block
+      // from two repetitions up -- below that, hand its steps over on their own.
+      if (item.steps.length === 0) return [];
+      if (item.reps < MIN_REPS) return item.steps.map(strip);
+      return [{ reps: item.reps, steps: item.steps.map(strip) }];
+    });
   }
 
   async function handleSave() {
@@ -222,7 +282,63 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   }
 
   function addStep() {
-    setSteps((prev) => [...prev, { _id: newStepId(), type: "interval", duration_type: "distance", duration_value: 1 }]);
+    setSteps((prev) => [...prev, blankStep("interval")]);
+  }
+
+  /** A repeat block starts as the shape it is almost always used for: a work step plus
+   * a jogged recovery, four times over. */
+  function addBlock() {
+    setSteps((prev) => [
+      ...prev,
+      { _id: newStepId(), reps: 4, steps: [blankStep("interval"), blankStep("recovery")] },
+    ]);
+  }
+
+  function setBlockReps(blockId: string, reps: number) {
+    setSteps((prev) =>
+      prev.map((item) =>
+        isEditableBlock(item) && item._id === blockId
+          ? { ...item, reps: Math.min(MAX_REPS, Math.max(MIN_REPS, reps)) }
+          : item
+      )
+    );
+  }
+
+  function addStepToBlock(blockId: string) {
+    setSteps((prev) =>
+      prev.map((item) =>
+        isEditableBlock(item) && item._id === blockId
+          ? { ...item, steps: [...item.steps, blankStep("interval")] }
+          : item
+      )
+    );
+  }
+
+  /** Removes a step wherever it sits -- top level or inside a block -- and takes an
+   * emptied block with it, so the list can never hold a "0 ×" row. */
+  function removeStep(stepId: string) {
+    setSteps((prev) =>
+      prev
+        .map((item) =>
+          isEditableBlock(item) ? { ...item, steps: item.steps.filter((s) => s._id !== stepId) } : item
+        )
+        .filter((item) => (isEditableBlock(item) ? item.steps.length > 0 : item._id !== stepId))
+    );
+  }
+
+  function removeBlock(blockId: string) {
+    setSteps((prev) => prev.filter((item) => item._id !== blockId));
+  }
+
+  function replaceStep(updated: EditableStep) {
+    setSteps((prev) =>
+      prev.map((item) => {
+        if (isEditableBlock(item)) {
+          return { ...item, steps: item.steps.map((s) => (s._id === updated._id ? updated : s)) };
+        }
+        return item._id === updated._id ? updated : item;
+      })
+    );
   }
 
   return (
@@ -313,49 +429,70 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
 
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 20 }}>
         <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>Struttura</span>
-        <button type="button" onClick={addStep} className="tap-target" style={{ background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-          + step
-        </button>
+        <span style={{ display: "flex", gap: 14 }}>
+          <button type="button" onClick={addBlock} className="tap-target" style={{ background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            + blocco
+          </button>
+          <button type="button" onClick={addStep} className="tap-target" style={{ background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            + step
+          </button>
+        </span>
       </div>
 
+      {/* Only the top level is draggable. A block's own steps are reordered by
+          rebuilding the block (delete + add), which keeps the drag handling to one
+          `Reorder.Group` instead of nesting one inside another. */}
       <Reorder.Group axis="y" values={steps} onReorder={setSteps} style={{ listStyle: "none", margin: "10px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-        {steps.map((step) => {
-          const isKey = step.type === "interval";
-          return (
+        {steps.map((item) =>
+          isEditableBlock(item) ? (
             <Reorder.Item
-              key={step._id}
-              value={step}
+              key={item._id}
+              value={item}
               style={{
-                background: isKey ? "var(--corallo)" : "var(--crema-card)",
-                color: isKey ? "var(--corallo-testo)" : "var(--inchiostro)",
+                background: "var(--sabbia-chip)",
                 borderRadius: "var(--radius-row)",
-                padding: "12px 14px",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
+                padding: "12px 12px 14px",
                 cursor: "grab",
               }}
             >
-              <span aria-hidden="true" style={{ opacity: 0.5, fontSize: 14 }}>⠿</span>
-              <span style={{ flex: 1 }}>
-                <span style={{ display: "block", fontSize: 13.5, fontWeight: 600 }}>{stepTypeLabel(step.type)}</span>
-                <span className="font-mono" style={{ display: "block", fontSize: 11.5, opacity: 0.8, marginTop: 2 }}>{stepSummary(step)}</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setEditingStep(step)}
-                className="tap-target"
-                aria-label="Modifica step"
-                style={{ background: "none", border: "none", fontSize: 14, color: "inherit", opacity: 0.7, cursor: "pointer" }}
-              >
-                ✎
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span aria-hidden="true" style={{ opacity: 0.5, fontSize: 14 }}>⠿</span>
+                <span style={{ fontSize: 13.5, fontWeight: 600, flex: 1 }}>Ripeti</span>
+                <RepsStepper reps={item.reps} onChange={(reps) => setBlockReps(item._id, reps)} />
+                <button
+                  type="button"
+                  onClick={() => removeBlock(item._id)}
+                  className="tap-target"
+                  aria-label="Elimina blocco"
+                  style={{ background: "none", border: "none", fontSize: 14, color: "var(--inchiostro-50)", cursor: "pointer" }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10, paddingLeft: 12, borderLeft: "2px solid var(--sabbia-bordo)" }}>
+                {item.steps.map((step) => (
+                  <StepRow key={step._id} step={step} onEdit={() => setEditingStep(step)} onRemove={() => removeStep(step._id)} />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addStepToBlock(item._id)}
+                  className="tap-target"
+                  style={{ alignSelf: "flex-start", background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "4px 0" }}
+                >
+                  + step nel blocco
+                </button>
+              </div>
             </Reorder.Item>
-          );
-        })}
+          ) : (
+            <Reorder.Item key={item._id} value={item} style={{ cursor: "grab" }}>
+              <StepRow step={item} draggable onEdit={() => setEditingStep(item)} onRemove={() => removeStep(item._id)} />
+            </Reorder.Item>
+          )
+        )}
         {steps.length === 0 && (
           <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-50)", padding: "6px 2px" }}>
-            Nessuno step. Aggiungine uno con &quot;+ step&quot;.
+            Nessuno step. Aggiungi uno step singolo, o un blocco da ripetere.
           </p>
         )}
       </Reorder.Group>
@@ -402,7 +539,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
           step={editingStep}
           onCancel={() => setEditingStep(null)}
           onSave={(updated) => {
-            setSteps((prev) => prev.map((s) => (s._id === updated._id ? updated : s)));
+            replaceStep(updated);
             setEditingStep(null);
           }}
         />
@@ -411,13 +548,146 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   );
 }
 
+/** One step row, identical whether it sits at the top level or inside a block -- the
+ * drag handle is the only difference, since a block's steps don't drag. */
+function StepRow({
+  step,
+  draggable = false,
+  onEdit,
+  onRemove,
+}: {
+  step: EditableStep;
+  draggable?: boolean;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  const isKey = step.type === "interval";
+  return (
+    <div
+      style={{
+        background: isKey ? "var(--corallo)" : "var(--crema-card)",
+        color: isKey ? "var(--corallo-testo)" : "var(--inchiostro)",
+        borderRadius: "var(--radius-row)",
+        padding: "12px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+      }}
+    >
+      {draggable && <span aria-hidden="true" style={{ opacity: 0.5, fontSize: 14 }}>⠿</span>}
+      <span style={{ flex: 1 }}>
+        <span style={{ display: "block", fontSize: 13.5, fontWeight: 600 }}>{stepTypeLabel(step.type)}</span>
+        <span className="font-mono" style={{ display: "block", fontSize: 11.5, opacity: 0.8, marginTop: 2 }}>{stepSummary(step)}</span>
+      </span>
+      <button
+        type="button"
+        onClick={onEdit}
+        className="tap-target"
+        aria-label={`Modifica ${stepTypeLabel(step.type).toLowerCase()}`}
+        style={{ background: "none", border: "none", fontSize: 14, color: "inherit", opacity: 0.7, cursor: "pointer" }}
+      >
+        ✎
+      </button>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="tap-target"
+        aria-label={`Elimina ${stepTypeLabel(step.type).toLowerCase()}`}
+        style={{ background: "none", border: "none", fontSize: 14, color: "inherit", opacity: 0.55, cursor: "pointer" }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+/** "− 4 × +". A stepper rather than a number field: reps are single digits in
+ * practice, and this is the one control on the row that has to work one-handed. */
+function RepsStepper({ reps, onChange }: { reps: number; onChange: (reps: number) => void }) {
+  const button = (delta: number, label: string, disabled: boolean) => (
+    <button
+      type="button"
+      onClick={() => onChange(reps + delta)}
+      disabled={disabled}
+      className="tap-target"
+      aria-label={label}
+      style={{
+        background: "var(--crema-card)",
+        border: "none",
+        borderRadius: "var(--radius-pill)",
+        width: 30,
+        height: 30,
+        fontSize: 16,
+        lineHeight: 1,
+        color: "var(--inchiostro)",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.35 : 1,
+      }}
+    >
+      {delta > 0 ? "+" : "−"}
+    </button>
+  );
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      {button(-1, "Una ripetizione in meno", reps <= MIN_REPS)}
+      <span className="font-mono" style={{ fontSize: 14, fontWeight: 600, minWidth: 34, textAlign: "center" }}>
+        {reps} ×
+      </span>
+      {button(1, "Una ripetizione in più", reps >= MAX_REPS)}
+    </span>
+  );
+}
+
 function StepEditorModal({ step, onSave, onCancel }: { step: EditableStep; onSave: (step: EditableStep) => void; onCancel: () => void }) {
-  const [type, setType] = useState<Step["type"]>(step.type);
+  const [type, setType] = useState<StepType>(step.type);
   const [durationType, setDurationType] = useState<Step["duration_type"]>(step.duration_type);
   const [durationValue, setDurationValue] = useState(step.duration_value);
   const [hasPace, setHasPace] = useState(!!step.target_pace);
-  const [slower, setSlower] = useState(step.target_pace?.slower_sec_per_km ?? 300);
-  const [faster, setFaster] = useState(step.target_pace?.faster_sec_per_km ?? 280);
+  // Pace is typed -- and only ever typed -- as minutes per km ("4:40"), the same unit
+  // the plan file and every other screen use. It lives in state as the raw text so a
+  // half-typed "4:" isn't rounded into something else under the cursor; the seconds/km
+  // the API wants are derived below, once, at save time.
+  const [slowerText, setSlowerText] = useState(formatPaceMinSec(step.target_pace?.slower_sec_per_km ?? 300));
+  const [fasterText, setFasterText] = useState(formatPaceMinSec(step.target_pace?.faster_sec_per_km ?? 280));
+
+  /** Changing the type moves the pace target with it, because the two are not really
+   * independent: a recovery without a target is the "two minutes of standing still"
+   * this editor exists to avoid, and a target on a standing rest means nothing. */
+  function changeType(next: StepType) {
+    setType(next);
+    if (next === "recovery" && !hasPace) {
+      setSlowerText(formatPaceMinSec(420));
+      setFasterText(formatPaceMinSec(360));
+      setHasPace(true);
+    }
+    if (next === "rest") setHasPace(false);
+  }
+
+  const slowerSec = parsePaceMinSec(slowerText);
+  const fasterSec = parsePaceMinSec(fasterText);
+  const paceError = !hasPace
+    ? null
+    : slowerSec == null || fasterSec == null
+      ? "Passo in minuti al km, tipo 4:40."
+      : slowerSec === fasterSec
+        ? "I due estremi devono essere diversi."
+        : null;
+
+  function handleDone() {
+    if (paceError) return;
+    onSave({
+      ...step,
+      type,
+      duration_type: durationType,
+      duration_value: durationValue,
+      // Stored slower-bound-first whichever field each was typed in, the same
+      // normalisation `parse_target_pace` applies to the plan file.
+      target_pace:
+        hasPace && slowerSec != null && fasterSec != null
+          ? { slower_sec_per_km: Math.max(slowerSec, fasterSec), faster_sec_per_km: Math.min(slowerSec, fasterSec) }
+          : null,
+    });
+  }
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(28,26,22,.45)", display: "flex", alignItems: "flex-end", zIndex: 20 }} onClick={onCancel}>
@@ -428,13 +698,19 @@ function StepEditorModal({ step, onSave, onCancel }: { step: EditableStep; onSav
         <p style={{ font: "600 18px var(--font-outfit)", margin: 0 }}>Modifica step</p>
 
         <Field label="Tipo">
-          <select value={type} onChange={(e) => setType(e.target.value as Step["type"])} style={selectStyle}>
+          <select value={type} onChange={(e) => changeType(e.target.value as StepType)} style={selectStyle}>
             {STEP_TYPES.map((t) => (
               <option key={t} value={t}>
                 {stepTypeLabel(t)}
               </option>
             ))}
           </select>
+          {/* What the chosen type actually does on the watch. Without this the
+              difference between "Recupero" and "Riposo" is invisible until the
+              workout is already running. */}
+          <p className="font-serif-italic" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>
+            {stepTypeHint(type)}
+          </p>
         </Field>
 
         <Field label="Durata">
@@ -457,29 +733,43 @@ function StepEditorModal({ step, onSave, onCancel }: { step: EditableStep; onSav
           Passo target
         </label>
         {hasPace && (
-          <Field label="Passo (sec/km, più lento - più veloce)">
+          <Field label="Passo (min/km, più lento – più veloce)">
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input type="number" value={slower} onChange={(e) => setSlower(Number(e.target.value))} style={{ ...selectStyle, flex: 1 }} />
+              <input
+                value={slowerText}
+                onChange={(e) => setSlowerText(e.target.value)}
+                inputMode="numeric"
+                placeholder="5:00"
+                aria-label="Passo più lento, minuti al km"
+                className="font-mono"
+                style={{ ...selectStyle, flex: 1 }}
+              />
               <span>–</span>
-              <input type="number" value={faster} onChange={(e) => setFaster(Number(e.target.value))} style={{ ...selectStyle, flex: 1 }} />
+              <input
+                value={fasterText}
+                onChange={(e) => setFasterText(e.target.value)}
+                inputMode="numeric"
+                placeholder="4:40"
+                aria-label="Passo più veloce, minuti al km"
+                className="font-mono"
+                style={{ ...selectStyle, flex: 1 }}
+              />
             </div>
+            {paceError && (
+              <p role="alert" style={{ color: "var(--rosso-forte)", fontSize: 12, margin: "6px 0 0" }}>
+                {paceError}
+              </p>
+            )}
           </Field>
         )}
 
         <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
           <button
             type="button"
-            onClick={() =>
-              onSave({
-                ...step,
-                type,
-                duration_type: durationType,
-                duration_value: durationValue,
-                target_pace: hasPace ? { slower_sec_per_km: slower, faster_sec_per_km: faster } : null,
-              })
-            }
+            onClick={handleDone}
+            disabled={!!paceError}
             className="tap-target"
-            style={{ flex: 1, background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
+            style={{ flex: 1, background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: paceError ? "not-allowed" : "pointer", opacity: paceError ? 0.45 : 1 }}
           >
             Fatto
           </button>

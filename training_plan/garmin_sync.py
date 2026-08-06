@@ -24,14 +24,21 @@ from garminconnect import (
 
 from .models import (
     CONDITION_TYPE_PAYLOAD,
+    ITERATIONS_CONDITION_PAYLOAD,
     LAP_BUTTON_CONDITION_PAYLOAD,
+    MAX_REPETITIONS,
+    MIN_REPETITIONS,
     NO_TARGET_PAYLOAD,
     PACE_TARGET_PAYLOAD,
+    REPEAT_STEP_TYPE_PAYLOAD,
     SPORT_TYPE_PAYLOAD,
     STEP_TYPE_PAYLOAD,
     PaceTarget,
+    RepeatBlock,
+    SessionStep,
     Step,
     TrainingSession,
+    flatten_steps,
     sport_from_garmin_key,
 )
 
@@ -167,11 +174,17 @@ def workout_fingerprint(workout: dict) -> str:
     the one Garmin stored), so projecting them through the same reducer makes them
     comparable without depending on the many server-added fields, key ordering, or
     float formatting that differ between the two.
+
+    Repeat groups are expanded, not hashed as groups, so a session hashes the same
+    whether its six intervals are written out one by one or wrapped in a `6 ×` block.
+    That is deliberate: it keeps every workout uploaded before repeat groups existed
+    from showing up as "changed" purely because the same session would now be
+    *expressed* differently, while a real edit (five reps instead of six, a different
+    recovery) still changes the expansion and so the hash.
     """
-    segments = workout.get("workoutSegments") or []
     steps = []
-    for segment in segments:
-        for step in segment.get("workoutSteps") or []:
+    for segment in workout.get("workoutSegments") or []:
+        for step in _expand_raw_steps(segment.get("workoutSteps") or []):
             end = step.get("endCondition") or {}
             target = step.get("targetType") or {}
             steps.append(
@@ -190,6 +203,19 @@ def workout_fingerprint(workout: dict) -> str:
         "steps": steps,
     }
     return hashlib.sha256(json.dumps(projection, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def _expand_raw_steps(raw_steps: list[dict]) -> list[dict]:
+    """Raw Garmin step payloads in execution order, with `RepeatGroupDTO`s expanded
+    into their repeated children (nested groups included)."""
+    expanded: list[dict] = []
+    for raw in raw_steps:
+        if raw.get("type") == "RepeatGroupDTO":
+            children = _expand_raw_steps(raw.get("workoutSteps") or [])
+            expanded.extend(children * int(raw.get("numberOfIterations") or 1))
+        else:
+            expanded.append(raw)
+    return expanded
 
 
 def _round_or_none(value, digits: int):
@@ -459,11 +485,13 @@ class GarminSync:
         sport_payload = SPORT_TYPE_PAYLOAD.get(session.sport, SPORT_TYPE_PAYLOAD["other"])
 
         if session.steps:
-            workout_steps = [
-                _build_step_payload(step, order) for order, step in enumerate(session.steps, start=1)
-            ]
+            workout_steps, _ = _build_steps_payload(session.steps, start_order=1)
             estimated_duration_secs = int(
-                sum(step.duration_value * 60 for step in session.steps if step.duration_type == "time")
+                sum(
+                    step.duration_value * 60
+                    for step in flatten_steps(session.steps)
+                    if step.duration_type == "time"
+                )
             )
         else:
             workout_steps = [
@@ -620,7 +648,7 @@ class GarminSync:
         except Exception as exc:  # noqa: BLE001 - surfaced as a clean CLI error
             raise GarminSyncError(f"Could not read workout {workout_id}: {exc}") from exc
 
-        steps: list[Step] = []
+        steps: list[SessionStep] = []
         for segment in remote.get("workoutSegments") or []:
             steps.extend(_parse_workout_steps(segment.get("workoutSteps") or []))
 
@@ -670,6 +698,42 @@ class GarminSync:
 
     def delete_all(self, workouts: list[ScheduledWorkout]) -> list[DeleteResult]:
         return [self.delete_workout(w) for w in workouts]
+
+
+def _build_steps_payload(items: list[SessionStep], start_order: int) -> tuple[list[dict], int]:
+    """Garmin step payloads for a session's steps, plus the next free `stepOrder`.
+
+    Garmin numbers `stepOrder` continuously across the whole workout, a repeat group
+    and its children alike (warmup 1, group 2, its two steps 3 and 4, cooldown 5), so
+    the counter is threaded through rather than restarted per level.
+    """
+    payloads: list[dict] = []
+    order = start_order
+    for item in items:
+        if isinstance(item, RepeatBlock):
+            group_order, order = order, order + 1
+            children, order = _build_steps_payload(list(item.steps), order)
+            for child in children:
+                # Marks each child as belonging to the group above it -- what Garmin
+                # Connect's own payloads carry, and what makes the app show the steps
+                # nested inside the repeat rather than after it.
+                child["childStepId"] = 1
+            payloads.append(
+                {
+                    "type": "RepeatGroupDTO",
+                    "stepOrder": group_order,
+                    "stepType": REPEAT_STEP_TYPE_PAYLOAD,
+                    "numberOfIterations": item.reps,
+                    "endCondition": ITERATIONS_CONDITION_PAYLOAD,
+                    "endConditionValue": float(item.reps),
+                    "smartRepeat": False,
+                    "workoutSteps": children,
+                }
+            )
+            continue
+        payloads.append(_build_step_payload(item, order))
+        order += 1
+    return payloads, order
 
 
 def _build_step_payload(step: Step, order: int) -> dict:
@@ -732,22 +796,93 @@ def _parse_workout_step(raw_step: dict) -> Step | None:
     )
 
 
-def _parse_workout_steps(raw_steps: list[dict]) -> list[Step]:
-    """Flattens Garmin's `RepeatGroupDTO` (a repeated block of steps, e.g. "5x400m")
-    into repeated `Step` entries -- this app's own file format has no repeat-group
-    concept, only a flat step list where the web UI regroups consecutive identical
-    steps for display (see `web/src/lib/format.ts`'s `groupSteps`).
+def _parse_workout_steps(raw_steps: list[dict]) -> list[SessionStep]:
+    """Reads Garmin's step tree back into this app's steps and `RepeatBlock`s.
+
+    A `RepeatGroupDTO` (a repeated block, e.g. "5x400m") becomes a `RepeatBlock`, so a
+    workout authored in Garmin Connect keeps its "5 ×" shape here instead of arriving
+    as five look-alike steps. Nesting is the one thing that doesn't survive: a group
+    inside a group is expanded into its parent's steps, since `RepeatBlock` is a
+    single level deep by design.
+
+    A workout written out *flat* -- six identical interval/recovery pairs one after the
+    other, no group around them, which is what Garmin Connect produces when the loop is
+    typed step by step -- describes the same block, so it is read back as one (see
+    `_fold_repeated_steps`).
     """
-    steps: list[Step] = []
+    return _fold_repeated_steps(_parse_raw_steps(raw_steps))
+
+
+def _parse_raw_steps(raw_steps: list[dict]) -> list[SessionStep]:
+    """`_parse_workout_steps` without the flat-repetition folding -- the tree walk on its
+    own, so recursing into a group doesn't re-fold children that are about to be
+    flattened anyway."""
+    items: list[SessionStep] = []
     for raw in raw_steps:
         if raw.get("type") == "RepeatGroupDTO":
-            nested = _parse_workout_steps(raw.get("workoutSteps") or [])
-            steps.extend(nested * (raw.get("numberOfIterations") or 1))
+            children = flatten_steps(_parse_raw_steps(raw.get("workoutSteps") or []))
+            reps = int(raw.get("numberOfIterations") or 1)
+            if not children:
+                continue
+            # A group that runs once is only noise in the UI -- keep its steps inline.
+            if reps <= 1:
+                items.extend(children)
+            else:
+                items.append(RepeatBlock(reps=reps, steps=children))
             continue
         step = _parse_workout_step(raw)
         if step is not None:
-            steps.append(step)
-    return steps
+            items.append(step)
+    return items
+
+
+def _repeated_pattern_at(items: list[SessionStep], start: int) -> tuple[int, int] | None:
+    """(pattern length, repetitions) for the run of back-to-back identical steps
+    starting at `start`, or None if what starts there doesn't repeat.
+
+    The *shortest* repeating pattern wins, so "1000m, rec, 1000m, rec, ..." is read as
+    the pair repeated rather than as one long stretch that happens to occur twice --
+    the tightest loop is the one the athlete actually runs.
+
+    Only plain steps are considered: a `RepeatBlock` inside the pattern would mean a
+    nested group, which `RepeatBlock` doesn't model.
+    """
+    remaining = len(items) - start
+    for length in range(1, remaining // 2 + 1):
+        pattern = items[start : start + length]
+        if isinstance(pattern[-1], RepeatBlock):
+            return None  # a longer pattern would contain it too
+        reps = 1
+        while items[start + reps * length : start + (reps + 1) * length] == pattern:
+            reps += 1
+        if reps >= MIN_REPETITIONS:
+            # Past Garmin's cap the run is folded in chunks of 99 rather than left flat;
+            # the leftovers come back around on the caller's next pass.
+            return length, min(reps, MAX_REPETITIONS)
+    return None
+
+
+def _fold_repeated_steps(items: list[SessionStep]) -> list[SessionStep]:
+    """Runs of identical consecutive steps collapsed into the `RepeatBlock` they spell
+    out, leaving everything else -- blocks Garmin already grouped, one-off steps, an
+    odd trailing interval whose recovery was left off -- exactly as it came in."""
+    folded: list[SessionStep] = []
+    i = 0
+    while i < len(items):
+        item = items[i]
+        if isinstance(item, RepeatBlock):
+            folded.append(item)
+            i += 1
+            continue
+        match = _repeated_pattern_at(items, i)
+        if match is None:
+            folded.append(item)
+            i += 1
+            continue
+        length, reps = match
+        folded.append(RepeatBlock(reps=reps, steps=list(items[i : i + length])))
+        i += length * reps
+    return folded
 
 
 def _extract_calendar_items(data: dict) -> list[dict]:

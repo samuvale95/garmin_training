@@ -119,6 +119,39 @@ def test_parse_plan_requires_file_or_text(client):
     assert response.status_code == 400
 
 
+def test_parse_plan_returns_repeat_blocks_as_blocks(client):
+    """A session's steps are a heterogeneous list over the wire, and the two shapes
+    are told apart by their fields alone -- so the block must survive serialization
+    instead of being coerced into (or dropped by) the plain-step shape."""
+    yaml_text = (
+        "sessions:\n"
+        "  - date: '2026-08-01'\n"
+        "    sport: running\n"
+        "    title: Ripetute\n"
+        "    steps:\n"
+        "      - type: warmup\n"
+        "        duration_type: time\n"
+        "        duration_value: 10\n"
+        "      - repeat: 6\n"
+        "        steps:\n"
+        "          - type: interval\n"
+        "            duration_type: distance\n"
+        "            duration_value: 1.0\n"
+        "          - type: recovery\n"
+        "            duration_type: time\n"
+        "            duration_value: 2\n"
+        "            target_pace: '6:30-6:00'\n"
+    )
+    response = client.post("/plan/parse", data={"yaml_text": yaml_text})
+
+    assert response.status_code == 200
+    steps = response.json()["sessions"][0]["steps"]
+    assert steps[0]["type"] == "warmup"
+    assert steps[1]["reps"] == 6
+    assert [s["type"] for s in steps[1]["steps"]] == ["interval", "recovery"]
+    assert steps[1]["steps"][1]["target_pace"] == {"slower_sec_per_km": 390, "faster_sec_per_km": 360}
+
+
 # ---- /plan/diff -------------------------------------------------------------------------------
 
 

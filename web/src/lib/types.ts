@@ -2,7 +2,7 @@
 // unless the backend starts generating an OpenAPI client.
 
 export type Sport = "running" | "cycling" | "swimming" | "strength_training" | "other";
-export type StepType = "warmup" | "interval" | "recovery" | "cooldown";
+export type StepType = "warmup" | "interval" | "recovery" | "rest" | "cooldown";
 export type DurationType = "time" | "distance";
 
 export interface PaceTarget {
@@ -17,12 +17,36 @@ export interface Step {
   target_pace?: PaceTarget | null;
 }
 
+/** A group of steps repeated `reps` times -- Garmin's own repeat group, kept as a
+ * structure end to end (see `training_plan.models.RepeatBlock`) rather than expanded
+ * into look-alike steps. One level deep: `steps` never holds another block. */
+export interface RepeatBlock {
+  reps: number;
+  steps: Step[];
+}
+
+/** What a session's `steps` may hold: plain steps, repeat blocks, or a mix. */
+export type SessionStep = Step | RepeatBlock;
+
+export function isRepeatBlock(item: SessionStep): item is RepeatBlock {
+  return "reps" in item;
+}
+
+/** Every step in execution order, with blocks expanded -- for the consumers that only
+ * want totals (distance rings, planned summaries) and not the grouping. Mirrors
+ * `training_plan.models.flatten_steps`; the steps are shared, not copied. */
+export function flattenSteps(steps: SessionStep[]): Step[] {
+  return steps.flatMap((item) =>
+    isRepeatBlock(item) ? Array.from({ length: item.reps }, () => item.steps).flat() : [item]
+  );
+}
+
 export interface TrainingSession {
   date: string; // YYYY-MM-DD
   sport: Sport;
   title: string;
   description?: string | null;
-  steps: Step[];
+  steps: SessionStep[];
 }
 
 export interface ScheduledWorkout {
