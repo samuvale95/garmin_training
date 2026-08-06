@@ -5,8 +5,14 @@ import { useRouter } from "next/navigation";
 import { useGarminStatus, usePlanQuery, type PlanState } from "./queries";
 
 /** Screens that need an imported plan redirect to /import when there isn't one --
- * matching the "no plan imported -> screen 03 is the home" empty state. */
-export function useRequirePlan(): PlanState | null {
+ * matching the "no plan imported -> screen 03 is the home" empty state.
+ *
+ * `isHydrated` is returned alongside the plan because the two "no plan" states look the
+ * same but must not render the same: before the localStorage read has happened (one tick
+ * after mount) the answer is simply unknown, and a screen should show its loading shape;
+ * after it, there really is no plan and we're on our way to /import.
+ */
+export function useRequirePlan(): { plan: PlanState | null; isHydrated: boolean } {
   const router = useRouter();
   const { data: plan, isHydrated } = usePlanQuery();
 
@@ -14,7 +20,7 @@ export function useRequirePlan(): PlanState | null {
     if (isHydrated && !plan) router.replace("/import");
   }, [isHydrated, plan, router]);
 
-  return plan ?? null;
+  return { plan: plan ?? null, isHydrated };
 }
 
 export interface CalendarAccess {

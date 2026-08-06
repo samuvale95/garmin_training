@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date as date_type
 from datetime import datetime, timedelta, timezone
@@ -25,6 +27,10 @@ import httpx
 from .models import TrainingSession
 
 DEFAULT_TOKENSTORE_PATH = str(Path.home() / ".garmin_training_strava_tokens.json")
+# Retired-shoe flags live in their own file, *not* in the tokenstore: the tokenstore is
+# deleted on disconnect, on a failed refresh and on any 401, which used to silently
+# resurrect every shoe the user had retired.
+DEFAULT_SHOESTORE_PATH = str(Path.home() / ".garmin_training_strava_shoes.json")
 
 STRAVA_AUTHORIZE_URL = "https://www.strava.com/oauth/authorize"
 STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
@@ -34,6 +40,10 @@ STRAVA_SCOPE = "activity:read_all,profile:read_all"
 
 WEAR_THRESHOLD_KM = 700
 RECENT_WINDOW_DAYS = 56  # 8 weeks, used for the "estimated time to exhaustion" figure
+
+# Independent Strava reads go out concurrently, a few at a time (Strava's own rate
+# limit is per-app, so a wide fan-out is not free either).
+MAX_PARALLEL_READS = 6
 
 # Strava's `type`/`sport_type` values, mapped onto this app's sport vocabulary
 # (training_plan.models.SUPPORTED_SPORTS). Unrecognized Strava types fall back to
@@ -88,6 +98,23 @@ def _now() -> int:
     return int(time.time())
 
 
+# Strava invalidates a refresh token the moment it is used, so two requests refreshing
+# at the same time can leave the *stored* token dead and force a spurious "reconnect
+# from Settings". One process-wide lock around read-refresh-write makes the sequence
+# atomic; concurrent requests now either reuse the token the winner wrote or wait for it.
+_token_lock = threading.Lock()
+
+
+def _write_json_atomically(path: Path, payload: dict) -> None:
+    """Write via a temp file + `os.replace`, so a crash or a concurrent reader never
+    sees a half-written token/shoe file (a truncated JSON read as `{}` looks exactly
+    like "not connected")."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(payload))
+    os.replace(tmp, path)
+
+
 class StravaSync:
     """Thin wrapper around Strava's REST API for OAuth, activities, and gear."""
 
@@ -97,11 +124,13 @@ class StravaSync:
         client_secret: str | None = None,
         redirect_uri: str | None = None,
         tokenstore: str | None = None,
+        shoestore: str | None = None,
     ):
         self._client_id = client_id or os.getenv("STRAVA_CLIENT_ID")
         self._client_secret = client_secret or os.getenv("STRAVA_CLIENT_SECRET")
         self._redirect_uri = redirect_uri or os.getenv("STRAVA_REDIRECT_URI")
         self._tokenstore = Path(tokenstore or os.getenv("STRAVA_TOKENSTORE", DEFAULT_TOKENSTORE_PATH))
+        self._shoestore = Path(shoestore or os.getenv("STRAVA_SHOESTORE", DEFAULT_SHOESTORE_PATH))
 
     # ---- token storage -------------------------------------------------------------------
 
@@ -112,8 +141,7 @@ class StravaSync:
             return {}
 
     def _write_tokens(self, tokens: dict) -> None:
-        self._tokenstore.parent.mkdir(parents=True, exist_ok=True)
-        self._tokenstore.write_text(json.dumps(tokens))
+        _write_json_atomically(self._tokenstore, tokens)
 
     def _require_client_credentials(self) -> None:
         if not self._client_id or not self._client_secret:
@@ -195,20 +223,30 @@ class StravaSync:
             return tokens["access_token"]
 
         self._require_client_credentials()
-        response = httpx.post(
-            STRAVA_TOKEN_URL,
-            data={
-                "client_id": self._client_id,
-                "client_secret": self._client_secret,
-                "grant_type": "refresh_token",
-                "refresh_token": tokens["refresh_token"],
-            },
-        )
-        if response.status_code != 200:
-            self._tokenstore.unlink(missing_ok=True)
-            raise StravaAuthError("Strava authorization expired; reconnect from Settings.")
-        self._store_token_response(response.json())
-        return self._read_tokens()["access_token"]
+        with _token_lock:
+            # Re-read inside the lock: another request may have refreshed while we
+            # waited, in which case its token is the only valid one (ours is now
+            # revoked by Strava) and spending a second refresh would revoke theirs.
+            tokens = self._read_tokens()
+            if not tokens.get("refresh_token"):
+                raise StravaAuthError("Strava is not connected.")
+            if tokens.get("expires_at", 0) > _now() + 60:
+                return tokens["access_token"]
+
+            response = httpx.post(
+                STRAVA_TOKEN_URL,
+                data={
+                    "client_id": self._client_id,
+                    "client_secret": self._client_secret,
+                    "grant_type": "refresh_token",
+                    "refresh_token": tokens["refresh_token"],
+                },
+            )
+            if response.status_code != 200:
+                self._tokenstore.unlink(missing_ok=True)
+                raise StravaAuthError("Strava authorization expired; reconnect from Settings.")
+            self._store_token_response(response.json())
+            return self._read_tokens()["access_token"]
 
     def _get(self, path: str, params: dict | None = None) -> httpx.Response:
         access_token = self._ensure_fresh_access_token()
@@ -273,13 +311,17 @@ class StravaSync:
                 activity_date = datetime.fromisoformat(start.replace("Z", "+00:00")).date()
                 by_date.setdefault(activity_date, []).append(activity)
 
-        results: dict[str, dict] = {}
-        for session in sessions:
-            candidates = [
-                a for a in by_date.get(session.date, []) if _sport_compatible(a.get("type"), a.get("sport_type"), session.sport)
-            ]
-            results[session.date.isoformat()] = self._build_match(session, candidates)
-        return results
+        # One `get_activity_detail` per matched day, issued concurrently: a week with
+        # six matched sessions used to mean six serial Strava round-trips after the
+        # single list call, which dominated this endpoint.
+        with ThreadPoolExecutor(max_workers=MAX_PARALLEL_READS) as pool:
+            calls = {}
+            for session in sessions:
+                candidates = [
+                    a for a in by_date.get(session.date, []) if _sport_compatible(a.get("type"), a.get("sport_type"), session.sport)
+                ]
+                calls[session.date.isoformat()] = pool.submit(self._build_match, session, candidates)
+            return {key: call.result() for key, call in calls.items()}
 
     def _build_match(self, session: TrainingSession, candidates: list[dict]) -> dict:
         planned_distance_km, planned_duration_min, planned_pace_sec_per_km = _planned_summary(session)
@@ -330,14 +372,21 @@ class StravaSync:
     # ---- shoe wear ---------------------------------------------------------------------------
 
     def _retired_gear_ids(self) -> set[str]:
+        """Locally-retired gear ids, from the shoestore -- falling back once to the
+        tokenstore, where they used to live, so flags set by an older version survive.
+        """
+        try:
+            stored = json.loads(self._shoestore.read_text())
+        except (OSError, ValueError):
+            stored = None
+        if isinstance(stored, dict):
+            return set(stored.get("retired_gear_ids", []))
         return set(self._read_tokens().get("retired_gear_ids", []))
 
     def retire_shoe(self, gear_id: str) -> None:
-        tokens = self._read_tokens()
-        retired = set(tokens.get("retired_gear_ids", []))
+        retired = self._retired_gear_ids()
         retired.add(gear_id)
-        tokens["retired_gear_ids"] = sorted(retired)
-        self._write_tokens(tokens)
+        _write_json_atomically(self._shoestore, {"retired_gear_ids": sorted(retired)})
 
     def shoe_wear(self) -> list[dict]:
         athlete = self._get("/athlete").json()
@@ -355,10 +404,14 @@ class StravaSync:
             recent_km_by_gear[gear_id] = recent_km_by_gear.get(gear_id, 0.0) + activity["distance"] / 1000
 
         retired_ids = self._retired_gear_ids()
+        # One `/gear/{id}` per shoe, concurrently rather than in series.
+        with ThreadPoolExecutor(max_workers=MAX_PARALLEL_READS) as pool:
+            gear_calls = [pool.submit(self._get, f"/gear/{shoe['id']}") for shoe in shoes]
+            details = [call.result().json() for call in gear_calls]
+
         results = []
-        for shoe in shoes:
+        for shoe, detail in zip(shoes, details):
             gear_id = shoe["id"]
-            detail = self._get(f"/gear/{gear_id}").json()
             distance_km = round(detail.get("distance", 0) / 1000, 1)
             weekly_km = recent_km_by_gear.get(gear_id, 0.0) / (RECENT_WINDOW_DAYS / 7)
             remaining_km = WEAR_THRESHOLD_KM - distance_km

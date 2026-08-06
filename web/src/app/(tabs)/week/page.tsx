@@ -7,7 +7,9 @@ import { Illustration } from "@/components/Illustration";
 import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
-import { useActivities, useStravaActivityMatches, useStravaStatus, useWorkouts } from "@/lib/queries";
+import { useActivities, usePrefetchWorkoutSession, useStravaActivityMatches, useStravaStatus, useWeekWorkouts } from "@/lib/queries";
+import { RefreshButton } from "@/components/RefreshButton";
+import { SkeletonDayCards } from "@/components/skeletons";
 import { classifySession, sessionDistanceKm, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
 import { sessionDetailLine } from "@/lib/format";
 import type { ScheduledWorkout, TrainingSession } from "@/lib/types";
@@ -31,7 +33,7 @@ export default function WeekPage() {
   const { start, end } = weekBounds(reference);
   const startKey = toDateKey(start);
   const endKey = toDateKey(end);
-  const workoutsQuery = useWorkouts(startKey, endKey, liveMode);
+  const workoutsQuery = useWeekWorkouts(reference, liveMode);
   // Real done-vs-planned needs actual Garmin activities, not just the scheduled/planned
   // calendar -- only fetched (and only shown) when there's both a plan to compare
   // against and a live Garmin connection to pull completed activities from.
@@ -55,8 +57,20 @@ export default function WeekPage() {
       }));
   const stravaEnabled = !!stravaStatus.data?.connected && planSessions.length > 0;
   const stravaMatches = useStravaActivityMatches(planSessions, stravaEnabled);
+  const prefetchWorkoutSession = usePrefetchWorkoutSession();
 
-  if (!access.ready || (!access.plan && !access.garminConnected)) return null;
+  // Same rule as Oggi: while we don't yet know whether there's a plan or a Garmin
+  // connection, show this week's frame with empty day cards -- never a blank screen.
+  if (!access.ready || (!access.plan && !access.garminConnected)) {
+    return (
+      <div>
+        <WeekHeader start={start} end={end} animate={animate} onPrev={() => setOffset((o) => o - 1)} onNext={() => setOffset((o) => o + 1)} />
+        <div style={{ padding: "16px 20px 12px" }}>
+          <SkeletonDayCards />
+        </div>
+      </div>
+    );
+  }
 
   const sessions: DisplaySession[] = access.plan ? access.plan.sessions : workoutsQuery.data?.workouts ?? [];
 
@@ -83,26 +97,13 @@ export default function WeekPage() {
   return (
     <div>
       <div style={{ padding: "22px 20px 0", position: "sticky", top: 0, zIndex: 1, background: "var(--crema)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <BrandMark height={22} />
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <NavButton label="Settimana precedente" onClick={() => setOffset((o) => o - 1)}>
-              ‹
-            </NavButton>
-            <NavButton label="Settimana successiva" onClick={() => setOffset((o) => o + 1)}>
-              ›
-            </NavButton>
-            <Link href="/week/new" aria-label="Aggiungi allenamento" className="tap-target" style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--inchiostro)", color: "var(--crema)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", textDecoration: "none", fontSize: 16 }}>
-              +
-            </Link>
-          </div>
-        </div>
-
-        <div style={{ marginTop: 14 }}>
-          <WordIn active={animate} style={{ font: "600 30px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>
-            {formatWeekRange(start, end)}
-          </WordIn>
-        </div>
+        <WeekHeaderRow
+          start={start}
+          end={end}
+          animate={animate}
+          onPrev={() => setOffset((o) => o - 1)}
+          onNext={() => setOffset((o) => o + 1)}
+        />
 
         {showProgress && (
           <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
@@ -135,73 +136,134 @@ export default function WeekPage() {
         )}
 
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-          {days.map((day, i) => {
-            const visual = classifySession(day.session);
-            const height = day.session ? 78 + Math.min(40, sessionDistanceKm(day.session) * 2) : 78;
-            const detail = day.session ? sessionDetailLine(day.session) || visual.label : "e va bene così";
-            const isToday = day.key === todayKey;
-            const match = stravaMatches.data?.matches[day.key];
-            const card = (
-              <SlideUp
-                active={animate}
-                delayMs={i * 80}
-                row
-                style={{
-                  background: visual.background,
-                  color: visual.foreground,
-                  borderRadius: "var(--radius-card)",
-                  padding: 14,
-                  minHeight: height,
-                  position: "relative",
-                  overflow: "hidden",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "center",
-                }}
-              >
-                <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{day.session ? day.session.title : "Riposo"}</p>
-                <p className="font-serif-italic" style={{ fontSize: 13, margin: "4px 0 0", opacity: 0.85 }}>
-                  {detail}
-                </p>
-                {match?.matched && match.distance_km != null && (
-                  <p className="font-mono" style={{ fontSize: 11, margin: "4px 0 0", opacity: 0.75 }}>
-                    svolto {match.distance_km.toFixed(1)} km
+          {/* In live mode the days come from Garmin, so before that answer lands every
+              day would read as "Riposo" -- a wrong statement, not a loading state. */}
+          {liveMode && workoutsQuery.isPending ? (
+            <SkeletonDayCards />
+          ) : (
+            days.map((day, i) => {
+              const visual = classifySession(day.session);
+              const height = day.session ? 78 + Math.min(40, sessionDistanceKm(day.session) * 2) : 78;
+              const detail = day.session ? sessionDetailLine(day.session) || visual.label : "e va bene così";
+              const isToday = day.key === todayKey;
+              const match = stravaMatches.data?.matches[day.key];
+              const card = (
+                <SlideUp
+                  active={animate}
+                  delayMs={i * 80}
+                  row
+                  style={{
+                    background: visual.background,
+                    color: visual.foreground,
+                    borderRadius: "var(--radius-card)",
+                    padding: 14,
+                    minHeight: height,
+                    position: "relative",
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                  }}
+                >
+                  <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{day.session ? day.session.title : "Riposo"}</p>
+                  <p className="font-serif-italic" style={{ fontSize: 13, margin: "4px 0 0", opacity: 0.85 }}>
+                    {detail}
                   </p>
-                )}
-                {visual.illustration && (
-                  <Illustration name={visual.illustration} width={64} height={70} breathe={false} active={animate} delayMs={200 + i * 80} />
-                )}
-              </SlideUp>
-            );
-            return (
-              <div key={day.key} style={{ display: "flex", gap: 10 }}>
-                <div className="font-mono" style={{ width: 30, paddingTop: 14, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                  <span style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? "var(--inchiostro)" : "var(--inchiostro-50)" }}>
-                    {day.date.toLocaleDateString("it-IT", { weekday: "short" })}
-                  </span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--inchiostro)" }}>{day.date.getDate()}</span>
+                  {match?.matched && match.distance_km != null && (
+                    <p className="font-mono" style={{ fontSize: 11, margin: "4px 0 0", opacity: 0.75 }}>
+                      svolto {match.distance_km.toFixed(1)} km
+                    </p>
+                  )}
+                  {visual.illustration && (
+                    <Illustration name={visual.illustration} width={64} height={70} breathe={false} active={animate} delayMs={200 + i * 80} />
+                  )}
+                </SlideUp>
+              );
+              return (
+                <div key={day.key} style={{ display: "flex", gap: 10 }}>
+                  <div className="font-mono" style={{ width: 30, paddingTop: 14, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                    <span style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? "var(--inchiostro)" : "var(--inchiostro-50)" }}>
+                      {day.date.toLocaleDateString("it-IT", { weekday: "short" })}
+                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--inchiostro)" }}>{day.date.getDate()}</span>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    {(() => {
+                      if (day.session && day.index >= 0) {
+                        return <Link href={`/session/${day.index}`} style={{ textDecoration: "none", color: "inherit" }}>{card}</Link>;
+                      }
+                      const workout = liveMode ? (day.session as ScheduledWorkout | null) : null;
+                      if (workout?.scheduled_workout_id != null) {
+                        return (
+                          <Link
+                            href={`/workout/${workout.scheduled_workout_id}?date=${day.key}`}
+                            style={{ textDecoration: "none", color: "inherit" }}
+                            // The detail screen's own step structure is a second Garmin
+                            // read (`useWorkoutSession`) that the week list doesn't need.
+                            // Start it on touch-down, so it's usually already in flight --
+                            // or done -- by the time the screen appears.
+                            onPointerDown={() => prefetchWorkoutSession(workout)}
+                          >
+                            {card}
+                          </Link>
+                        );
+                      }
+                      return card;
+                    })()}
+                  </div>
                 </div>
-                <div style={{ flex: 1 }}>
-                  {(() => {
-                    if (day.session && day.index >= 0) {
-                      return <Link href={`/session/${day.index}`} style={{ textDecoration: "none", color: "inherit" }}>{card}</Link>;
-                    }
-                    const workout = liveMode ? (day.session as ScheduledWorkout | null) : null;
-                    if (workout?.scheduled_workout_id != null) {
-                      return (
-                        <Link href={`/workout/${workout.scheduled_workout_id}?date=${day.key}`} style={{ textDecoration: "none", color: "inherit" }}>
-                          {card}
-                        </Link>
-                      );
-                    }
-                    return card;
-                  })()}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+interface WeekHeaderProps {
+  start: Date;
+  end: Date;
+  animate: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+}
+
+/** Brand mark, week paging, refresh, "add workout", and the week range -- rendered the
+ * same whether or not the week's data has arrived. */
+function WeekHeaderRow({ start, end, animate, onPrev, onNext }: WeekHeaderProps) {
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <BrandMark height={22} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <NavButton label="Settimana precedente" onClick={onPrev}>
+            ‹
+          </NavButton>
+          <NavButton label="Settimana successiva" onClick={onNext}>
+            ›
+          </NavButton>
+          <RefreshButton />
+          <Link href="/week/new" aria-label="Aggiungi allenamento" className="tap-target" style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--inchiostro)", color: "var(--crema)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", textDecoration: "none", fontSize: 16 }}>
+            +
+          </Link>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <WordIn active={animate} style={{ font: "600 30px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>
+          {formatWeekRange(start, end)}
+        </WordIn>
+      </div>
+    </>
+  );
+}
+
+/** The same header inside its sticky container, for the loading state. */
+function WeekHeader(props: WeekHeaderProps) {
+  return (
+    <div style={{ padding: "22px 20px 0", position: "sticky", top: 0, zIndex: 1, background: "var(--crema)" }}>
+      <WeekHeaderRow {...props} />
     </div>
   );
 }

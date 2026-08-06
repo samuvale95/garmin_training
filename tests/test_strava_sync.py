@@ -24,7 +24,14 @@ def make_sync(tmp_path, tokens: dict | None = None) -> StravaSync:
     if tokens is not None:
         tokenstore.write_text(json.dumps(tokens))
     return StravaSync(
-        client_id="client-id", client_secret="client-secret", redirect_uri="http://localhost/cb", tokenstore=str(tokenstore)
+        client_id="client-id",
+        client_secret="client-secret",
+        redirect_uri="http://localhost/cb",
+        tokenstore=str(tokenstore),
+        # Retired-shoe flags live outside the tokenstore now (so disconnecting Strava
+        # can't wipe them); pin them under tmp_path too, or the tests would read and
+        # write the real one in $HOME.
+        shoestore=str(tmp_path / "strava_shoes.json"),
     )
 
 
@@ -291,6 +298,22 @@ def test_retire_shoe_persists_and_excludes_from_active(monkeypatch, tmp_path):
     shoes = sync.shoe_wear()
     assert shoes[0]["retired"] is True
 
-    # Retirement persists across a fresh StravaSync instance against the same tokenstore.
-    sync2 = StravaSync(tokenstore=str(tmp_path / "strava_tokens.json"))
+    # Retirement persists across a fresh StravaSync instance against the same store.
+    sync2 = make_sync(tmp_path)
     assert "g1" in sync2._retired_gear_ids()
+
+
+def test_retire_shoe_survives_a_disconnect(monkeypatch, tmp_path):
+    """Retiring a shoe is a local flag, so disconnecting Strava must not undo it.
+
+    It used to be stored inside the tokenstore, which `disconnect()` deletes (as does a
+    failed refresh, and any 401) -- so reconnecting silently un-retired every shoe.
+    """
+    sync = make_sync(tmp_path, tokens=valid_tokens())
+    sync.retire_shoe("g1")
+
+    monkeypatch.setattr(strava_sync.httpx, "post", lambda *a, **k: FakeResponse(200, {}))
+    sync.disconnect()
+
+    assert sync.connection_status() == {"connected": False}
+    assert "g1" in make_sync(tmp_path)._retired_gear_ids()

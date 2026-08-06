@@ -22,22 +22,24 @@ function isTabRoute(pathname: string): boolean {
   return TAB_PATHS.some((p) => pathname === p);
 }
 
+// Exits are deliberately shorter than entrances: the outgoing screen gets out of the way
+// while the incoming one is already arriving (see the `mode="popLayout"` note below).
 const pushVariants = {
   initial: { x: 24, opacity: 0 },
-  animate: { x: 0, opacity: 1, transition: { duration: 0.32, ease: EASE } },
-  exit: { x: -24, opacity: 0.6, transition: { duration: 0.28, ease: EASE } },
+  animate: { x: 0, opacity: 1, transition: { duration: 0.28, ease: EASE } },
+  exit: { x: -16, opacity: 0, transition: { duration: 0.16, ease: EASE } },
 };
 
 const fadeVariants = {
   initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.26, ease: EASE } },
-  exit: { opacity: 0, transition: { duration: 0.26, ease: EASE } },
+  animate: { opacity: 1, transition: { duration: 0.22, ease: EASE } },
+  exit: { opacity: 0, transition: { duration: 0.14, ease: EASE } },
 };
 
 const tabVariants = {
   initial: { opacity: 0, y: 8 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.24, ease: EASE } },
-  exit: { opacity: 0, y: -8, transition: { duration: 0.24, ease: EASE } },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.22, ease: EASE } },
+  exit: { opacity: 0, y: -8, transition: { duration: 0.14, ease: EASE } },
 };
 
 const reducedVariants = {
@@ -59,8 +61,13 @@ export function RouteTransition({ children }: { children: ReactNode }) {
         ? tabVariants
         : pushVariants;
 
+  // `mode="popLayout"` rather than `mode="wait"`: "wait" refuses to mount the incoming
+  // screen until the outgoing one has finished exiting, so every navigation began with a
+  // guaranteed ~0.3s of nothing on screen *before* the new page even started loading its
+  // data. "popLayout" takes the exiting screen out of the flow so the two overlap -- the
+  // new screen (with its skeletons) is there immediately, and no layout jump.
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    <AnimatePresence mode="popLayout" initial={false}>
       <motion.div
         key={pathname}
         initial="initial"

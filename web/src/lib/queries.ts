@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPostForm } from "./apiClient";
+import { toDateKey, weekBounds } from "./sessionVisuals";
 import type {
   BodySnapshot,
   CompletedActivity,
@@ -21,6 +22,11 @@ import type {
 } from "./types";
 
 // ---- plan / sessions (client-only, no backend record -- see usePlanQuery below) ---------
+
+/** The plan's own cache key. Deliberately *not* `["plan", ...]`-prefixed: the diff and
+ * the sync job used to share that prefix, so any `invalidateQueries({queryKey:["plan"]})`
+ * would have blown away the localStorage-backed plan alongside them. */
+const PLAN_KEY = ["plan-state"] as const;
 
 const PLAN_STORAGE_KEY = "passo-plan";
 /** Zustand's old `persist` key (store.ts) that used to hold `plan` alongside prefs/
@@ -85,7 +91,7 @@ export function usePlanQuery() {
   useEffect(() => {
     const persisted = readPersistedPlan();
     if (persisted) {
-      queryClient.setQueryData<PlanState | null>(["plan"], persisted);
+      queryClient.setQueryData<PlanState | null>(PLAN_KEY, persisted);
       // Migrated from the legacy Zustand key (or just a normal re-read) -- writing it
       // back under the new key makes it the source of truth from here on, so this
       // fallback only ever does real work once per browser.
@@ -97,7 +103,7 @@ export function usePlanQuery() {
   }, []);
 
   const query = useQuery({
-    queryKey: ["plan"],
+    queryKey: PLAN_KEY,
     queryFn: (): PlanState | null => null,
     initialData: null,
     staleTime: Infinity,
@@ -108,7 +114,7 @@ export function usePlanQuery() {
 }
 
 function writePlan(queryClient: ReturnType<typeof useQueryClient>, next: PlanState | null): void {
-  queryClient.setQueryData<PlanState | null>(["plan"], next);
+  queryClient.setQueryData<PlanState | null>(PLAN_KEY, next);
   persistPlan(next);
 }
 
@@ -136,14 +142,37 @@ export function useResetAllLocalData() {
     if (typeof window !== "undefined") {
       localStorage.removeItem(PLAN_STORAGE_KEY);
       localStorage.removeItem(LEGACY_STORAGE_KEY);
+      // The cache is also mirrored to localStorage across reloads (see providers.tsx);
+      // clearing only the in-memory copy would let the old one come back on refresh.
+      localStorage.removeItem("passo-query-cache");
     }
   };
+}
+
+/** "Ask again, now": the user-facing refresh.
+ *
+ * Reads are cached on both sides -- in this client for minutes, and in the backend's own
+ * TTL cache -- which is what makes moving between screens instant. Refreshing therefore
+ * has to clear the server's copy first, otherwise refetching would just re-read the same
+ * cached answer. Data stays on screen throughout; it's replaced when the new one lands.
+ */
+export function useRefreshServerData() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ cleared: boolean }>("/cache/clear"),
+    onSettled: () => {
+      // Everything except the local plan, which has no server side to refresh.
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] !== PLAN_KEY[0],
+      });
+    },
+  });
 }
 
 export function useUpdateSession() {
   const queryClient = useQueryClient();
   return (index: number, updater: (session: TrainingSession) => TrainingSession) => {
-    const current = queryClient.getQueryData<PlanState | null>(["plan"]);
+    const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
     if (!current || !current.sessions[index]) return;
     const sessions = [...current.sessions];
     sessions[index] = updater(sessions[index]);
@@ -156,7 +185,7 @@ export function useUpdateSession() {
 export function useAddSession() {
   const queryClient = useQueryClient();
   return (session: TrainingSession): number => {
-    const current = queryClient.getQueryData<PlanState | null>(["plan"]);
+    const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
     const base = current ?? { yamlText: "", sessions: [], filename: null, importedAt: new Date().toISOString() };
     const sessions = [...base.sessions, session];
     writePlan(queryClient, { ...base, sessions });
@@ -167,7 +196,7 @@ export function useAddSession() {
 export function useRemoveSession() {
   const queryClient = useQueryClient();
   return (index: number) => {
-    const current = queryClient.getQueryData<PlanState | null>(["plan"]);
+    const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
     if (!current) return;
     const sessions = current.sessions.filter((_, i) => i !== index);
     writePlan(queryClient, { ...current, sessions });
@@ -179,7 +208,7 @@ export function useRemoveSession() {
 export function useGarminStatus() {
   return useQuery({
     queryKey: ["garmin", "status"],
-    queryFn: () => apiGet<GarminStatus>("/garmin/status"),
+    queryFn: ({ signal }) => apiGet<GarminStatus>("/garmin/status", undefined, signal),
     refetchInterval: (query) => (query.state.data?.cooldown_active ? 10_000 : 30_000),
   });
 }
@@ -231,7 +260,7 @@ export function useDisconnectGarmin() {
 export function useGarminDevice(enabled = true) {
   return useQuery({
     queryKey: ["garmin", "device"],
-    queryFn: () => apiGet<DeviceInfo>("/garmin/device"),
+    queryFn: ({ signal }) => apiGet<DeviceInfo>("/garmin/device", undefined, signal),
     enabled,
     staleTime: 5 * 60_000,
   });
@@ -259,19 +288,58 @@ export function useParsePlanFile() {
   });
 }
 
+/** Stable, short cache key for a plan's contents.
+ *
+ * The plan itself used to be embedded in the query key. That works (keys are hashed
+ * deterministically) but re-hashes the entire session list on every render, and any
+ * edit mints a brand-new entry -- so a cheap content hash is used instead. */
+function planFingerprint(sessions: TrainingSession[]): string {
+  const source = JSON.stringify(sessions);
+  let hash = 5381;
+  for (let i = 0; i < source.length; i += 1) hash = ((hash << 5) + hash + source.charCodeAt(i)) | 0;
+  return `${sessions.length}:${(hash >>> 0).toString(36)}`;
+}
+
+/** The plan-vs-calendar diff, content comparison included.
+ *
+ * `check_content` makes the backend read every matched workout back from Garmin to
+ * compare step contents -- that's what detects a session edited in place, which both Oggi
+ * ("N differenze") and /diff need. It used to run with `staleTime: 0, gcTime: 0` and no
+ * server-side cache, so *every* visit to Oggi re-paid a calendar read plus one Garmin
+ * call per session, and bouncing Oggi -> Settimana -> Oggi paid it twice.
+ *
+ * Now: one shared cache entry (Oggi and /diff use the same key), those per-session calls
+ * go out concurrently, and the backend caches the answer too. It can only become wrong if
+ * the plan changes -- a new fingerprint, hence a new key -- or if the calendar changes,
+ * which invalidates it server-side (`invalidate_calendar`). */
 export function usePlanDiff(sessions: TrainingSession[] | null) {
   return useQuery({
-    // Recomputed on every mount/visit -- the diff is derived, never cached long
-    // (README: "il diff è derivato... ricalcolarlo a ogni apertura").
-    queryKey: ["plan", "diff", sessions],
-    queryFn: () => apiPost<PlanDiff>("/plan/diff", { sessions, check_content: true }),
+    queryKey: ["plan-diff", sessions ? planFingerprint(sessions) : null],
+    queryFn: ({ signal }) => apiPost<PlanDiff>("/plan/diff", { sessions, check_content: true }, signal),
     enabled: !!sessions && sessions.length > 0,
-    staleTime: 0,
-    gcTime: 0,
+    // Keep showing the previous answer while a plan edit recomputes the new one,
+    // instead of dropping back to "no data" (and an empty screen) in between.
+    placeholderData: keepPreviousData,
   });
 }
 
 // ---- plan: sync job ----------------------------------------------------------------------
+
+/** Drop every cached view of the Garmin calendar -- call it after a write lands.
+ *
+ * A sync job writes to the calendar from a *background thread*, long after the request
+ * that started it returned, so no mutation's `onSettled` can stand in for this. Without
+ * it the week, the workout's own step structure, and the plan diff all keep serving
+ * their pre-write answers for the rest of their stale time, and the screen you land on
+ * after saving shows the workout exactly as it was. */
+export function useInvalidateCalendarData() {
+  const queryClient = useQueryClient();
+  return useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["garmin", "workouts"] });
+    queryClient.invalidateQueries({ queryKey: ["garmin", "workout-session"] });
+    queryClient.invalidateQueries({ queryKey: ["plan-diff"] });
+  }, [queryClient]);
+}
 
 export function useStartSync() {
   return useMutation({
@@ -291,8 +359,8 @@ export function useStartSync() {
 
 export function useSyncJobStatus(jobId: string | null) {
   return useQuery({
-    queryKey: ["plan", "sync-job", jobId],
-    queryFn: () => apiGet<SyncJobStatus>(`/plan/sync/${jobId}`),
+    queryKey: ["sync-job", jobId],
+    queryFn: ({ signal }) => apiGet<SyncJobStatus>(`/plan/sync/${jobId}`, undefined, signal),
     enabled: !!jobId,
     // Poll only while the job is actually running -- once done/cancelled/failed the
     // final snapshot is written into writeJobHistory and polling stops.
@@ -308,12 +376,39 @@ export function useCancelSync() {
 
 // ---- garmin calendar / deletions ----------------------------------------------------------
 
+/** Scheduled Garmin workouts for a date range.
+ *
+ * Prefer `useWeekWorkouts`/`useWorkoutsForDate` over calling this with an arbitrary
+ * range: the cache is keyed by (start, end), so a single-day request is a guaranteed
+ * miss against the week Oggi/Settimana already loaded -- which is exactly why opening a
+ * day's detail used to trigger a fresh Garmin round-trip for data already on screen. */
 export function useWorkouts(start: string, end: string, enabled = true) {
   return useQuery({
     queryKey: ["garmin", "workouts", start, end],
-    queryFn: () => apiGet<{ workouts: ScheduledWorkout[] }>("/garmin/workouts", { start, end }),
+    queryFn: ({ signal }) => apiGet<{ workouts: ScheduledWorkout[] }>("/garmin/workouts", { start, end }, signal),
     enabled,
+    // Paging through weeks keeps the previous week visible until the next one lands.
+    placeholderData: keepPreviousData,
   });
+}
+
+/** The calendar week containing `date` (any day in it) -- the one shape every screen
+ * shares, so all of them hit the same cache entry. */
+export function useWeekWorkouts(date: string | Date, enabled = true) {
+  const reference = typeof date === "string" ? new Date(`${date}T00:00:00`) : date;
+  const valid = !Number.isNaN(reference.getTime());
+  const { start, end } = weekBounds(valid ? reference : new Date());
+  return useWorkouts(toDateKey(start), toDateKey(end), enabled && valid);
+}
+
+/** Just the workouts scheduled on `date`, served from that date's cached *week*.
+ *
+ * Detail screens and the editor need one day, but asking for one day would cost its own
+ * request; deriving it from the week they were opened from is free. */
+export function useWorkoutsForDate(date: string, enabled = true) {
+  const query = useWeekWorkouts(date, enabled && !!date);
+  const workouts = query.data?.workouts.filter((w) => w.date === date);
+  return { ...query, workouts: workouts ?? [] };
 }
 
 /** The full step structure behind a live Garmin-calendar workout (no local plan) --
@@ -322,23 +417,53 @@ export function useWorkouts(start: string, end: string, enabled = true) {
  * `ScheduledWorkout`). `workout` is the calendar entry from `useWorkouts`, whose
  * date/sport/title travel along as query params since Garmin's workout definition
  * itself carries no calendar date. */
+/** One definition of "this workout's step structure", used by both the hook and the
+ * prefetch below -- if the key and the fetch could drift apart, a prefetch would warm a
+ * slot the screen never reads.
+ *
+ * The date is part of the key: the same workout definition scheduled on two days is two
+ * different sessions, and keying on `workout_id` alone made the second one read the
+ * first one's cached copy (wrong date, wrong "svolto" comparison). */
+function workoutSessionKey(workout: ScheduledWorkout | null) {
+  return ["garmin", "workout-session", workout?.workout_id ?? null, workout?.date ?? null] as const;
+}
+
+function fetchWorkoutSession(workout: ScheduledWorkout, signal?: AbortSignal) {
+  return apiGet<TrainingSession>(
+    `/garmin/workouts/${workout.workout_id}/session`,
+    { date: workout.date, sport: workout.sport, title: workout.title },
+    signal
+  );
+}
+
 export function useWorkoutSession(workout: ScheduledWorkout | null, enabled = true) {
   return useQuery({
-    queryKey: ["garmin", "workout-session", workout?.workout_id],
-    queryFn: () =>
-      apiGet<TrainingSession>(`/garmin/workouts/${workout!.workout_id}/session`, {
-        date: workout!.date,
-        sport: workout!.sport,
-        title: workout!.title,
-      }),
+    queryKey: workoutSessionKey(workout),
+    queryFn: ({ signal }) => fetchWorkoutSession(workout!, signal),
     enabled: enabled && !!workout,
   });
+}
+
+/** Start a workout's step-structure fetch before its detail screen is even mounted.
+ *
+ * Used on touch-down from Settimana: the detail screen needs a Garmin read the week list
+ * didn't, and starting it a few hundred milliseconds early is usually the difference
+ * between arriving to content and arriving to a skeleton. */
+export function usePrefetchWorkoutSession() {
+  const queryClient = useQueryClient();
+  return (workout: ScheduledWorkout | null) => {
+    if (!workout) return;
+    queryClient.prefetchQuery({
+      queryKey: workoutSessionKey(workout),
+      queryFn: ({ signal }) => fetchWorkoutSession(workout, signal),
+    });
+  };
 }
 
 export function useActivities(start: string, end: string, enabled = true) {
   return useQuery({
     queryKey: ["garmin", "activities", start, end],
-    queryFn: () => apiGet<{ activities: CompletedActivity[] }>("/garmin/activities", { start, end }),
+    queryFn: ({ signal }) => apiGet<{ activities: CompletedActivity[] }>("/garmin/activities", { start, end }, signal),
     enabled,
     staleTime: 5 * 60_000,
   });
@@ -379,7 +504,7 @@ export function useApplyDeletion() {
 export function useBodyToday() {
   return useQuery({
     queryKey: ["body", "today"],
-    queryFn: () => apiGet<BodySnapshot>("/body/today"),
+    queryFn: ({ signal }) => apiGet<BodySnapshot>("/body/today", undefined, signal),
     staleTime: 5 * 60_000,
   });
 }
@@ -387,16 +512,21 @@ export function useBodyToday() {
 export function useBodyLoad() {
   return useQuery({
     queryKey: ["body", "load"],
-    queryFn: () => apiGet<LoadSnapshot>("/body/load"),
+    queryFn: ({ signal }) => apiGet<LoadSnapshot>("/body/load", undefined, signal),
     staleTime: 5 * 60_000,
   });
 }
 
+/** Does this morning's readiness clash with the next planned session?
+ *
+ * `enabled` matters here: with no session to assess there is nothing to ask, and this
+ * hook used to fire `{next_session: null}` at the server anyway -- a full body snapshot
+ * computed to answer "no conflict", on every single Oggi load with an empty tomorrow. */
 export function useBodyConflict(nextSession: TrainingSession | null) {
   return useQuery({
-    queryKey: ["body", "conflict", nextSession],
-    queryFn: () => apiPost<ConflictAssessment>("/body/conflict", { next_session: nextSession }),
-    staleTime: 5 * 60_000,
+    queryKey: ["body", "conflict", nextSession?.date ?? null],
+    queryFn: ({ signal }) => apiPost<ConflictAssessment>("/body/conflict", { next_session: nextSession }, signal),
+    enabled: !!nextSession,
   });
 }
 
@@ -405,7 +535,7 @@ export function useBodyConflict(nextSession: TrainingSession | null) {
 export function useStravaStatus() {
   return useQuery({
     queryKey: ["strava", "status"],
-    queryFn: () => apiGet<StravaStatus>("/strava/status"),
+    queryFn: ({ signal }) => apiGet<StravaStatus>("/strava/status", undefined, signal),
   });
 }
 
@@ -453,32 +583,54 @@ export function useDisconnectStrava() {
   });
 }
 
+/** One cache slot per calendar day, shared by the single and batch hooks below.
+ *
+ * A match *is* per-day: the batch endpoint keys its results by date too, and a plan has
+ * one session per day. Keying it this way is what lets a detail screen reuse the match
+ * Settimana already fetched instead of asking Strava again for the same activity. */
+function stravaMatchKey(dateKey: string | null) {
+  return ["strava", "match", dateKey] as const;
+}
+
 export function useStravaActivityMatch(session: TrainingSession | null, enabled: boolean) {
   return useQuery({
-    queryKey: ["strava", "activity-match", session],
-    queryFn: () => apiPost<StravaActivityMatch>("/strava/activity-match", { session }),
+    queryKey: stravaMatchKey(session?.date ?? null),
+    queryFn: ({ signal }) => apiPost<StravaActivityMatch>("/strava/activity-match", { session }, signal),
     enabled: enabled && !!session,
-    staleTime: 5 * 60_000,
   });
 }
 
 /** Batch version for a whole week's worth of sessions at once (Week/Today) -- one
  * request covering the full date range instead of one `useStravaActivityMatch` per
  * visible day, matching the batch endpoint's `find_activity_matches_for_range`.
- * Keyed by each session's own date (YYYY-MM-DD). */
+ *
+ * Each day's result is also written into that day's own cache slot, so tapping into a
+ * day's detail finds its match already there. */
 export function useStravaActivityMatches(sessions: TrainingSession[], enabled: boolean) {
-  return useQuery({
-    queryKey: ["strava", "activity-matches", sessions],
-    queryFn: () => apiPost<{ matches: Record<string, StravaActivityMatch> }>("/strava/activity-matches", { sessions }),
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: ["strava", "matches", sessions.length ? planFingerprint(sessions) : null],
+    queryFn: ({ signal }) =>
+      apiPost<{ matches: Record<string, StravaActivityMatch> }>("/strava/activity-matches", { sessions }, signal),
     enabled: enabled && sessions.length > 0,
-    staleTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
   });
+
+  const matches = query.data?.matches;
+  useEffect(() => {
+    if (!matches) return;
+    for (const [dateKey, match] of Object.entries(matches)) {
+      queryClient.setQueryData(stravaMatchKey(dateKey), match);
+    }
+  }, [matches, queryClient]);
+
+  return query;
 }
 
 export function useShoes(enabled = true) {
   return useQuery({
     queryKey: ["strava", "shoes"],
-    queryFn: () => apiGet<{ shoes: Shoe[] }>("/strava/shoes"),
+    queryFn: ({ signal }) => apiGet<{ shoes: Shoe[] }>("/strava/shoes", undefined, signal),
     enabled,
     staleTime: 5 * 60_000,
   });

@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from training_plan import body_insights
 from training_plan.api import app as fastapi_app
+from training_plan.api import garmin_session
 from tests.test_body_insights import EmptyGarminClient, FakeGarminClient, FakeGarminSync
 
 
@@ -10,6 +11,9 @@ from tests.test_body_insights import EmptyGarminClient, FakeGarminClient, FakeGa
 def fake_garmin_sync(monkeypatch):
     FakeGarminSync.client_cls = FakeGarminClient
     monkeypatch.setattr(body_insights, "GarminSync", FakeGarminSync)
+    # The body endpoints now take their session from the shared holder, which builds its
+    # own GarminSync -- that's the one these tests must intercept.
+    monkeypatch.setattr(garmin_session, "GarminSync", FakeGarminSync)
     return FakeGarminSync
 
 

@@ -10,7 +10,7 @@ from training_plan.garmin_sync import (
     GarminSyncError,
     ScheduledWorkout,
 )
-from training_plan.models import PaceTarget, Step, TrainingSession
+from training_plan.models import SPORT_TYPE_PAYLOAD, PaceTarget, Step, TrainingSession
 
 
 class FakeClient:
@@ -541,6 +541,42 @@ def test_get_workout_session_skips_steps_it_cannot_represent():
 
     assert len(result.steps) == 1
     assert result.steps[0].type == "warmup"
+
+
+@pytest.mark.parametrize(
+    ("calendar_sport", "expected"),
+    [
+        ("running", "running"),
+        ("trail_running", "running"),
+        ("fitness_equipment", "strength_training"),
+        ("indoor_cycling", "cycling"),
+        ("lap_swimming", "swimming"),
+        ("yoga", "other"),
+        (None, "other"),
+    ],
+)
+def test_get_workout_session_returns_a_writable_sport(calendar_sport, expected):
+    """The calendar's sport is Garmin's own key; the session it produces is editable, so
+    it has to come back in the file format `build_workout_payload` is keyed by."""
+    sync, fake = make_sync_with_fake_client()
+    fake.workouts_by_id[42] = {"description": None, "workoutSegments": []}
+
+    result = sync.get_workout_session(42, date(2026, 8, 5), calendar_sport, "Sessione")
+
+    assert result.sport == expected
+    # And it survives the round trip back to Garmin, rather than raising on lookup.
+    assert sync.build_workout_payload(result)["sportType"] == SPORT_TYPE_PAYLOAD[expected]
+
+
+def test_build_workout_payload_falls_back_on_an_unknown_sport():
+    """`replace_session` deletes before it creates: an unknown sport must not be the
+    reason the replacement never happens."""
+    sync, _ = make_sync_with_fake_client()
+    session = TrainingSession(date=date(2026, 8, 1), sport="parkour", title="Salti")
+
+    payload = sync.build_workout_payload(session)
+
+    assert payload["sportType"] == SPORT_TYPE_PAYLOAD["other"]
 
 
 # ---- create & schedule ------------------------------------------------------------------

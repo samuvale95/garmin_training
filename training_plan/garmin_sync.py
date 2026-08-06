@@ -8,11 +8,13 @@ import os
 import shutil
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date as date_type
 from datetime import datetime, timezone
 from pathlib import Path
 
+import requests
 from garminconnect import (
     Garmin,
     GarminConnectAuthenticationError,
@@ -30,6 +32,7 @@ from .models import (
     PaceTarget,
     Step,
     TrainingSession,
+    sport_from_garmin_key,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,13 +47,55 @@ DEFAULT_LOGIN_STATE_PATH = str(Path.home() / ".garmin_training_login_state.json"
 RATE_LIMIT_COOLDOWN_SECONDS = 15 * 60
 AUTH_FAILURE_COOLDOWN_SECONDS = [0, 60, 5 * 60, 15 * 60]
 
+# Independent read-only calls are issued concurrently, a few at a time. Writes are
+# never parallelized (see sync_all/replace_all): they must stay ordered and, on
+# cancellation, must have applied a prefix of the plan rather than an arbitrary subset.
+MAX_PARALLEL_READS = 6
+
+# `garminconnect` builds a throwaway `requests.Session` for every single API call
+# (its `Client._fresh_api_session`), so each call pays a fresh TLS handshake even
+# though the session it creates asks for a 20-connection pool that then dies unused.
+# Sharing one *adapter* (which owns the urllib3 connection pool, and is thread-safe)
+# across those per-call sessions keeps the library's own semantics -- a clean cookie
+# jar per call -- while letting connections survive between calls.
+_SHARED_HTTPS_ADAPTER = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20)
+
+
+def _pooled_api_session() -> requests.Session:
+    session = requests.Session()
+    session.mount("https://", _SHARED_HTTPS_ADAPTER)
+    return session
+
+
+def _enable_connection_reuse(client: Garmin) -> None:
+    """Point the client's per-call session factory at the shared pool above.
+
+    Defensive on purpose: this reaches into a `garminconnect` internal, so if a future
+    version renames or drops `_fresh_api_session` we silently keep the (slower, but
+    correct) stock behavior instead of breaking every Garmin call.
+    """
+    inner = getattr(client, "client", None)
+    if inner is None or not hasattr(inner, "_fresh_api_session"):
+        logger.debug("garminconnect has no _fresh_api_session hook; skipping connection reuse")
+        return
+    inner._fresh_api_session = _pooled_api_session  # type: ignore[method-assign]
+
 
 class GarminSyncError(Exception):
     """Raised when authentication or a Garmin Connect API call fails."""
 
 
 class GarminRateLimitError(GarminSyncError):
-    """Raised when Garmin rate-limited the login, or a local cooldown is still active."""
+    """Raised when Garmin rate-limited the login, or a local cooldown is still active.
+
+    Carries how long the caller should wait, so the API layer can put a real number in
+    `ErrorResponse.retry_after_seconds` instead of leaving the field the frontend
+    already reads (`apiClient.ts`) permanently null.
+    """
+
+    def __init__(self, message: str, retry_after_seconds: int | None = None):
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
 
 
 @dataclass
@@ -267,7 +312,8 @@ class GarminSync:
                     f"Login temporarily blocked locally: {detail}. "
                     f"Wait {remaining // 60}m {remaining % 60}s before retrying, "
                     "and double-check your credentials in the meantime. "
-                    "Retrying sooner only deepens Garmin's rate limit."
+                    "Retrying sooner only deepens Garmin's rate limit.",
+                    retry_after_seconds=remaining,
                 )
 
         client = Garmin(email=self._email, password=self._password, prompt_mfa=self._prompt_mfa)
@@ -278,7 +324,8 @@ class GarminSync:
             raise GarminRateLimitError(
                 f"Garmin rate-limited this IP (HTTP 429): {exc}. "
                 f"Wait at least {RATE_LIMIT_COOLDOWN_SECONDS // 60} minutes before retrying. "
-                "This is tied to your IP/network, not only your account."
+                "This is tied to your IP/network, not only your account.",
+                retry_after_seconds=RATE_LIMIT_COOLDOWN_SECONDS,
             ) from exc
         except GarminConnectAuthenticationError as exc:
             self._record_failure(rate_limited=False)
@@ -292,6 +339,7 @@ class GarminSync:
             raise GarminSyncError(f"Could not reach Garmin Connect: {exc}") from exc
 
         self._clear_state()
+        _enable_connection_reuse(client)
         self._client = client
 
     def connection_status(self) -> dict:
@@ -403,7 +451,12 @@ class GarminSync:
     # ---- workout creation & scheduling -------------------------------------------------
 
     def build_workout_payload(self, session: TrainingSession) -> dict:
-        sport_payload = SPORT_TYPE_PAYLOAD[session.sport]
+        # Falls back rather than raising on an unknown sport: plan files are validated
+        # against SUPPORTED_SPORTS and Garmin-sourced sessions go through
+        # `sport_from_garmin_key`, so this should be unreachable -- but `replace_session`
+        # deletes the old workout *before* creating the new one, and a KeyError here
+        # would mean the workout is gone and nothing took its place.
+        sport_payload = SPORT_TYPE_PAYLOAD.get(session.sport, SPORT_TYPE_PAYLOAD["other"])
 
         if session.steps:
             workout_steps = [
@@ -471,7 +524,7 @@ class GarminSync:
         by_key = {session_key(w.date, w.title): w for w in existing}
         plan_keys = {session_key(s.date, s.title) for s in sessions}
 
-        to_create, already_present, changed = [], [], []
+        to_create, already_present, matched = [], [], []
         for session in sessions:
             match = by_key.get(session_key(session.date, session.title))
             if match is None:
@@ -480,9 +533,16 @@ class GarminSync:
 
             already_present.append(session)
             if check_content:
-                difference = self._compare_content(session, match)
-                if difference is not None:
-                    changed.append(difference)
+                matched.append((session, match))
+
+        # The per-session content fetches are independent reads, so they go out
+        # concurrently (bounded -- see MAX_PARALLEL_READS): serially, a full week made
+        # check_content cost roughly as much as the whole rest of the diff put together.
+        changed = []
+        if matched:
+            with ThreadPoolExecutor(max_workers=MAX_PARALLEL_READS) as pool:
+                comparisons = [pool.submit(self._compare_content, s, w) for s, w in matched]
+                changed = [result for call in comparisons if (result := call.result()) is not None]
 
         return PlanDiff(
             to_create=to_create,
@@ -549,6 +609,11 @@ class GarminSync:
         `/workout/[id]` route). `date`/`sport`/`title` come from the caller's own
         `ScheduledWorkout` (the calendar entry), since a workout definition on its own
         carries no calendar date -- only `get_workout_by_id`'s structure is read here.
+
+        The sport is brought back into the file format on the way in: the calendar hands
+        out Garmin's own key (strength training is "fitness_equipment"), and this session
+        is editable -- saving it goes back through `build_workout_payload`, which is
+        keyed by the file-format value.
         """
         try:
             remote = self.client.get_workout_by_id(workout_id)
@@ -560,7 +625,11 @@ class GarminSync:
             steps.extend(_parse_workout_steps(segment.get("workoutSteps") or []))
 
         return TrainingSession(
-            date=date, sport=sport, title=title, description=remote.get("description"), steps=steps
+            date=date,
+            sport=sport_from_garmin_key(sport),
+            title=title,
+            description=remote.get("description"),
+            steps=steps,
         )
 
     def list_activities(self, start: date_type, end: date_type) -> list[CompletedActivity]:

@@ -3,14 +3,22 @@
 import Image from "next/image";
 import { useMotionEnabled } from "@/lib/motion";
 
+/** 640px WebP (alpha preserved), which is 2x the largest size any of these is ever drawn
+ * at (212px, the entry screen's hero). They used to ship as 1024px PNGs of ~1.5 MB each
+ * -- 10 MB for a set displayed at 64-212px, with Settimana rendering seven of them in one
+ * screen. The 1024px originals live in `web/assets-src/illustrazioni/`, outside `public/`,
+ * so they are kept but never served; re-encode from there if a bigger size is ever
+ * needed:
+ *   cwebp -q 82 -resize 640 640 -alpha_q 100 <src>.png -o public/illustrazioni/<name>.webp
+ */
 const SOURCES = {
-  corsa: "/illustrazioni/corsa.png",
-  attesa: "/illustrazioni/attesa.png",
-  esultanza: "/illustrazioni/esultanza.png",
-  riposo: "/illustrazioni/riposo.png",
-  forza: "/illustrazioni/forza.png",
-  bici: "/illustrazioni/bici.png",
-  crollo: "/illustrazioni/crollo.png",
+  corsa: "/illustrazioni/corsa.webp",
+  attesa: "/illustrazioni/attesa.webp",
+  esultanza: "/illustrazioni/esultanza.webp",
+  riposo: "/illustrazioni/riposo.webp",
+  forza: "/illustrazioni/forza.webp",
+  bici: "/illustrazioni/bici.webp",
+  crollo: "/illustrazioni/crollo.webp",
 } as const;
 
 export type IllustrationName = keyof typeof SOURCES;

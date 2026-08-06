@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
@@ -35,6 +35,12 @@ export default function ImportPlanPage() {
   const parseFile = useParsePlanFile();
   const parseText = useParsePlanText();
   const pending = parseFile.isPending || parseText.isPending;
+
+  // Both paths below end at /diff, and a `router.push` doesn't prefetch on its own --
+  // so fetch that route now, while the user is still choosing a file.
+  useEffect(() => {
+    router.prefetch("/diff");
+  }, [router]);
 
   async function acceptFile(file: File) {
     setErrors([]);

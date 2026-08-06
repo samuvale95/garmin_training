@@ -12,15 +12,15 @@ import type { TrainingSession } from "@/lib/types";
 
 export default function DiffPage() {
   const router = useRouter();
-  const plan = useRequirePlan();
+  const { plan } = useRequirePlan();
+  // Same query (and so the same cache entry) Oggi already ran to count the differences:
+  // arriving here from its banner needs no new request at all.
   const diffQuery = usePlanDiff(plan?.sessions ?? null);
   const startSync = useStartSync();
   const setSelection = useSyncFlowStore((s) => s.setSelection);
   const markStarted = useSyncFlowStore((s) => s.markStarted);
 
-  if (!plan) return null;
-
-  const diff = diffQuery.data;
+  const diff = plan ? diffQuery.data : undefined;
 
   async function writeNewOnly() {
     if (!diff) return;

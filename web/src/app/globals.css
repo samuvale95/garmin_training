@@ -385,6 +385,10 @@ button {
 .anim-spin-slow {
   animation: mkSpinSlow 9s linear infinite;
 }
+/* The manual-refresh affordance while its request is in flight (RefreshButton). */
+.anim-spin {
+  animation: mkSpinSlow 1s linear infinite;
+}
 .anim-arrow-up {
   animation: mkArrowUp 3.6s var(--ease) infinite;
 }

@@ -92,14 +92,15 @@ export default function SettingsPage() {
             scollega
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={() => router.push("/connect-garmin")}
+          // A Link, not a router.push: Next prefetches the route so the tap lands on a
+          // ready screen instead of compiling/fetching it first.
+          <Link
+            href="/connect-garmin"
             className="tap-target"
-            style={{ marginTop: 10, background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}
+            style={{ display: "inline-block", marginTop: 10, color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
           >
             Collega ora
-          </button>
+          </Link>
         )}
         {garminStatus?.connected && device?.device_name && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--sabbia-bordo)" }}>
@@ -127,14 +128,13 @@ export default function SettingsPage() {
             scollega Strava
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={() => router.push("/connect-strava")}
+          <Link
+            href="/connect-strava"
             className="tap-target"
-            style={{ marginTop: 10, background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}
+            style={{ display: "inline-block", marginTop: 10, color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
           >
             collega
-          </button>
+          </Link>
         )}
       </Card>
 

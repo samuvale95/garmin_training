@@ -4,20 +4,18 @@ import Link from "next/link";
 import { formatPaceValue } from "@/lib/format";
 import type { StravaActivityMatch } from "@/lib/types";
 
-/** The "svolto" and "pianificato" panel for a matched Strava activity -- shared by
- * `session/[id]/strava` (an imported plan's session) and `workout/[id]/strava` (a
- * live Garmin-calendar workout with no local plan, whose "pianificato" side now comes
- * from Garmin's own copy of the workout via `useWorkoutSession`). Both pass
- * `showPlanned`. */
+/** The "svolto" and "pianificato" panel for a matched Strava activity -- rendered by
+ * `StravaComparisonScreen` for both an imported plan's session and a live
+ * Garmin-calendar workout (whose "pianificato" side comes from Garmin's own copy of the
+ * workout via `useWorkoutSession`). Both have a planned side, which is why the old
+ * `showPlanned` switch is gone: every caller passed `true`. */
 export function StravaMatchPanel({
   match,
   isLoading,
-  showPlanned,
   shoesFrom,
 }: {
   match: StravaActivityMatch | undefined;
   isLoading: boolean;
-  showPlanned: boolean;
   shoesFrom: string;
 }) {
   if (!match || !match.matched) {
@@ -31,17 +29,15 @@ export function StravaMatchPanel({
   return (
     <>
       <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-        {showPlanned && (
-          <div style={{ flex: 1, background: "rgba(246,238,218,.08)", borderRadius: "var(--radius-card)", padding: 14 }}>
-            <p style={{ fontSize: 11, color: "var(--inchiostro-su-scuro)", margin: "0 0 6px" }}>pianificato</p>
-            <p className="font-mono" style={{ fontSize: 22, fontWeight: 500, margin: 0 }}>
-              {match.planned_distance_km != null ? match.planned_distance_km.toFixed(1) : "—"} km
-            </p>
-            <p style={{ fontSize: 11, color: "var(--inchiostro-su-scuro)", margin: "4px 0 0" }}>
-              {match.planned_pace_sec_per_km != null ? `${formatPaceValue(match.planned_pace_sec_per_km)} target` : "nessun passo target"}
-            </p>
-          </div>
-        )}
+        <div style={{ flex: 1, background: "rgba(246,238,218,.08)", borderRadius: "var(--radius-card)", padding: 14 }}>
+          <p style={{ fontSize: 11, color: "var(--inchiostro-su-scuro)", margin: "0 0 6px" }}>pianificato</p>
+          <p className="font-mono" style={{ fontSize: 22, fontWeight: 500, margin: 0 }}>
+            {match.planned_distance_km != null ? match.planned_distance_km.toFixed(1) : "—"} km
+          </p>
+          <p style={{ fontSize: 11, color: "var(--inchiostro-su-scuro)", margin: "4px 0 0" }}>
+            {match.planned_pace_sec_per_km != null ? `${formatPaceValue(match.planned_pace_sec_per_km)} target` : "nessun passo target"}
+          </p>
+        </div>
         <div style={{ flex: 1, background: "var(--corallo)", color: "var(--corallo-testo)", borderRadius: "var(--radius-card)", padding: 14 }}>
           <p style={{ fontSize: 11, opacity: 0.75, margin: "0 0 6px" }}>svolto</p>
           <p className="font-mono" style={{ fontSize: 22, fontWeight: 500, margin: 0 }}>
@@ -60,7 +56,8 @@ export function StravaMatchPanel({
 
       <StravaRow label="Dislivello">
         {match.elevation_gain_m != null ? `+${Math.round(match.elevation_gain_m)} m` : "—"}
-        {showPlanned ? " · nessuno pianificato" : ""}
+        {" · nessuno pianificato"}
+
       </StravaRow>
 
       {match.felt_note && (
@@ -79,7 +76,7 @@ export function StravaMatchPanel({
         </div>
       </Link>
 
-      {showPlanned && match.plan_note && (
+      {match.plan_note && (
         <div style={{ background: "var(--azzurro)", color: "var(--azzurro-testo)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 16 }}>
           <p style={{ fontWeight: 600, margin: "0 0 6px", fontSize: 14 }}>Cosa cambia nel piano</p>
           <p className="font-serif-italic" style={{ fontSize: 13.5, margin: 0 }}>{match.plan_note}</p>

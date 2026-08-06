@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date as date_type
 from datetime import timedelta
@@ -22,6 +23,10 @@ from .garmin_sync import GarminSync
 from .models import TrainingSession
 
 logger = logging.getLogger(__name__)
+
+# Independent Garmin reads are issued concurrently, but only a few at a time: Garmin
+# rate-limits per IP, so a wide fan-out trades one kind of slowness for a much worse one.
+MAX_PARALLEL_GARMIN_CALLS = 6
 
 READINESS_LOW_THRESHOLD = 60
 HRV_DELTA_ALERT_MS = -15  # a drop of this many ms vs. baseline reads as a meaningful signal
@@ -93,10 +98,20 @@ class ConflictAssessment:
     options: list[ConflictOption]
 
 
-def _login(prompt_mfa: Callable[[], str] | None = None) -> GarminSync:
-    sync = GarminSync(prompt_mfa=prompt_mfa)
-    sync.login()
-    return sync
+def _login(
+    prompt_mfa: Callable[[], str] | None = None, sync: GarminSync | None = None
+) -> GarminSync:
+    """The caller's already-authenticated session, or a fresh login.
+
+    Same optional-`sync` shape as `service.py`'s `_authenticated`, for the same reason:
+    the web backend passes the process-wide session so a body screen doesn't pay a
+    login per endpoint, while the CLI keeps logging in on its own.
+    """
+    if sync is not None:
+        return sync
+    fresh = GarminSync(prompt_mfa=prompt_mfa)
+    fresh.login()
+    return fresh
 
 
 def _fetch_hrv_last_night(client, day: date_type) -> int | None:
@@ -106,26 +121,42 @@ def _fetch_hrv_last_night(client, day: date_type) -> int | None:
 
 
 def fetch_body_snapshot(
-    target_date: date_type | None = None, prompt_mfa: Callable[[], str] | None = None
+    target_date: date_type | None = None,
+    prompt_mfa: Callable[[], str] | None = None,
+    sync: GarminSync | None = None,
 ) -> BodySnapshot:
     """The morning snapshot for `target_date` (default today): readiness, sleep, a
     7-day HRV trend, resting heart rate, battery, stress.
+
+    The eleven Garmin calls this needs are issued concurrently: they are independent
+    reads, and run serially they dominated this endpoint's latency (each one opens its
+    own connection inside `garminconnect`). The pool is deliberately small -- Garmin
+    rate-limits by IP, and `GarminSync`'s cooldown machinery exists because of it.
     """
     day = target_date or date_type.today()
-    sync = _login(prompt_mfa)
-    client = sync.client
+    client = _login(prompt_mfa, sync).client
     day_str = day.isoformat()
+    hrv_days = [day - timedelta(days=offset) for offset in range(6, -1, -1)]
 
-    readiness = client.get_training_readiness(day_str)
+    with ThreadPoolExecutor(max_workers=MAX_PARALLEL_GARMIN_CALLS) as pool:
+        readiness_call = pool.submit(client.get_training_readiness, day_str)
+        sleep_call = pool.submit(client.get_sleep_data, day_str)
+        stress_call = pool.submit(client.get_stress_data, day_str)
+        # `get_body_battery`'s "charged"/"drained" are cumulative deltas over the day,
+        # not a current level, and `get_rhr_day`'s resting-heart-rate fields live nested
+        # under `allMetrics.metricsMap` (not at the root, and without a 7-day average at
+        # all) -- the daily user-summary endpoint has correct, flat fields for both.
+        stats_call = pool.submit(client.get_stats, day_str)
+        hrv_calls = [pool.submit(_fetch_hrv_last_night, client, d) for d in hrv_days]
+
+        readiness = readiness_call.result()
+        sleep = sleep_call.result()
+        stress = stress_call.result()
+        stats = stats_call.result()
+        hrv_results = list(zip(hrv_days, hrv_calls))
+
     if isinstance(readiness, list):
         readiness = readiness[0] if readiness else None
-    sleep = client.get_sleep_data(day_str)
-    stress = client.get_stress_data(day_str)
-    # `get_body_battery`'s "charged"/"drained" are cumulative deltas over the day, not
-    # a current level, and `get_rhr_day`'s resting-heart-rate fields live nested under
-    # `allMetrics.metricsMap` (not at the root, and without a 7-day average at all) --
-    # the daily user-summary endpoint has correct, flat fields for both instead.
-    stats = client.get_stats(day_str)
 
     sleep_dto = _get(sleep, "dailySleepDTO", default=sleep)
     total_minutes = _seconds_to_minutes(_get(sleep_dto, "sleepTimeSeconds"))
@@ -142,10 +173,9 @@ def fetch_body_snapshot(
     )
 
     hrv_seven_day: list[tuple[date_type, int | None]] = []
-    for offset in range(6, -1, -1):
-        series_day = day - timedelta(days=offset)
+    for series_day, call in hrv_results:
         try:
-            hrv_seven_day.append((series_day, _fetch_hrv_last_night(client, series_day)))
+            hrv_seven_day.append((series_day, call.result()))
         except Exception:  # noqa: BLE001 - one missing day must not blank the whole trend
             logger.warning("HRV fetch failed for %s, degrading to unavailable", series_day, exc_info=True)
             hrv_seven_day.append((series_day, None))
@@ -189,7 +219,9 @@ def _primary_device_training_status(status) -> dict | None:
 
 
 def fetch_load_snapshot(
-    weeks: int = 5, prompt_mfa: Callable[[], str] | None = None
+    weeks: int = 5,
+    prompt_mfa: Callable[[], str] | None = None,
+    sync: GarminSync | None = None,
 ) -> LoadSnapshot:
     """Garmin-actual weekly training load for the last `weeks` weeks, plus acute:chronic
     ratio and VO2max. Does not know about the plan (see schemas.WeeklyLoadOut) -- the
@@ -203,22 +235,31 @@ def fetch_load_snapshot(
     `mostRecentVO2Max.generic` on the same response -- `get_max_metrics` (queried
     separately before) returns an empty list on this endpoint and isn't needed.
     """
-    sync = _login(prompt_mfa)
-    client = sync.client
+    client = _login(prompt_mfa, sync).client
     today = date_type.today()
     current_week_start = today - timedelta(days=today.weekday())
 
+    # One `get_training_status` per week plus today's, all independent -- issued
+    # concurrently for the same reason as `fetch_body_snapshot`'s fan-out.
+    week_starts = [current_week_start - timedelta(days=7 * i) for i in range(weeks - 1, -1, -1)]
+    with ThreadPoolExecutor(max_workers=MAX_PARALLEL_GARMIN_CALLS) as pool:
+        week_calls = [pool.submit(client.get_training_status, w.isoformat()) for w in week_starts]
+        latest_call = pool.submit(client.get_training_status, today.isoformat())
+        week_statuses = [call.result() for call in week_calls]
+        latest_status = latest_call.result()
+
     week_records = []
-    for i in range(weeks - 1, -1, -1):
-        week_start = current_week_start - timedelta(days=7 * i)
-        status = client.get_training_status(week_start.isoformat())
+    for offset, (week_start, status) in enumerate(zip(week_starts, week_statuses)):
         device_status = _primary_device_training_status(status)
         load = _get(_get(device_status, "acuteTrainingLoadDTO"), "dailyTrainingLoadAcute")
         week_records.append(
-            WeeklyLoad(week_start=week_start, completed_load=load, in_progress=i == 0)
+            WeeklyLoad(
+                week_start=week_start,
+                completed_load=load,
+                in_progress=offset == len(week_starts) - 1,
+            )
         )
 
-    latest_status = client.get_training_status(today.isoformat())
     latest_device_status = _primary_device_training_status(latest_status)
     acute_chronic = _get(_get(latest_device_status, "acuteTrainingLoadDTO"), "dailyAcuteChronicWorkloadRatio")
 

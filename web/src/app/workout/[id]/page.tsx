@@ -1,16 +1,19 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { SessionDetailBody } from "@/components/SessionDetailBody";
+import { DeleteConfirmStrip, DeleteIconButton, DetailScaffold } from "@/components/DetailScaffold";
+import { SkeletonDetailBody } from "@/components/skeletons";
 import { useMountOnce } from "@/lib/motion";
 import {
   useApplyDeletion,
   useStravaActivityMatch,
   useStravaStatus,
   useWorkoutSession,
-  useWorkouts,
+  useWorkoutsForDate,
 } from "@/lib/queries";
 import { ApiError } from "@/lib/apiClient";
 import { formatFullDate } from "@/lib/format";
@@ -19,11 +22,10 @@ import { formatFullDate } from "@/lib/format";
  * imported -- see `web/src/app/(tabs)/week/page.tsx`'s `liveMode`). Unlike
  * `session/[id]`, there's no local index to key off of (no `plan.sessions` array), so
  * the route is keyed by the workout's own `scheduled_workout_id`, with the date passed
- * as a query param since `useWorkouts` needs a date range to look it up. The step
- * structure itself comes from `useWorkoutSession` (Garmin's own copy of the workout,
- * read back via `get_workout_by_id`), so this renders the exact same
- * `SessionDetailBody` an imported plan's session does, instead of a thinner
- * Strava-only stand-in. */
+ * as a query param since the calendar is looked up by date. The step structure itself
+ * comes from `useWorkoutSession` (Garmin's own copy of the workout, read back via
+ * `get_workout_by_id`), so this renders the exact same `SessionDetailBody` an imported
+ * plan's session does, instead of a thinner Strava-only stand-in. */
 function WorkoutDetailContent() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -31,8 +33,10 @@ function WorkoutDetailContent() {
   const animate = useMountOnce(`workout-${params.id}`);
   const date = searchParams.get("date") ?? "";
 
-  const workoutsQuery = useWorkouts(date, date, !!date);
-  const workout = workoutsQuery.data?.workouts.find((w) => String(w.scheduled_workout_id) === params.id) ?? null;
+  // Served from the cached week Settimana already loaded -- the workout is normally
+  // already here, so this screen opens without waiting on Garmin at all.
+  const workoutsQuery = useWorkoutsForDate(date, !!date);
+  const workout = workoutsQuery.workouts.find((w) => String(w.scheduled_workout_id) === params.id) ?? null;
 
   const sessionQuery = useWorkoutSession(workout);
   const session = sessionQuery.data ?? null;
@@ -63,9 +67,16 @@ function WorkoutDetailContent() {
     }
   }
 
-  if (!date || workoutsQuery.isLoading) return null;
-
+  // Only a genuinely finished, genuinely empty lookup means "not found" -- while the
+  // week is still loading, the frame plus a loading body is the honest answer.
   if (!workout) {
+    if (!date || workoutsQuery.isPending || workoutsQuery.isFetching) {
+      return (
+        <DetailScaffold backHref="/week" caption={date ? formatFullDate(date) : undefined}>
+          <SkeletonDetailBody />
+        </DetailScaffold>
+      );
+    }
     return (
       <div style={{ padding: 22 }}>
         <PageHeader backHref="/week" />
@@ -74,77 +85,70 @@ function WorkoutDetailContent() {
     );
   }
 
-  if (!session) return null;
-
   return (
-    <div style={{ minHeight: "100dvh", background: "var(--inchiostro)", color: "var(--crema)", padding: "24px 22px 32px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <div style={{ alignSelf: "stretch", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <PageHeader backHref="/week" color="var(--crema)" />
-          <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)" }}>
-            {formatFullDate(workout.date)} · dal calendario Garmin
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={isDeleting}
-          className="tap-target"
-          aria-label="Elimina allenamento"
-          style={{ background: "none", border: "none", fontSize: 18, color: "var(--rosso-avviso)", cursor: isDeleting ? "default" : "pointer", opacity: isDeleting ? 0.6 : 1 }}
-        >
-          🗑
-        </button>
-      </div>
-
-      {confirmDelete && (
-        <div style={{ alignSelf: "stretch", background: "rgba(246,238,218,.1)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
-          <p style={{ fontSize: 13, margin: 0, flex: 1 }}>Eliminare questo allenamento dal calendario Garmin?</p>
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={isDeleting}
+    <DetailScaffold
+      backHref="/week"
+      caption={`${formatFullDate(workout.date)} · dal calendario Garmin`}
+      error={deleteError}
+      actions={
+        <>
+          {/* Only once the step structure is here: the editor is seeded from it, and a
+              pencil tapped before it lands would open an empty form. */}
+          {session && (
+            <Link
+              href={`/workout/${params.id}/edit?date=${date}`}
+              className="tap-target"
+              aria-label="Modifica allenamento"
+              style={{ color: "var(--crema)", fontSize: 18, textDecoration: "none" }}
+            >
+              ✎
+            </Link>
+          )}
+          <DeleteIconButton onClick={handleDelete} disabled={isDeleting} />
+        </>
+      }
+      confirm={
+        confirmDelete && (
+          <DeleteConfirmStrip
+            message="Eliminare questo allenamento dal calendario Garmin?"
+            isDeleting={isDeleting}
+            onConfirm={handleDelete}
+            onCancel={() => setConfirmDelete(false)}
+          />
+        )
+      }
+      footer={
+        <div style={{ marginTop: 28, textAlign: "center" }}>
+          <Link
+            href="/week"
             className="tap-target"
-            style={{ background: "var(--rosso-forte)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: isDeleting ? "default" : "pointer" }}
+            style={{ color: "var(--crema)", fontSize: 14, fontWeight: 600, textDecoration: "none" }}
           >
-            {isDeleting ? "..." : "Elimina"}
-          </button>
-          <button type="button" onClick={() => setConfirmDelete(false)} disabled={isDeleting} className="tap-target" style={{ background: "none", border: "none", fontSize: 12, color: "var(--inchiostro-su-scuro)", cursor: "pointer" }}>
-            Annulla
-          </button>
+            Torna alla settimana
+          </Link>
         </div>
+      }
+    >
+      {session ? (
+        <SessionDetailBody
+          session={session}
+          animate={animate}
+          hasStravaMatch={hasStravaMatch}
+          matchData={matchQuery.data}
+          stravaHref={`/workout/${params.id}/strava?date=${date}`}
+        />
+      ) : (
+        // The step structure is a second Garmin read; the title/date above are already
+        // on screen, so only the body waits.
+        <SkeletonDetailBody />
       )}
-      {deleteError && (
-        <p style={{ alignSelf: "stretch", color: "var(--rosso-avviso)", fontSize: 13, marginTop: 10 }} role="alert">
-          {deleteError}
-        </p>
-      )}
-
-      <SessionDetailBody
-        session={session}
-        animate={animate}
-        hasStravaMatch={hasStravaMatch}
-        matchData={matchQuery.data}
-        stravaHref={`/workout/${params.id}/strava?date=${date}`}
-      />
-
-      <div style={{ marginTop: 28, textAlign: "center" }}>
-        <button
-          type="button"
-          onClick={() => router.push("/week")}
-          className="tap-target"
-          style={{ background: "none", border: "none", color: "var(--crema)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
-        >
-          Torna alla settimana
-        </button>
-      </div>
-    </div>
+    </DetailScaffold>
   );
 }
 
 export default function WorkoutDetailPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<DetailScaffold backHref="/week"><SkeletonDetailBody /></DetailScaffold>}>
       <WorkoutDetailContent />
     </Suspense>
   );

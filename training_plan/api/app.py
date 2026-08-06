@@ -18,6 +18,7 @@ from ..garmin_sync import GarminRateLimitError, GarminSyncError
 from ..parser import TrainingPlanValidationError
 from ..strava_sync import StravaAuthError
 from . import schemas
+from .cache import cache
 from .routes_body import router as body_router
 from .routes_garmin import router as garmin_router
 from .routes_plan import router as plan_router
@@ -55,7 +56,11 @@ async def _validation_error_handler(request: Request, exc: TrainingPlanValidatio
 async def _rate_limit_handler(request: Request, exc: GarminRateLimitError) -> JSONResponse:
     return JSONResponse(
         status_code=429,
-        content=schemas.ErrorResponse(category="rate_limited", message=str(exc)).model_dump(),
+        content=schemas.ErrorResponse(
+            category="rate_limited",
+            message=str(exc),
+            retry_after_seconds=exc.retry_after_seconds,
+        ).model_dump(),
     )
 
 
@@ -92,3 +97,15 @@ app.include_router(strava_router, tags=["strava"])
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
+
+
+@app.post("/cache/clear")
+async def clear_cache() -> dict:
+    """Drop every cached read, so the next request goes back to Garmin/Strava.
+
+    This is the escape hatch behind the app's manual refresh: reads are cached for
+    minutes at a time (see api/cache.py), which is what makes navigation instant, but
+    the user must always have a way to say "no, ask again now".
+    """
+    cache.clear()
+    return {"cleared": True}

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from training_plan import service
 from training_plan.api import app as fastapi_app
+from training_plan.api import garmin_session
 from training_plan.api import jobs as jobs_module
 from training_plan.api import routes_garmin
 from training_plan.garmin_sync import (
@@ -77,6 +78,9 @@ def fake_garmin(monkeypatch):
     monkeypatch.setattr(service, "GarminSync", FakeGarminSync)
     monkeypatch.setattr(routes_garmin, "GarminSync", FakeGarminSync)
     monkeypatch.setattr(jobs_module, "GarminSync", FakeGarminSync)
+    # The shared session holder builds its own GarminSync (see api/garmin_session.py),
+    # so it needs the fake too or the API would try to reach the real Garmin.
+    monkeypatch.setattr(garmin_session, "GarminSync", FakeGarminSync)
     return FakeGarminSync
 
 

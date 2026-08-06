@@ -9,7 +9,9 @@ import { Illustration } from "@/components/Illustration";
 import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
-import { usePlanDiff, useBodyConflict, useBodyToday, useStravaActivityMatches, useStravaStatus, useWorkouts } from "@/lib/queries";
+import { usePlanDiff, useBodyConflict, useBodyToday, useStravaActivityMatches, useStravaStatus, useWeekWorkouts } from "@/lib/queries";
+import { RefreshButton } from "@/components/RefreshButton";
+import { SkeletonTodayHero } from "@/components/skeletons";
 import { usePassoStore } from "@/lib/store";
 import { classifySession, isoWeekNumber, sessionDistanceKm, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
 import { capitalize, formatFullDate, groupSteps, numberToItalianWords, relativeDayLabel, stepGroupLine } from "@/lib/format";
@@ -24,7 +26,8 @@ export default function TodayPage() {
   const liveMode = !access.plan && access.garminConnected;
   const startKey = toDateKey(start);
   const endKey = toDateKey(end);
-  const workoutsQuery = useWorkouts(startKey, endKey, liveMode);
+  const workoutsQuery = useWeekWorkouts(today, liveMode);
+  // Same cache entry /diff uses, so tapping through to it costs no new request.
   const diffQuery = usePlanDiff(access.plan?.sessions ?? null);
   const bodyQuery = useBodyToday();
 
@@ -54,7 +57,22 @@ export default function TodayPage() {
     router.replace("/body/conflict");
   }, [avvisamiSeIlCorpoNonRegge, nextPlanSession, conflictQuery.data?.has_conflict, conflictDismissedDate, todayKey, router]);
 
-  if (!access.ready || (!access.plan && !access.garminConnected)) return null;
+  // Until we know whether there's a plan or a live Garmin connection there is nothing
+  // real to show -- but "nothing real" used to mean `return null`, i.e. an empty screen
+  // for as long as the Garmin status check took. Render the header and the shapes.
+  if (!access.ready || (!access.plan && !access.garminConnected)) {
+    return (
+      <div style={{ padding: "22px 20px 12px" }}>
+        <TodayHeader />
+        <div style={{ marginTop: 18 }}>
+          <WordIn active={animate} style={{ font: "600 34px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>Settimana</WordIn>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <SkeletonTodayHero />
+        </div>
+      </div>
+    );
+  }
 
   const sessions: DisplaySession[] = access.plan ? access.plan.sessions : workoutsQuery.data?.workouts ?? [];
 
@@ -82,12 +100,7 @@ export default function TodayPage() {
 
   return (
     <div style={{ padding: "22px 20px 12px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <BrandMark height={22} />
-        <Link href="/settings" aria-label="Impostazioni" className="tap-target" style={{ display: "block" }}>
-          <Avatar size={36} />
-        </Link>
-      </div>
+      <TodayHeader />
 
       <div style={{ marginTop: 18 }}>
         <WordIn active={animate} style={{ font: "600 34px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>Settimana</WordIn>
@@ -240,6 +253,22 @@ export default function TodayPage() {
             </SlideUp>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/** Brand mark, manual refresh, and the settings avatar -- rendered identically whether
+ * or not the screen's data has arrived, so the top of the page never flickers in. */
+function TodayHeader() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <BrandMark height={22} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <RefreshButton />
+        <Link href="/settings" aria-label="Impostazioni" className="tap-target" style={{ display: "block" }}>
+          <Avatar size={36} />
+        </Link>
       </div>
     </div>
   );

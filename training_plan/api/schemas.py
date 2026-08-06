@@ -212,6 +212,10 @@ class StartSyncResponse(BaseModel):
     job_id: str
 
 
+class CancelSyncResponse(BaseModel):
+    ok: bool
+
+
 class SyncItemResult(BaseModel):
     date: date_type
     sport: str

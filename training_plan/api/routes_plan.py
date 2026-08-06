@@ -7,6 +7,7 @@ shapes the result back to JSON.
 
 from __future__ import annotations
 
+import hashlib
 import tempfile
 from pathlib import Path
 
@@ -15,7 +16,8 @@ from fastapi.concurrency import run_in_threadpool
 
 from .. import service
 from ..parser import parse_training_plan
-from . import schemas
+from . import garmin_session, schemas
+from .cache import TTL_PLAN_DIFF, cache
 from .jobs import job_store
 
 router = APIRouter()
@@ -45,10 +47,26 @@ async def parse_plan(
 
 
 @router.post("/plan/diff", response_model=schemas.DiffResponse)
-async def diff_plan(payload: schemas.DiffRequest) -> schemas.DiffResponse:
+async def diff_plan(payload: schemas.DiffRequest, refresh: bool = False) -> schemas.DiffResponse:
     sessions = [s.to_model() for s in payload.sessions]
-    preview = await run_in_threadpool(service.preview_plan_sync, sessions, False, payload.check_content)
-    return schemas.DiffResponse.from_model(preview.diff)
+    # Keyed by the exact plan (and by check_content, which changes the answer's depth):
+    # Oggi asks for this on every mount, and with check_content it costs one Garmin
+    # call per matched session on top of the calendar read.
+    key = hashlib.sha1(payload.model_dump_json().encode()).hexdigest()
+    diff = await run_in_threadpool(
+        lambda: cache.get_or_call(
+            "plan:diff",
+            key,
+            TTL_PLAN_DIFF,
+            lambda: garmin_session.run(
+                lambda sync: service.preview_plan_sync(
+                    sessions, False, payload.check_content, sync=sync
+                ).diff
+            ),
+            refresh=refresh,
+        )
+    )
+    return schemas.DiffResponse.from_model(diff)
 
 
 @router.post("/plan/sync", response_model=schemas.StartSyncResponse)
@@ -86,8 +104,8 @@ async def get_sync_status(job_id: str) -> schemas.SyncJobStatus:
     )
 
 
-@router.post("/plan/sync/{job_id}/cancel")
-async def cancel_sync(job_id: str) -> dict:
+@router.post("/plan/sync/{job_id}/cancel", response_model=schemas.CancelSyncResponse)
+async def cancel_sync(job_id: str) -> schemas.CancelSyncResponse:
     if not job_store.request_cancel(job_id):
         raise HTTPException(status_code=404, detail="Unknown job id")
-    return {"ok": True}
+    return schemas.CancelSyncResponse(ok=True)

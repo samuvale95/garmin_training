@@ -16,6 +16,40 @@ SPORT_TYPE_PAYLOAD = {
     "other": {"sportTypeId": 8, "sportTypeKey": "other", "displayOrder": 8},
 }
 
+# The other direction: Garmin's own sport keys, mapped back onto the five file-format
+# values. Garmin has far more sports than this format does (and spells some of ours
+# differently -- strength training is "fitness_equipment"), so anything read *from* the
+# calendar has to be brought back into the format before it can be written out again.
+# Substrings, not an exhaustive list: Garmin's keys are compounds around a handful of
+# stems ("trail_running", "indoor_cycling", "lap_swimming", ...), and a new one should
+# land on the closest sport rather than on "other".
+_GARMIN_SPORT_STEMS = (
+    ("swim", "swimming"),
+    ("run", "running"),
+    ("cycl", "cycling"),
+    ("bik", "cycling"),
+    ("ride", "cycling"),
+    ("strength", "strength_training"),
+    ("fitness_equipment", "strength_training"),
+)
+
+
+def sport_from_garmin_key(key: str | None) -> str:
+    """A Garmin sport key as one of `SUPPORTED_SPORTS` -- "other" when nothing fits.
+
+    Needed wherever a workout Garmin holds becomes a `TrainingSession` this app can edit
+    and write back: `SPORT_TYPE_PAYLOAD` is keyed by the file-format value, so a session
+    carrying Garmin's own spelling could be shown but never saved.
+    """
+    normalized = (key or "").strip().lower()
+    if normalized in SUPPORTED_SPORTS:
+        return normalized
+    for stem, sport in _GARMIN_SPORT_STEMS:
+        if stem in normalized:
+            return sport
+    return "other"
+
+
 # Garmin Connect stepType payload fragments, keyed by our file-format step type.
 STEP_TYPE_PAYLOAD = {
     "warmup": {"stepTypeId": 1, "stepTypeKey": "warmup", "displayOrder": 1},

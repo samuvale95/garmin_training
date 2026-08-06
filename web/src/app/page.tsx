@@ -23,9 +23,29 @@ export default function EntryPage() {
     if (plan || garminConnected) router.replace("/today");
   }, [plan, garminConnected, router]);
 
-  // Wait for the first status check before deciding to show "Inizia" -- otherwise an
-  // already-connected user briefly sees the welcome screen while it loads.
-  if (plan || garminConnected || status.isLoading) return null;
+  // The only two places this screen can lead. Prefetching them here means the tap lands
+  // on a ready screen: a `router.push` on its own fetches the route only once tapped
+  // (unlike a `<Link>`, which prefetches when it comes into view).
+  useEffect(() => {
+    router.prefetch("/connect-garmin");
+    router.prefetch("/today");
+  }, [router]);
+
+  // Wait for the first status check before deciding to show the welcome copy --
+  // otherwise an already-connected user briefly sees it while the check lands. Only the
+  // headline and CTA wait; the brand row is painted immediately, so the app never opens
+  // on a blank screen (this whole branch used to `return null`).
+  const decided = !plan && !garminConnected && !status.isPending;
+  if (!decided) {
+    return (
+      <div style={{ padding: "30px 22px 0", minHeight: "100dvh" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <BrandMark height={26} />
+          <span style={{ fontSize: 18, fontWeight: 600 }}>Passo</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: "30px 22px 0", display: "flex", flexDirection: "column", minHeight: "100dvh" }}>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Reorder } from "framer-motion";
 import { PrimaryButton, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { useAddSession, useApplyDeletion, usePlanQuery, useRemoveSession, useStartSync, useSyncJobStatus, useUpdateSession, useWorkouts } from "@/lib/queries";
+import { useAddSession, useApplyDeletion, useInvalidateCalendarData, usePlanQuery, useRemoveSession, useStartSync, useSyncJobStatus, useUpdateSession, useWorkoutsForDate } from "@/lib/queries";
 import { ApiError } from "@/lib/apiClient";
 import { normalizeTitle, toDateKey } from "@/lib/sessionVisuals";
 import { stepTypeLabel } from "@/lib/format";
@@ -38,14 +38,32 @@ function stepSummary(step: Step): string {
   return `${duration}${pace}`;
 }
 
-interface WorkoutEditorProps {
-  mode: "create" | "edit";
-  sessionIndex?: number;
-}
+/** The three things this form can be editing.
+ *
+ * `edit` is a session of the *local plan*, which may or may not also exist on the Garmin
+ * calendar (found by (date, title) below). `garmin` is the opposite case: a workout that
+ * only ever existed on the calendar -- opened from `/workout/[id]`, with no plan behind
+ * it -- whose identity is already known, and whose contents Garmin itself supplied. The
+ * local plan is left untouched in that mode: this workout is not part of it. */
+type WorkoutEditorProps =
+  | { mode: "create" }
+  | { mode: "edit"; sessionIndex: number }
+  | { mode: "garmin"; workout: ScheduledWorkout; session: TrainingSession };
 
-export function WorkoutEditor({ mode, sessionIndex }: WorkoutEditorProps) {
+export function WorkoutEditor(props: WorkoutEditorProps) {
+  const { mode } = props;
+  const sessionIndex = props.mode === "edit" ? props.sessionIndex : null;
+  const garminWorkout = props.mode === "garmin" ? props.workout : null;
+  const garminSession = props.mode === "garmin" ? props.session : null;
+
   const router = useRouter();
-  const animate = useMountOnce(mode === "edit" ? `session-edit-${sessionIndex}` : "session-new");
+  const animate = useMountOnce(
+    mode === "edit"
+      ? `session-edit-${sessionIndex}`
+      : mode === "garmin"
+        ? `workout-edit-${garminWorkout!.scheduled_workout_id}`
+        : "session-new"
+  );
   // No `useRequirePlan()` here, deliberately: create mode must work with no plan at
   // all (the whole point of "+" from Settimana is to start one from scratch) --
   // `addSession` below lazily creates an empty plan the first time it's called.
@@ -53,11 +71,16 @@ export function WorkoutEditor({ mode, sessionIndex }: WorkoutEditorProps) {
   const updateSession = useUpdateSession();
   const addSession = useAddSession();
   const removeSession = useRemoveSession();
+  const invalidateCalendar = useInvalidateCalendarData();
 
-  const existing = mode === "edit" && plan && sessionIndex != null ? plan.sessions[sessionIndex] : null;
+  const existing =
+    mode === "edit" ? (plan && sessionIndex != null ? plan.sessions[sessionIndex] : null) : garminSession;
   // Captured once, at mount: the (date, title) Garmin actually knows this session by,
   // so editing the title/date in this form doesn't break the calendar lookup below.
-  const [originalKey] = useState(() => (existing ? { date: existing.date, title: existing.title } : null));
+  // Only needed in `edit` mode -- in `garmin` mode the calendar entry is handed in.
+  const [originalKey] = useState(() =>
+    mode === "edit" && existing ? { date: existing.date, title: existing.title } : null
+  );
 
   const [date, setDate] = useState(existing?.date ?? toDateKey(new Date()));
   const [sport, setSport] = useState<Sport>((existing?.sport as Sport) ?? "running");
@@ -69,12 +92,33 @@ export function WorkoutEditor({ mode, sessionIndex }: WorkoutEditorProps) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
 
-  const originHref = mode === "edit" ? `/session/${sessionIndex}` : "/week";
+  /** Where "×"/"Annulla" go back to: the screen this editor was opened from. */
+  const originHref =
+    mode === "edit"
+      ? `/session/${sessionIndex}`
+      : mode === "garmin"
+        ? `/workout/${garminWorkout!.scheduled_workout_id}?date=${garminWorkout!.date}`
+        : "/week";
+  /** Where a *successful* save lands. Not `originHref` in `garmin` mode: a replace on
+   * Garmin is a delete plus a create (see `GarminSync.replace_session`), so the id in
+   * that route no longer exists once the job is done. */
+  const successHref = mode === "garmin" ? "/week" : originHref;
 
-  const workoutsQuery = useWorkouts(originalKey?.date ?? "", originalKey?.date ?? "", mode === "edit" && !!originalKey);
-  const originalWorkout: ScheduledWorkout | undefined = originalKey
-    ? workoutsQuery.data?.workouts.find((w) => normalizeTitle(w.title) === normalizeTitle(originalKey.title))
-    : undefined;
+  // Read out of the cached week the editor was opened from, so this lookup is normally
+  // already answered by the time the form appears.
+  const workoutsQuery = useWorkoutsForDate(originalKey?.date ?? "", mode === "edit" && !!originalKey);
+  const originalWorkout: ScheduledWorkout | undefined =
+    garminWorkout ??
+    (originalKey
+      ? workoutsQuery.workouts.find((w) => normalizeTitle(w.title) === normalizeTitle(originalKey.title))
+      : undefined);
+  /** Whether we yet know if this session already exists on the Garmin calendar.
+   *
+   * This gates saving, and it must: `handleSave` picks "replace the existing workout" vs
+   * "create a new one" from `originalWorkout`, so saving before the lookup resolved took
+   * the create branch and left a *duplicate* workout on the calendar. Never in doubt in
+   * `garmin` mode, where the calendar entry is what the editor was opened on. */
+  const calendarIdentityKnown = mode !== "edit" || !originalKey || workoutsQuery.isSuccess;
 
   const startSync = useStartSync();
   const syncStatus = useSyncJobStatus(jobId);
@@ -93,10 +137,16 @@ export function WorkoutEditor({ mode, sessionIndex }: WorkoutEditorProps) {
   const jobSucceeded = syncStatus.data?.status === "done" && jobItem?.status !== "failed";
 
   // Navigation is the one genuine side effect here (not React state), so it stays in
-  // an effect: once the job settles successfully, leave for the origin screen.
+  // an effect: once the job settles successfully, leave for the origin screen. The
+  // calendar it just wrote to is dropped from the client cache on the way out --
+  // otherwise the week we land on would keep showing the pre-edit workout for the rest
+  // of its stale time (the backend has already dropped its own copy, see `jobs.py`).
   useEffect(() => {
-    if (jobId && jobSucceeded) router.push(originHref);
-  }, [jobId, jobSucceeded, originHref, router]);
+    if (jobId && jobSucceeded) {
+      invalidateCalendar();
+      router.push(successHref);
+    }
+  }, [jobId, jobSucceeded, successHref, router, invalidateCalendar]);
 
   if (mode === "edit" && (!plan || !existing)) {
     return (
@@ -123,9 +173,11 @@ export function WorkoutEditor({ mode, sessionIndex }: WorkoutEditorProps) {
       steps: plainSteps(),
     };
 
+    // `garmin` mode edits a workout that isn't in the local plan at all, so it writes
+    // nothing there -- the calendar is the only place this session lives.
     if (mode === "create") {
       addSession(session);
-    } else {
+    } else if (mode === "edit") {
       updateSession(sessionIndex!, () => session);
     }
 
@@ -162,7 +214,7 @@ export function WorkoutEditor({ mode, sessionIndex }: WorkoutEditorProps) {
       if (originalWorkout) {
         await applyDeletion.mutateAsync([originalWorkout]);
       }
-      removeSession(sessionIndex!);
+      if (mode === "edit") removeSession(sessionIndex!);
       router.push("/week");
     } catch (err) {
       setSaveError(err instanceof ApiError ? err.message : "Non sono riuscito a cancellare l'allenamento.");
@@ -186,7 +238,7 @@ export function WorkoutEditor({ mode, sessionIndex }: WorkoutEditorProps) {
           className="font-mono"
           style={{ border: "none", background: "none", fontSize: 13, color: "var(--inchiostro-50)", textAlign: "center" }}
         />
-        {mode === "edit" ? (
+        {mode !== "create" ? (
           <button
             type="button"
             onClick={handleDelete}
@@ -203,7 +255,11 @@ export function WorkoutEditor({ mode, sessionIndex }: WorkoutEditorProps) {
 
       {confirmDelete && (
         <div style={{ background: "var(--rosa-avviso)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
-          <p style={{ fontSize: 13, color: "var(--rosso-testo)", margin: 0, flex: 1 }}>Eliminare questo allenamento dal piano e dal calendario Garmin?</p>
+          <p style={{ fontSize: 13, color: "var(--rosso-testo)", margin: 0, flex: 1 }}>
+            {mode === "garmin"
+              ? "Eliminare questo allenamento dal calendario Garmin?"
+              : "Eliminare questo allenamento dal piano e dal calendario Garmin?"}
+          </p>
           <button type="button" onClick={handleDelete} className="tap-target" style={{ background: "var(--rosso-forte)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
             Elimina
           </button>
@@ -214,7 +270,7 @@ export function WorkoutEditor({ mode, sessionIndex }: WorkoutEditorProps) {
       )}
 
       <WordIn active={animate} style={{ font: "600 30px/1.06 var(--font-outfit)", letterSpacing: "-.03em", marginTop: 18 }}>
-        {mode === "edit" ? "Modifica allenamento" : "Crea allenamento"}
+        {mode === "create" ? "Crea allenamento" : "Modifica allenamento"}
       </WordIn>
 
       <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
@@ -325,8 +381,11 @@ export function WorkoutEditor({ mode, sessionIndex }: WorkoutEditorProps) {
       )}
 
       <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 10 }}>
-        <PrimaryButton state={isSaving ? "loading" : "idle"} onClick={handleSave}>
-          Salva sul calendario
+        <PrimaryButton
+          state={isSaving || !calendarIdentityKnown ? "loading" : "idle"}
+          onClick={handleSave}
+        >
+          {calendarIdentityKnown ? "Salva sul calendario" : "Leggo il calendario…"}
         </PrimaryButton>
         <button
           type="button"

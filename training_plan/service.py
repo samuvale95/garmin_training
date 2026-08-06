@@ -41,6 +41,22 @@ class DeletionPreview:
     sync: GarminSync  # authenticated; pass straight through to apply_deletion
 
 
+def _authenticated(sync: GarminSync | None, prompt_mfa: Callable[[], str] | None) -> GarminSync:
+    """Use the caller's already-authenticated session, or establish a fresh one.
+
+    Every function below takes an optional `sync`: the CLI has no session to share and
+    passes nothing (one login per command, as before), while the web backend passes the
+    process-wide session from `api/garmin_session.py` so a page's worth of requests
+    doesn't re-login once per request. Keeping it optional means this module stays the
+    presentation-independent seam it was, with no import back into the API package.
+    """
+    if sync is not None:
+        return sync
+    fresh = GarminSync(prompt_mfa=prompt_mfa)
+    fresh.login()
+    return fresh
+
+
 def verify_login(prompt_mfa: Callable[[], str] | None = None) -> None:
     """Log in on its own, raising on failure. Callers decide how to report success."""
     GarminSync(prompt_mfa=prompt_mfa).login()
@@ -52,6 +68,7 @@ def preview_plan_sync(
     check_content: bool = False,
     prompt_mfa: Callable[[], str] | None = None,
     on_authenticated: Callable[[], None] | None = None,
+    sync: GarminSync | None = None,
 ) -> PlanPreview:
     """Log in and compute what a sync of `sessions` would do. Writes nothing.
 
@@ -66,8 +83,7 @@ def preview_plan_sync(
     to print anything itself, and without paying for a second login just to split
     "log in" and "diff" into separately orderable steps.
     """
-    sync = GarminSync(prompt_mfa=prompt_mfa)
-    sync.login()
+    sync = _authenticated(sync, prompt_mfa)
     if on_authenticated is not None:
         on_authenticated()
 
@@ -86,12 +102,13 @@ def apply_plan_sync(
 
 
 def list_workouts(
-    start: date_type, end: date_type, prompt_mfa: Callable[[], str] | None = None
+    start: date_type,
+    end: date_type,
+    prompt_mfa: Callable[[], str] | None = None,
+    sync: GarminSync | None = None,
 ) -> list[ScheduledWorkout]:
     """Log in and list scheduled workouts in a date range."""
-    sync = GarminSync(prompt_mfa=prompt_mfa)
-    sync.login()
-    return sync.list_scheduled_workouts(start, end)
+    return _authenticated(sync, prompt_mfa).list_scheduled_workouts(start, end)
 
 
 def get_workout_session(
@@ -100,20 +117,20 @@ def get_workout_session(
     sport: str,
     title: str,
     prompt_mfa: Callable[[], str] | None = None,
+    sync: GarminSync | None = None,
 ) -> TrainingSession:
     """Log in and fetch the full step structure Garmin holds for a scheduled workout."""
-    sync = GarminSync(prompt_mfa=prompt_mfa)
-    sync.login()
-    return sync.get_workout_session(workout_id, date, sport, title)
+    return _authenticated(sync, prompt_mfa).get_workout_session(workout_id, date, sport, title)
 
 
 def list_activities(
-    start: date_type, end: date_type, prompt_mfa: Callable[[], str] | None = None
+    start: date_type,
+    end: date_type,
+    prompt_mfa: Callable[[], str] | None = None,
+    sync: GarminSync | None = None,
 ) -> list[CompletedActivity]:
     """Log in and list actually-completed activities in a date range."""
-    sync = GarminSync(prompt_mfa=prompt_mfa)
-    sync.login()
-    return sync.list_activities(start, end)
+    return _authenticated(sync, prompt_mfa).list_activities(start, end)
 
 
 def preview_deletion(
@@ -122,10 +139,10 @@ def preview_deletion(
     sport: str | None = None,
     title_match: str | None = None,
     prompt_mfa: Callable[[], str] | None = None,
+    sync: GarminSync | None = None,
 ) -> DeletionPreview:
     """Log in and compute which workouts a deletion would select. Deletes nothing."""
-    sync = GarminSync(prompt_mfa=prompt_mfa)
-    sync.login()
+    sync = _authenticated(sync, prompt_mfa)
     workouts = sync.list_scheduled_workouts(start, end)
     selected = sync.select_workouts(workouts, sport=sport, title_match=title_match)
     return DeletionPreview(selected=selected, sync=sync)
