@@ -290,6 +290,16 @@ class DeviceInfoResponse(BaseModel):
     last_synced_at: datetime | None = None
 
 
+class AthleteProfileResponse(BaseModel):
+    """Who the connected account belongs to -- shared by /strava/athlete and
+    /garmin/profile so the client can prefer one over the other without two shapes.
+    Every field is optional: a connected account with no photo (or a name Garmin never
+    filled in) is normal, and the avatar falls back on its own."""
+
+    name: str | None = None
+    image_url: str | None = None
+
+
 class DisconnectResponse(BaseModel):
     connected: bool
 

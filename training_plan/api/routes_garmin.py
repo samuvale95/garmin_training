@@ -13,6 +13,7 @@ from . import garmin_session, schemas
 from .cache import (
     TTL_GARMIN_ACTIVITIES,
     TTL_GARMIN_DEVICE,
+    TTL_GARMIN_PROFILE,
     TTL_GARMIN_WORKOUT_SESSION,
     TTL_GARMIN_WORKOUTS,
     cache,
@@ -56,6 +57,20 @@ async def device(refresh: bool = False) -> schemas.DeviceInfoResponse:
         )
     )
     return schemas.DeviceInfoResponse(**result)
+
+
+@router.get("/garmin/profile", response_model=schemas.AthleteProfileResponse)
+async def profile(refresh: bool = False) -> schemas.AthleteProfileResponse:
+    result = await run_in_threadpool(
+        lambda: cache.get_or_call(
+            "garmin:profile",
+            None,
+            TTL_GARMIN_PROFILE,
+            lambda: garmin_session.run(lambda sync: sync.user_profile()),
+            refresh=refresh,
+        )
+    )
+    return schemas.AthleteProfileResponse(**result)
 
 
 @router.post("/garmin/disconnect", response_model=schemas.DisconnectResponse)

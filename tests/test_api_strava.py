@@ -11,6 +11,7 @@ class FakeStravaSync:
     status_response = {"connected": True}
     activity_match_response = {"matched": False}
     shoes_response: list = []
+    athlete_response = {"name": "Samuele Valente", "image_url": "https://cdn.strava.com/a.jpg"}
     connect_should_fail = False
     shoes_should_fail = False
 
@@ -36,6 +37,9 @@ class FakeStravaSync:
     def find_activity_matches_for_range(self, sessions) -> dict:
         return {s.date.isoformat(): FakeStravaSync.activity_match_response for s in sessions}
 
+    def athlete_profile(self) -> dict:
+        return FakeStravaSync.athlete_response
+
     def shoe_wear(self) -> list:
         if FakeStravaSync.shoes_should_fail:
             raise StravaAuthError("Strava is not connected.")
@@ -51,6 +55,7 @@ def fake_strava(monkeypatch):
     FakeStravaSync.status_response = {"connected": True}
     FakeStravaSync.activity_match_response = {"matched": False}
     FakeStravaSync.shoes_response = []
+    FakeStravaSync.athlete_response = {"name": "Samuele Valente", "image_url": "https://cdn.strava.com/a.jpg"}
     FakeStravaSync.connect_should_fail = False
     monkeypatch.setattr(routes_strava, "StravaSync", FakeStravaSync)
     return FakeStravaSync
@@ -165,3 +170,28 @@ def test_shoes_requires_connection(client, fake_strava):
     response = client.get("/strava/shoes")
     assert response.status_code == 401
     assert response.json()["category"] == "auth_failed"
+
+
+def test_athlete_returns_name_and_photo(client, fake_strava):
+    fake_strava.athlete_response = {"name": "Samuele Valente", "image_url": "https://cdn.strava.com/a.jpg"}
+    response = client.get("/strava/athlete")
+    assert response.status_code == 200
+    assert response.json() == {"name": "Samuele Valente", "image_url": "https://cdn.strava.com/a.jpg"}
+
+
+def test_athlete_is_cached_between_requests(client, fake_strava):
+    """The avatar is on nearly every screen -- it must not cost a Strava call each time."""
+    client.get("/strava/athlete")
+    fake_strava.athlete_response = {"name": "Qualcun Altro", "image_url": None}
+    assert client.get("/strava/athlete").json()["name"] == "Samuele Valente"
+
+    # ...unless the caller explicitly asks again (the app's manual refresh).
+    assert client.get("/strava/athlete", params={"refresh": "true"}).json()["name"] == "Qualcun Altro"
+
+
+def test_connecting_drops_the_previous_athlete(client, fake_strava):
+    client.get("/strava/athlete")
+    fake_strava.athlete_response = {"name": "Qualcun Altro", "image_url": None}
+    client.post("/strava/connect", json={"code": "auth-code"})
+
+    assert client.get("/strava/athlete").json()["name"] == "Qualcun Altro"

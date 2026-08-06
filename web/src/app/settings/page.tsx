@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { RefreshButton } from "@/components/RefreshButton";
 import { StatusDot } from "@/components/motion/primitives";
 import { useClearPlan, useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, usePlanQuery, useResetAllLocalData, useStravaStatus } from "@/lib/queries";
+import { useAthleteIdentity } from "@/lib/identity";
 import { usePassoStore } from "@/lib/store";
 import { downloadPlanYaml } from "@/lib/planYaml";
 import { minutesAgo } from "@/lib/format";
@@ -21,6 +22,7 @@ export default function SettingsPage() {
   const { data: stravaStatus } = useStravaStatus();
   const disconnectStrava = useDisconnectStrava();
   const { data: plan } = usePlanQuery();
+  const identity = useAthleteIdentity();
   const prefs = usePassoStore((s) => s.prefs);
   const setPref = usePassoStore((s) => s.setPref);
   const profile = usePassoStore((s) => s.profile);
@@ -53,12 +55,25 @@ export default function SettingsPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Avatar size={40} />
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-            <input
-              value={profile.name}
-              onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-              placeholder="Il tuo nome"
-              style={{ border: "none", background: "none", fontSize: 15, fontWeight: 600, padding: 0, outline: "none" }}
-            />
+            {/* Name and photo come from the connected account (Strava first, Garmin
+                second): there's a real one to show, so typing a second one by hand
+                would only be a way to disagree with it. The hand-typed name stays for
+                anyone with neither account connected. */}
+            {identity.source === "strava" || identity.source === "garmin" ? (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>{identity.name}</span>
+                <span style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
+                  da {identity.source === "strava" ? "Strava" : "Garmin"}
+                </span>
+              </div>
+            ) : (
+              <input
+                value={profile.name}
+                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                placeholder="Il tuo nome"
+                style={{ border: "none", background: "none", fontSize: 15, fontWeight: 600, padding: 0, outline: "none" }}
+              />
+            )}
             <input
               value={profile.email}
               onChange={(e) => setProfile({ ...profile, email: e.target.value })}

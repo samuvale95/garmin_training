@@ -5,6 +5,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { apiGet, apiPost, apiPostForm } from "./apiClient";
 import { toDateKey, weekBounds } from "./sessionVisuals";
 import type {
+  AthleteProfile,
   BodySnapshot,
   CompletedActivity,
   ConflictAssessment,
@@ -231,6 +232,9 @@ export function useConnectGarmin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["garmin", "status"] });
+      // A different account may be behind this login -- the old one's name and photo
+      // must not survive it.
+      queryClient.invalidateQueries({ queryKey: ["garmin", "profile"] });
     },
   });
 }
@@ -253,6 +257,7 @@ export function useDisconnectGarmin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["garmin", "status"] });
       queryClient.invalidateQueries({ queryKey: ["garmin", "device"] });
+      queryClient.invalidateQueries({ queryKey: ["garmin", "profile"] });
     },
   });
 }
@@ -263,6 +268,18 @@ export function useGarminDevice(enabled = true) {
     queryFn: ({ signal }) => apiGet<DeviceInfo>("/garmin/device", undefined, signal),
     enabled,
     staleTime: 5 * 60_000,
+  });
+}
+
+/** The Garmin account's own name/photo -- the avatar's fallback when Strava has none
+ * (see `useAthleteIdentity`). Long `staleTime`: who the user is does not change while
+ * they use the app, and this is read on every screen with an avatar in the corner. */
+export function useGarminProfile(enabled = true) {
+  return useQuery({
+    queryKey: ["garmin", "profile"],
+    queryFn: ({ signal }) => apiGet<AthleteProfile>("/garmin/profile", undefined, signal),
+    enabled,
+    staleTime: 60 * 60_000,
   });
 }
 
@@ -539,6 +556,17 @@ export function useStravaStatus() {
   });
 }
 
+/** Name + photo of the connected Strava athlete: the app's preferred identity for the
+ * avatar and the profile card (see `useAthleteIdentity`). */
+export function useStravaAthlete(enabled = true) {
+  return useQuery({
+    queryKey: ["strava", "athlete"],
+    queryFn: ({ signal }) => apiGet<AthleteProfile>("/strava/athlete", undefined, signal),
+    enabled,
+    staleTime: 60 * 60_000,
+  });
+}
+
 export function useStravaAuthorize() {
   return useMutation({
     mutationFn: () => apiGet<{ authorize_url: string }>("/strava/authorize"),
@@ -560,6 +588,9 @@ export function useConnectStrava() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strava", "status"] });
+      // A different athlete may be behind this token (the backend drops its own cached
+      // answer for the same reason).
+      queryClient.invalidateQueries({ queryKey: ["strava", "athlete"] });
     },
   });
 }
@@ -579,6 +610,7 @@ export function useDisconnectStrava() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strava", "status"] });
+      queryClient.removeQueries({ queryKey: ["strava", "athlete"] });
     },
   });
 }

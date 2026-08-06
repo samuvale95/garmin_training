@@ -175,6 +175,13 @@ export interface StravaStatus {
   connected: boolean;
 }
 
+/** Name + avatar of a connected account, from /strava/athlete or /garmin/profile.
+ * Both fields are optional on purpose: an account with no photo is normal. */
+export interface AthleteProfile {
+  name: string | null;
+  image_url: string | null;
+}
+
 export interface StravaActivityMatch {
   matched: boolean;
   activity_id?: number | null;

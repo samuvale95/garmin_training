@@ -317,3 +317,49 @@ def test_retire_shoe_survives_a_disconnect(monkeypatch, tmp_path):
 
     assert sync.connection_status() == {"connected": False}
     assert "g1" in make_sync(tmp_path)._retired_gear_ids()
+
+
+# ---- athlete profile ------------------------------------------------------------------------
+
+
+def test_athlete_profile_returns_name_and_photo(monkeypatch, tmp_path):
+    sync = make_sync(tmp_path, tokens=valid_tokens())
+
+    def fake_get(url, params=None, headers=None, timeout=None):
+        assert url.endswith("/athlete")
+        return FakeResponse(
+            200,
+            {
+                "firstname": "Samuele",
+                "lastname": "Valente",
+                "profile": "https://cdn.strava.com/large.jpg",
+                "profile_medium": "https://cdn.strava.com/medium.jpg",
+            },
+        )
+
+    monkeypatch.setattr(strava_sync.httpx, "get", fake_get)
+    assert sync.athlete_profile() == {
+        "name": "Samuele Valente",
+        "image_url": "https://cdn.strava.com/large.jpg",
+    }
+
+
+def test_athlete_profile_ignores_the_default_avatar_placeholder(monkeypatch, tmp_path):
+    """Strava sends a bare path, not a URL, for an athlete who never set a photo --
+    reporting it as an image would leave the app rendering a broken one instead of
+    falling back to Garmin's."""
+    sync = make_sync(tmp_path, tokens=valid_tokens())
+    monkeypatch.setattr(
+        strava_sync.httpx,
+        "get",
+        lambda *a, **k: FakeResponse(200, {"firstname": "Samuele", "profile": "avatar/athlete/large.png"}),
+    )
+
+    assert sync.athlete_profile() == {"name": "Samuele", "image_url": None}
+
+
+def test_athlete_profile_with_no_name_at_all(monkeypatch, tmp_path):
+    sync = make_sync(tmp_path, tokens=valid_tokens())
+    monkeypatch.setattr(strava_sync.httpx, "get", lambda *a, **k: FakeResponse(200, {}))
+
+    assert sync.athlete_profile() == {"name": None, "image_url": None}

@@ -426,6 +426,48 @@ class GarminSync:
             return None
         return data.get("di_token")
 
+    def _cached_profile_name(self) -> str | None:
+        """The name `garminconnect` already read during login, free of any call.
+
+        Its `login()` fetches the social profile itself and keeps the names off it (see
+        api/garmin_session.py) -- so even when `user_profile`'s own fetch fails there is
+        usually still a name to show, just no photo.
+        """
+        name = getattr(self._client, "full_name", None) or getattr(self._client, "display_name", None)
+        return (name or "").strip() or None
+
+    def user_profile(self) -> dict:
+        """Best-effort account name + avatar URL, the fallback behind Strava's own.
+
+        Read straight from Garmin's social-profile endpoint: `garminconnect` caches only
+        the names off it (`display_name`/`full_name`) and drops the image URLs, and like
+        `device_info` this is a nice-to-have -- an unreachable or reshaped endpoint
+        degrades to `None`s so the avatar just falls back instead of the screen failing.
+        """
+        try:
+            profile = self.client.connectapi("/userprofile-service/socialProfile")
+        except Exception:  # noqa: BLE001 - profile info is a nice-to-have, never fatal
+            logger.warning("socialProfile failed, degrading to the cached name", exc_info=True)
+            return {"name": self._cached_profile_name(), "image_url": None}
+
+        if not isinstance(profile, dict):
+            return {"name": self._cached_profile_name(), "image_url": None}
+
+        name = (
+            profile.get("fullName")
+            or profile.get("displayName")
+            or profile.get("userName")
+            or self._cached_profile_name()
+        )
+        image_url = (
+            profile.get("profileImageUrlLarge")
+            or profile.get("profileImageUrlMedium")
+            or profile.get("profileImageUrlSmall")
+        )
+        if not isinstance(image_url, str) or not image_url.startswith("http"):
+            image_url = None
+        return {"name": (name or "").strip() or None, "image_url": image_url}
+
     def device_info(self) -> dict:
         """Best-effort primary-device name + last-sync time (settings screen 15).
 

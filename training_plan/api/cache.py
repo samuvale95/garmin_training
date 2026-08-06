@@ -38,6 +38,12 @@ TTL_BODY_TODAY = 10 * 60
 TTL_BODY_LOAD = 30 * 60
 TTL_STRAVA_MATCH = 5 * 60
 TTL_STRAVA_SHOES = 5 * 60
+# Who the user is (name + avatar) changes about never, and both endpoints are read on
+# every screen that shows the avatar -- so they get the longest TTL here. Connect and
+# disconnect invalidate them anyway, which covers the only case that matters: a
+# different account behind the token.
+TTL_STRAVA_ATHLETE = 60 * 60
+TTL_GARMIN_PROFILE = 60 * 60
 # Matched to the client's own staleTime for this query: the diff can only go stale if the
 # plan changes (a different cache key) or the calendar changes (invalidated on write).
 TTL_PLAN_DIFF = 5 * 60

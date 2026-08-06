@@ -388,6 +388,22 @@ class StravaSync:
         retired.add(gear_id)
         _write_json_atomically(self._shoestore, {"retired_gear_ids": sorted(retired)})
 
+    def athlete_profile(self) -> dict:
+        """Display name + avatar URL of the connected athlete, for the app's avatar.
+
+        Strava hands back a placeholder path (`avatar/athlete/large.png`) rather than a
+        URL for accounts with no photo, so anything that isn't an absolute URL degrades
+        to `None` and lets the caller fall back.
+        """
+        athlete = self._get("/athlete").json()
+        name = " ".join(
+            part.strip() for part in (athlete.get("firstname"), athlete.get("lastname")) if part
+        ).strip()
+        image_url = athlete.get("profile") or athlete.get("profile_medium")
+        if not isinstance(image_url, str) or not image_url.startswith("http"):
+            image_url = None
+        return {"name": name or None, "image_url": image_url}
+
     def shoe_wear(self) -> list[dict]:
         athlete = self._get("/athlete").json()
         shoes = athlete.get("shoes") or []

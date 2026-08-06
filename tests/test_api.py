@@ -25,6 +25,7 @@ class FakeGarminSync:
     login_should_fail = False
     login_should_rate_limit = False
     status_response = {"connected": True, "cooldown_active": False, "retry_after_seconds": 0, "reason": None}
+    profile_response = {"name": "Samuele Valente", "image_url": "https://garmin.example/p.png"}
 
     def __init__(self, email=None, password=None, tokenstore=None, state_path=None, prompt_mfa=None):
         self.email = email
@@ -44,6 +45,9 @@ class FakeGarminSync:
 
     def connection_status(self) -> dict:
         return FakeGarminSync.status_response
+
+    def user_profile(self) -> dict:
+        return FakeGarminSync.profile_response
 
     def diff_plan(self, sessions, check_content=False):
         return PlanDiff(to_create=list(sessions), already_present=[], extra_on_garmin=[])
@@ -75,6 +79,7 @@ def fake_garmin(monkeypatch):
     FakeGarminSync.status_response = {
         "connected": True, "cooldown_active": False, "retry_after_seconds": 0, "reason": None
     }
+    FakeGarminSync.profile_response = {"name": "Samuele Valente", "image_url": "https://garmin.example/p.png"}
     monkeypatch.setattr(service, "GarminSync", FakeGarminSync)
     monkeypatch.setattr(routes_garmin, "GarminSync", FakeGarminSync)
     monkeypatch.setattr(jobs_module, "GarminSync", FakeGarminSync)
@@ -290,6 +295,28 @@ def test_garmin_status_cooldown(client, fake_garmin):
     body = client.get("/garmin/status").json()
     assert body["cooldown_active"] is True
     assert body["retry_after_seconds"] == 842
+
+
+def test_garmin_profile_returns_name_and_photo(client, fake_garmin):
+    fake_garmin.profile_response = {"name": "Samuele Valente", "image_url": "https://garmin.example/p.png"}
+    response = client.get("/garmin/profile")
+    assert response.status_code == 200
+    assert response.json() == {"name": "Samuele Valente", "image_url": "https://garmin.example/p.png"}
+
+
+def test_garmin_profile_allows_a_nameless_account(client, fake_garmin):
+    """An account with nothing filled in is a normal answer, not an error: the client
+    falls back to initials or a placeholder on its own."""
+    fake_garmin.profile_response = {"name": None, "image_url": None}
+    assert client.get("/garmin/profile").json() == {"name": None, "image_url": None}
+
+
+def test_garmin_profile_is_cached_between_requests(client, fake_garmin):
+    client.get("/garmin/profile")
+    fake_garmin.profile_response = {"name": "Qualcun Altro", "image_url": None}
+    assert client.get("/garmin/profile").json()["name"] == "Samuele Valente"
+
+    assert client.get("/garmin/profile", params={"refresh": "true"}).json()["name"] == "Qualcun Altro"
 
 
 # ---- /garmin/workouts, /garmin/deletions/* ---------------------------------------------------

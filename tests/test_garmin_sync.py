@@ -1139,3 +1139,53 @@ def test_delete_all_continues_after_one_failure():
 
     assert [r.success for r in results] == [True, False]
     assert results[1].error == "cannot delete"
+
+
+# ---- user profile ---------------------------------------------------------------------------
+
+
+def test_user_profile_reads_name_and_photo():
+    sync, fake = make_sync_with_fake_client()
+    fake.connectapi = lambda path: {
+        "fullName": "Samuele Valente",
+        "displayName": "samu",
+        "profileImageUrlLarge": "https://garmin.example/large.png",
+    }
+
+    assert sync.user_profile() == {
+        "name": "Samuele Valente",
+        "image_url": "https://garmin.example/large.png",
+    }
+
+
+def test_user_profile_falls_back_to_display_name_and_smaller_photo():
+    sync, fake = make_sync_with_fake_client()
+    fake.connectapi = lambda path: {"displayName": "samu", "profileImageUrlSmall": "https://garmin.example/s.png"}
+
+    assert sync.user_profile() == {"name": "samu", "image_url": "https://garmin.example/s.png"}
+
+
+def test_user_profile_degrades_when_the_endpoint_fails():
+    """Undocumented endpoint, nice-to-have data: it must never take a screen down."""
+    sync, fake = make_sync_with_fake_client()
+
+    def boom(path):
+        raise RuntimeError("502 from Garmin")
+
+    fake.connectapi = boom
+
+    assert sync.user_profile() == {"name": None, "image_url": None}
+
+
+def test_user_profile_falls_back_to_the_name_login_already_cached():
+    """`garminconnect` reads the social profile during login and keeps the names off
+    it, so a later failure on the same endpoint should still leave a name to show."""
+    sync, fake = make_sync_with_fake_client()
+    fake.full_name = "Samuele Valente"
+
+    def boom(path):
+        raise RuntimeError("502 from Garmin")
+
+    fake.connectapi = boom
+
+    assert sync.user_profile() == {"name": "Samuele Valente", "image_url": None}

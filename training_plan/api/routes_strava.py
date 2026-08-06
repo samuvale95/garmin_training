@@ -16,11 +16,11 @@ from pydantic import BaseModel
 
 from ..strava_sync import StravaSync
 from . import schemas
-from .cache import TTL_STRAVA_MATCH, TTL_STRAVA_SHOES, cache
+from .cache import TTL_STRAVA_ATHLETE, TTL_STRAVA_MATCH, TTL_STRAVA_SHOES, cache
 
 router = APIRouter()
 
-STRAVA_NAMESPACES = ("strava:match", "strava:matches", "strava:shoes")
+STRAVA_NAMESPACES = ("strava:match", "strava:matches", "strava:shoes", "strava:athlete")
 
 
 def _payload_key(payload: BaseModel) -> str:
@@ -57,6 +57,20 @@ async def disconnect() -> schemas.StravaDisconnectResponse:
     await run_in_threadpool(lambda: StravaSync().disconnect())
     cache.invalidate(STRAVA_NAMESPACES)
     return schemas.StravaDisconnectResponse(connected=False)
+
+
+@router.get("/strava/athlete", response_model=schemas.AthleteProfileResponse)
+async def athlete(refresh: bool = False) -> schemas.AthleteProfileResponse:
+    result = await run_in_threadpool(
+        lambda: cache.get_or_call(
+            "strava:athlete",
+            None,
+            TTL_STRAVA_ATHLETE,
+            lambda: StravaSync().athlete_profile(),
+            refresh=refresh,
+        )
+    )
+    return schemas.AthleteProfileResponse(**result)
 
 
 @router.post("/strava/activity-match", response_model=schemas.StravaActivityMatchResponse)
