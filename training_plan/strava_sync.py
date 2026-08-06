@@ -24,7 +24,13 @@ from pathlib import Path
 
 import httpx
 
-from .models import TrainingSession, flatten_steps
+from .models import (
+    TrainingSession,
+    avg_pace_sec_per_km,
+    flatten_steps,
+    session_fallback_pace,
+    step_distance_km,
+)
 
 DEFAULT_TOKENSTORE_PATH = str(Path.home() / ".garmin_training_strava_tokens.json")
 # Retired-shoe flags live in their own file, *not* in the tokenstore: the tokenstore is
@@ -452,44 +458,6 @@ def _sport_compatible(strava_type: str | None, strava_sport_type: str | None, pl
     return mapped is None or mapped == planned_sport
 
 
-# Stand-in pace for a time-based step that names none and sits in a session that names
-# none either -- 6:00/km, an unhurried running pace. Mirrors DEFAULT_EASY_PACE_SEC_PER_KM
-# in format.ts; the two must agree or the same session gets two different planned totals.
-DEFAULT_EASY_PACE_SEC_PER_KM = 360.0
-
-
-def _avg_pace_sec_per_km(target) -> float:
-    return (target.slower_sec_per_km + target.faster_sec_per_km) / 2
-
-
-def _session_fallback_pace(steps) -> float:
-    """The pace to assume for the steps that carry no target of their own: the slowest
-    one the session does name. The unpaced steps are a session's easy parts, so its
-    slowest named pace is the closest honest proxy -- borrowing the interval pace would
-    turn a 15-minute warmup into 3.7 km.
-    """
-    paces = [_avg_pace_sec_per_km(step.target_pace) for step in steps if step.target_pace]
-    return max(paces) if paces else DEFAULT_EASY_PACE_SEC_PER_KM
-
-
-def _step_distance_km(step, fallback_pace: float = DEFAULT_EASY_PACE_SEC_PER_KM) -> float:
-    """Mirrors the frontend's `stepDistanceKm` (format.ts): a step's own distance if it
-    has one, otherwise a pace-derived estimate from its time and either its own target
-    pace or `fallback_pace`.
-
-    The fallback matters: a time-based step with no pace of its own used to count as
-    0 km, which understated the planned distance of every session written as
-    "riscaldamento: 15 min" with no target -- and that planned total is what the Strava
-    comparison holds the actual run up against. "rest" really is 0 km: standing still.
-    """
-    if step.duration_type == "distance":
-        return step.duration_value
-    if step.type == "rest":
-        return 0.0
-    sec_per_km = _avg_pace_sec_per_km(step.target_pace) if step.target_pace else fallback_pace
-    return (step.duration_value * 60) / sec_per_km
-
-
 def _planned_summary(session: TrainingSession) -> tuple[float | None, float | None, float | None]:
     """Planned (distance_km, duration_min, avg_pace_sec_per_km) derived from the
     session's own steps -- there is no separately-stored "planned totals" field, so
@@ -498,14 +466,14 @@ def _planned_summary(session: TrainingSession) -> tuple[float | None, float | No
     # Flattened first: a "6 ×" block is six times the work, and totals that counted it
     # once would under-report every interval session the moment blocks are used.
     steps = flatten_steps(session.steps)
-    fallback_pace = _session_fallback_pace(steps)
-    distance_km = sum(_step_distance_km(step, fallback_pace) for step in steps)
+    fallback_pace = session_fallback_pace(steps)
+    distance_km = sum(step_distance_km(step, fallback_pace) for step in steps)
+    # Deliberately only the time-based steps: this figure is compared against a Strava
+    # activity's *moving* time, and a distance step converted through its target pace
+    # would be planned time dressed up as measured time. `session_duration_minutes`
+    # converts both, for fuelling, where minutes on the feet is the whole question.
     duration_min = sum(step.duration_value for step in steps if step.duration_type == "time")
-    pace_samples = [
-        (step.target_pace.slower_sec_per_km + step.target_pace.faster_sec_per_km) / 2
-        for step in steps
-        if step.target_pace
-    ]
+    pace_samples = [avg_pace_sec_per_km(step.target_pace) for step in steps if step.target_pace]
     avg_pace = sum(pace_samples) / len(pace_samples) if pace_samples else None
     return (
         round(distance_km, 2) if distance_km else None,

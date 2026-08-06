@@ -11,7 +11,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date as date_type
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
@@ -467,6 +467,85 @@ class GarminSync:
         if not isinstance(image_url, str) or not image_url.startswith("http"):
             image_url = None
         return {"name": (name or "").strip() or None, "image_url": image_url}
+
+    def body_metrics(self, lookback_days: int = 30) -> dict:
+        """Best-effort weight + the personal figures fuelling targets are scaled by.
+
+        Two sources, in falling order of trust, because most runners are one or the
+        other and neither alone covers them:
+
+        1. **The scale.** `get_body_composition` over the last `lookback_days`, newest
+           entry wins. This is a measurement, with a date, and it moves.
+        2. **The profile field.** `get_user_profile`'s `userData.weight` -- typed in
+           once at signup and possibly years stale, but for a runner without a smart
+           scale it is the only weight Garmin holds, and a stale weight beats a
+           reference one.
+
+        Weights come back from Garmin in **grams** in both places. Height is in
+        centimetres. Everything degrades to `None` field by field rather than raising:
+        this feeds a nutrition screen that already has a no-weight state, so an
+        unavailable figure is a supported outcome, not an error (same discipline as
+        `body_insights.py` around the undocumented wellness fields).
+        """
+        result: dict = {
+            "weight_kg": None,
+            "measured_on": None,
+            "source": None,
+            "height_cm": None,
+            "birth_date": None,
+            "gender": None,
+        }
+
+        today = date_type.today()
+        try:
+            composition = self.client.get_body_composition(
+                (today - timedelta(days=lookback_days)).isoformat(), today.isoformat()
+            )
+        except Exception:  # noqa: BLE001 - a missing scale is the common case, not a failure
+            logger.warning("get_body_composition failed, falling back to the profile weight", exc_info=True)
+            composition = None
+
+        entries = (composition or {}).get("dateWeightList") if isinstance(composition, dict) else None
+        if isinstance(entries, list) and entries:
+            # Newest first: the list comes back ascending, and a weigh-in from three
+            # weeks ago should not overwrite this morning's.
+            latest = max(
+                (e for e in entries if isinstance(e, dict) and isinstance(e.get("weight"), (int, float))),
+                key=lambda e: e.get("calendarDate") or "",
+                default=None,
+            )
+            if latest:
+                result["weight_kg"] = round(latest["weight"] / 1000, 1)
+                result["measured_on"] = latest.get("calendarDate")
+                result["source"] = "scale"
+
+        try:
+            profile = self.client.get_user_profile()
+        except Exception:  # noqa: BLE001 - same rule: personal figures are never fatal
+            logger.warning("get_user_profile failed, degrading to what the scale gave", exc_info=True)
+            return result
+
+        user_data = profile.get("userData") if isinstance(profile, dict) else None
+        if not isinstance(user_data, dict):
+            return result
+
+        height = user_data.get("height")
+        if isinstance(height, (int, float)) and height > 0:
+            result["height_cm"] = round(height, 1)
+        birth_date = user_data.get("birthDate")
+        if isinstance(birth_date, str) and birth_date:
+            result["birth_date"] = birth_date
+        gender = user_data.get("gender")
+        if isinstance(gender, str) and gender:
+            result["gender"] = gender.lower()
+
+        if result["weight_kg"] is None:
+            weight = user_data.get("weight")
+            if isinstance(weight, (int, float)) and weight > 0:
+                result["weight_kg"] = round(weight / 1000, 1)
+                result["source"] = "profile"
+
+        return result
 
     def device_info(self) -> dict:
         """Best-effort primary-device name + last-sync time (settings screen 15).

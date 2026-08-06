@@ -181,6 +181,61 @@ def flatten_steps(steps: list[SessionStep]) -> list[Step]:
     return flat
 
 
+# Stand-in pace for a time-based step that names none and sits in a session that names
+# none either -- 6:00/km, an unhurried running pace. Mirrors DEFAULT_EASY_PACE_SEC_PER_KM
+# in format.ts; the two must agree or the same session gets two different planned totals.
+DEFAULT_EASY_PACE_SEC_PER_KM = 360.0
+
+
+def avg_pace_sec_per_km(target: PaceTarget) -> float:
+    return (target.slower_sec_per_km + target.faster_sec_per_km) / 2
+
+
+def session_fallback_pace(steps: list[Step]) -> float:
+    """The pace to assume for the steps that carry no target of their own: the slowest
+    one the session does name. The unpaced steps are a session's easy parts, so its
+    slowest named pace is the closest honest proxy -- borrowing the interval pace would
+    turn a 15-minute warmup into 3.7 km.
+
+    Takes *flattened* steps: a repeat block holds its own paces and they count.
+    """
+    paces = [avg_pace_sec_per_km(step.target_pace) for step in steps if step.target_pace]
+    return max(paces) if paces else DEFAULT_EASY_PACE_SEC_PER_KM
+
+
+def step_distance_km(step: Step, fallback_pace: float = DEFAULT_EASY_PACE_SEC_PER_KM) -> float:
+    """Mirrors the frontend's `stepDistanceKm` (format.ts): a step's own distance if it
+    has one, otherwise a pace-derived estimate from its time and either its own target
+    pace or `fallback_pace`.
+
+    The fallback matters: a time-based step with no pace of its own used to count as
+    0 km, which understated the planned distance of every session written as
+    "riscaldamento: 15 min" with no target -- and that planned total is what the Strava
+    comparison holds the actual run up against. "rest" really is 0 km: standing still.
+    """
+    if step.duration_type == "distance":
+        return step.duration_value
+    if step.type == "rest":
+        return 0.0
+    sec_per_km = avg_pace_sec_per_km(step.target_pace) if step.target_pace else fallback_pace
+    return (step.duration_value * 60) / sec_per_km
+
+
+def step_duration_minutes(step: Step, fallback_pace: float = DEFAULT_EASY_PACE_SEC_PER_KM) -> float:
+    """The mirror image of `step_distance_km`: minutes on the feet, with a distance-based
+    step converted through its pace.
+
+    Time spent is what fuelling scales on -- 90 minutes is 90 minutes of glycogen whether
+    the file wrote it as "90 min" or as "15 km" -- so a totals function that only summed
+    the time-based steps (as `strava_sync._planned_summary` does, deliberately, for a
+    different purpose) would read a plan written in kilometres as a rest day.
+    """
+    if step.duration_type == "time":
+        return step.duration_value
+    sec_per_km = avg_pace_sec_per_km(step.target_pace) if step.target_pace else fallback_pace
+    return (step.duration_value * sec_per_km) / 60
+
+
 @dataclass
 class TrainingSession:
     date: date_type
@@ -188,3 +243,11 @@ class TrainingSession:
     title: str
     description: str | None = None
     steps: list[SessionStep] = field(default_factory=list)
+
+
+def session_duration_minutes(session: TrainingSession) -> float:
+    """Total minutes the session asks for, repeat blocks expanded and distance steps
+    converted at their own (or the session's slowest named) pace."""
+    steps = flatten_steps(session.steps)
+    fallback = session_fallback_pace(steps)
+    return sum(step_duration_minutes(step, fallback) for step in steps)

@@ -21,6 +21,7 @@ from . import schemas
 from .cache import cache
 from .routes_body import router as body_router
 from .routes_garmin import router as garmin_router
+from .routes_nutrition import router as nutrition_router
 from .routes_plan import router as plan_router
 from .routes_strava import router as strava_router
 
@@ -92,6 +93,7 @@ app.include_router(plan_router, tags=["plan"])
 app.include_router(garmin_router, tags=["garmin"])
 app.include_router(body_router, tags=["body"])
 app.include_router(strava_router, tags=["strava"])
+app.include_router(nutrition_router, tags=["nutrition"])
 
 
 @app.get("/health")

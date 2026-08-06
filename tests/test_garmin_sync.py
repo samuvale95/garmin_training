@@ -5,6 +5,7 @@ from datetime import date
 import pytest
 
 from training_plan.garmin_sync import (
+    ChangedSession,
     GarminRateLimitError,
     GarminSync,
     GarminSyncError,
@@ -914,6 +915,59 @@ def test_sync_all_continues_after_one_failure():
     assert results[1].error == "boom"
 
 
+# ---- replacing a scheduled session --------------------------------------------------------
+
+
+def _change(session, workout):
+    return ChangedSession(session=session, workout=workout, local_hash="", remote_hash="")
+
+
+def test_replace_session_reschedules_on_the_sessions_own_date():
+    """Editing a workout's *day* is a replace, not a separate operation.
+
+    Garmin schedules a workout definition onto a date, so there is nothing to "move":
+    the old calendar entry is unscheduled and deleted, and the new one is scheduled on
+    whatever day the edited session now carries. This is what the workout editor's day
+    field relies on -- including for a workout that only exists on Garmin, with no plan
+    file behind it to re-import.
+    """
+    sync, fake = make_sync_with_fake_client()
+    workout = ScheduledWorkout(
+        scheduled_workout_id=7, workout_id=42, date=date(2026, 8, 5), sport="running", title="Ripetute"
+    )
+    moved = TrainingSession(date=date(2026, 8, 7), sport="running", title="Ripetute")
+
+    result = sync.replace_session(_change(moved, workout))
+
+    assert result.success
+    # The old day's entry is gone, rather than left behind as a duplicate...
+    assert fake.unscheduled == [7]
+    assert fake.deleted == [42]
+    # ...and the workout now sits on the day the edited session names.
+    assert fake.scheduled == [(fake.next_workout_id, "2026-08-07")]
+
+
+def test_replace_session_does_not_delete_when_the_old_entry_cannot_be_removed():
+    """A failed unschedule must not be followed by a create: that would leave the same
+    session on two days at once, which is worse than not having applied the edit."""
+    sync, fake = make_sync_with_fake_client()
+
+    def failing_unschedule(scheduled_workout_id):
+        raise RuntimeError("nope")
+
+    fake.unschedule_workout = failing_unschedule
+    workout = ScheduledWorkout(
+        scheduled_workout_id=7, workout_id=42, date=date(2026, 8, 5), sport="running", title="Ripetute"
+    )
+    moved = TrainingSession(date=date(2026, 8, 7), sport="running", title="Ripetute")
+
+    result = sync.replace_session(_change(moved, workout))
+
+    assert not result.success
+    assert "nope" in result.error
+    assert fake.scheduled == []
+
+
 # ---- listing existing workouts -----------------------------------------------------------
 
 
@@ -1189,3 +1243,84 @@ def test_user_profile_falls_back_to_the_name_login_already_cached():
     fake.connectapi = boom
 
     assert sync.user_profile() == {"name": "Samuele Valente", "image_url": None}
+
+
+# ---- body metrics ---------------------------------------------------------------------
+
+
+def _weigh_in(calendar_date, grams):
+    return {"calendarDate": calendar_date, "weight": grams, "date": 0}
+
+
+def test_body_metrics_reads_the_scale_and_converts_from_grams():
+    """Garmin returns weights in grams in both of its two places. A gram-per-kilogram
+    target computed off 72300 would be off by a factor of a thousand."""
+    sync, fake = make_sync_with_fake_client()
+    fake.get_body_composition = lambda start, end: {
+        "dateWeightList": [_weigh_in("2026-08-01", 73000.0), _weigh_in("2026-08-05", 72300.0)]
+    }
+    fake.get_user_profile = lambda: {"userData": {"height": 178.0, "birthDate": "1990-04-02"}}
+
+    metrics = sync.body_metrics()
+
+    assert metrics["weight_kg"] == 72.3
+    assert metrics["measured_on"] == "2026-08-05"
+    assert metrics["source"] == "scale"
+    assert metrics["height_cm"] == 178.0
+
+
+def test_body_metrics_takes_the_newest_weigh_in_not_the_last_row():
+    sync, fake = make_sync_with_fake_client()
+    fake.get_body_composition = lambda start, end: {
+        "dateWeightList": [_weigh_in("2026-08-05", 72300.0), _weigh_in("2026-07-20", 74000.0)]
+    }
+    fake.get_user_profile = lambda: {}
+
+    assert sync.body_metrics()["weight_kg"] == 72.3
+
+
+def test_body_metrics_falls_back_to_the_profile_weight():
+    """Most runners have no smart scale. A weight typed in at signup is stale, but a
+    stale weight beats a reference one -- and `source` says which it is."""
+    sync, fake = make_sync_with_fake_client()
+    fake.get_body_composition = lambda start, end: {"dateWeightList": []}
+    fake.get_user_profile = lambda: {"userData": {"weight": 68000.0, "gender": "MALE"}}
+
+    metrics = sync.body_metrics()
+
+    assert (metrics["weight_kg"], metrics["source"]) == (68.0, "profile")
+    assert metrics["measured_on"] is None
+    assert metrics["gender"] == "male"
+
+
+def test_body_metrics_degrades_field_by_field():
+    """The nutrition screen has a no-weight state. An unavailable figure is a supported
+    outcome, not an error."""
+    sync, fake = make_sync_with_fake_client()
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("502 from Garmin")
+
+    fake.get_body_composition = boom
+    fake.get_user_profile = boom
+
+    assert sync.body_metrics() == {
+        "weight_kg": None,
+        "measured_on": None,
+        "source": None,
+        "height_cm": None,
+        "birth_date": None,
+        "gender": None,
+    }
+
+
+def test_body_metrics_keeps_the_scale_weight_when_the_profile_call_fails():
+    sync, fake = make_sync_with_fake_client()
+    fake.get_body_composition = lambda start, end: {"dateWeightList": [_weigh_in("2026-08-05", 72300.0)]}
+
+    def boom():
+        raise RuntimeError("502 from Garmin")
+
+    fake.get_user_profile = boom
+
+    assert sync.body_metrics()["weight_kg"] == 72.3

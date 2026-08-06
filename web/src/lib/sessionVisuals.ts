@@ -80,6 +80,39 @@ export function toDateKey(d: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/** A YYYY-MM-DD key back as a local-midnight Date, or null if it isn't one.
+ *
+ * The `T00:00:00` matters: `new Date("2026-08-06")` is parsed as UTC midnight, which in
+ * any positive-offset timezone is the *previous* day once read back with local getters --
+ * the exact round-trip bug `toDateKey` above avoids in the other direction. */
+export function parseDateKey(key: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
+  const parsed = new Date(`${key}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/** How many weeks away from the current one the week containing `key` is (negative for
+ * past weeks) -- what Settimana's `?date=` needs to open on a given day's week.
+ *
+ * Rounded, not floored: the two week starts are both local midnights, so a DST switch
+ * between them leaves the difference an hour short of a whole number of days. */
+export function weekOffsetFromToday(key: string): number {
+  const target = parseDateKey(key);
+  if (!target) return 0;
+  const targetStart = weekBounds(target).start.getTime();
+  const currentStart = weekBounds(new Date()).start.getTime();
+  return Math.round((targetStart - currentStart) / (7 * 24 * 60 * 60 * 1000));
+}
+
+/** `key` moved by `delta` days, still as a YYYY-MM-DD key. `Date.setDate` rolls over
+ * month and year ends on its own, so no bounds check is needed here. */
+export function shiftDateKey(key: string, delta: number): string {
+  const parsed = parseDateKey(key);
+  if (!parsed) return key;
+  parsed.setDate(parsed.getDate() + delta);
+  return toDateKey(parsed);
+}
+
 /** Whitespace/case-normalized title, used to match a local plan session against its
  * Garmin-side `ScheduledWorkout` (dates alone aren't a unique key -- see callers). */
 export function normalizeTitle(title: string): string {

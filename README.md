@@ -307,13 +307,34 @@ Endpoints, grouped by capability:
 
 - **Plan** — `POST /plan/parse` (file or pasted YAML), `POST /plan/diff` (preview vs. the calendar, writes nothing), `POST /plan/sync` (starts a background write job, returns a `job_id`), `GET /plan/sync/{job_id}` (poll progress), `POST /plan/sync/{job_id}/cancel`.
 - **Garmin** — `POST /garmin/connect`, `GET /garmin/status` (connected / cooldown + remaining seconds), `GET /garmin/workouts`, `POST /garmin/deletions/preview`, `POST /garmin/deletions/apply`.
-- **Body** (read-only) — `GET /body/today` (readiness/sleep/HRV/RHR/battery/stress), `GET /body/load` (weekly training load, acute:chronic ratio, VO₂max), `POST /body/conflict` (compares today's snapshot against a submitted next-planned-session and returns concrete resolution options).
+- **Body** (read-only) — `GET /body/today` (readiness/sleep/HRV/RHR/battery/stress), `GET /body/load` (weekly training load, acute:chronic ratio, VO₂max), `GET /body/metrics` (weight/height/age, from the scale or the Garmin profile), `POST /body/conflict` (compares today's snapshot against a submitted next-planned-session and returns concrete resolution options).
+- **Nutrition** — `POST /nutrition/targets` (carbohydrate/protein targets for today and tomorrow, from the submitted plan), `POST /nutrition/narrative` (the same thing phrased by a model, falling back to a template), `GET /nutrition/day`, `GET /nutrition/history`, `POST /nutrition/photo` (multipart: a plate photo, estimated and stored), `POST /nutrition/entry` (manual), `PATCH`/`DELETE /nutrition/entry/{id}`, `GET /nutrition/entry/{id}/photo`, `GET /nutrition/config`.
 
 The Garmin write job in `/plan/sync` runs one session at a time on a background thread and keeps going even if the client disconnects — matching the CLI's existing sequential `sync_all`/`replace_all` behavior, just with per-item progress exposed for polling. Job state is in-memory only (lost on process restart); this is a local, single-user tool, not a production job queue.
 
 Body/wellness data (`training_plan/body_insights.py`) reads readiness/sleep/HRV/load/VO₂max via the `garminconnect` client's existing wellness endpoints. Those endpoints are undocumented and their exact response shapes haven't been verified against a live account yet (every field extraction is defensive and degrades to "unavailable" rather than raising) — treat the numbers as provisional until checked against real data, the same caveat `models.py` already carries for Garmin's workout condition-type IDs.
 
-No accounts, no server-side database: the API holds only the Garmin session token (via the existing tokenstore/cooldown files below) and in-memory job state. Everything else — the imported plan, preferences, write-job history — lives in the browser.
+No accounts, and — apart from the food log below — no server-side database: the API holds only the Garmin session token (via the existing tokenstore/cooldown files below) and in-memory job state. Everything else — the imported plan, preferences, write-job history — lives in the browser.
+
+### Fuelling and the food log
+
+`training_plan/nutrition.py` scales published carbohydrate/protein consensus ranges by body weight and the training load of the day being fuelled for. Every figure is arithmetic the user could redo by hand; the framing is fuelling, never restriction (no calorie budgets, no weight targets, no judgement of what was eaten).
+
+Two things break existing invariants, both deliberately and narrowly:
+
+- **A database.** `training_plan/db.py` keeps one SQLite table (`food_entry`) plus the photos, under `~/.passo/` — override with `PASSO_DATA_DIR` or `PASSO_DB_PATH`. A food diary is a longitudinal record that nothing upstream holds and `localStorage` would lose to a cleared browser.
+- **An outbound model call.** `training_plan/llm.py` is the only module in the codebase that talks to a language model, over OpenRouter's OpenAI-compatible endpoint. It has two independent roles: text (writes the Italian sentence over numbers already computed) and vision (reads a plate photo — the one genuinely perceptual task here). **Every function returns `None` instead of raising**: no screen depends on a model being reachable.
+
+```bash
+OPENRUTER_API_KEY=sk-or-...                      # note the spelling used by this project's .env
+LLM_BASE_URL=https://openrouter.ai/api/v1        # point at a local Ollama/vLLM server to keep photos on the machine
+LLM_TEXT_MODEL=deepseek/deepseek-v3.2
+LLM_VISION_MODEL=qwen/qwen3-vl-235b-a22b-instruct  # must be vision-capable; DeepSeek has no such model
+LLM_TIMEOUT_S=20
+PASSO_PHOTO_UPLOAD=0                             # switch off sending plate photos to a hosted model
+```
+
+Model availability moves fast — check `https://openrouter.ai/api/v1/models` rather than trusting the defaults above. **Privacy, stated plainly:** with a hosted provider configured, plate photos leave the machine when they are estimated (and only then — they are otherwise stored locally and served back by entry id). `GET /nutrition/config` reports this so the UI can say so before the user takes a photo.
 
 ## Web app (Next.js)
 
@@ -342,6 +363,9 @@ The project is split into a presentation-independent core, a thin CLI, and a thi
 
 - **`training_plan/models.py`, `parser.py`, `garmin_sync.py`** — pure logic: data models, YAML parsing/validation, and the Garmin Connect integration (auth, rate-limit guards, workout payload construction, diff/list/delete). No printing, no prompting.
 - **`training_plan/body_insights.py`** — read-only Garmin wellness data (readiness, sleep, HRV, training load, VO₂max) and the derived body/plan conflict assessment. Same no-printing, no-prompting discipline as `garmin_sync.py`.
+- **`training_plan/nutrition.py`** — pure fuelling arithmetic: session load classification (from step durations and the spread of the target paces), carbohydrate/protein targets, and the deterministic Italian advice sentence. No I/O, no model.
+- **`training_plan/db.py`** — the food log: one SQLite table, entry CRUD, and local photo storage. The only persistent server-side state in the project.
+- **`training_plan/llm.py`** — the only module that calls a language model. Two roles (text, vision), every function degrading to `None` rather than raising, so callers always have a template or a manual path to fall back to.
 - **`training_plan/service.py`** — the orchestration seam: one function per operation (`preview_plan_sync`/`apply_plan_sync`, `list_workouts`, `preview_deletion`/`apply_deletion`, `verify_login`), each taking plain arguments and returning plain dataclasses (or raising `GarminSyncError`/`TrainingPlanValidationError`). Nothing here prints, prompts, or calls `sys.exit`. Write operations are split into a `preview_*` step (computes what would happen, writes nothing) and an `apply_*` step (performs the write), so a caller can show a preview and decide whether to proceed before anything touches Garmin.
 - **`training_plan/cli.py`** — argument parsing and presentation only: it calls `service.py` and turns the result into printed output, interactive confirmation prompts, and process exit codes.
 - **`training_plan/api/`** — the FastAPI adapter: request/response schemas (`schemas.py`), the async write-job store (`jobs.py`), and route handlers (`routes_plan.py`, `routes_garmin.py`, `routes_body.py`) that call `service.py`/`garmin_sync.py`/`body_insights.py` on a thread pool and shape the result to JSON. Like `cli.py`, it adds no business logic of its own.

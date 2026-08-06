@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
@@ -9,7 +10,7 @@ import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import { useActivities, usePrefetchWorkoutSession, useStravaActivityMatches, useStravaStatus, useWeekWorkouts } from "@/lib/queries";
 import { SkeletonDayCards } from "@/components/skeletons";
-import { classifySession, sessionDistanceKm, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
+import { classifySession, sessionDistanceKm, toDateKey, weekBounds, weekOffsetFromToday, type DisplaySession } from "@/lib/sessionVisuals";
 import { sessionDetailLine } from "@/lib/format";
 import type { ScheduledWorkout, TrainingSession } from "@/lib/types";
 
@@ -20,10 +21,16 @@ function formatWeekRange(start: Date, end: Date): string {
   return `${start.getDate()} ${startMonth} – ${end.getDate()} ${endMonth}`;
 }
 
-export default function WeekPage() {
+function WeekPageContent() {
   const access = useCalendarAccess();
   const animate = useMountOnce("week");
-  const [offset, setOffset] = useState(0);
+  // `?date=` opens on the week containing that day instead of the current one -- how the
+  // editor comes back after a save, since the day it saved on may not be in this week at
+  // all (the day is editable: see WorkoutEditor's DayField). Read once, as the initial
+  // offset: from there on the ‹ › buttons own which week is shown, so paging away from
+  // the week we landed on doesn't fight with the URL that got us here.
+  const focusDate = useSearchParams().get("date");
+  const [offset, setOffset] = useState(() => (focusDate ? weekOffsetFromToday(focusDate) : 0));
   const liveMode = !access.plan && access.garminConnected;
   const todayKey = toDateKey(new Date());
 
@@ -218,6 +225,29 @@ export default function WeekPage() {
             })
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** `useSearchParams` above makes this tree client-rendered up to the nearest Suspense
+ * boundary, so it brings its own -- the same loading shape the page shows before it
+ * knows whether there's a plan, rather than a blank tab. */
+export default function WeekPage() {
+  return (
+    <Suspense fallback={<WeekFallback />}>
+      <WeekPageContent />
+    </Suspense>
+  );
+}
+
+function WeekFallback() {
+  const { start, end } = weekBounds(new Date());
+  return (
+    <div>
+      <WeekHeader start={start} end={end} animate={false} onPrev={() => {}} onNext={() => {}} />
+      <div style={{ padding: "16px 20px 12px" }}>
+        <SkeletonDayCards />
       </div>
     </div>
   );

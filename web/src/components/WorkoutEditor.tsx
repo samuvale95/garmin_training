@@ -7,8 +7,8 @@ import { PrimaryButton, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useAddSession, useApplyDeletion, useInvalidateCalendarData, usePlanQuery, useRemoveSession, useStartSync, useSyncJobStatus, useUpdateSession, useWorkoutsForDate } from "@/lib/queries";
 import { ApiError } from "@/lib/apiClient";
-import { normalizeTitle, toDateKey } from "@/lib/sessionVisuals";
-import { formatPaceMinSec, formatPaceRange, parsePaceMinSec, stepTypeHint, stepTypeLabel } from "@/lib/format";
+import { normalizeTitle, parseDateKey, shiftDateKey, toDateKey } from "@/lib/sessionVisuals";
+import { capitalize, formatFullDate, formatPaceMinSec, formatPaceRange, parsePaceMinSec, stepTypeHint, stepTypeLabel } from "@/lib/format";
 import { isRepeatBlock } from "@/lib/types";
 import type { ScheduledWorkout, SessionStep, Sport, Step, StepType, TrainingSession } from "@/lib/types";
 
@@ -128,6 +128,15 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   const [originalKey] = useState(() =>
     mode === "edit" && existing ? { date: existing.date, title: existing.title } : null
   );
+  /** The day this workout is scheduled on *now*, before anything typed in this form --
+   * null in create mode, where there is nothing to move.
+   *
+   * Editing the day is a move, not a content edit: Garmin schedules a workout on a date,
+   * so saving a different one has to delete the old calendar entry and re-schedule it
+   * (`GarminSync.replace_session`), which is exactly what the `changed` branch of
+   * `handleSave` already asks for. Nothing extra is needed on the wire -- only that the
+   * identity below keeps pointing at the *old* day while the form holds the new one. */
+  const originalDate = mode === "garmin" ? garminWorkout!.date : originalKey?.date ?? null;
 
   const [date, setDate] = useState(existing?.date ?? toDateKey(new Date()));
   const [sport, setSport] = useState<Sport>((existing?.sport as Sport) ?? "running");
@@ -148,8 +157,12 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
         : "/week";
   /** Where a *successful* save lands. Not `originHref` in `garmin` mode: a replace on
    * Garmin is a delete plus a create (see `GarminSync.replace_session`), so the id in
-   * that route no longer exists once the job is done. */
-  const successHref = mode === "garmin" ? "/week" : originHref;
+   * that route no longer exists once the job is done.
+   *
+   * The day travels along, because it may not be the day we came from: a workout moved
+   * to another week would otherwise land on *this* week, where it is now correctly
+   * absent -- indistinguishable, on screen, from having deleted it. */
+  const successHref = mode === "edit" ? originHref : `/week?date=${date}`;
 
   // Read out of the cached week the editor was opened from, so this lookup is normally
   // already answered by the time the form appears.
@@ -205,6 +218,10 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
 
   const displayError = saveError ?? jobFailedMessage;
   const isSaving = startSync.isPending || (!!jobId && !jobFailedMessage && !jobSucceeded);
+  // A date field can be cleared, and an empty (or half-typed) day would reach the API as
+  // an unparseable date and come back a 422 -- so it gates the save instead.
+  const dayIsValid = parseDateKey(date) !== null;
+  const movedFrom = originalDate && dayIsValid && date !== originalDate ? originalDate : null;
 
   function plainSteps(): SessionStep[] {
     const strip = (s: EditableStep): Step => ({
@@ -224,6 +241,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   }
 
   async function handleSave() {
+    if (!dayIsValid) return;
     setSaveError(null);
     const session: TrainingSession = {
       date,
@@ -347,13 +365,6 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
         <button type="button" onClick={() => router.push(originHref)} className="tap-target" aria-label="Chiudi" style={{ background: "none", border: "none", fontSize: 22, color: "var(--inchiostro)", cursor: "pointer" }}>
           ×
         </button>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="font-mono"
-          style={{ border: "none", background: "none", fontSize: 13, color: "var(--inchiostro-50)", textAlign: "center" }}
-        />
         {mode !== "create" ? (
           <button
             type="button"
@@ -415,7 +426,18 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
         })}
       </div>
 
-      <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 18 }}>
+      <DayField
+        value={date}
+        onChange={setDate}
+        isValid={dayIsValid}
+        movedFrom={movedFrom}
+        // In `garmin` mode there is no local plan behind this workout: the calendar is
+        // the only place the move happens, and saying so is the whole point of the
+        // screen the user reached from "dal calendario Garmin".
+        onlyOnGarmin={mode === "garmin"}
+      />
+
+      <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14 }}>
         <span style={{ display: "block", fontSize: 11, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--inchiostro-50)", marginBottom: 8 }}>
           Titolo
         </span>
@@ -519,10 +541,16 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
 
       <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 10 }}>
         <PrimaryButton
-          state={isSaving || !calendarIdentityKnown ? "loading" : "idle"}
+          state={!dayIsValid ? "disabled" : isSaving || !calendarIdentityKnown ? "loading" : "idle"}
           onClick={handleSave}
         >
-          {calendarIdentityKnown ? "Salva sul calendario" : "Leggo il calendario…"}
+          {!dayIsValid
+            ? "Scegli un giorno"
+            : !calendarIdentityKnown
+              ? "Leggo il calendario…"
+              : movedFrom
+                ? "Sposta sul calendario"
+                : "Salva sul calendario"}
         </PrimaryButton>
         <button
           type="button"
@@ -543,6 +571,102 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
             setEditingStep(null);
           }}
         />
+      )}
+    </div>
+  );
+}
+
+/** The day the workout is scheduled on -- a field of its own, not a caption.
+ *
+ * It used to be a bare `<input type="date">` in the header, styled down to 13px grey to
+ * sit next to the close and delete icons: on a phone that reads as the screen's date
+ * label, not as something you can change. Which day a session falls on is one of the
+ * things most often edited (a workout postponed by a day), and on a workout that lives
+ * only on Garmin -- with no plan file to re-import -- this field is the *only* way to
+ * move it, so it gets the same weight as the title.
+ *
+ * Both ways in, because they answer different questions: the arrows for "one day later",
+ * the field itself for "which Thursday" -- tapping anywhere on the date opens the
+ * platform's own date picker, which is why the native input is still here, stretched
+ * invisibly over the formatted text rather than replaced by a custom calendar. */
+function DayField({
+  value,
+  onChange,
+  isValid,
+  movedFrom,
+  onlyOnGarmin,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  isValid: boolean;
+  movedFrom: string | null;
+  onlyOnGarmin: boolean;
+}) {
+  const nudge = (delta: number, label: string) => (
+    <button
+      type="button"
+      onClick={() => onChange(shiftDateKey(value, delta))}
+      disabled={!isValid}
+      className="tap-target"
+      aria-label={label}
+      style={{
+        background: "var(--sabbia-chip)",
+        border: "none",
+        borderRadius: "var(--radius-pill)",
+        width: 32,
+        height: 32,
+        flex: "none",
+        fontSize: 16,
+        lineHeight: 1,
+        color: "var(--inchiostro)",
+        cursor: isValid ? "pointer" : "not-allowed",
+        opacity: isValid ? 1 : 0.35,
+      }}
+    >
+      {delta > 0 ? "›" : "‹"}
+    </button>
+  );
+
+  return (
+    <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 18 }}>
+      <span style={{ display: "block", fontSize: 11, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--inchiostro-50)", marginBottom: 8 }}>
+        Giorno
+      </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {nudge(-1, "Un giorno prima")}
+        <label style={{ position: "relative", flex: 1, display: "block", textAlign: "center", cursor: "pointer" }}>
+          <span style={{ fontSize: 17, fontWeight: 600, color: isValid ? "var(--inchiostro)" : "var(--inchiostro-50)" }}>
+            {isValid ? capitalize(formatFullDate(value)) : "Scegli un giorno"}
+          </span>
+          {/* Laid over the text, not next to it: the whole date is the tap target, and
+              the native picker is what actually opens. `opacity: 0` rather than
+              `visibility/display: none`, which would take the picker with it. */}
+          <input
+            type="date"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            aria-label="Giorno dell'allenamento"
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              opacity: 0,
+              border: "none",
+              background: "transparent",
+              WebkitAppearance: "none",
+              appearance: "none",
+              cursor: "pointer",
+            }}
+          />
+        </label>
+        {nudge(1, "Un giorno dopo")}
+      </div>
+      {movedFrom && (
+        <p className="font-serif-italic" style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "10px 0 0", textAlign: "center" }}>
+          Era {formatFullDate(movedFrom)}. Salvando, l&apos;allenamento si sposta
+          {onlyOnGarmin ? " sul calendario Garmin." : " anche sul calendario Garmin."}
+        </p>
       )}
     </div>
   );

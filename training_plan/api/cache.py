@@ -44,6 +44,11 @@ TTL_STRAVA_SHOES = 5 * 60
 # different account behind the token.
 TTL_STRAVA_ATHLETE = 60 * 60
 TTL_GARMIN_PROFILE = 60 * 60
+# Weight/height/age. Two Garmin calls, and a body weight moves by amounts that matter to
+# a gram-per-kilo target roughly never within a day -- but shorter than the profile TTLs
+# above, because a user who steps on the scale to fix their fuelling targets should not
+# have to wait an hour to see it land.
+TTL_BODY_METRICS = 30 * 60
 # Matched to the client's own staleTime for this query: the diff can only go stale if the
 # plan changes (a different cache key) or the calendar changes (invalidated on write).
 TTL_PLAN_DIFF = 5 * 60

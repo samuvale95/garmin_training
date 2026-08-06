@@ -12,7 +12,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from .. import body_insights, garmin_sync, models
+from .. import body_insights, db, garmin_sync, models, nutrition
 
 
 # ---- plan / steps --------------------------------------------------------------------------
@@ -545,6 +545,188 @@ class ShoesResponse(BaseModel):
 class RetireShoeResponse(BaseModel):
     id: str
     retired: bool
+
+
+# ---- body metrics / nutrition -----------------------------------------------------------------
+
+
+class BodyMetricsResponse(BaseModel):
+    """The personal figures fuelling targets are scaled by.
+
+    Every field optional, and `source` says which of Garmin's two weights answered (a
+    scale reading, or the number typed into the profile years ago) so the UI can show
+    its provenance instead of presenting both as the same fact.
+    """
+
+    weight_kg: float | None = None
+    measured_on: date_type | None = None
+    source: str | None = None  # "scale" | "profile"
+    height_cm: float | None = None
+    birth_date: date_type | None = None
+    gender: str | None = None
+
+
+class DayTargetOut(BaseModel):
+    date: date_type
+    session_title: str | None = None
+    load: str  # nutrition.SessionLoad
+    duration_minutes: float | None = None
+    carb_g_per_kg: tuple[float, float]
+    protein_g_per_kg: tuple[float, float]
+    carb_g: tuple[int, int] | None = None
+    protein_g: tuple[int, int] | None = None
+
+    @classmethod
+    def from_model(cls, target: "nutrition.DayTarget") -> "DayTargetOut":
+        return cls(
+            date=target.date,
+            session_title=target.session_title,
+            load=target.load,
+            duration_minutes=target.duration_minutes,
+            carb_g_per_kg=target.carb_g_per_kg,
+            protein_g_per_kg=target.protein_g_per_kg,
+            carb_g=target.carb_g,
+            protein_g=target.protein_g,
+        )
+
+
+class FuelTargetsRequest(BaseModel):
+    """The plan travels with the request, as it does for /body/conflict: the file lives
+    on the device and the server has no copy of it.
+
+    `sessions` is the whole plan rather than just today's and tomorrow's, because the
+    back-to-back rule needs to see the day after tomorrow too -- and because filtering
+    client-side would put a rule that changes targets on the wrong side of the wire.
+    """
+
+    date: date_type | None = None
+    sessions: list[TrainingSessionIn] = Field(default_factory=list)
+    # A weight typed in by the user wins over Garmin's. Omitted means "ask Garmin".
+    weight_kg: float | None = None
+
+
+class FuelTargetsResponse(BaseModel):
+    date: date_type
+    weight_kg: float | None = None
+    weight_source: str | None = None  # "scale" | "profile" | "manual" | "reference"
+    today: DayTargetOut
+    tomorrow: DayTargetOut
+    advice: str
+    # The model's sentence is fetched separately (/nutrition/narrative) so this response
+    # stays instant; it is null here by construction, never "not yet loaded".
+    narrative: str | None = None
+
+    @classmethod
+    def from_model(cls, fuelling: "nutrition.DailyFuelling") -> "FuelTargetsResponse":
+        return cls(
+            date=fuelling.date,
+            weight_kg=fuelling.weight_kg,
+            weight_source=fuelling.weight_source,
+            today=DayTargetOut.from_model(fuelling.today),
+            tomorrow=DayTargetOut.from_model(fuelling.tomorrow),
+            advice=fuelling.advice,
+        )
+
+
+class NarrativeResponse(BaseModel):
+    text: str
+    # "model" or "template". Not for display -- the screen must read the same either way
+    # -- but the difference matters when debugging why a sentence is dull.
+    source: str
+
+
+class FoodEntryOut(BaseModel):
+    id: int
+    date: date_type
+    logged_at: datetime
+    source: str
+    description: str | None = None
+    kcal: float | None = None
+    carb_g: float | None = None
+    protein_g: float | None = None
+    fat_g: float | None = None
+    confidence: str | None = None
+    corrected: bool = False
+    # A URL onto /nutrition/entry/{id}/photo, never a filesystem path: the photo is a
+    # local file and the browser must not be told where it lives.
+    image_url: str | None = None
+
+    @classmethod
+    def from_model(cls, entry: "db.FoodEntry") -> "FoodEntryOut":
+        return cls(
+            id=entry.id,
+            date=entry.date,
+            logged_at=entry.logged_at,
+            source=entry.source,
+            description=entry.description,
+            kcal=entry.kcal,
+            carb_g=entry.carb_g,
+            protein_g=entry.protein_g,
+            fat_g=entry.fat_g,
+            confidence=entry.confidence,
+            corrected=entry.corrected,
+            image_url=f"/nutrition/entry/{entry.id}/photo" if entry.image_path else None,
+        )
+
+
+class DayTotals(BaseModel):
+    kcal: float = 0
+    carb_g: float = 0
+    protein_g: float = 0
+    fat_g: float = 0
+    entries: int = 0
+
+
+class FoodDayResponse(BaseModel):
+    date: date_type
+    entries: list[FoodEntryOut] = Field(default_factory=list)
+    totals: DayTotals
+
+
+class DayTotalsOut(DayTotals):
+    date: date_type
+
+
+class FoodHistoryResponse(BaseModel):
+    days: list[DayTotalsOut] = Field(default_factory=list)
+
+
+class ManualEntryRequest(BaseModel):
+    """Logging a meal without a photo -- the way out when the model is unavailable, the
+    photo is unreadable, or the user simply knows what they ate."""
+
+    date: date_type
+    description: str | None = None
+    kcal: float | None = None
+    carb_g: float | None = None
+    protein_g: float | None = None
+    fat_g: float | None = None
+
+
+class EntryPatchRequest(BaseModel):
+    """A correction. Every field optional: an untouched field keeps its estimate, and
+    sending any of them marks the entry as corrected by the user."""
+
+    description: str | None = None
+    kcal: float | None = None
+    carb_g: float | None = None
+    protein_g: float | None = None
+    fat_g: float | None = None
+
+
+class DeleteEntryResponse(BaseModel):
+    deleted: bool
+
+
+class NutritionConfigResponse(BaseModel):
+    """What the client needs to pick between the working and the degraded states --
+    and, for the photo path, to tell the user plainly that a plate photo leaves the
+    machine before they take one."""
+
+    configured: bool
+    text_model: str
+    vision_model: str
+    photo_upload_enabled: bool
 
 
 # ---- errors -----------------------------------------------------------------------------------

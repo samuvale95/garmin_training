@@ -2,14 +2,39 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter
 from fastapi.concurrency import run_in_threadpool
 
 from .. import body_insights
 from . import garmin_session, schemas
-from .cache import TTL_BODY_LOAD, TTL_BODY_TODAY, cache
+from .cache import TTL_BODY_LOAD, TTL_BODY_METRICS, TTL_BODY_TODAY, cache
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def body_metrics_or_empty() -> dict:
+    """Garmin's view of the user's body -- weight, height, age -- cached, degrading to
+    an empty dict.
+
+    Shared with the fuelling routes, which scale their targets by the weight. Unlike
+    every other endpoint in this module, a missing Garmin session here is a *supported*
+    state rather than a 401: the nutrition screen falls back to a reference weight and
+    says so, and the settings screen offers to take the weight by hand.
+    """
+    try:
+        return cache.get_or_call(
+            "garmin:body_metrics",
+            None,
+            TTL_BODY_METRICS,
+            lambda: garmin_session.run(lambda sync: sync.body_metrics()),
+        )
+    except Exception:  # noqa: BLE001 - no Garmin is a supported state, not an error
+        logger.warning("body metrics unavailable, degrading to no weight", exc_info=True)
+        return {}
 
 
 def _body_snapshot(refresh: bool = False) -> body_insights.BodySnapshot:
@@ -46,6 +71,14 @@ async def body_load(refresh: bool = False) -> schemas.LoadSnapshotResponse:
         )
     )
     return schemas.LoadSnapshotResponse.from_model(snapshot)
+
+
+@router.get("/body/metrics", response_model=schemas.BodyMetricsResponse)
+async def body_metrics(refresh: bool = False) -> schemas.BodyMetricsResponse:
+    if refresh:
+        cache.invalidate(["garmin:body_metrics"])
+    metrics = await run_in_threadpool(body_metrics_or_empty)
+    return schemas.BodyMetricsResponse(**metrics)
 
 
 @router.post("/body/conflict", response_model=schemas.ConflictResponse)
