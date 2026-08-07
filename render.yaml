@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: passo-api
+    runtime: python
+    plan: free
+    repo: https://github.com/samuvale95/garmin_training
+    branch: development
+    buildCommand: pip install .
+    startCommand: uvicorn training_plan.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      # Values are set in the Render dashboard, never committed here.
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: STRAVA_CLIENT_ID
+        sync: false
+      - key: STRAVA_CLIENT_SECRET
+        sync: false
+      - key: STRAVA_REDIRECT_URI
+        sync: false
+      - key: OPENRUTER_API_KEY
+        sync: false
+      # Comma-separated origins allowed by CORS -- the deployed Vercel URL(s).
+      - key: PASSO_WEB_ORIGIN
+        sync: false
