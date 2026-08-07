@@ -7,6 +7,8 @@ the degraded answer, not the happy path.
 
 from __future__ import annotations
 
+import base64
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -190,9 +192,9 @@ def _photo(monkeypatch, estimate):
 
 
 def test_a_photo_is_stored_even_when_the_model_cannot_read_it(client, monkeypatch):
-    """The photo is the record. A user who took it should not have to take it again
-    because a third-party API was down -- the row simply arrives empty, like a manual
-    entry waiting to be filled in.
+    """The estimate is not the record, the row is. A user who took the photo should not
+    have to take it again because a third-party API was down -- the row simply arrives
+    empty, like a manual entry waiting to be filled in.
     """
     _photo(monkeypatch, None)
     response = client.post(
@@ -204,7 +206,8 @@ def test_a_photo_is_stored_even_when_the_model_cannot_read_it(client, monkeypatc
     entry = response.json()
     assert entry["carb_g"] is None
     assert entry["confidence"] is None
-    assert entry["image_url"] == f"/nutrition/entry/{entry['id']}/photo"
+    # No thumbnail was uploaded alongside this photo, so there is nothing to show.
+    assert entry["image_url"] is None
 
 
 def test_a_read_photo_carries_its_estimate_and_confidence(client, monkeypatch):
@@ -229,19 +232,26 @@ def test_a_read_photo_carries_its_estimate_and_confidence(client, monkeypatch):
     assert entry["corrected"] is False
 
 
-def test_the_photo_is_served_back_by_entry_id(client, monkeypatch):
+def test_a_thumbnail_travels_back_as_a_data_uri(client, monkeypatch):
+    """The low-quality thumbnail the client generates client-side (never the full
+    photo) rides inside the same JSON response as a `data:` URI -- there is no
+    fetch-by-id endpoint to point at, since every route needs a bearer token a plain
+    `<img src>` could never attach.
+    """
     _photo(monkeypatch, None)
     entry = client.post(
-        "/nutrition/photo", files={"image": ("plate.jpg", b"jpeg-bytes", "image/jpeg")}
+        "/nutrition/photo",
+        files={
+            "image": ("plate.jpg", b"jpeg-bytes", "image/jpeg"),
+            "thumbnail": ("thumb.jpg", b"tiny-thumb-bytes", "image/jpeg"),
+        },
     ).json()
-    response = client.get(f"/nutrition/entry/{entry['id']}/photo")
-    assert response.status_code == 200
-    assert response.content == b"jpeg-bytes"
+    assert entry["image_url"] == f"data:image/jpeg;base64,{base64.b64encode(b'tiny-thumb-bytes').decode()}"
 
 
-def test_an_entry_with_no_photo_has_nothing_to_serve(client):
+def test_an_entry_with_no_thumbnail_has_no_image_url(client):
     entry = client.post("/nutrition/entry", json={"date": "2026-08-10", "carb_g": 90}).json()
-    assert client.get(f"/nutrition/entry/{entry['id']}/photo").status_code == 404
+    assert entry["image_url"] is None
 
 
 def test_an_empty_upload_is_rejected(client):
@@ -253,6 +263,21 @@ def test_an_oversized_upload_is_rejected(client, monkeypatch):
     monkeypatch.setattr("training_plan.api.routes_nutrition.MAX_PHOTO_BYTES", 10)
     response = client.post(
         "/nutrition/photo", files={"image": ("plate.jpg", b"more than ten bytes", "image/jpeg")}
+    )
+    assert response.status_code == 413
+
+
+def test_an_oversized_thumbnail_is_rejected(client, monkeypatch):
+    """The size cap on `thumbnail` exists for a client that lies about how it was
+    generated -- a well-behaved client's downscaled JPEG never gets close to it."""
+    _photo(monkeypatch, None)
+    monkeypatch.setattr("training_plan.api.routes_nutrition.MAX_THUMBNAIL_BYTES", 10)
+    response = client.post(
+        "/nutrition/photo",
+        files={
+            "image": ("plate.jpg", b"jpeg-bytes", "image/jpeg"),
+            "thumbnail": ("thumb.jpg", b"more than ten bytes", "image/jpeg"),
+        },
     )
     assert response.status_code == 413
 

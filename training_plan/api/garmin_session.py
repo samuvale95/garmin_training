@@ -1,100 +1,68 @@
-"""One authenticated `GarminSync` per server process, shared across requests.
+"""Per-user Garmin session, materialized from Postgres for the life of one call.
 
-Without this, every HTTP request built its own `GarminSync` and called `login()`.
-That is never free, even with a valid cached token: `garminconnect`'s `login()`
-unconditionally fetches the social profile *and* the user settings before returning
-(see `garminconnect/__init__.py`, "Ensure profile is loaded"), each with its own
-`time.sleep(1)` retry ladder. So a page that fires six queries paid twelve extra
-Garmin round-trips purely to re-establish a session it already had.
+Replaces the old process-wide singleton (one shared `GarminSync`, adopted on connect,
+reused by every request) now that the backend serves more than one person: a session
+belongs to whoever authenticated it, not to the process. `garmin_sync.py` itself is
+unchanged -- this module only decides *where* its tokenstore lives at rest, via
+`user_tokenstore.materialized_garmin_tokenstore`.
 
-The instance is created under a lock, so a burst of concurrent first requests
-performs exactly one login instead of N -- which also matters for Garmin's IP-based
-rate limiter, the thing `GarminSync`'s cooldown state machine exists to protect.
-
-Cache invalidation is deliberately narrow: `reset()` on connect/disconnect (the token
-store changed underneath us) and on a `GarminSyncError` that isn't a rate limit (the
-session may have gone stale server-side). Everything else keeps the session.
+There is no "retry with a fresh login" healing here, unlike the old single-account
+design: a per-user session has no server-held email/password to fall back to (only a
+`/garmin/connect` request carries those, from the browser, once, and this process never
+sees them again). A session that turns out to be stale surfaces as `GarminSyncError` --
+the same error the frontend already turns into "reconnect from Settings."
 """
 
 from __future__ import annotations
 
 import logging
-import threading
 from collections.abc import Callable
 from typing import TypeVar
 
-from ..garmin_sync import GarminRateLimitError, GarminSync, GarminSyncError
+from ..garmin_sync import GarminSync, GarminSyncError
+from .user_tokenstore import materialized_garmin_tokenstore
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-_lock = threading.Lock()
-_sync: GarminSync | None = None
 
+def connect(user_id: str, email: str, password: str, prompt_mfa: Callable[[], str] | None = None) -> None:
+    """Log in with real credentials and persist the resulting session for `user_id`.
 
-def get_sync() -> GarminSync:
-    """The shared authenticated session, logging in on first use.
-
-    Raises whatever `GarminSync.login()` raises (`GarminSyncError` /
-    `GarminRateLimitError`) and leaves the cache empty, so a failed login is retried
-    by the next request rather than being remembered as a broken session.
+    The browser sends `email`/`password` for this one request and this process never
+    stores them anywhere -- only the tokenstore `login()` produces gets persisted, by
+    `materialized_garmin_tokenstore` on the way out of the `with` block.
     """
-    return _acquire()[0]
+    with materialized_garmin_tokenstore(user_id) as tmp_dir:
+        sync = GarminSync(email=email, password=password, tokenstore=str(tmp_dir), prompt_mfa=prompt_mfa)
+        sync.login()  # raises GarminSyncError/GarminRateLimitError on failure
 
 
-def adopt(sync: GarminSync) -> None:
-    """Install an already-authenticated session as the shared one.
+def disconnect(user_id: str) -> None:
+    with materialized_garmin_tokenstore(user_id) as tmp_dir:
+        GarminSync(tokenstore=str(tmp_dir)).disconnect()
 
-    `/garmin/connect` has just logged in with real credentials; throwing that session
-    away only to log in again on the next request would waste the expensive part.
+
+def status(user_id: str) -> dict:
+    """Cached-session/cooldown state, no network call -- see `GarminSync.connection_status`."""
+    with materialized_garmin_tokenstore(user_id) as tmp_dir:
+        return GarminSync(tokenstore=str(tmp_dir)).connection_status()
+
+
+def run(user_id: str, work: Callable[[GarminSync], T]) -> T:
+    """Run `work` against `user_id`'s Garmin session, materialized from Postgres.
+
+    On a `GarminSyncError` (not a rate limit), the stale tokenstore is dropped so the
+    next status check correctly reports "not connected" instead of a zombie session
+    that would only ever fail the same way again.
     """
-    global _sync
-    with _lock:
-        _sync = sync
-
-
-def reset() -> None:
-    """Forget the shared session; the next `get_sync()` logs in again."""
-    global _sync
-    with _lock:
-        _sync = None
-
-
-def run(work: Callable[[GarminSync], T]) -> T:
-    """Run `work` against the shared session, healing a stale one exactly once.
-
-    A cached Garmin session can expire or be invalidated server-side, in which case
-    the *first* call using it fails. Rather than surfacing that as an error the user
-    has to retry by hand, the session is dropped and `work` is re-run against a fresh
-    login -- but only when the failed session was a reused one (a session this call
-    just created failing again would only repeat the same failure) and never for a
-    rate limit, where retrying is precisely the wrong move.
-
-    Only for reads and idempotent work. A partially-applied write must not be
-    replayed: `jobs.py` and the deletion endpoint take the session directly instead.
-    """
-    sync, reused = _acquire()
-    try:
-        return work(sync)
-    except GarminRateLimitError:
-        raise
-    except GarminSyncError:
-        reset()
-        if not reused:
+    with materialized_garmin_tokenstore(user_id) as tmp_dir:
+        sync = GarminSync(tokenstore=str(tmp_dir))
+        sync.login()  # cheap: cached tokens only, raises if there are none
+        try:
+            return work(sync)
+        except GarminSyncError:
+            logger.info("Garmin session for user looked stale; dropping the cached tokenstore")
+            sync.disconnect()
             raise
-        logger.info("Shared Garmin session looked stale; retrying once with a fresh login")
-        fresh, _ = _acquire()
-        return work(fresh)
-
-
-def _acquire() -> tuple[GarminSync, bool]:
-    """The shared session plus whether it was already there (vs. just logged in)."""
-    global _sync
-    with _lock:
-        if _sync is not None:
-            return _sync, True
-        sync = GarminSync()
-        sync.login()  # raises: cache stays empty so the next request retries
-        _sync = sync
-        return sync, False

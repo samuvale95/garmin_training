@@ -345,6 +345,12 @@ export function formatFullDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
 }
 
+/** "13:20" -- from an ISO timestamp, the format the fuel screens use for a logged
+ * meal's time (screens 23, 28). */
+export function formatClockTime(isoTimestamp: string): string {
+  return new Date(isoTimestamp).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+}
+
 // ---- body-insight captions ----------------------------------------------------------------
 // Small qualitative labels derived client-side from thresholds -- the same pattern the
 // body screens already used for readiness ("Pronto a lavorare" vs "Vacci piano oggi"),

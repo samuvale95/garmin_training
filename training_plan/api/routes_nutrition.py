@@ -21,32 +21,39 @@ import logging
 from datetime import date as date_type
 from datetime import timedelta
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi import Form
-from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
 
 from .. import db, llm, nutrition
 from . import routes_body, schemas
+from .auth import current_user_id
+from fastapi.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Photos are held in memory while the vision model looks at them, then written to disk.
-# Phone cameras produce 3-8 MB JPEGs, so the ceiling is generous, but it is a ceiling:
-# without one, a request body is bounded only by what the client feels like sending.
+# The full photo is held in memory only, for exactly as long as the vision model call
+# takes, and then discarded -- never written to disk. Phone cameras produce 3-8 MB
+# JPEGs, so the ceiling is generous, but it is a ceiling: without one, a request body is
+# bounded only by what the client feels like sending.
 MAX_PHOTO_BYTES = 12 * 1024 * 1024
 
+# The thumbnail is a different animal: the client generates it by downscaling the same
+# photo to icon size before upload, so a well-behaved client never gets near this. The
+# ceiling exists for the client that lies -- generous for a low-quality JPEG, nowhere
+# close to what a full photo would need.
+MAX_THUMBNAIL_BYTES = 200 * 1024
 
-def _resolve_weight(requested: float | None) -> tuple[float | None, str | None]:
+
+def _resolve_weight(user_id: str, requested: float | None) -> tuple[float | None, str | None]:
     """(weight, source). A weight sent by the client is one the user typed in, and it
     wins: they are standing on the scale, Garmin is remembering a number from 2023."""
     if requested is not None and requested > 0:
         return requested, "manual"
     # Through the module, not a direct import: the name has to stay late-bound so a test
     # (or anything else) can substitute it without also getting a live Garmin session.
-    metrics = routes_body.body_metrics_or_empty()
+    metrics = routes_body.body_metrics_or_empty(user_id)
     weight = metrics.get("weight_kg")
     return (weight, metrics.get("source")) if weight else (None, None)
 
@@ -57,9 +64,11 @@ async def nutrition_config() -> schemas.NutritionConfigResponse:
 
 
 @router.post("/nutrition/targets", response_model=schemas.FuelTargetsResponse)
-async def nutrition_targets(payload: schemas.FuelTargetsRequest) -> schemas.FuelTargetsResponse:
+async def nutrition_targets(
+    payload: schemas.FuelTargetsRequest, user_id: str = Depends(current_user_id)
+) -> schemas.FuelTargetsResponse:
     day = payload.date or date_type.today()
-    weight, source = await run_in_threadpool(_resolve_weight, payload.weight_kg)
+    weight, source = await run_in_threadpool(_resolve_weight, user_id, payload.weight_kg)
     fuelling = nutrition.daily_fuelling(
         day, [s.to_model() for s in payload.sessions], weight_kg=weight, weight_source=source
     )
@@ -67,15 +76,17 @@ async def nutrition_targets(payload: schemas.FuelTargetsRequest) -> schemas.Fuel
 
 
 @router.post("/nutrition/narrative", response_model=schemas.NarrativeResponse)
-async def nutrition_narrative(payload: schemas.FuelTargetsRequest) -> schemas.NarrativeResponse:
+async def nutrition_narrative(
+    payload: schemas.FuelTargetsRequest, user_id: str = Depends(current_user_id)
+) -> schemas.NarrativeResponse:
     """The same targets, phrased by the model -- falling back to the template it would
     have replaced. Never fails: `source` says which one came back."""
     day = payload.date or date_type.today()
-    weight, source = await run_in_threadpool(_resolve_weight, payload.weight_kg)
+    weight, source = await run_in_threadpool(_resolve_weight, user_id, payload.weight_kg)
     fuelling = nutrition.daily_fuelling(
         day, [s.to_model() for s in payload.sessions], weight_kg=weight, weight_source=source
     )
-    consumed = await run_in_threadpool(db.totals_for_date, day.isoformat())
+    consumed = await run_in_threadpool(db.totals_for_date, user_id, day.isoformat())
     facts = nutrition.fuelling_facts(fuelling, consumed if consumed["entries"] else None)
 
     text = await run_in_threadpool(llm.write_fuelling_narrative, facts)
@@ -85,10 +96,12 @@ async def nutrition_narrative(payload: schemas.FuelTargetsRequest) -> schemas.Na
 
 
 @router.get("/nutrition/day", response_model=schemas.FoodDayResponse)
-async def nutrition_day(date: date_type | None = None) -> schemas.FoodDayResponse:
+async def nutrition_day(
+    date: date_type | None = None, user_id: str = Depends(current_user_id)
+) -> schemas.FoodDayResponse:
     day = (date or date_type.today()).isoformat()
-    entries = await run_in_threadpool(db.entries_for_date, day)
-    totals = await run_in_threadpool(db.totals_for_date, day)
+    entries = await run_in_threadpool(db.entries_for_date, user_id, day)
+    totals = await run_in_threadpool(db.totals_for_date, user_id, day)
     return schemas.FoodDayResponse(
         date=day,
         entries=[schemas.FoodEntryOut.from_model(e) for e in entries],
@@ -97,24 +110,32 @@ async def nutrition_day(date: date_type | None = None) -> schemas.FoodDayRespons
 
 
 @router.get("/nutrition/history", response_model=schemas.FoodHistoryResponse)
-async def nutrition_history(days: int = 7, end: date_type | None = None) -> schemas.FoodHistoryResponse:
+async def nutrition_history(
+    days: int = 7, end: date_type | None = None, user_id: str = Depends(current_user_id)
+) -> schemas.FoodHistoryResponse:
     last = end or date_type.today()
     first = last - timedelta(days=max(1, min(days, 120)) - 1)
-    rows = await run_in_threadpool(db.totals_between, first, last)
+    rows = await run_in_threadpool(db.totals_between, user_id, first, last)
     return schemas.FoodHistoryResponse(days=[schemas.DayTotalsOut(**row) for row in rows])
 
 
 @router.post("/nutrition/photo", response_model=schemas.FoodEntryOut)
 async def nutrition_photo(
     image: UploadFile = File(...),
+    thumbnail: UploadFile | None = File(None),
     date: date_type | None = Form(None),
+    user_id: str = Depends(current_user_id),
 ) -> schemas.FoodEntryOut:
-    """Estimate one plate and store it.
+    """Estimate one plate from the full photo, but only ever store the thumbnail.
 
-    The entry is written **even when the model can't read it**: the photo is the record,
-    and a user who took it should not have to take it again because a third-party API
-    was down. The row simply arrives with null macros and no confidence, which is the
-    same state as a manual entry waiting to be filled in.
+    The entry is written **even when the model can't read it**: a user who took the
+    photo should not have to take it again because a third-party API was down. The row
+    simply arrives with null macros and no confidence, the same state as a manual entry
+    waiting to be filled in. The full-resolution image bytes exist only for the
+    duration of this request -- they are read, sent to the vision model, and then go
+    out of scope; there is no disk write and nothing to clean up. `thumbnail`, a small
+    client-downscaled copy of the same photo meant only for the meal-list icon, is the
+    one thing that gets persisted (see `db.py`).
     """
     payload = await image.read()
     if not payload:
@@ -122,15 +143,20 @@ async def nutrition_photo(
     if len(payload) > MAX_PHOTO_BYTES:
         raise HTTPException(status_code=413, detail="Image too large")
 
+    thumbnail_bytes: bytes | None = None
+    if thumbnail is not None:
+        thumbnail_bytes = await thumbnail.read()
+        if thumbnail_bytes and len(thumbnail_bytes) > MAX_THUMBNAIL_BYTES:
+            raise HTTPException(status_code=413, detail="Thumbnail too large")
+
     day = (date or date_type.today()).isoformat()
-    suffix = ".png" if (image.content_type or "").endswith("png") else ".jpg"
-    path = await run_in_threadpool(db.save_photo, payload, suffix)
     estimate = await run_in_threadpool(
         llm.estimate_macros_from_photo, payload, image.content_type or "image/jpeg"
     )
 
     entry = await run_in_threadpool(
         lambda: db.add_entry(
+            user_id=user_id,
             date=day,
             source="photo",
             description=estimate.description if estimate else None,
@@ -139,16 +165,19 @@ async def nutrition_photo(
             protein_g=estimate.protein_g if estimate else None,
             fat_g=estimate.fat_g if estimate else None,
             confidence=estimate.confidence if estimate else None,
-            image_path=path,
+            thumbnail=thumbnail_bytes or None,
         )
     )
     return schemas.FoodEntryOut.from_model(entry)
 
 
 @router.post("/nutrition/entry", response_model=schemas.FoodEntryOut)
-async def nutrition_add_entry(payload: schemas.ManualEntryRequest) -> schemas.FoodEntryOut:
+async def nutrition_add_entry(
+    payload: schemas.ManualEntryRequest, user_id: str = Depends(current_user_id)
+) -> schemas.FoodEntryOut:
     entry = await run_in_threadpool(
         lambda: db.add_entry(
+            user_id=user_id,
             date=payload.date.isoformat(),
             source="manual",
             description=payload.description,
@@ -166,31 +195,20 @@ async def nutrition_add_entry(payload: schemas.ManualEntryRequest) -> schemas.Fo
 
 @router.patch("/nutrition/entry/{entry_id}", response_model=schemas.FoodEntryOut)
 async def nutrition_update_entry(
-    entry_id: int, payload: schemas.EntryPatchRequest
+    entry_id: int, payload: schemas.EntryPatchRequest, user_id: str = Depends(current_user_id)
 ) -> schemas.FoodEntryOut:
     fields = payload.model_dump(exclude_unset=True)
-    entry = await run_in_threadpool(lambda: db.update_entry(entry_id, **fields))
+    entry = await run_in_threadpool(lambda: db.update_entry(user_id, entry_id, **fields))
     if entry is None:
         raise HTTPException(status_code=404, detail="Entry not found")
     return schemas.FoodEntryOut.from_model(entry)
 
 
 @router.delete("/nutrition/entry/{entry_id}", response_model=schemas.DeleteEntryResponse)
-async def nutrition_delete_entry(entry_id: int) -> schemas.DeleteEntryResponse:
-    deleted = await run_in_threadpool(db.delete_entry, entry_id)
+async def nutrition_delete_entry(
+    entry_id: int, user_id: str = Depends(current_user_id)
+) -> schemas.DeleteEntryResponse:
+    deleted = await run_in_threadpool(db.delete_entry, user_id, entry_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Entry not found")
     return schemas.DeleteEntryResponse(deleted=True)
-
-
-@router.get("/nutrition/entry/{entry_id}/photo")
-async def nutrition_entry_photo(entry_id: int) -> FileResponse:
-    """Serve the stored photo by entry id.
-
-    By id, never by path: the filename is a uuid on the server's disk and the browser
-    has no business knowing it, let alone being able to ask for a neighbouring one.
-    """
-    entry = await run_in_threadpool(db.get_entry, entry_id)
-    if entry is None or not entry.image_path:
-        raise HTTPException(status_code=404, detail="No photo for this entry")
-    return FileResponse(entry.image_path)

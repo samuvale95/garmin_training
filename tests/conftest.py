@@ -1,41 +1,30 @@
 """Shared test isolation for the server's process-wide state.
 
-Three things now outlive a single request on purpose: the authenticated Garmin session
-(`api/garmin_session.py`), the read-through TTL cache (`api/cache.py`), and the food
-log on disk (`db.py`). All three are exactly the kind of state that makes tests pass or
-fail depending on what ran before them -- a cached `/strava/activity-match` answer would
-be served to the next test, and a session adopted by a `/garmin/connect` test would still
-be there afterwards. Reset all of them around every test so each one starts cold.
+The read-through TTL cache (`api/cache.py`) outlives a single request on purpose --
+without a reset, a cached `/strava/activity-match` answer from one test would be served
+to the next. Garmin/Strava sessions and the food log no longer live in process state at
+all (they're per-user, materialized from Postgres per call -- see `garmin_session.py`
+and `user_tokenstore.py`), so there is nothing left to reset for those.
+
+NOTE: `test_db.py`, `test_api.py`, `test_api_body.py`, and `test_api_caching.py` predate
+the Postgres/per-user rewrite and are not updated yet -- see the TODO tracked alongside
+this change. They need a real (or fake) Postgres to run against, which the old
+`PASSO_DATA_DIR`/SQLite-per-test-directory fixture this file used to provide can no
+longer stand in for.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from training_plan.api import garmin_session
 from training_plan.api.cache import cache
 
 
 @pytest.fixture(autouse=True)
 def cold_server_state():
-    garmin_session.reset()
     cache.clear()
     yield
-    garmin_session.reset()
     cache.clear()
-
-
-@pytest.fixture(autouse=True)
-def isolated_data_dir(tmp_path, monkeypatch):
-    """Point the food log at a per-test directory.
-
-    Without this the suite writes meals and photographs into the developer's real
-    `~/.passo` -- and, worse, reads them back, so a local database would quietly change
-    what the assertions see.
-    """
-    monkeypatch.setenv("PASSO_DATA_DIR", str(tmp_path / "passo"))
-    monkeypatch.delenv("PASSO_DB_PATH", raising=False)
-    return tmp_path
 
 
 @pytest.fixture(autouse=True)

@@ -6,9 +6,14 @@ that mounts six queries, or a user bouncing between Oggi and Settimana, used to 
 the full upstream cost every time even though the answers cannot meaningfully change
 second to second.
 
-Values are cached per (namespace, key) with a per-call TTL, and namespaces are the unit
-of invalidation: a write that changes the Garmin calendar drops `garmin:workouts` and
-`plan:diff` wholesale rather than trying to patch individual entries.
+Values are cached per (namespace, user_id, key) with a per-call TTL, and namespaces are
+the unit of invalidation: a write that changes the Garmin calendar drops
+`garmin:workouts` and `plan:diff` wholesale rather than trying to patch individual
+entries. `user_id` is mandatory, not an extra key component tacked on by convention:
+this cache is shared by every request the process serves, so a lookup that forgot it
+would hand one person's Garmin/Strava reads to whoever asks next -- see the incident
+this was written to prevent, `garmin_session.py`'s docstring on why the old singleton
+had to go.
 
 Deliberately not thread-locked around the *factory*: two concurrent misses may both
 call upstream and the last one wins. Serializing them would mean holding a lock across
@@ -56,55 +61,65 @@ TTL_PLAN_DIFF = 5 * 60
 
 class TTLCache:
     def __init__(self) -> None:
-        self._entries: dict[tuple[str, Hashable], tuple[float, Any]] = {}
+        self._entries: dict[tuple[str, str, Hashable], tuple[float, Any]] = {}
         self._lock = threading.Lock()
 
     def get_or_call(
         self,
         namespace: str,
+        user_id: str,
         key: Hashable,
         ttl: float,
         factory: Callable[[], T],
         *,
         refresh: bool = False,
     ) -> T:
-        """The cached value for (namespace, key), or `factory()`'s result, stored.
+        """The cached value for (namespace, user_id, key), or `factory()`'s result,
+        stored. `user_id` is not optional: see the module docstring for why.
 
         `refresh=True` skips the read but still writes -- that's the manual
         pull-to-refresh path: it must actually reach upstream, and everything after it
         should see the new answer.
         """
         if not refresh:
-            hit = self._lookup(namespace, key)
+            hit = self._lookup(namespace, user_id, key)
             if hit is not None:
                 return hit[0]
 
         value = factory()
         with self._lock:
-            self._entries[(namespace, key)] = (time.monotonic() + ttl, value)
+            self._entries[(namespace, user_id, key)] = (time.monotonic() + ttl, value)
         return value
 
-    def invalidate(self, namespaces: Iterable[str]) -> None:
-        """Drop every entry in these namespaces (used after a write)."""
+    def invalidate(self, namespaces: Iterable[str], user_id: str) -> None:
+        """Drop this user's entries in these namespaces (used after a write)."""
         targets = set(namespaces)
         with self._lock:
-            for entry_key in [k for k in self._entries if k[0] in targets]:
+            for entry_key in [k for k in self._entries if k[0] in targets and k[1] == user_id]:
+                del self._entries[entry_key]
+
+    def invalidate_user(self, user_id: str) -> None:
+        """Drop every cached entry for one user, across every namespace -- used on
+        Garmin/Strava connect/disconnect, where a different account may now be behind
+        the token and nothing cached under the old one is still true."""
+        with self._lock:
+            for entry_key in [k for k in self._entries if k[1] == user_id]:
                 del self._entries[entry_key]
 
     def clear(self) -> None:
         with self._lock:
             self._entries.clear()
 
-    def _lookup(self, namespace: str, key: Hashable) -> tuple[Any] | None:
+    def _lookup(self, namespace: str, user_id: str, key: Hashable) -> tuple[Any] | None:
         """`(value,)` on a live hit, `None` on a miss -- wrapped in a tuple so a cached
         `None`/falsy value is still a hit."""
         with self._lock:
-            entry = self._entries.get((namespace, key))
+            entry = self._entries.get((namespace, user_id, key))
             if entry is None:
                 return None
             expires_at, value = entry
             if expires_at <= time.monotonic():
-                del self._entries[(namespace, key)]
+                del self._entries[(namespace, user_id, key)]
                 return None
             return (value,)
 
@@ -119,5 +134,5 @@ cache = TTLCache()
 CALENDAR_NAMESPACES = ("garmin:workouts", "garmin:workout-session", "plan:diff")
 
 
-def invalidate_calendar() -> None:
-    cache.invalidate(CALENDAR_NAMESPACES)
+def invalidate_calendar(user_id: str) -> None:
+    cache.invalidate(CALENDAR_NAMESPACES, user_id)

@@ -7,6 +7,7 @@ so FastAPI can validate/serialize JSON at the HTTP boundary.
 
 from __future__ import annotations
 
+import base64
 from datetime import date as date_type
 from datetime import datetime
 
@@ -573,8 +574,10 @@ class DayTargetOut(BaseModel):
     duration_minutes: float | None = None
     carb_g_per_kg: tuple[float, float]
     protein_g_per_kg: tuple[float, float]
+    fat_g_per_kg: tuple[float, float]
     carb_g: tuple[int, int] | None = None
     protein_g: tuple[int, int] | None = None
+    fat_g: tuple[int, int] | None = None
 
     @classmethod
     def from_model(cls, target: "nutrition.DayTarget") -> "DayTargetOut":
@@ -585,8 +588,10 @@ class DayTargetOut(BaseModel):
             duration_minutes=target.duration_minutes,
             carb_g_per_kg=target.carb_g_per_kg,
             protein_g_per_kg=target.protein_g_per_kg,
+            fat_g_per_kg=target.fat_g_per_kg,
             carb_g=target.carb_g,
             protein_g=target.protein_g,
+            fat_g=target.fat_g,
         )
 
 
@@ -647,8 +652,11 @@ class FoodEntryOut(BaseModel):
     fat_g: float | None = None
     confidence: str | None = None
     corrected: bool = False
-    # A URL onto /nutrition/entry/{id}/photo, never a filesystem path: the photo is a
-    # local file and the browser must not be told where it lives.
+    # Null unless a low-quality thumbnail was saved alongside this entry -- the full
+    # photo is never written to disk (see `db.py`), only the small client-compressed
+    # copy used for the meal-list icon. A `data:` URI, not a link: every route requires
+    # a bearer token (`api/auth.py`), which a plain `<img src>` has no way to attach, so
+    # the bytes ride along in this same JSON response instead of a fetch-by-id endpoint.
     image_url: str | None = None
 
     @classmethod
@@ -665,7 +673,11 @@ class FoodEntryOut(BaseModel):
             fat_g=entry.fat_g,
             confidence=entry.confidence,
             corrected=entry.corrected,
-            image_url=f"/nutrition/entry/{entry.id}/photo" if entry.image_path else None,
+            image_url=(
+                f"data:image/jpeg;base64,{base64.b64encode(entry.thumbnail).decode('ascii')}"
+                if entry.thumbnail
+                else None
+            ),
         )
 
 

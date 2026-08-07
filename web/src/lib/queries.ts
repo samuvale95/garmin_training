@@ -1,18 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost, apiPostForm } from "./apiClient";
+import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm } from "./apiClient";
 import { toDateKey, weekBounds } from "./sessionVisuals";
 import type {
   AthleteProfile,
+  BodyMetrics,
   BodySnapshot,
   CompletedActivity,
   ConflictAssessment,
   DeleteResult,
   DeviceInfo,
+  FoodDay,
+  FoodEntry,
+  FoodHistory,
+  FuelTargets,
   GarminStatus,
   LoadSnapshot,
+  Narrative,
   PlanDiff,
   ScheduledWorkout,
   Shoe,
@@ -690,6 +696,136 @@ export function useShoes(enabled = true) {
     queryFn: ({ signal }) => apiGet<{ shoes: Shoe[] }>("/strava/shoes", undefined, signal),
     enabled,
     staleTime: 5 * 60_000,
+  });
+}
+
+// ---- body metrics + fuelling (nutrition) --------------------------------------------------
+
+/** Garmin's weight/height/age -- the settings "Il tuo corpo" card reads this directly,
+ * and it's what a manual weight (store.ts) is offered in place of. */
+export function useBodyMetrics() {
+  return useQuery({
+    queryKey: ["body", "metrics"],
+    queryFn: ({ signal }) => apiGet<BodyMetrics>("/body/metrics", undefined, signal),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Today's and tomorrow's carb/protein targets. `weightKg` is the manual override
+ * (store.ts's `manualWeight`) when set, `undefined`/`null` otherwise -- omitting it
+ * lets the backend fall back to Garmin, then to the 70 kg reference (see
+ * `_resolve_weight` in routes_nutrition.py). The whole plan travels along, not just
+ * today/tomorrow: the back-to-back-hard-days bump needs the day after tomorrow too. */
+export function useFuelTargets(date: string, sessions: TrainingSession[], weightKg: number | null | undefined) {
+  return useQuery({
+    queryKey: ["nutrition", "targets", date, weightKg ?? null, sessions.length ? planFingerprint(sessions) : null],
+    queryFn: ({ signal }) =>
+      apiPost<FuelTargets>("/nutrition/targets", { date, sessions, weight_kg: weightKg ?? null }, signal),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** One `today` target per date -- what the weekly history chart (screen E2) needs to
+ * tell "in target" from "sotto" for each of the last seven days, since `/nutrition/
+ * history` only returns what was actually eaten, never what was asked for. A fixed-
+ * length array of `useQuery`-shaped configs, not a loop of `useFuelTargets` calls: the
+ * rules of hooks forbid a variable number of hook calls, which is exactly what mapping
+ * a hook over a dynamic date list would be. */
+export function useFuelTargetsForDates(dates: string[], sessions: TrainingSession[], weightKg: number | null | undefined) {
+  const fingerprint = sessions.length ? planFingerprint(sessions) : null;
+  return useQueries({
+    queries: dates.map((date) => ({
+      queryKey: ["nutrition", "targets", date, weightKg ?? null, fingerprint] as const,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        apiPost<FuelTargets>("/nutrition/targets", { date, sessions, weight_kg: weightKg ?? null }, signal),
+      staleTime: 5 * 60_000,
+    })),
+  });
+}
+
+/** The model's phrasing of the same targets -- fetched separately so the fuel screen
+ * paints from `advice` immediately and swaps in `narrative` if/when this lands (see
+ * routes_nutrition.py's module docstring). Never fails: the response always carries a
+ * sentence, template or model. */
+export function useFuelNarrative(date: string, sessions: TrainingSession[], weightKg: number | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ["nutrition", "narrative", date, weightKg ?? null, sessions.length ? planFingerprint(sessions) : null],
+    queryFn: ({ signal }) =>
+      apiPost<Narrative>("/nutrition/narrative", { date, sessions, weight_kg: weightKg ?? null }, signal),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useFoodDay(date: string) {
+  return useQuery({
+    queryKey: ["nutrition", "day", date],
+    queryFn: ({ signal }) => apiGet<FoodDay>("/nutrition/day", { date }, signal),
+  });
+}
+
+export function useFoodHistory(days = 7, end?: string) {
+  return useQuery({
+    queryKey: ["nutrition", "history", days, end ?? null],
+    queryFn: ({ signal }) => apiGet<FoodHistory>("/nutrition/history", { days: String(days), end }, signal),
+  });
+}
+
+function invalidateNutrition(queryClient: ReturnType<typeof useQueryClient>, date?: string) {
+  queryClient.invalidateQueries({ queryKey: date ? ["nutrition", "day", date] : ["nutrition", "day"] });
+  queryClient.invalidateQueries({ queryKey: ["nutrition", "history"] });
+}
+
+/** Estimate + store one plate. The entry is written server-side even when the model
+ * can't read the photo (null macros, no confidence) -- the caller distinguishes that
+ * case by `confidence == null` and routes to the manual-entry fallback (screen D4)
+ * rather than treating it as a request failure. */
+export function useLogPhoto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ file, date, thumbnail }: { file: File; date: string; thumbnail?: Blob | null }) => {
+      const form = new FormData();
+      form.set("image", file);
+      form.set("date", date);
+      if (thumbnail) form.set("thumbnail", thumbnail, "thumbnail.jpg");
+      return apiPostForm<FoodEntry>("/nutrition/photo", form);
+    },
+    onSuccess: (_entry, vars) => invalidateNutrition(queryClient, vars.date),
+  });
+}
+
+interface ManualEntryFields {
+  description?: string | null;
+  kcal?: number | null;
+  carb_g?: number | null;
+  protein_g?: number | null;
+  fat_g?: number | null;
+}
+
+export function useAddManualEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ManualEntryFields & { date: string }) => apiPost<FoodEntry>("/nutrition/entry", payload),
+    onSuccess: (_entry, vars) => invalidateNutrition(queryClient, vars.date),
+  });
+}
+
+/** A correction (screen E1) or the manual fallback after a failed estimate (screen
+ * D4) -- both patch the same entry and both mark it `corrected`. */
+export function useUpdateEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...fields }: ManualEntryFields & { id: number }) =>
+      apiPatch<FoodEntry>(`/nutrition/entry/${id}`, fields),
+    onSuccess: () => invalidateNutrition(queryClient),
+  });
+}
+
+export function useDeleteEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => apiDelete<{ deleted: boolean }>(`/nutrition/entry/${id}`),
+    onSuccess: () => invalidateNutrition(queryClient),
   });
 }
 

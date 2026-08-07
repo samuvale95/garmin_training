@@ -3,6 +3,7 @@ import { Outfit, Instrument_Serif, DM_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { AppShell } from "@/components/AppShell";
+import { AuthGate } from "@/components/AuthGate";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -52,7 +53,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="it" className={`${outfit.variable} ${instrumentSerif.variable} ${dmMono.variable}`}>
       <body>
         <Providers>
-          <AppShell>{children}</AppShell>
+          <AppShell>
+            <AuthGate>{children}</AuthGate>
+          </AppShell>
         </Providers>
       </body>
     </html>

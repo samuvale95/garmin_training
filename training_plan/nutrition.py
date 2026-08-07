@@ -56,6 +56,12 @@ CARB_G_PER_KG: dict[SessionLoad, tuple[float, float]] = {
 # Flat across every day: protein supports repair, and repair happens on the rest day too.
 PROTEIN_G_PER_KG = (1.6, 2.0)
 
+# Flat across every day too, for the same reason: fat is not periodized around a
+# session the way carbohydrate is. The range is the standard endurance-athlete floor
+# (essential fatty acids, hormone production) up to a share that still leaves room for
+# the carbohydrate a hard day needs.
+FAT_G_PER_KG = (0.8, 1.2)
+
 # The weight the ranges are shown against when no real one is available. Never presented
 # silently -- `DailyFuelling.weight_source` is "reference" and the UI must say so.
 REFERENCE_WEIGHT_KG = 70.0
@@ -91,10 +97,12 @@ class DayTarget:
     duration_minutes: float | None
     carb_g_per_kg: tuple[float, float]
     protein_g_per_kg: tuple[float, float]
+    fat_g_per_kg: tuple[float, float]
     # Absolute grams, or None when there is no weight to multiply by -- the caller
     # decides whether to fall back to REFERENCE_WEIGHT_KG and say so.
     carb_g: tuple[int, int] | None
     protein_g: tuple[int, int] | None
+    fat_g: tuple[int, int] | None
 
 
 @dataclass
@@ -187,8 +195,10 @@ def day_target(
         duration_minutes=round(session_duration_minutes(session), 1) if session else None,
         carb_g_per_kg=carb,
         protein_g_per_kg=PROTEIN_G_PER_KG,
+        fat_g_per_kg=FAT_G_PER_KG,
         carb_g=_grams(carb, weight_kg),
         protein_g=_grams(PROTEIN_G_PER_KG, weight_kg),
+        fat_g=_grams(FAT_G_PER_KG, weight_kg),
     )
 
 

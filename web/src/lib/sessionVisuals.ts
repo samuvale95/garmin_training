@@ -1,7 +1,7 @@
 import type { IllustrationName } from "@/components/Illustration";
 import { sessionFallbackPaceSecPerKm, stepDistanceKm } from "./format";
 import { flattenSteps } from "./types";
-import type { SessionStep } from "./types";
+import type { ScheduledWorkout, SessionStep, Sport, TrainingSession } from "./types";
 
 export type SessionKind = "riposo" | "ripetute" | "fondo_lento" | "forza" | "lungo";
 
@@ -111,6 +111,15 @@ export function shiftDateKey(key: string, delta: number): string {
   if (!parsed) return key;
   parsed.setDate(parsed.getDate() + delta);
   return toDateKey(parsed);
+}
+
+/** A live Garmin calendar entry has no step detail, so it becomes a session with an
+ * empty step list rather than being left out. `nutrition.classify_load` (backend)
+ * reads an empty-steps session as "something is planned, just not sized" and answers
+ * "facile", never "riposo" -- so a day with a Garmin workout but no imported plan
+ * still fuels as a training day instead of silently degrading to rest. */
+export function workoutsToSessions(workouts: ScheduledWorkout[]): TrainingSession[] {
+  return workouts.map((w) => ({ date: w.date, sport: w.sport as Sport, title: w.title, steps: [] }));
 }
 
 /** Whitespace/case-normalized title, used to match a local plan session against its

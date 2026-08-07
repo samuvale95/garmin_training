@@ -11,12 +11,13 @@ import hashlib
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
 from .. import service
 from ..parser import parse_training_plan
 from . import garmin_session, schemas
+from .auth import current_user_id
 from .cache import TTL_PLAN_DIFF, cache
 from .jobs import job_store
 
@@ -47,7 +48,9 @@ async def parse_plan(
 
 
 @router.post("/plan/diff", response_model=schemas.DiffResponse)
-async def diff_plan(payload: schemas.DiffRequest, refresh: bool = False) -> schemas.DiffResponse:
+async def diff_plan(
+    payload: schemas.DiffRequest, refresh: bool = False, user_id: str = Depends(current_user_id)
+) -> schemas.DiffResponse:
     sessions = [s.to_model() for s in payload.sessions]
     # Keyed by the exact plan (and by check_content, which changes the answer's depth):
     # Oggi asks for this on every mount, and with check_content it costs one Garmin
@@ -56,12 +59,14 @@ async def diff_plan(payload: schemas.DiffRequest, refresh: bool = False) -> sche
     diff = await run_in_threadpool(
         lambda: cache.get_or_call(
             "plan:diff",
+            user_id,
             key,
             TTL_PLAN_DIFF,
             lambda: garmin_session.run(
+                user_id,
                 lambda sync: service.preview_plan_sync(
                     sessions, False, payload.check_content, sync=sync
-                ).diff
+                ).diff,
             ),
             refresh=refresh,
         )
@@ -70,16 +75,18 @@ async def diff_plan(payload: schemas.DiffRequest, refresh: bool = False) -> sche
 
 
 @router.post("/plan/sync", response_model=schemas.StartSyncResponse)
-async def start_sync(payload: schemas.StartSyncRequest) -> schemas.StartSyncResponse:
+async def start_sync(
+    payload: schemas.StartSyncRequest, user_id: str = Depends(current_user_id)
+) -> schemas.StartSyncResponse:
     to_create = [s.to_model() for s in payload.to_create]
     changed = [c.to_model() for c in payload.changed]
-    job_id = job_store.start(to_create, changed)
+    job_id = job_store.start(user_id, to_create, changed)
     return schemas.StartSyncResponse(job_id=job_id)
 
 
 @router.get("/plan/sync/{job_id}", response_model=schemas.SyncJobStatus)
-async def get_sync_status(job_id: str) -> schemas.SyncJobStatus:
-    job = job_store.get(job_id)
+async def get_sync_status(job_id: str, user_id: str = Depends(current_user_id)) -> schemas.SyncJobStatus:
+    job = job_store.get(user_id, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Unknown job id")
     return schemas.SyncJobStatus(
@@ -105,7 +112,7 @@ async def get_sync_status(job_id: str) -> schemas.SyncJobStatus:
 
 
 @router.post("/plan/sync/{job_id}/cancel", response_model=schemas.CancelSyncResponse)
-async def cancel_sync(job_id: str) -> schemas.CancelSyncResponse:
-    if not job_store.request_cancel(job_id):
+async def cancel_sync(job_id: str, user_id: str = Depends(current_user_id)) -> schemas.CancelSyncResponse:
+    if not job_store.request_cancel(user_id, job_id):
         raise HTTPException(status_code=404, detail="Unknown job id")
     return schemas.CancelSyncResponse(ok=True)

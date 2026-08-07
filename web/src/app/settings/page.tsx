@@ -10,6 +10,7 @@ import { RefreshButton } from "@/components/RefreshButton";
 import { StatusDot } from "@/components/motion/primitives";
 import { useClearPlan, useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, usePlanQuery, useResetAllLocalData, useStravaStatus } from "@/lib/queries";
 import { useAthleteIdentity } from "@/lib/identity";
+import { signOut } from "@/lib/auth";
 import { usePassoStore } from "@/lib/store";
 import { downloadPlanYaml } from "@/lib/planYaml";
 import { minutesAgo } from "@/lib/format";
@@ -165,6 +166,16 @@ export default function SettingsPage() {
       </Card>
 
       <Card>
+        <Link href="/settings/body" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ flex: 1 }}>
+            <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Il tuo corpo</span>
+            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>peso, altezza, età</span>
+          </span>
+          <span aria-hidden="true">›</span>
+        </Link>
+      </Card>
+
+      <Card>
         <p style={{ fontWeight: 600, margin: "0 0 4px" }}>Preferenze</p>
         <Toggle label="Avvisami se il corpo non regge" checked={prefs.avvisamiSeIlCorpoNonRegge} onChange={(v) => setPref("avvisamiSeIlCorpoNonRegge", v)} />
         <Toggle label="Chiedi prima di cancellare" checked={prefs.chiediPrimaDiCancellare} onChange={(v) => setPref("chiediPrimaDiCancellare", v)} />
@@ -244,9 +255,13 @@ export default function SettingsPage() {
 
       <button
         type="button"
-        onClick={() => {
+        onClick={async () => {
           clearPlan();
-          router.push("/");
+          await signOut();
+          // Hard navigation, not router.push: AuthGate reads the Supabase session on
+          // mount, and a signed-out user has no reason to keep any client-side query
+          // cache (someone else's Garmin/Strava reads) around for the next sign-in.
+          window.location.href = "/login";
         }}
         className="tap-target"
         style={{ display: "block", width: "100%", background: "none", border: "none", color: "var(--rosso-forte)", fontSize: 14, fontWeight: 600, marginTop: 24, cursor: "pointer" }}

@@ -10,14 +10,16 @@ from __future__ import annotations
 import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .. import db
 from ..garmin_sync import GarminRateLimitError, GarminSyncError
 from ..parser import TrainingPlanValidationError
 from ..strava_sync import StravaAuthError
-from . import schemas
+from . import schemas, user_tokenstore
+from .auth import AuthError, current_user_id
 from .cache import cache
 from .routes_body import router as body_router
 from .routes_garmin import router as garmin_router
@@ -41,6 +43,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def _ensure_schema() -> None:
+    """Create the food-log and credential tables if this is a fresh database.
+    Idempotent (`CREATE TABLE IF NOT EXISTS`) and cheap enough to run once per process
+    start rather than gating it behind a separate migration step for a two-table app."""
+    db.ensure_schema()
+    user_tokenstore.ensure_schema()
+
+
+@app.exception_handler(AuthError)
+async def _auth_error_handler(request: Request, exc: AuthError) -> JSONResponse:
+    return JSONResponse(
+        status_code=401,
+        content=schemas.ErrorResponse(category="auth_failed", message=str(exc)).model_dump(),
+    )
 
 
 @app.exception_handler(TrainingPlanValidationError)
@@ -89,11 +108,17 @@ async def _unhandled_error_handler(request: Request, exc: Exception) -> JSONResp
     )
 
 
-app.include_router(plan_router, tags=["plan"])
-app.include_router(garmin_router, tags=["garmin"])
-app.include_router(body_router, tags=["body"])
-app.include_router(strava_router, tags=["strava"])
-app.include_router(nutrition_router, tags=["nutrition"])
+# Every route in these five routers needs a signed-in caller -- `/health` is the one
+# deliberate exception, checked by hosting platforms before any user ever gets there.
+# The dependency's return value (the user id) isn't consumed at this level; handlers
+# that need it declare their own `Depends(current_user_id)` parameter, which FastAPI
+# resolves from the same per-request cache rather than re-verifying the token twice.
+_auth_gate = [Depends(current_user_id)]
+app.include_router(plan_router, tags=["plan"], dependencies=_auth_gate)
+app.include_router(garmin_router, tags=["garmin"], dependencies=_auth_gate)
+app.include_router(body_router, tags=["body"], dependencies=_auth_gate)
+app.include_router(strava_router, tags=["strava"], dependencies=_auth_gate)
+app.include_router(nutrition_router, tags=["nutrition"], dependencies=_auth_gate)
 
 
 @app.get("/health")
@@ -102,12 +127,13 @@ async def health() -> dict:
 
 
 @app.post("/cache/clear")
-async def clear_cache() -> dict:
-    """Drop every cached read, so the next request goes back to Garmin/Strava.
+async def clear_cache(user_id: str = Depends(current_user_id)) -> dict:
+    """Drop this user's cached reads, so their next request goes back to Garmin/Strava.
 
     This is the escape hatch behind the app's manual refresh: reads are cached for
     minutes at a time (see api/cache.py), which is what makes navigation instant, but
-    the user must always have a way to say "no, ask again now".
+    the user must always have a way to say "no, ask again now". Scoped to the caller,
+    not `cache.clear()`, now that the cache is shared by more than one person.
     """
-    cache.clear()
+    cache.invalidate_user(user_id)
     return {"cleared": True}

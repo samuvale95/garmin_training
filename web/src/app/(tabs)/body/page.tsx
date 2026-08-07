@@ -7,16 +7,33 @@ import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { ProgressRing, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { useBodyToday, usePlanQuery } from "@/lib/queries";
+import { useBodyToday, useFuelTargets, usePlanQuery } from "@/lib/queries";
 import { useWatchSyncStatus } from "@/lib/watchSync";
 import { toDateKey } from "@/lib/sessionVisuals";
 import { formatFullDate, hrvCaption, stressCaption } from "@/lib/format";
+import { usePassoStore } from "@/lib/store";
+import type { DayTarget } from "@/lib/types";
+
+/** Short teaser line for the fuel-preview card ("domani il lungo · stasera
+ * carboidrati") -- the full sentence (`advice`/`narrative`) belongs to /body/fuel;
+ * this card only has to earn the tap. */
+function fuelSubtitle(tomorrow: DayTarget): string {
+  const label = tomorrow.session_title?.toLowerCase() ?? "un allenamento";
+  if (tomorrow.load === "riposo") return "domani riposo";
+  if (tomorrow.load === "duro" || tomorrow.load === "molto_lungo") return `domani ${label} · stasera carboidrati`;
+  return `domani ${label}`;
+}
 
 export default function RecoveryPage() {
   const router = useRouter();
   const animate = useMountOnce("body-recovery");
   const { data, isLoading } = useBodyToday();
   const { data: plan } = usePlanQuery();
+  const manualWeight = usePassoStore((s) => s.manualWeight);
+  const sessions = plan?.sessions ?? [];
+  const fuelQuery = useFuelTargets(toDateKey(new Date()), sessions, manualWeight?.weightKg);
+  const fuel = fuelQuery.data;
+  const fuelDegraded = fuel?.weight_source === "reference" && sessions.length === 0;
 
   // Same substitution as Oggi: with a watch that hasn't synced in over 24h this screen
   // is nothing but em dashes, so screen 19 takes its place (see useWatchSyncStatus).
@@ -142,6 +159,39 @@ export default function RecoveryPage() {
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 4 }}>
         <NavRow href="/body/load" label="Carico 4 settimane" />
       </div>
+
+      {fuel && (
+        fuelDegraded ? (
+          <SlideUp active={animate} delayMs={500} style={{ marginTop: 4 }}>
+            <NavRow href="/body/fuel" label="Carburante" />
+          </SlideUp>
+        ) : (
+          <SlideUp active={animate} delayMs={500} style={{ marginTop: 10 }}>
+            <Link
+              href="/body/fuel"
+              className="tap-target"
+              style={{ display: "block", background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card)", padding: 16, textDecoration: "none" }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: 15, margin: "0 0 3px" }}>Carburante</p>
+                  <p style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: 0 }}>{fuelSubtitle(fuel.tomorrow)}</p>
+                </div>
+                <span className="anim-chev" aria-hidden="true">→</span>
+              </div>
+              {fuel.tomorrow.carb_g && (
+                <p className="font-mono" style={{ fontSize: 30, fontWeight: 500, color: "var(--corallo)", margin: "10px 0 0" }}>
+                  {fuel.tomorrow.carb_g[0]}–{fuel.tomorrow.carb_g[1]}{" "}
+                  <span style={{ fontSize: 14, fontWeight: 400, color: "var(--crema)" }}>g di carboidrati</span>
+                </p>
+              )}
+              <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-su-scuro)", margin: "8px 0 0" }}>
+                {fuel.advice}
+              </p>
+            </Link>
+          </SlideUp>
+        )
+      )}
     </div>
   );
 }

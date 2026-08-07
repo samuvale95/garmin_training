@@ -42,11 +42,17 @@ interface PassoStore {
    * Today from bouncing straight back to /body/conflict after the user picks
    * "Lascia tutto com'è" or acts on it, for the rest of that day. */
   conflictDismissedDate: string | null;
+  /** A weight typed in by the user, device-local (see handoff-carburante/SPEC.md
+   * "Il valore che scrivi tu vince"). Wins over whatever Garmin reports until cleared
+   * -- sent as `weight_kg` on every /nutrition/targets and /nutrition/narrative call,
+   * which is what turns it into `weight_source: "manual"` server-side. */
+  manualWeight: { weightKg: number; setOn: string } | null;
 
   setPref: <K extends keyof Prefs>(key: K, value: Prefs[K]) => void;
   setProfile: (profile: Profile) => void;
   setLastGarminEmail: (email: string) => void;
   dismissConflictToday: (dateKey: string) => void;
+  setManualWeight: (weightKg: number | null) => void;
 
   addJobHistory: (entry: WriteJobHistoryEntry) => void;
 }
@@ -68,11 +74,14 @@ export const usePassoStore = create<PassoStore>()(
       writeJobHistory: [],
       lastGarminEmail: null,
       conflictDismissedDate: null,
+      manualWeight: null,
 
       setPref: (key, value) => set((state) => ({ prefs: { ...state.prefs, [key]: value } })),
       setProfile: (profile) => set({ profile }),
       setLastGarminEmail: (email) => set({ lastGarminEmail: email }),
       dismissConflictToday: (dateKey) => set({ conflictDismissedDate: dateKey }),
+      setManualWeight: (weightKg) =>
+        set({ manualWeight: weightKg != null ? { weightKg, setOn: new Date().toISOString() } : null }),
 
       addJobHistory: (entry) =>
         set((state) => ({ writeJobHistory: [entry, ...state.writeJobHistory].slice(0, 20) })),
@@ -89,6 +98,7 @@ export const usePassoStore = create<PassoStore>()(
         writeJobHistory: state.writeJobHistory,
         lastGarminEmail: state.lastGarminEmail,
         conflictDismissedDate: state.conflictDismissedDate,
+        manualWeight: state.manualWeight,
       }),
       // zustand/persist's default merge is a single shallow spread of the persisted
       // blob over the fresh state -- a `prefs`/`profile` that's partial (an older app

@@ -209,6 +209,98 @@ export interface Shoe {
   retired: boolean;
 }
 
+// ---- body metrics + fuelling (nutrition) --------------------------------------------------
+
+/** Garmin's view of the user's body -- weight, height, age. Every field optional: a
+ * missing Garmin session degrades to an empty object, never a 401 (see
+ * `body_metrics_or_empty`). `source` says which of Garmin's two weights answered. */
+export interface BodyMetrics {
+  weight_kg: number | null;
+  measured_on: string | null;
+  source: "scale" | "profile" | null;
+  height_cm: number | null;
+  birth_date: string | null;
+  gender: string | null;
+}
+
+export type SessionLoad = "riposo" | "facile" | "moderato" | "duro" | "molto_lungo";
+
+export interface DayTarget {
+  date: string;
+  session_title: string | null;
+  load: SessionLoad;
+  duration_minutes: number | null;
+  carb_g_per_kg: [number, number];
+  protein_g_per_kg: [number, number];
+  fat_g_per_kg: [number, number];
+  carb_g: [number, number] | null;
+  protein_g: [number, number] | null;
+  fat_g: [number, number] | null;
+}
+
+export interface FuelTargets {
+  date: string;
+  weight_kg: number | null;
+  weight_source: "scale" | "profile" | "manual" | "reference" | null;
+  today: DayTarget;
+  tomorrow: DayTarget;
+  advice: string;
+  // Fetched separately (/nutrition/narrative) -- always null on the targets response.
+  narrative: string | null;
+}
+
+export interface Narrative {
+  text: string;
+  source: "model" | "template";
+}
+
+export type FoodConfidence = "low" | "medium" | "high";
+
+export interface FoodEntry {
+  id: number;
+  date: string;
+  logged_at: string;
+  source: "photo" | "manual";
+  description: string | null;
+  kcal: number | null;
+  carb_g: number | null;
+  protein_g: number | null;
+  fat_g: number | null;
+  confidence: FoodConfidence | null;
+  corrected: boolean;
+  // Relative to API_BASE_URL, e.g. "/nutrition/entry/12/photo" -- never a filesystem path.
+  image_url: string | null;
+}
+
+export interface DayTotals {
+  kcal: number;
+  carb_g: number;
+  protein_g: number;
+  fat_g: number;
+  entries: number;
+}
+
+export interface FoodDay {
+  date: string;
+  entries: FoodEntry[];
+  totals: DayTotals;
+}
+
+export interface DayTotalsForDate extends DayTotals {
+  date: string;
+}
+
+export interface FoodHistory {
+  days: DayTotalsForDate[];
+}
+
+export interface NutritionConfig {
+  configured: boolean;
+  text_model: string;
+  vision_model: string;
+  photo_upload_enabled: boolean;
+}
+
 export interface ApiErrorBody {
   category: "validation_failed" | "auth_failed" | "rate_limited" | "mfa_required" | "server_error";
   message: string;
