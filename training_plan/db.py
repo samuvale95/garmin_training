@@ -1,11 +1,10 @@
-"""The food log: the first server-held state this project keeps.
+"""Server-held state this project keeps: the food log, and the active training plan.
 
-Everything else Passo shows is fetched fresh from Garmin or Strava, or lives in the
-plan file on the user's device -- "il file resta la verità". A food diary cannot work
-that way. It is an append-only record that only has meaning longitudinally, nothing
-upstream holds it, and `localStorage` loses it to a cleared browser. So this breaks the
-no-database invariant, knowingly and narrowly: one table, and nothing else moves in
-here.
+Everything else Passo shows is fetched fresh from Garmin or Strava. Both tables here
+broke the original no-database invariant knowingly: a food diary only has meaning
+longitudinally and nothing upstream holds it, and the plan -- device-only at first --
+turned out to not survive a cleared browser or a second device either. `localStorage`
+stays as a same-tab-instant mirror for both; this is what makes either of them durable.
 
 Postgres (Supabase), not SQLite: the app now runs as a stateless deployed service with
 several people behind the same backend, so the database has to live somewhere every
@@ -31,6 +30,7 @@ from typing import Any, Literal
 
 import psycopg
 from psycopg.rows import DictRow, dict_row
+from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
 SCHEMA = """
@@ -50,6 +50,15 @@ CREATE TABLE IF NOT EXISTS food_entry (
 );
 CREATE INDEX IF NOT EXISTS idx_food_entry_user_date ON food_entry(user_id, date);
 ALTER TABLE food_entry ADD COLUMN IF NOT EXISTS thumbnail BYTEA;
+
+CREATE TABLE IF NOT EXISTS user_plan (
+  user_id      TEXT PRIMARY KEY,
+  yaml_text    TEXT NOT NULL,
+  sessions     JSONB NOT NULL,
+  filename     TEXT,
+  imported_at  TEXT NOT NULL,
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 Confidence = Literal["low", "medium", "high"]
@@ -305,3 +314,63 @@ def totals_between(user_id: str, start: date_type, end: date_type) -> list[dict[
         )
         current = date_type.fromordinal(current.toordinal() + 1)
     return days
+
+
+# ---- the active training plan ----------------------------------------------------------------
+
+
+@dataclass
+class UserPlan:
+    yaml_text: str
+    # A list of plain dicts shaped like the frontend's `TrainingSession` (date/sport/
+    # title/description/steps) -- stored as opaque JSON rather than modeled with
+    # `models.TrainingSession`, the same way `thumbnail` stores bytes instead of a
+    # decoded image: nothing server-side reads into a session's structure, it is only
+    # ever round-tripped back to the one client that does.
+    sessions: list[dict[str, Any]]
+    filename: str | None
+    imported_at: str
+
+    @classmethod
+    def from_row(cls, row: DictRow) -> "UserPlan":
+        return cls(
+            yaml_text=row["yaml_text"],
+            sessions=row["sessions"],
+            filename=row["filename"],
+            imported_at=row["imported_at"],
+        )
+
+
+def get_plan(user_id: str) -> UserPlan | None:
+    with connect() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT * FROM user_plan WHERE user_id = %s", (user_id,))
+            row = cur.fetchone()
+    return UserPlan.from_row(row) if row else None
+
+
+def save_plan(
+    *, user_id: str, yaml_text: str, sessions: list[dict[str, Any]], filename: str | None, imported_at: str
+) -> UserPlan:
+    with connect() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """INSERT INTO user_plan (user_id, yaml_text, sessions, filename, imported_at, updated_at)
+                   VALUES (%s, %s, %s, %s, %s, now())
+                   ON CONFLICT (user_id) DO UPDATE SET
+                     yaml_text = EXCLUDED.yaml_text,
+                     sessions = EXCLUDED.sessions,
+                     filename = EXCLUDED.filename,
+                     imported_at = EXCLUDED.imported_at,
+                     updated_at = now()
+                   RETURNING *""",
+                (user_id, yaml_text, Jsonb(sessions), filename, imported_at),
+            )
+            row = cur.fetchone()
+    return UserPlan.from_row(row)
+
+
+def delete_plan(user_id: str) -> None:
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM user_plan WHERE user_id = %s", (user_id,))

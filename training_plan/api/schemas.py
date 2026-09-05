@@ -142,6 +142,40 @@ class ParsePlanResponse(BaseModel):
     sessions: list[TrainingSessionOut]
 
 
+# ---- the active plan, persisted server-side ---------------------------------------------------
+
+
+class PlanIn(BaseModel):
+    yaml_text: str
+    sessions: list[TrainingSessionIn]
+    filename: str | None = None
+    imported_at: str
+
+
+class PlanOut(BaseModel):
+    yaml_text: str
+    sessions: list[TrainingSessionOut]
+    filename: str | None = None
+    imported_at: str
+
+    @classmethod
+    def from_model(cls, plan: db.UserPlan) -> "PlanOut":
+        return cls(
+            yaml_text=plan.yaml_text,
+            sessions=[TrainingSessionOut.model_validate(s) for s in plan.sessions],
+            filename=plan.filename,
+            imported_at=plan.imported_at,
+        )
+
+
+class PlanResponse(BaseModel):
+    plan: PlanOut | None
+
+
+class DeletePlanResponse(BaseModel):
+    ok: bool
+
+
 # ---- diff -----------------------------------------------------------------------------------
 
 

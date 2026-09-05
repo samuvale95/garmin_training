@@ -14,7 +14,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
-from .. import service
+from .. import db, service
 from ..parser import parse_training_plan
 from . import garmin_session, schemas
 from .auth import current_user_id
@@ -22,6 +22,32 @@ from .cache import TTL_PLAN_DIFF, cache
 from .jobs import job_store
 
 router = APIRouter()
+
+
+@router.get("/plan", response_model=schemas.PlanResponse)
+async def get_plan(user_id: str = Depends(current_user_id)) -> schemas.PlanResponse:
+    plan = await run_in_threadpool(db.get_plan, user_id)
+    return schemas.PlanResponse(plan=schemas.PlanOut.from_model(plan) if plan else None)
+
+
+@router.put("/plan", response_model=schemas.PlanOut)
+async def save_plan(payload: schemas.PlanIn, user_id: str = Depends(current_user_id)) -> schemas.PlanOut:
+    plan = await run_in_threadpool(
+        lambda: db.save_plan(
+            user_id=user_id,
+            yaml_text=payload.yaml_text,
+            sessions=[s.model_dump(mode="json") for s in payload.sessions],
+            filename=payload.filename,
+            imported_at=payload.imported_at,
+        )
+    )
+    return schemas.PlanOut.from_model(plan)
+
+
+@router.delete("/plan", response_model=schemas.DeletePlanResponse)
+async def delete_plan(user_id: str = Depends(current_user_id)) -> schemas.DeletePlanResponse:
+    await run_in_threadpool(db.delete_plan, user_id)
+    return schemas.DeletePlanResponse(ok=True)
 
 
 @router.post("/plan/parse", response_model=schemas.ParsePlanResponse)

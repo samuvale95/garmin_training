@@ -106,6 +106,17 @@ export async function apiPost<T>(path: string, body?: unknown, signal?: AbortSig
   return handle<T>(response);
 }
 
+export async function apiPut<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(new URL(path, API_BASE_URL), {
+    method: "PUT",
+    headers: { ...(await authHeaders()), ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    cache: "no-store",
+    signal: requestSignal(signal),
+  });
+  return handle<T>(response);
+}
+
 export async function apiPostForm<T>(path: string, form: FormData): Promise<T> {
   const response = await fetch(new URL(path, API_BASE_URL), {
     method: "POST",

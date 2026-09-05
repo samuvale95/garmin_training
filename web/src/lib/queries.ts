@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm } from "./apiClient";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm, apiPut } from "./apiClient";
 import { toDateKey, weekBounds } from "./sessionVisuals";
 import type {
   AthleteProfile,
@@ -29,7 +29,7 @@ import type {
   TrainingSession,
 } from "./types";
 
-// ---- plan / sessions (client-only, no backend record -- see usePlanQuery below) ---------
+// ---- plan / sessions (server-backed, mirrored to localStorage -- see usePlanQuery below) ---
 
 /** The plan's own cache key. Deliberately *not* `["plan", ...]`-prefixed: the diff and
  * the sync job used to share that prefix, so any `invalidateQueries({queryKey:["plan"]})`
@@ -75,13 +75,18 @@ function persistPlan(plan: PlanState | null): void {
   else localStorage.removeItem(PLAN_STORAGE_KEY);
 }
 
-/** Whether the localStorage read below has already happened, as a tiny external store.
- * It is a property of the browser tab, not of any one component -- the first
- * `usePlanQuery` to mount restores the plan for everybody -- and keeping it outside React
- * is also what lets the effect stay a pure "sync from an external system" step: it writes
- * the cache and flips this flag in the same tick, so nobody can ever observe
- * `isHydrated === true` next to a plan that hasn't been restored yet. */
+/** Whether the plan has been restored yet (from the server, falling back to
+ * localStorage), as a tiny external store. It is a property of the browser tab, not of
+ * any one component -- the first `usePlanQuery` to mount restores the plan for
+ * everybody -- and keeping it outside React is also what lets `isHydrated` flip only
+ * once the restore has actually landed, so nobody can ever observe `isHydrated ===
+ * true` next to a plan that hasn't been restored yet. */
 let planHydrated = false;
+/** Set synchronously, before the `GET /plan` round-trip even starts -- unlike
+ * `planHydrated`, which only flips once that call resolves. Without a separate,
+ * synchronous guard, two `usePlanQuery` mounts in the same tick (Settimana's guard and
+ * Oggi's, say) would each see `planHydrated === false` and both fire the request. */
+let planHydrationStarted = false;
 const planHydrationListeners = new Set<() => void>();
 
 function subscribePlanHydration(onChange: () => void): () => void {
@@ -90,35 +95,53 @@ function subscribePlanHydration(onChange: () => void): () => void {
 }
 
 function restorePersistedPlanOnce(queryClient: ReturnType<typeof useQueryClient>): void {
-  if (planHydrated) return;
-  const persisted = readPersistedPlan();
-  if (persisted) {
-    queryClient.setQueryData<PlanState | null>(PLAN_KEY, persisted);
-    // Migrated from the legacy Zustand key (or just a normal re-read) -- writing it
-    // back under the new key makes it the source of truth from here on, so this
-    // fallback only ever does real work once per browser.
-    persistPlan(persisted);
-  }
-  planHydrated = true;
-  for (const listener of planHydrationListeners) listener();
+  if (planHydrationStarted) return;
+  planHydrationStarted = true;
+  const local = readPersistedPlan();
+
+  apiGet<{ plan: PlanState | null }>("/plan")
+    .then(({ plan: remote }) => {
+      if (remote) {
+        // The server has a copy -- it wins over whatever this device had cached,
+        // exactly the same way a second device or a cleared browser should see it.
+        applyPlanLocally(queryClient, remote);
+      } else if (local) {
+        // Nothing server-side yet, but this device already has a plan from before the
+        // move to server-backed storage (or a stretch spent offline): push it up once,
+        // rather than let the switch silently orphan it.
+        writePlan(queryClient, local);
+      }
+    })
+    .catch(() => {
+      // Offline, or the request failed -- fall back to whatever this device already
+      // has. The next successful `writePlan` (or the next reload) reconciles with the
+      // server.
+      if (local) applyPlanLocally(queryClient, local);
+    })
+    .finally(() => {
+      planHydrated = true;
+      for (const listener of planHydrationListeners) listener();
+    });
 }
 
-/** The imported plan is "genuinely device-only" (design.md, passo-nextjs-web-app):
- * the backend never stores it, only receives it per-request to diff/sync. It lives in
- * the TanStack Query cache like every other piece of app data, but with no real
- * `queryFn` (there is nothing to fetch) -- `staleTime: Infinity` keeps it from ever
- * being silently refetched into nothing. All writes go through `queryClient.
- * setQueryData` below, mirrored into localStorage in the same tick.
+/** The active plan: server-backed (Postgres, one row per user -- see `training_plan/
+ * db.py`'s `user_plan` table), with a localStorage mirror for an instant same-tab
+ * paint and offline resilience. It lives in the TanStack Query cache like every other
+ * piece of app data, but with no real `queryFn` (there is nothing to fetch through
+ * `useQuery` itself -- the restore below drives the cache directly) -- `staleTime:
+ * Infinity` keeps it from ever being silently refetched into nothing. All writes go
+ * through `writePlan`, which updates the cache, mirrors to localStorage, and pushes to
+ * the server in the same call.
  *
- * The localStorage read itself happens in an effect, not in `initialData`: Next.js
- * server-renders this ("use client") page too, where `localStorage` doesn't exist, so
- * seeding synchronously would make the client's first render disagree with the
+ * The restore itself happens in an effect, not in `initialData`: Next.js server-renders
+ * this ("use client") page too, where neither `localStorage` nor a real session exist,
+ * so seeding synchronously would make the client's first render disagree with the
  * server-rendered HTML and trigger a React hydration-mismatch (a full, jank-y
- * client-side re-render of the tree). Deferring the read to `useEffect` keeps the
- * first client render identical to the server's (both start from `null`), then
- * hydrates a tick later -- `isHydrated` lets callers that redirect on a missing plan
- * (see guards.ts) hold off until that tick has happened, so an existing plan doesn't
- * cause a spurious bounce to /import.
+ * client-side re-render of the tree). Deferring it to `useEffect` keeps the first
+ * client render identical to the server's (both start from `null`), then hydrates once
+ * the restore lands -- `isHydrated` lets callers that redirect on a missing plan (see
+ * guards.ts) hold off until then, so an existing plan doesn't cause a spurious bounce
+ * to /import.
  */
 export function usePlanQuery() {
   const queryClient = useQueryClient();
@@ -146,9 +169,30 @@ export function usePlanQuery() {
   return { ...query, isHydrated };
 }
 
-function writePlan(queryClient: ReturnType<typeof useQueryClient>, next: PlanState | null): void {
+function applyPlanLocally(queryClient: ReturnType<typeof useQueryClient>, next: PlanState | null): void {
   queryClient.setQueryData<PlanState | null>(PLAN_KEY, next);
   persistPlan(next);
+}
+
+/** Best-effort: the query cache + localStorage mirror (updated synchronously, just
+ * before this call) stay this tab's source of truth regardless of whether the request
+ * succeeds -- a save made offline reaches the server on the next `writePlan` call, or
+ * gets pushed by `restorePersistedPlanOnce`'s own migration path on the next load. */
+function persistPlanToServer(plan: PlanState | null): void {
+  const request = plan
+    ? apiPut("/plan", {
+        yaml_text: plan.yamlText,
+        sessions: plan.sessions,
+        filename: plan.filename,
+        imported_at: plan.importedAt ?? new Date().toISOString(),
+      })
+    : apiDelete("/plan");
+  request.catch(() => {});
+}
+
+function writePlan(queryClient: ReturnType<typeof useQueryClient>, next: PlanState | null): void {
+  applyPlanLocally(queryClient, next);
+  persistPlanToServer(next);
 }
 
 export function useSetPlan() {
@@ -179,6 +223,9 @@ export function useResetAllLocalData() {
       // clearing only the in-memory copy would let the old one come back on refresh.
       localStorage.removeItem("passo-query-cache");
     }
+    // The plan now also lives server-side (see `writePlan`) -- without this, the next
+    // reload's restore would pull the "deleted" plan right back down from there.
+    apiDelete("/plan").catch(() => {});
   };
 }
 
