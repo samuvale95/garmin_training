@@ -742,6 +742,12 @@ class GarminSync:
 
     def list_scheduled_workouts(self, start: date_type, end: date_type) -> list[ScheduledWorkout]:
         results: list[ScheduledWorkout] = []
+        # Garmin's per-month calendar response includes the full leading/trailing week
+        # that spills into the neighboring month (so its own month view can render whole
+        # weeks) -- a range spanning a month boundary therefore sees the boundary week's
+        # entries twice, once from each month's response. `seen_ids` dedupes on the one
+        # thing that's stable across both copies: the calendar entry's own id.
+        seen_ids: set[int] = set()
         year, month = start.year, start.month
         while (year, month) <= (end.year, end.month):
             try:
@@ -752,7 +758,8 @@ class GarminSync:
                 ) from exc
             for item in _extract_calendar_items(data):
                 scheduled = _parse_calendar_item(item)
-                if scheduled and start <= scheduled.date <= end:
+                if scheduled and start <= scheduled.date <= end and scheduled.scheduled_workout_id not in seen_ids:
+                    seen_ids.add(scheduled.scheduled_workout_id)
                     results.append(scheduled)
             year, month = (year + 1, 1) if month == 12 else (year, month + 1)
         results.sort(key=lambda w: w.date)

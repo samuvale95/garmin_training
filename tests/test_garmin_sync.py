@@ -999,6 +999,23 @@ def test_list_scheduled_workouts_filters_to_date_range_across_months():
     assert [w.title for w in workouts] == ["End of July run", "In range"]
 
 
+def test_list_scheduled_workouts_dedupes_the_boundary_week_between_months():
+    # Garmin's per-month calendar response includes the whole leading/trailing week
+    # that spills into the neighboring month, so a range that crosses a month boundary
+    # sees that week's entries once from each month's response -- same id both times.
+    sync, fake = make_sync_with_fake_client()
+    boundary_entry = _calendar_item(1, 10, "2026-08-31", "Corsa 40'")
+    fake.calendar_by_month[(2026, 8)] = {"calendarItems": [boundary_entry]}
+    fake.calendar_by_month[(2026, 9)] = {"calendarItems": [boundary_entry, _calendar_item(2, 11, "2026-09-04", "Lungo")]}
+
+    workouts = sync.list_scheduled_workouts(date(2026, 8, 31), date(2026, 9, 6))
+
+    assert [(w.scheduled_workout_id, w.date, w.title) for w in workouts] == [
+        (1, date(2026, 8, 31), "Corsa 40'"),
+        (2, date(2026, 9, 4), "Lungo"),
+    ]
+
+
 def test_list_scheduled_workouts_empty_range():
     sync, fake = make_sync_with_fake_client()
     workouts = sync.list_scheduled_workouts(date(2026, 8, 1), date(2026, 8, 31))
