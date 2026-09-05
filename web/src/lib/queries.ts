@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm, apiPut } from "./apiClient";
-import { toDateKey, weekBounds } from "./sessionVisuals";
+import { shiftDateKey, toDateKey, weekBounds } from "./sessionVisuals";
 import type {
   AthleteProfile,
   BodyMetrics,
@@ -28,6 +28,35 @@ import type {
   SyncJobStatus,
   TrainingSession,
 } from "./types";
+
+// ---- how long an answer stays good --------------------------------------------------------
+
+/** The default for anything that tracks "now": five minutes, matching the QueryClient's
+ * own default (providers.tsx). */
+const LIVE_STALE_TIME = 5 * 60_000;
+
+/** ...and the rule for everything that doesn't.
+ *
+ * A date range that has already ended cannot change on its own: a completed activity is
+ * a fact, and Garmin's calendar for a past week only ever changes because *this app*
+ * wrote to it -- which invalidates the `garmin` keys outright (see `useRescheduleWorkout`,
+ * `useApplyDeletion`, the sync job) and so overrides any staleTime set here. Paging back
+ * to a week already looked at therefore costs nothing, however long ago it was looked
+ * at, instead of re-paying a Garmin round-trip every five minutes. `useRefreshServerData`
+ * remains the "ask again anyway" escape hatch, and invalidation ignores staleness too.
+ *
+ * The day of margin is for timezones: this device may be a day ahead of the server that
+ * answers, and a range that is still "today" for anyone involved must not be frozen. */
+const PAST_RANGE_MARGIN_DAYS = 1;
+
+function isPastDate(dateKey: string): boolean {
+  return dateKey < shiftDateKey(toDateKey(new Date()), -PAST_RANGE_MARGIN_DAYS);
+}
+
+/** `Infinity` for a range that has ended, the live default otherwise. */
+function rangeStaleTime(end: string): number {
+  return isPastDate(end) ? Infinity : LIVE_STALE_TIME;
+}
 
 // ---- plan / sessions (server-backed, mirrored to localStorage -- see usePlanQuery below) ---
 
@@ -478,10 +507,20 @@ export function useCancelSync() {
  * range: the cache is keyed by (start, end), so a single-day request is a guaranteed
  * miss against the week Oggi/Settimana already loaded -- which is exactly why opening a
  * day's detail used to trigger a fresh Garmin round-trip for data already on screen. */
+/** One definition of "this range's scheduled workouts", shared by the hook and the
+ * prefetch below so a warmed slot is always the one the screen goes on to read. */
+function workoutsQueryOptions(start: string, end: string) {
+  return {
+    queryKey: ["garmin", "workouts", start, end] as const,
+    queryFn: ({ signal }: { signal?: AbortSignal }) =>
+      apiGet<{ workouts: ScheduledWorkout[] }>("/garmin/workouts", { start, end }, signal),
+    staleTime: rangeStaleTime(end),
+  };
+}
+
 export function useWorkouts(start: string, end: string, enabled = true) {
   return useQuery({
-    queryKey: ["garmin", "workouts", start, end],
-    queryFn: ({ signal }) => apiGet<{ workouts: ScheduledWorkout[] }>("/garmin/workouts", { start, end }, signal),
+    ...workoutsQueryOptions(start, end),
     enabled,
     // Paging through weeks keeps the previous week visible until the next one lands.
     placeholderData: keepPreviousData,
@@ -532,11 +571,19 @@ function fetchWorkoutSession(workout: ScheduledWorkout, signal?: AbortSignal) {
   );
 }
 
+/** A workout's step structure only changes when it is edited here, which invalidates
+ * this key -- so an hour for anything still ahead, and never for a day already run. */
+function workoutSessionStaleTime(workout: ScheduledWorkout | null): number {
+  if (workout && isPastDate(workout.date)) return Infinity;
+  return 60 * 60_000;
+}
+
 export function useWorkoutSession(workout: ScheduledWorkout | null, enabled = true) {
   return useQuery({
     queryKey: workoutSessionKey(workout),
     queryFn: ({ signal }) => fetchWorkoutSession(workout!, signal),
     enabled: enabled && !!workout,
+    staleTime: workoutSessionStaleTime(workout),
   });
 }
 
@@ -552,17 +599,46 @@ export function usePrefetchWorkoutSession() {
     queryClient.prefetchQuery({
       queryKey: workoutSessionKey(workout),
       queryFn: ({ signal }) => fetchWorkoutSession(workout, signal),
+      staleTime: workoutSessionStaleTime(workout),
     });
   };
 }
 
+function activitiesQueryOptions(start: string, end: string) {
+  return {
+    queryKey: ["garmin", "activities", start, end] as const,
+    queryFn: ({ signal }: { signal?: AbortSignal }) =>
+      apiGet<{ activities: CompletedActivity[] }>("/garmin/activities", { start, end }, signal),
+    staleTime: rangeStaleTime(end),
+  };
+}
+
 export function useActivities(start: string, end: string, enabled = true) {
-  return useQuery({
-    queryKey: ["garmin", "activities", start, end],
-    queryFn: ({ signal }) => apiGet<{ activities: CompletedActivity[] }>("/garmin/activities", { start, end }, signal),
-    enabled,
-    staleTime: 5 * 60_000,
+  return useQuery({ ...activitiesQueryOptions(start, end), enabled });
+}
+
+/** Warms whole weeks that haven't been asked for yet -- Settimana calls it for the two
+ * weeks either side of the one on screen, so paging is instant the *first* time too and
+ * not only on the way back. Prefetching respects `staleTime`, so a week already in the
+ * cache costs nothing here. */
+export function usePrefetchWeeks(references: Date[], { workouts, activities }: { workouts: boolean; activities: boolean }) {
+  const queryClient = useQueryClient();
+  const ranges = references.map((reference) => {
+    const { start, end } = weekBounds(reference);
+    return [toDateKey(start), toDateKey(end)] as const;
   });
+  // The effect must run when the *weeks* change, not on every render that rebuilt the
+  // Date objects above.
+  const fingerprint = ranges.map(([start, end]) => `${start}:${end}`).join("|");
+
+  useEffect(() => {
+    for (const range of fingerprint.split("|")) {
+      const [start, end] = range.split(":");
+      if (!start || !end) continue;
+      if (workouts) queryClient.prefetchQuery(workoutsQueryOptions(start, end));
+      if (activities) queryClient.prefetchQuery(activitiesQueryOptions(start, end));
+    }
+  }, [fingerprint, workouts, activities, queryClient]);
 }
 
 export function useDeletionPreview() {
@@ -740,6 +816,7 @@ export function useStravaActivityMatch(session: TrainingSession | null, enabled:
     queryKey: stravaMatchKey(session?.date ?? null),
     queryFn: ({ signal }) => apiPost<StravaActivityMatch>("/strava/activity-match", { session }, signal),
     enabled: enabled && !!session,
+    staleTime: session ? rangeStaleTime(session.date) : LIVE_STALE_TIME,
   });
 }
 
@@ -751,11 +828,15 @@ export function useStravaActivityMatch(session: TrainingSession | null, enabled:
  * day's detail finds its match already there. */
 export function useStravaActivityMatches(sessions: TrainingSession[], enabled: boolean) {
   const queryClient = useQueryClient();
+  // The last day these sessions cover: once it has passed, no new Strava activity can
+  // land on any of them, so the answer is final.
+  const lastDate = sessions.reduce((latest, session) => (session.date > latest ? session.date : latest), "");
   const query = useQuery({
     queryKey: ["strava", "matches", sessions.length ? planFingerprint(sessions) : null],
     queryFn: ({ signal }) =>
       apiPost<{ matches: Record<string, StravaActivityMatch> }>("/strava/activity-matches", { sessions }, signal),
     enabled: enabled && sessions.length > 0,
+    staleTime: lastDate ? rangeStaleTime(lastDate) : LIVE_STALE_TIME,
     placeholderData: keepPreviousData,
   });
 
@@ -841,6 +922,9 @@ export function useFoodDay(date: string) {
   return useQuery({
     queryKey: ["nutrition", "day", date],
     queryFn: ({ signal }) => apiGet<FoodDay>("/nutrition/day", { date }, signal),
+    // Photographing or correcting a meal invalidates this key (`invalidateNutrition`),
+    // so a day in the past has nothing left to tell us.
+    staleTime: rangeStaleTime(date),
   });
 }
 

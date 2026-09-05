@@ -19,6 +19,7 @@ from .cache import (
     TTL_GARMIN_WORKOUTS,
     cache,
     invalidate_calendar,
+    range_ttl,
 )
 
 router = APIRouter()
@@ -92,7 +93,7 @@ async def workouts(
             "garmin:workouts",
             user_id,
             (start, end),
-            TTL_GARMIN_WORKOUTS,
+            range_ttl(end, TTL_GARMIN_WORKOUTS),
             lambda: garmin_session.run(user_id, lambda sync: service.list_workouts(start, end, sync=sync)),
             refresh=refresh,
         )
@@ -114,7 +115,7 @@ async def workout_session(
             "garmin:workout-session",
             user_id,
             (workout_id, date, sport, title),
-            TTL_GARMIN_WORKOUT_SESSION,
+            range_ttl(date, TTL_GARMIN_WORKOUT_SESSION),
             lambda: garmin_session.run(
                 user_id, lambda sync: service.get_workout_session(workout_id, date, sport, title, sync=sync)
             ),
@@ -133,7 +134,7 @@ async def activities(
             "garmin:activities",
             user_id,
             (start, end),
-            TTL_GARMIN_ACTIVITIES,
+            range_ttl(end, TTL_GARMIN_ACTIVITIES),
             lambda: garmin_session.run(user_id, lambda sync: service.list_activities(start, end, sync=sync)),
             refresh=refresh,
         )

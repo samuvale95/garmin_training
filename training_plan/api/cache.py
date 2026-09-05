@@ -26,6 +26,7 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Callable, Hashable, Iterable
+from datetime import date, timedelta
 from typing import Any, TypeVar
 
 T = TypeVar("T")
@@ -57,6 +58,23 @@ TTL_BODY_METRICS = 30 * 60
 # Matched to the client's own staleTime for this query: the diff can only go stale if the
 # plan changes (a different cache key) or the calendar changes (invalidated on write).
 TTL_PLAN_DIFF = 5 * 60
+
+# A date range that has already ended has nothing left to say: a completed activity is a
+# fact, and the calendar for a past week only changes when this app writes to it -- which
+# drops CALENDAR_NAMESPACES wholesale, so a long TTL here can never serve a stale answer
+# after a write. This is what makes paging back through past weeks free instead of a
+# Garmin round-trip per minute (TTL_GARMIN_WORKOUTS above is deliberately short, because
+# the *current* week is what a second device might be changing underneath us).
+TTL_PAST_RANGE = 24 * 60 * 60
+# The client sends dates in its own local calendar and this process may be running in a
+# different timezone, so "ended" means ended the day before yesterday -- never a range
+# that is still today for whoever asked.
+PAST_RANGE_MARGIN = timedelta(days=1)
+
+
+def range_ttl(end: date, live_ttl: float, *, today: date | None = None) -> float:
+    """`TTL_PAST_RANGE` for a range that ended before yesterday, `live_ttl` otherwise."""
+    return TTL_PAST_RANGE if end < (today or date.today()) - PAST_RANGE_MARGIN else live_ttl
 
 
 class TTLCache:
