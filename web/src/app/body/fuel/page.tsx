@@ -1,17 +1,18 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
-import { BarGrow, ProgressRing, PulseRing, SlideUp } from "@/components/motion/primitives";
-import { FoodThumb, FuelCorrectionSheet } from "@/components/FuelCorrectionSheet";
+import { PulseRing, Skeleton, SlideUp } from "@/components/motion/primitives";
+import { FuelCorrectionSheet } from "@/components/FuelCorrectionSheet";
+import { FuelComment, FuelHero, MealList, TodayFuelBlock } from "@/components/FuelBlocks";
 import { useMountOnce } from "@/lib/motion";
-import { capitalize, formatClockTime, formatFullDate, formatWeekday } from "@/lib/format";
+import { formatWeekday } from "@/lib/format";
 import { useCalendarAccess } from "@/lib/guards";
 import { useFoodDay, useFuelNarrative, useFuelTargets, useLogPhoto, useWorkouts, useDeleteEntry, useUpdateEntry } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
 import { shiftDateKey, toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
-import type { DayTarget, DayTotals, FoodEntry, FuelTargets } from "@/lib/types";
+import type { FoodEntry } from "@/lib/types";
 
 // ---- flow state: idle screen (C), or one of the photo-estimate states (D) ------------------
 
@@ -157,31 +158,38 @@ export default function FuelPage() {
   const day = dayQuery.data;
   const entries = day?.entries ?? [];
   const hasPlan = sessions.length > 0;
+  const narrative = narrativeQuery.data?.text;
+  // The hero already prints one of these two sentences; the comment block only earns
+  // its place when it has something else to say (the model's narrative shown above,
+  // the deterministic advice below). Identical text stacked twice was the screen's
+  // most visible flaw.
+  const commentText = fuel && narrative && narrative !== fuel.advice ? fuel.advice : null;
 
   return (
-    <div style={{ padding: "22px 20px 130px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+    <div style={{ padding: "22px 20px 148px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/body" />
-        <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}>
-          carburante · {formatWeekday(today)} {new Date(`${today}T00:00:00`).getDate()}
+        <h1 style={{ font: "600 20px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Carburante</h1>
+        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "6px 12px" }}>
+          {formatWeekday(today)} {new Date(`${today}T00:00:00`).getDate()}
         </span>
       </div>
 
       {fuelQuery.isLoading || !fuel ? (
-        <p style={{ marginTop: 20 }}>Carico i dati…</p>
+        <FuelSkeleton />
       ) : (
         <>
-          <HeroTomorrow animate={animate} fuel={fuel} narrativeText={narrativeQuery.data?.text} />
+          <FuelHero animate={animate} fuel={fuel} narrativeText={narrative} />
 
           {fuel.weight_source === "reference" && (
             <SlideUp active={animate} delayMs={200} style={{ marginTop: 10 }}>
               <Link
                 href="/settings/body"
-                className="tap-target"
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: "16px 18px", textDecoration: "none", color: "inherit" }}
+                className="press-soft"
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: "16px 18px", textDecoration: "none", color: "inherit" }}
               >
                 <span>
-                  <span style={{ fontWeight: 700, fontSize: 15, display: "block" }}>Aggiungi il tuo peso</span>
+                  <span style={{ fontWeight: 600, fontSize: 15, display: "block" }}>Aggiungi il tuo peso</span>
                   <span style={{ fontSize: 12.5, color: "var(--inchiostro-50)" }}>dieci secondi, una volta sola</span>
                 </span>
                 <span aria-hidden="true" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--inchiostro)", color: "var(--crema)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
@@ -191,37 +199,66 @@ export default function FuelPage() {
             </SlideUp>
           )}
 
-          <TodayBlock animate={animate} fuel={fuel} totals={day?.totals} hasPlan={hasPlan} />
+          <TodayFuelBlock animate={animate} fuel={fuel} totals={day?.totals} hasPlan={hasPlan} />
 
           <MealList entries={entries} animate={animate} onSelect={setCorrecting} />
 
-          {entries.length > 0 && (
-            <SlideUp active={animate} delayMs={340} style={{ marginTop: 4 }}>
-              <Link href="/body/fuel/history" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 4px", textDecoration: "none", color: "inherit" }}>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Sette giorni</span>
-                <span aria-hidden="true">→</span>
-              </Link>
-            </SlideUp>
-          )}
+          {/* Shown on an empty day too: seven days of context is exactly what someone
+              who hasn't logged anything today might want to look at. */}
+          <SlideUp active={animate} delayMs={340} style={{ marginTop: 10 }}>
+            <Link
+              href="/body/fuel/history"
+              className="press-soft"
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "14px 18px", textDecoration: "none", color: "inherit" }}
+            >
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Sette giorni</span>
+              <span className="anim-chev" aria-hidden="true">→</span>
+            </Link>
+          </SlideUp>
 
-          <CommentBlock animate={animate} text={narrativeQuery.data?.text ?? fuel.advice} />
+          {commentText && <FuelComment animate={animate} text={commentText} />}
         </>
       )}
 
       <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={onFileSelected} style={{ display: "none" }} />
 
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center", zIndex: 15, pointerEvents: "none" }}>
-        <div style={{ width: "100%", maxWidth: "var(--frame-max-width)", padding: "0 20px 16px", pointerEvents: "auto" }}>
+        {/* The CTA floats over a scrolling list, so it gets a scrim of the page's own
+            background rather than letting rows slide edge-to-edge under a hard button. */}
+        <div
+          style={{
+            width: "100%",
+            maxWidth: "var(--frame-max-width)",
+            padding: "30px 20px 16px",
+            pointerEvents: "auto",
+            background: "linear-gradient(to top, var(--crema) 62%, rgba(246,238,218,0))",
+          }}
+        >
           <button
             type="button"
             onClick={openCamera}
             disabled={logPhoto.isPending}
-            className="tap-target"
-            style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "var(--corallo)", color: "var(--corallo-testo)", border: "none", borderRadius: "var(--radius-pill)", padding: "17px 22px", fontSize: 16, fontWeight: 700, cursor: "pointer", boxShadow: "0 8px 20px rgba(28,26,22,.18)" }}
+            className="tap-target press-soft"
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              background: "var(--corallo)",
+              color: "var(--corallo-testo)",
+              border: "none",
+              borderRadius: "var(--radius-pill)",
+              padding: "17px 22px",
+              fontSize: 16,
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: "0 10px 24px rgba(28,26,22,.16)",
+            }}
           >
             <span aria-hidden="true">📷</span> Fotografa il piatto
           </button>
-          <p style={{ textAlign: "center", fontSize: 11, color: "var(--inchiostro-35)", fontWeight: 500, margin: "8px 0 0" }}>
+          <p style={{ textAlign: "center", fontSize: 11, color: "var(--inchiostro-35)", fontWeight: 500, margin: "9px 0 0" }}>
             Orientamento sportivo generale, non un consiglio clinico.
           </p>
         </div>
@@ -232,203 +269,17 @@ export default function FuelPage() {
   );
 }
 
-// ---- C1: hero "domani" -----------------------------------------------------------------
-
-function HeroTomorrow({ animate, fuel, narrativeText }: { animate: boolean; fuel: FuelTargets; narrativeText?: string }) {
-  const degraded = fuel.weight_source === "reference";
-  const t = fuel.tomorrow;
-  const title = t.session_title ? capitalize(t.session_title) : t.load === "riposo" ? "Domani riposo" : "Allenamento";
-
+/** MOTION.md §7.1: shape-matching rectangles, never a spinner and never a bare "Carico
+ * i dati…" line where a card is about to appear. */
+function FuelSkeleton() {
   return (
-    <SlideUp
-      active={animate}
-      delayMs={100}
-      style={{ background: degraded ? "var(--sabbia)" : "var(--inchiostro)", color: degraded ? "var(--inchiostro)" : "var(--crema)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 16 }}
-    >
-      <p style={{ fontSize: 12, opacity: 0.65, margin: "0 0 4px" }}>domani · {formatFullDate(t.date)}</p>
-      <p style={{ font: "700 24px/1.1 var(--font-outfit)", margin: "0 0 14px" }}>{title}</p>
-
-      {t.carb_g && (
-        <p className="font-mono" style={{ fontSize: 40, fontWeight: 500, color: "var(--corallo)", margin: 0, lineHeight: 1 }}>
-          {t.carb_g[0]}–{t.carb_g[1]} <span style={{ fontSize: 17, fontWeight: 400, color: degraded ? "var(--inchiostro-70)" : "var(--inchiostro-su-scuro)" }}>g</span>
-        </p>
-      )}
-
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-        <span style={{ fontSize: 13, opacity: 0.65 }}>
-          {t.carb_g_per_kg[0]}–{t.carb_g_per_kg[1]} g per kg
-        </span>
-        {degraded && (
-          <span style={{ background: "var(--giallo)", color: "var(--giallo-testo)", borderRadius: "var(--radius-pill)", padding: "4px 10px", fontSize: 11, fontWeight: 600 }}>
-            su 70 kg di riferimento
-          </span>
-        )}
-      </div>
-
-      <p className="font-serif-italic" style={{ fontSize: 15, marginTop: 14, opacity: 0.95 }}>{narrativeText ?? fuel.advice}</p>
-    </SlideUp>
-  );
-}
-
-// ---- C2: "oggi" block, empty vs logged --------------------------------------------------
-
-const RING_SIZE = 104;
-
-function TodayBlock({ animate, fuel, totals, hasPlan }: { animate: boolean; fuel: FuelTargets; totals: DayTotals | undefined; hasPlan: boolean }) {
-  const t: DayTarget = fuel.today;
-  const hasEntries = !!totals && totals.entries > 0;
-  const subtitle = !hasPlan ? "nessun piano importato" : t.session_title ? t.session_title.toLowerCase() : t.load === "riposo" ? "riposo" : t.load;
-
-  return (
-    <SlideUp active={animate} delayMs={240} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 18, marginTop: 12 }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-        <p style={{ font: "700 17px/1 var(--font-outfit)", margin: 0 }}>Oggi</p>
-        <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{subtitle}</span>
-      </div>
-
-      {!hasPlan && <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "8px 0 0" }}>Senza sapere cosa corri uso i valori di mantenimento.</p>}
-
-      {hasEntries && totals ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 14 }}>
-          <ProgressRing key={Math.round(totals.carb_g)} value={t.carb_g ? totals.carb_g / t.carb_g[1] : 0} size={RING_SIZE} strokeWidth={11} trackColor="var(--sabbia-chip)">
-            <div style={{ textAlign: "center" }}>
-              <p className="font-mono" style={{ fontSize: 26, fontWeight: 500, margin: 0 }}>{Math.round(totals.carb_g)}</p>
-              <p style={{ fontSize: 10, color: "var(--inchiostro-50)", margin: 0 }}>g carbo</p>
-            </div>
-          </ProgressRing>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{t.carb_g ? `su ${t.carb_g[0]}-${t.carb_g[1]} g` : ""}</span>
-              <span style={{ background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "3px 10px", fontSize: 10, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase" }}>stima</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14 }}>
-              <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>proteine</span>
-              <span className="font-mono" style={{ fontSize: 13 }}>{Math.round(totals.protein_g)} g</span>
-            </div>
-            <div style={{ marginTop: 6 }}>
-              <BarGrow value={t.protein_g ? totals.protein_g / t.protein_g[1] : 0} color="var(--azzurro-tratto)" trackColor="var(--sabbia-chip)" height={7} />
-            </div>
-            {t.protein_g && (
-              <p style={{ fontSize: 11, color: "var(--inchiostro-35)", margin: "5px 0 0" }}>
-                su {t.protein_g[0]}-{t.protein_g[1]} g
-              </p>
-            )}
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14 }}>
-              <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>grassi</span>
-              <span className="font-mono" style={{ fontSize: 13 }}>{Math.round(totals.fat_g)} g</span>
-            </div>
-            <div style={{ marginTop: 6 }}>
-              <BarGrow value={t.fat_g ? totals.fat_g / t.fat_g[1] : 0} color="var(--lilla)" trackColor="var(--sabbia-chip)" height={7} />
-            </div>
-            {t.fat_g && (
-              <p style={{ fontSize: 11, color: "var(--inchiostro-35)", margin: "5px 0 0" }}>
-                su {t.fat_g[0]}-{t.fat_g[1]} g
-              </p>
-            )}
-          </div>
-        </div>
-      ) : (
-        <>
-          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-            <TargetTile label="carboidrati" range={t.carb_g} />
-            <TargetTile label="proteine" range={t.protein_g} />
-            <TargetTile label="grassi" range={t.fat_g} />
-          </div>
-          <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", marginTop: 10 }}>
-            {hasPlan && "Non hai ancora fotografato niente. "}Questi sono i target del giorno, non un debito.
-          </p>
-        </>
-      )}
-    </SlideUp>
-  );
-}
-
-function TargetTile({ label, range }: { label: string; range: [number, number] | null }) {
-  return (
-    <div style={{ flex: 1, background: "var(--sabbia)", borderRadius: "var(--radius-chip)", padding: 14 }}>
-      <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "0 0 6px" }}>{label}</p>
-      {range && (
-        <p className="font-mono" style={{ fontSize: 20, fontWeight: 500, margin: "0 0 8px" }}>
-          {range[0]}-{range[1]} <span style={{ fontSize: 12, fontWeight: 400 }}>g</span>
-        </p>
-      )}
-      <div style={{ height: 4, borderRadius: 100, background: "var(--neutro-barra)" }} />
+    <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+      <Skeleton height={232} radius={27} />
+      <Skeleton height={196} radius={27} />
     </div>
   );
 }
 
-// ---- C3: meal list -----------------------------------------------------------------------
-
-function MealList({ entries, animate, onSelect }: { entries: FoodEntry[]; animate: boolean; onSelect: (e: FoodEntry) => void }) {
-  if (entries.length === 0) return null;
-  return (
-    <div style={{ marginTop: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>Pasti di oggi</span>
-        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
-          {entries.length} {entries.length === 1 ? "voce" : "voci"}
-        </span>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-        {entries.map((entry, i) => (
-          <SlideUp key={entry.id} active={animate} delayMs={300 + i * 60} row>
-            <MealRow entry={entry} onSelect={onSelect} />
-          </SlideUp>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MealRow({ entry, onSelect }: { entry: FoodEntry; onSelect: (e: FoodEntry) => void }) {
-  const low = entry.confidence === "low";
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(entry)}
-      className="tap-target"
-      style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "var(--crema-card)", border: low ? "1.5px dashed var(--sabbia-bordo)" : "1.5px solid transparent", borderRadius: "var(--radius-row)", padding: 12, textAlign: "left", cursor: "pointer" }}
-    >
-      <FoodThumb entry={entry} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontWeight: 600, fontSize: 14, margin: "0 0 3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: low ? "var(--inchiostro-70)" : "var(--inchiostro)" }}>
-          {entry.description ?? "Pasto"}
-        </p>
-        <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
-          {low && "~"}
-          {entry.carb_g != null ? Math.round(entry.carb_g) : "—"} g C · {low && "~"}
-          {entry.protein_g != null ? Math.round(entry.protein_g) : "—"} g P
-        </p>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flex: "none" }}>
-        <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{formatClockTime(entry.logged_at)}</span>
-        <ConfidenceBadge entry={entry} />
-      </div>
-    </button>
-  );
-}
-
-function ConfidenceBadge({ entry }: { entry: FoodEntry }) {
-  if (entry.corrected) return <Chip background="var(--sabbia-chip)" color="var(--inchiostro-70)">corretto da te</Chip>;
-  if (entry.confidence === "low") return <Chip background="var(--rosa-avviso)" color="var(--rosso-testo)">bassa</Chip>;
-  if (entry.confidence === "medium") return <Chip background="var(--sabbia-chip)" color="var(--inchiostro-70)">media</Chip>;
-  if (entry.confidence === "high") return <Chip background="var(--verde)" color="var(--verde-testo)">alta</Chip>;
-  return null;
-}
-
-function Chip({ background, color, children }: { background: string; color: string; children: ReactNode }) {
-  return <span style={{ background, color, borderRadius: "var(--radius-pill)", padding: "4px 10px", fontSize: 11, fontWeight: 700, flex: "none" }}>{children}</span>;
-}
-
-// ---- C5: comment block ---------------------------------------------------------------------
-
-function CommentBlock({ animate, text }: { animate: boolean; text: string }) {
-  return (
-    <SlideUp active={animate} delayMs={380} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14 }}>
-      <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-70)", margin: 0 }}>{text}</p>
-    </SlideUp>
-  );
-}
 
 // ---- D2: "sto stimando" -------------------------------------------------------------------
 
