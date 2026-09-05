@@ -120,6 +120,12 @@ export interface DeleteResult {
   error?: string | null;
 }
 
+export interface RescheduleResult {
+  workout: ScheduledWorkout;
+  success: boolean;
+  error?: string | null;
+}
+
 export interface SleepPhases {
   deep_minutes: number | null;
   light_minutes: number | null;

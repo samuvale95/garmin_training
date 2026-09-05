@@ -185,3 +185,22 @@ async def deletion_apply(
             for r in results
         ]
     )
+
+
+@router.post("/garmin/workouts/reschedule", response_model=schemas.RescheduleResultOut)
+async def reschedule_workout(
+    payload: schemas.RescheduleWorkoutRequest, user_id: str = Depends(current_user_id)
+) -> schemas.RescheduleResultOut:
+    def _run(sync):
+        workout = ScheduledWorkout(
+            scheduled_workout_id=payload.workout.scheduled_workout_id,
+            workout_id=payload.workout.workout_id,
+            date=payload.workout.date,
+            sport=payload.workout.sport,
+            title=payload.workout.title,
+        )
+        return sync.reschedule_workout(workout, payload.new_date)
+
+    result = await run_in_threadpool(lambda: garmin_session.run(user_id, _run))
+    invalidate_calendar(user_id)
+    return schemas.RescheduleResultOut.from_model(result)

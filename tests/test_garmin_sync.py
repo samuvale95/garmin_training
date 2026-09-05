@@ -1195,6 +1195,32 @@ def test_delete_all_continues_after_one_failure():
     assert results[1].error == "cannot delete"
 
 
+# ---- rescheduling existing workouts --------------------------------------------------------
+
+
+def test_reschedule_workout_moves_calendar_entry_without_deleting_it():
+    sync, fake = make_sync_with_fake_client()
+    workout = ScheduledWorkout(1, 10, date(2026, 8, 1), "running", "Easy Run")
+
+    result = sync.reschedule_workout(workout, date(2026, 8, 5))
+
+    assert result.success
+    assert fake.unscheduled == [1]
+    assert fake.scheduled == [(10, "2026-08-05")]
+    assert fake.deleted == []
+
+
+def test_reschedule_workout_reports_failure():
+    sync, fake = make_sync_with_fake_client()
+    workout = ScheduledWorkout(1, 10, date(2026, 8, 1), "running", "Easy Run")
+    fake.schedule_should_fail = True
+
+    result = sync.reschedule_workout(workout, date(2026, 8, 5))
+
+    assert not result.success
+    assert result.error == "schedule failed"
+
+
 # ---- user profile ---------------------------------------------------------------------------
 
 

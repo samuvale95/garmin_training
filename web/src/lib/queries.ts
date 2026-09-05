@@ -20,6 +20,7 @@ import type {
   LoadSnapshot,
   Narrative,
   PlanDiff,
+  RescheduleResult,
   ScheduledWorkout,
   Shoe,
   StravaActivityMatch,
@@ -543,6 +544,38 @@ export function useApplyDeletion() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["garmin", "workouts"] });
+    },
+  });
+}
+
+/** Drags a live Garmin calendar entry onto a different day (Settimana). Optimistic,
+ * same shape as `useApplyDeletion` above: the card has to jump to its new day
+ * immediately, not wait a round-trip for Garmin to confirm the move. */
+export function useRescheduleWorkout() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ workout, newDate }: { workout: ScheduledWorkout; newDate: string }) =>
+      apiPost<RescheduleResult>("/garmin/workouts/reschedule", { workout, new_date: newDate }),
+    onMutate: async ({ workout, newDate }) => {
+      await queryClient.cancelQueries({ queryKey: ["garmin", "workouts"] });
+      const previous = queryClient.getQueriesData<{ workouts: ScheduledWorkout[] }>({ queryKey: ["garmin", "workouts"] });
+      queryClient.setQueriesData<{ workouts: ScheduledWorkout[] } | undefined>({ queryKey: ["garmin", "workouts"] }, (old) =>
+        old
+          ? {
+              workouts: old.workouts.map((w) =>
+                w.scheduled_workout_id === workout.scheduled_workout_id ? { ...w, date: newDate } : w
+              ),
+            }
+          : old
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      context?.previous.forEach(([key, data]) => queryClient.setQueryData(key, data));
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["garmin", "workouts"] });
+      queryClient.invalidateQueries({ queryKey: ["garmin", "workout-session"] });
     },
   });
 }

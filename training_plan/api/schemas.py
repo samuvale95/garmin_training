@@ -358,6 +358,21 @@ class DeletionApplyResponse(BaseModel):
     results: list[DeleteResultOut]
 
 
+class RescheduleWorkoutRequest(BaseModel):
+    workout: ScheduledWorkoutOut
+    new_date: date_type
+
+
+class RescheduleResultOut(BaseModel):
+    workout: ScheduledWorkoutOut
+    success: bool
+    error: str | None = None
+
+    @classmethod
+    def from_model(cls, result: garmin_sync.RescheduleResult) -> "RescheduleResultOut":
+        return cls(workout=ScheduledWorkoutOut.from_model(result.workout), success=result.success, error=result.error)
+
+
 # ---- body insights --------------------------------------------------------------------------
 
 

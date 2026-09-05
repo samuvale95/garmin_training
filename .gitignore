@@ -4,3 +4,4 @@ __pycache__/
 .env
 .garmin_training_tokens
 *.egg-info/
+.DS_Store

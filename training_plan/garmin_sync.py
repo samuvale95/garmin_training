@@ -142,6 +142,13 @@ class DeleteResult:
 
 
 @dataclass
+class RescheduleResult:
+    workout: ScheduledWorkout
+    success: bool
+    error: str | None = None
+
+
+@dataclass
 class ChangedSession:
     """A session present on both sides whose contents no longer match."""
 
@@ -819,6 +826,16 @@ class GarminSync:
 
     def delete_all(self, workouts: list[ScheduledWorkout]) -> list[DeleteResult]:
         return [self.delete_workout(w) for w in workouts]
+
+    def reschedule_workout(self, workout: ScheduledWorkout, new_date: date_type) -> RescheduleResult:
+        """Moves a workout's calendar entry to `new_date`, keeping its definition
+        (`workout_id`) intact -- unlike `delete_workout`, which removes both."""
+        try:
+            self.client.unschedule_workout(workout.scheduled_workout_id)
+            self.client.schedule_workout(workout.workout_id, new_date.isoformat())
+        except Exception as exc:  # noqa: BLE001 - reported to the caller, not fatal to the app
+            return RescheduleResult(workout=workout, success=False, error=str(exc))
+        return RescheduleResult(workout=workout, success=True)
 
 
 def _build_steps_payload(items: list[SessionStep], start_order: int) -> tuple[list[dict], int]:

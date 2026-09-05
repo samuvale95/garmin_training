@@ -1,14 +1,23 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { motion, useDragControls } from "framer-motion";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
-import { useActivities, usePrefetchWorkoutSession, useStravaActivityMatches, useStravaStatus, useWeekWorkouts } from "@/lib/queries";
+import {
+  useActivities,
+  usePrefetchWorkoutSession,
+  useRescheduleWorkout,
+  useStravaActivityMatches,
+  useStravaStatus,
+  useUpdateSession,
+  useWeekWorkouts,
+} from "@/lib/queries";
 import { SkeletonDayCards } from "@/components/skeletons";
 import { classifySession, sessionDistanceKm, toDateKey, weekBounds, weekOffsetFromToday, type DisplaySession } from "@/lib/sessionVisuals";
 import { sessionDetailLine } from "@/lib/format";
@@ -64,6 +73,34 @@ function WeekPageContent() {
   const stravaEnabled = !!stravaStatus.data?.connected && planSessions.length > 0;
   const stravaMatches = useStravaActivityMatches(planSessions, stravaEnabled);
   const prefetchWorkoutSession = usePrefetchWorkoutSession();
+  const updateSession = useUpdateSession();
+  const rescheduleWorkout = useRescheduleWorkout();
+
+  // Drag target detection for the day cards below: each day row registers itself here
+  // by key, and a drag's release point is tested against every row's rect to find which
+  // day it landed on -- cheaper than a real DnD library for a plain "move to this day"
+  // gesture, and keeps the list a plain vertical stack (no reordering *within* a day).
+  const dayRowRefs = useRef(new Map<string, HTMLDivElement | null>());
+  const listContainerRef = useRef<HTMLDivElement>(null);
+
+  function dayKeyAtPageY(pageY: number): string | null {
+    for (const [key, el] of dayRowRefs.current) {
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (pageY >= rect.top + window.scrollY && pageY <= rect.bottom + window.scrollY) return key;
+    }
+    return null;
+  }
+
+  function handleCardDrop(card: DayCardData, pageY: number) {
+    const targetKey = dayKeyAtPageY(pageY);
+    if (!targetKey || targetKey === card.session.date) return;
+    if (card.planIndex != null) {
+      updateSession(card.planIndex, (s) => ({ ...s, date: targetKey }));
+    } else if (card.workout) {
+      rescheduleWorkout.mutate({ workout: card.workout, newDate: targetKey });
+    }
+  }
 
   // Same rule as Oggi: while we don't yet know whether there's a plan or a Garmin
   // connection, show this week's frame with empty day cards -- never a blank screen.
@@ -78,18 +115,24 @@ function WeekPageContent() {
     );
   }
 
-  const sessions: DisplaySession[] = access.plan ? access.plan.sessions : workoutsQuery.data?.workouts ?? [];
-
   const days = Array.from({ length: 7 }).map((_, i) => {
     const date = new Date(start);
     date.setDate(start.getDate() + i);
     const key = toDateKey(date);
-    const index = access.plan ? access.plan.sessions.findIndex((s) => s.date === key) : -1;
-    const session = index >= 0 ? sessions[index] : sessions.find((s) => s.date === key) ?? null;
-    return { date, key, session, index };
+    const cards: DayCardData[] = access.plan
+      ? access.plan.sessions
+          .map((session, index) => ({ session, index }))
+          .filter((x) => x.session.date === key)
+          .map(({ session, index }) => ({ id: `plan:${index}`, session, planIndex: index }))
+      : liveMode
+        ? (workoutsQuery.data?.workouts ?? [])
+            .filter((w) => w.date === key)
+            .map((w) => ({ id: `garmin:${w.scheduled_workout_id}`, session: w, workout: w }))
+        : [];
+    return { date, key, cards };
   });
 
-  const weekSessions = days.map((d) => d.session).filter((s): s is NonNullable<typeof s> => !!s);
+  const weekSessions = days.flatMap((d) => d.cards.map((c) => c.session));
   const weekKm = weekSessions.reduce((sum, s) => sum + sessionDistanceKm(s), 0);
   const doneKm = (activitiesQuery.data?.activities ?? []).reduce((sum, a) => sum + (a.distance_km ?? 0), 0);
   const progressFraction = weekKm > 0 ? Math.min(1, doneKm / weekKm) : 0;
@@ -144,81 +187,46 @@ function WeekPageContent() {
           </Link>
         )}
 
-        <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div ref={listContainerRef} style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
           {/* In live mode the days come from Garmin, so before that answer lands every
               day would read as "Riposo" -- a wrong statement, not a loading state. */}
           {liveMode && workoutsQuery.isPending ? (
             <SkeletonDayCards />
           ) : (
             days.map((day, i) => {
-              const visual = classifySession(day.session);
-              const height = day.session ? 78 + Math.min(40, sessionDistanceKm(day.session) * 2) : 78;
-              const detail = day.session ? sessionDetailLine(day.session) || visual.label : "e va bene così";
               const isToday = day.key === todayKey;
               const match = stravaMatches.data?.matches[day.key];
-              const card = (
-                <SlideUp
-                  active={animate}
-                  delayMs={i * 80}
-                  row
-                  style={{
-                    background: visual.background,
-                    color: visual.foreground,
-                    borderRadius: "var(--radius-card)",
-                    padding: 14,
-                    minHeight: height,
-                    position: "relative",
-                    overflow: "hidden",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                  }}
-                >
-                  <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{day.session ? day.session.title : "Riposo"}</p>
-                  <p className="font-serif-italic" style={{ fontSize: 13, margin: "4px 0 0", opacity: 0.85 }}>
-                    {detail}
-                  </p>
-                  {match?.matched && match.distance_km != null && (
-                    <p className="font-mono" style={{ fontSize: 11, margin: "4px 0 0", opacity: 0.75 }}>
-                      svolto {match.distance_km.toFixed(1)} km
-                    </p>
-                  )}
-                  {visual.illustration && (
-                    <Illustration name={visual.illustration} width={64} height={70} breathe={false} active={animate} delayMs={200 + i * 80} />
-                  )}
-                </SlideUp>
-              );
               return (
-                <div key={day.key} style={{ display: "flex", gap: 10 }}>
+                <div
+                  key={day.key}
+                  ref={(el) => {
+                    dayRowRefs.current.set(day.key, el);
+                  }}
+                  style={{ display: "flex", gap: 10 }}
+                >
                   <div className="font-mono" style={{ width: 30, paddingTop: 14, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
                     <span style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? "var(--inchiostro)" : "var(--inchiostro-50)" }}>
                       {day.date.toLocaleDateString("it-IT", { weekday: "short" })}
                     </span>
                     <span style={{ fontSize: 13, fontWeight: 700, color: "var(--inchiostro)" }}>{day.date.getDate()}</span>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    {(() => {
-                      if (day.session && day.index >= 0) {
-                        return <Link href={`/session/${day.index}`} style={{ textDecoration: "none", color: "inherit" }}>{card}</Link>;
-                      }
-                      const workout = liveMode ? (day.session as ScheduledWorkout | null) : null;
-                      if (workout?.scheduled_workout_id != null) {
-                        return (
-                          <Link
-                            href={`/workout/${workout.scheduled_workout_id}?date=${day.key}`}
-                            style={{ textDecoration: "none", color: "inherit" }}
-                            // The detail screen's own step structure is a second Garmin
-                            // read (`useWorkoutSession`) that the week list doesn't need.
-                            // Start it on touch-down, so it's usually already in flight --
-                            // or done -- by the time the screen appears.
-                            onPointerDown={() => prefetchWorkoutSession(workout)}
-                          >
-                            {card}
-                          </Link>
-                        );
-                      }
-                      return card;
-                    })()}
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                    {day.cards.length === 0 ? (
+                      <RestCard animate={animate} delayMs={i * 80} />
+                    ) : (
+                      day.cards.map((card, j) => (
+                        <DraggableWeekCard
+                          key={card.id}
+                          card={card}
+                          animate={animate}
+                          delayMs={i * 80 + j * 40}
+                          matchKm={j === 0 && match?.matched ? match.distance_km ?? null : null}
+                          containerRef={listContainerRef}
+                          onDrop={handleCardDrop}
+                          onPrefetch={card.workout ? () => prefetchWorkoutSession(card.workout!) : undefined}
+                        />
+                      ))
+                    )}
                   </div>
                 </div>
               );
@@ -227,6 +235,163 @@ function WeekPageContent() {
         </div>
       </div>
     </div>
+  );
+}
+
+interface DayCardData {
+  id: string;
+  session: DisplaySession;
+  planIndex?: number;
+  workout?: ScheduledWorkout;
+}
+
+/** A day with nothing scheduled -- not draggable (there's nothing to move), and never
+ * itself a drag target beyond being any other day row: dropping onto it just leaves the
+ * dragged card here since `dayRowRefs` tracks the whole row, card or no card. */
+function RestCard({ animate, delayMs }: { animate: boolean; delayMs: number }) {
+  const visual = classifySession(null);
+  return (
+    <SlideUp
+      active={animate}
+      delayMs={delayMs}
+      row
+      style={{
+        background: visual.background,
+        color: visual.foreground,
+        borderRadius: "var(--radius-card)",
+        padding: 14,
+        minHeight: 78,
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+      }}
+    >
+      <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Riposo</p>
+      <p className="font-serif-italic" style={{ fontSize: 13, margin: "4px 0 0", opacity: 0.85 }}>
+        e va bene così
+      </p>
+      {visual.illustration && <Illustration name={visual.illustration} width={64} height={70} breathe={false} active={animate} delayMs={200 + delayMs} />}
+    </SlideUp>
+  );
+}
+
+interface DraggableWeekCardProps {
+  card: DayCardData;
+  animate: boolean;
+  delayMs: number;
+  matchKm: number | null;
+  containerRef: { current: HTMLDivElement | null };
+  onDrop: (card: DayCardData, pageY: number) => void;
+  onPrefetch?: () => void;
+}
+
+/** One session/workout card in Settimana, draggable onto another day by its handle
+ * (top-right ⠿) -- the rest of the card stays a plain tap target for navigation, so a
+ * tap-to-open and a press-and-drag-to-move never fight over the same gesture (same
+ * split `WorkoutEditor`'s step list uses between a drag handle and its row content).
+ * `dragSnapToOrigin` matters here: on a same-day or off-list drop nothing about this
+ * card's identity changes, so nothing remounts it to reset its dragged position -- the
+ * snap-back has to be explicit. On a real move to another day, the card's `key` lives
+ * under a different day row after the state update and this instance unmounts anyway,
+ * so the snap-back animation is invisible. */
+function DraggableWeekCard({ card, animate, delayMs, matchKm, containerRef, onDrop, onPrefetch }: DraggableWeekCardProps) {
+  const dragControls = useDragControls();
+  const [dragging, setDragging] = useState(false);
+  const visual = classifySession(card.session);
+  const height = 78 + Math.min(40, sessionDistanceKm(card.session) * 2);
+  const detail = sessionDetailLine(card.session) || visual.label;
+
+  const body = (
+    <SlideUp
+      active={animate}
+      delayMs={delayMs}
+      row
+      style={{
+        background: visual.background,
+        color: visual.foreground,
+        borderRadius: "var(--radius-card)",
+        padding: 14,
+        minHeight: height,
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+      }}
+    >
+      <p style={{ fontSize: 14, fontWeight: 600, margin: 0, paddingRight: 26 }}>{card.session.title}</p>
+      <p className="font-serif-italic" style={{ fontSize: 13, margin: "4px 0 0", opacity: 0.85 }}>
+        {detail}
+      </p>
+      {matchKm != null && (
+        <p className="font-mono" style={{ fontSize: 11, margin: "4px 0 0", opacity: 0.75 }}>
+          svolto {matchKm.toFixed(1)} km
+        </p>
+      )}
+      {visual.illustration && <Illustration name={visual.illustration} width={64} height={70} breathe={false} active={animate} delayMs={200 + delayMs} />}
+    </SlideUp>
+  );
+
+  const href =
+    card.planIndex != null
+      ? `/session/${card.planIndex}`
+      : card.workout?.scheduled_workout_id != null
+        ? `/workout/${card.workout.scheduled_workout_id}?date=${card.session.date}`
+        : null;
+
+  return (
+    <motion.div
+      drag="y"
+      dragControls={dragControls}
+      dragListener={false}
+      dragConstraints={containerRef}
+      dragElastic={0.12}
+      dragMomentum={false}
+      dragSnapToOrigin
+      onDragStart={() => setDragging(true)}
+      onDragEnd={(_event, info) => {
+        setDragging(false);
+        onDrop(card, info.point.y);
+      }}
+      whileDrag={{ scale: 1.03, boxShadow: "0 10px 28px rgba(28,26,22,.28)" }}
+      style={{ position: "relative", zIndex: dragging ? 30 : "auto" }}
+    >
+      {href ? (
+        <Link href={href} style={{ textDecoration: "none", color: "inherit" }} onPointerDown={onPrefetch}>
+          {body}
+        </Link>
+      ) : (
+        body
+      )}
+      <div
+        role="button"
+        aria-label="Trascina per spostare su un altro giorno"
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          dragControls.start(e);
+        }}
+        className="tap-target"
+        style={{
+          position: "absolute",
+          top: 6,
+          right: 6,
+          width: 28,
+          height: 28,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          touchAction: "none",
+          cursor: "grab",
+          opacity: 0.55,
+          fontSize: 15,
+          color: visual.foreground,
+        }}
+      >
+        ⠿
+      </div>
+    </motion.div>
   );
 }
 
