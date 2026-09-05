@@ -1,6 +1,6 @@
 import type { IllustrationName } from "@/components/Illustration";
 import { sessionFallbackPaceSecPerKm, stepDistanceKm } from "./format";
-import { flattenSteps } from "./types";
+import { flattenSteps, isRepeatBlock } from "./types";
 import type { ScheduledWorkout, SessionStep, Sport, TrainingSession } from "./types";
 
 export type SessionKind = "riposo" | "ripetute" | "fondo_lento" | "forza" | "lungo";
@@ -32,16 +32,32 @@ const VISUALS: Record<SessionKind, Omit<SessionVisual, "kind">> = {
   lungo: { label: "Lungo", background: "var(--verde)", foreground: "var(--verde-testo)", illustration: "bici" },
 };
 
+/** A continuous run at or above this distance reads as the week's long one. */
+const LONG_RUN_KM = 15;
+
 /** Classifies a session into the design's five day-card types. The file format only
  * carries sport + steps, not an explicit category, so this is a heuristic -- good
  * enough to drive card color/illustration, not a source of truth about training
- * intent. */
+ * intent.
+ *
+ * "Has an interval step" is *not* that heuristic, which is what this used to test: a
+ * plain continuous run is written as a single `interval` step (see
+ * `examples/agosto_settembre_2026.yaml`, where `Corsa 40' ritmo costante` is exactly
+ * that), so every run in the plan came out "ripetute" and Settimana rendered the whole
+ * week in one shade of coral. Repetition work is what has *more than one* effort in it
+ * -- a repeat block, or several interval steps with recoveries between them. */
 export function classifySession(session: DisplaySession | null): SessionVisual {
   if (!session) return { kind: "riposo", ...VISUALS.riposo };
   if (session.sport === "strength_training") return { kind: "forza", ...VISUALS.forza };
   if (session.sport === "cycling") return { kind: "lungo", ...VISUALS.lungo };
-  const hasIntervals = flattenSteps(session.steps ?? []).some((s) => s.type === "interval");
-  if (hasIntervals) return { kind: "ripetute", ...VISUALS.ripetute };
+
+  const steps = session.steps ?? [];
+  const efforts = flattenSteps(steps).filter((s) => s.type === "interval").length;
+  if (steps.some(isRepeatBlock) || efforts > 1) return { kind: "ripetute", ...VISUALS.ripetute };
+  if (sessionDistanceKm(session) >= LONG_RUN_KM) {
+    // Same green as a long ride, but drawn by a runner.
+    return { kind: "lungo", ...VISUALS.lungo, illustration: "corsa" };
+  }
   return { kind: "fondo_lento", ...VISUALS.fondo_lento };
 }
 

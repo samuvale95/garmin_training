@@ -322,6 +322,19 @@ button {
     opacity: 1;
   }
 }
+/* Paging between weeks in Settimana: the day list leaves and re-enters from the side
+   it came from, so ‹ / › and a horizontal swipe read as moving along one strip of
+   time rather than swapping the screen's contents in place. */
+@keyframes mkWeekIn {
+  0% {
+    transform: translateX(var(--from-x, 0));
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
 @keyframes mkBarSettle {
   0%,
   100% {
@@ -408,8 +421,38 @@ button {
   animation: mkStretch 1.5s ease-in-out infinite;
 }
 
+.anim-week-in {
+  animation: mkWeekIn 0.34s var(--ease) both;
+}
+
 .word-in-clip {
   overflow: hidden;
+}
+
+/* Press feedback for whole cards and rows (MOTION.md §5.2: the surface acknowledges
+   the finger before the navigation happens). Kept as a class rather than the inline
+   pointer handlers a few screens grew, so it costs nothing per render and collapses
+   with the rest of the motion system under reduced motion. */
+.press-soft {
+  transition: transform 140ms var(--ease);
+}
+.press-soft:active {
+  transform: scale(0.985);
+}
+
+/* A card being carried between days: lifted off the page, the rest of the week pulled
+   back so the day it would land on is the only thing competing with it. */
+.day-drop-target {
+  outline: 1.5px dashed var(--corallo);
+  outline-offset: 3px;
+  border-radius: var(--radius-card);
+}
+
+.week-card {
+  transition: opacity 180ms var(--ease);
+}
+.week-list--dragging .week-card:not(.is-dragging) {
+  opacity: 0.45;
 }
 
 /* ---- page transitions: View Transitions API (see RouteTransition.tsx) ----------------
@@ -520,8 +563,16 @@ button {
   .anim-sheen,
   .anim-nudge,
   .anim-chev,
+  .anim-week-in,
   .anim-stretch {
     animation: none !important;
+  }
+
+  .press-soft {
+    transition: none;
+  }
+  .press-soft:active {
+    transform: none;
   }
 }
 
@@ -536,8 +587,16 @@ button {
 .app-shell[data-motion='reduced'] .anim-sheen,
 .app-shell[data-motion='reduced'] .anim-nudge,
 .app-shell[data-motion='reduced'] .anim-chev,
+.app-shell[data-motion='reduced'] .anim-week-in,
 .app-shell[data-motion='reduced'] .anim-stretch {
   animation: none !important;
+}
+
+.app-shell[data-motion='reduced'] .press-soft {
+  transition: none;
+}
+.app-shell[data-motion='reduced'] .press-soft:active {
+  transform: none;
 }
 
 /* still screens (04, 05, 14): zero animation, brand mark frozen -- enforced by not
@@ -555,6 +614,7 @@ button {
 [data-still='true'] .anim-sheen,
 [data-still='true'] .anim-nudge,
 [data-still='true'] .anim-chev,
+[data-still='true'] .anim-week-in,
 [data-still='true'] .anim-stretch {
   animation: none !important;
 }
