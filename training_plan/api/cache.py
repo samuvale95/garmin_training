@@ -59,6 +59,14 @@ TTL_BODY_METRICS = 30 * 60
 # plan changes (a different cache key) or the calendar changes (invalidated on write).
 TTL_PLAN_DIFF = 5 * 60
 
+# The fuelling screen's two slow answers. Targets are arithmetic over a Garmin weight
+# read; the narrative is a language-model call on top of that, and it is the one thing
+# on the screen a user actually waits for. Both are keyed by everything they depend on
+# (day, plan, weight -- and, for the narrative, what has been eaten so far), so the TTL
+# only has to cover "the same screen, opened again".
+TTL_NUTRITION_TARGETS = 30 * 60
+TTL_NUTRITION_NARRATIVE = 30 * 60
+
 # A date range that has already ended has nothing left to say: a completed activity is a
 # fact, and the calendar for a past week only changes when this app writes to it -- which
 # drops CALENDAR_NAMESPACES wholesale, so a long TTL here can never serve a stale answer
@@ -154,3 +162,15 @@ CALENDAR_NAMESPACES = ("garmin:workouts", "garmin:workout-session", "plan:diff")
 
 def invalidate_calendar(user_id: str) -> None:
     cache.invalidate(CALENDAR_NAMESPACES, user_id)
+
+
+# Logging, correcting or deleting a meal changes what the narrative is describing (it is
+# written over the day's running totals), so the sentence has to go with it. Targets do
+# not depend on what was eaten -- but they do depend on the weight, and a user who has
+# just changed something is exactly who should not be told a stale number, so both drop
+# together.
+NUTRITION_NAMESPACES = ("nutrition:targets", "nutrition:narrative")
+
+
+def invalidate_nutrition(user_id: str) -> None:
+    cache.invalidate(NUTRITION_NAMESPACES, user_id)

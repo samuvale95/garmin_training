@@ -259,14 +259,78 @@ Rispondi SOLO con un oggetto JSON, senza testo intorno e senza blocchi di codice
 - Se nella foto non c'è cibo, usa description "nessun cibo riconosciuto" e valori 0."""
 
 
-def estimate_macros_from_photo(image_bytes: bytes, mime_type: str = "image/jpeg") -> MacroEstimate | None:
-    """Macros for one plate, or `None` when the model is unavailable, disabled, or
-    returned something that isn't a valid estimate after one retry.
+TEXT_ESTIMATE_PROMPT = """Qualcuno che corre ti descrive quello che ha mangiato. Stima i
+macronutrienti di quella porzione.
+
+Rispondi SOLO con un oggetto JSON, senza testo intorno e senza blocchi di codice:
+{"description": "...", "kcal": 0, "carb_g": 0, "protein_g": 0, "fat_g": 0, "confidence": "low|medium|high"}
+
+- "description": quello che ha mangiato, ripulito, in italiano, minuscolo, max 8 parole.
+- i grammi si riferiscono alla porzione descritta, non a 100 g.
+- se le quantità sono dichiarate ("80 g di pasta", "un piatto grande"), fidati e usa
+  "high"; se la porzione è lasciata all'immaginazione ("un po' di riso"), stima una
+  porzione normale e usa "low".
+- Se il testo non descrive cibo, usa description "nessun cibo riconosciuto" e valori 0."""
+
+
+def estimate_macros_from_text(description: str) -> MacroEstimate | None:
+    """Macros for a meal the user typed out, or `None` on the same terms as the photo
+    path below (unavailable, disabled, or still not valid JSON after one retry).
+
+    Deliberately the *text* model, not the vision one: there is no image here, and the
+    two roles are configured separately precisely so the expensive one is only paid for
+    when a photograph is actually involved. Gated on a configured key rather than
+    `photo_upload_enabled()` -- that switch exists because a photo of someone's kitchen
+    is not a sentence about pasta, and turning it off must not take the typed path with
+    it.
+    """
+    text = description.strip()
+    if not text or _api_key() is None:
+        return None
+
+    messages: list[dict] = [
+        {"role": "system", "content": TEXT_ESTIMATE_PROMPT},
+        {"role": "user", "content": text},
+    ]
+    return _estimate_with_retry(os.getenv("LLM_TEXT_MODEL", DEFAULT_TEXT_MODEL), messages)
+
+
+def _estimate_with_retry(model: str, messages: list[dict]) -> MacroEstimate | None:
+    """The shared ladder behind both estimates: ask, parse, and on a malformed answer
+    ask once more saying so.
 
     The retry exists because JSON-mode support is uneven across providers and a model
     that ignored `response_format` usually complies when told a second time. It is one
     retry, not a ladder: past that the honest move is to show the manual-entry form.
     """
+    for attempt in range(2):
+        raw = _post_chat(model, messages, max_tokens=400, json_object=True)
+        if raw is None:
+            return None
+        parsed = _parse_json_object(raw)
+        if parsed is not None:
+            try:
+                return MacroEstimate.model_validate(parsed)
+            except ValidationError:
+                logger.warning("%s returned an out-of-shape estimate: %r", model, parsed)
+        if attempt == 0:
+            messages = messages + [
+                {"role": "assistant", "content": raw},
+                {
+                    "role": "user",
+                    "content": (
+                        "Non è JSON valido. Rispondi SOLO con l'oggetto JSON richiesto, "
+                        "senza testo intorno."
+                    ),
+                },
+            ]
+    return None
+
+
+def estimate_macros_from_photo(image_bytes: bytes, mime_type: str = "image/jpeg") -> MacroEstimate | None:
+    """Macros for one plate, or `None` when the model is unavailable, disabled, or
+    returned something that isn't a valid estimate after one retry (see
+    `_estimate_with_retry`)."""
     if not photo_upload_enabled():
         return None
 
@@ -280,27 +344,4 @@ def estimate_macros_from_photo(image_bytes: bytes, mime_type: str = "image/jpeg"
             ],
         }
     ]
-    model = os.getenv("LLM_VISION_MODEL", DEFAULT_VISION_MODEL)
-
-    for attempt in range(2):
-        raw = _post_chat(model, messages, max_tokens=400, json_object=True)
-        if raw is None:
-            return None
-        parsed = _parse_json_object(raw)
-        if parsed is not None:
-            try:
-                return MacroEstimate.model_validate(parsed)
-            except ValidationError:
-                logger.warning("vision model returned an out-of-shape estimate: %r", parsed)
-        if attempt == 0:
-            messages = messages + [
-                {"role": "assistant", "content": raw},
-                {
-                    "role": "user",
-                    "content": (
-                        "Non è JSON valido. Rispondi SOLO con l'oggetto JSON richiesto, "
-                        "senza testo intorno."
-                    ),
-                },
-            ]
-    return None
+    return _estimate_with_retry(os.getenv("LLM_VISION_MODEL", DEFAULT_VISION_MODEL), messages)

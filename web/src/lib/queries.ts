@@ -13,6 +13,7 @@ import type {
   DeleteResult,
   DeviceInfo,
   FoodDay,
+  FoodEntries,
   FoodEntry,
   FoodHistory,
   FuelTargets,
@@ -877,12 +878,27 @@ export function useBodyMetrics() {
  * lets the backend fall back to Garmin, then to the 70 kg reference (see
  * `_resolve_weight` in routes_nutrition.py). The whole plan travels along, not just
  * today/tomorrow: the back-to-back-hard-days bump needs the day after tomorrow too. */
-export function useFuelTargets(date: string, sessions: TrainingSession[], weightKg: number | null | undefined) {
+/** Everything a day's targets depend on is already in their query key -- the day, the
+ * plan, the weight -- so the answer only goes stale when the *weight source* changes
+ * behind the key (a fresh Garmin scale reading), which is a half-hour-scale event, not a
+ * five-minute one. Past days never change at all. This is what stops /body and
+ * /body/fuel re-asking for the same targets on every visit. */
+function fuelStaleTime(date: string): number {
+  return isPastDate(date) ? Infinity : 30 * 60_000;
+}
+
+/** `enabled` is not optional in practice: the plan is restored asynchronously, so a
+ * screen that asks on its first render asks with an *empty* plan -- a full round-trip
+ * (and, for the narrative, a paid model call) computed against "nothing scheduled",
+ * immediately thrown away when the real plan lands under a different cache key. Callers
+ * pass whatever tells them the plan has arrived. */
+export function useFuelTargets(date: string, sessions: TrainingSession[], weightKg: number | null | undefined, enabled = true) {
   return useQuery({
     queryKey: ["nutrition", "targets", date, weightKg ?? null, sessions.length ? planFingerprint(sessions) : null],
     queryFn: ({ signal }) =>
       apiPost<FuelTargets>("/nutrition/targets", { date, sessions, weight_kg: weightKg ?? null }, signal),
-    staleTime: 5 * 60_000,
+    enabled,
+    staleTime: fuelStaleTime(date),
   });
 }
 
@@ -892,14 +908,15 @@ export function useFuelTargets(date: string, sessions: TrainingSession[], weight
  * length array of `useQuery`-shaped configs, not a loop of `useFuelTargets` calls: the
  * rules of hooks forbid a variable number of hook calls, which is exactly what mapping
  * a hook over a dynamic date list would be. */
-export function useFuelTargetsForDates(dates: string[], sessions: TrainingSession[], weightKg: number | null | undefined) {
+export function useFuelTargetsForDates(dates: string[], sessions: TrainingSession[], weightKg: number | null | undefined, enabled = true) {
   const fingerprint = sessions.length ? planFingerprint(sessions) : null;
   return useQueries({
     queries: dates.map((date) => ({
+      enabled,
       queryKey: ["nutrition", "targets", date, weightKg ?? null, fingerprint] as const,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         apiPost<FuelTargets>("/nutrition/targets", { date, sessions, weight_kg: weightKg ?? null }, signal),
-      staleTime: 5 * 60_000,
+      staleTime: fuelStaleTime(date),
     })),
   });
 }
@@ -914,8 +931,31 @@ export function useFuelNarrative(date: string, sessions: TrainingSession[], weig
     queryFn: ({ signal }) =>
       apiPost<Narrative>("/nutrition/narrative", { date, sessions, weight_kg: weightKg ?? null }, signal),
     enabled,
-    staleTime: 5 * 60_000,
+    // The slowest thing on the screen: a language-model round-trip, three to eight
+    // seconds of it. It is written over the day's targets and what has been eaten so
+    // far, and `invalidateNutrition` drops it the moment either changes -- so there is
+    // nothing for a short staleTime to catch, only a wait to re-pay.
+    staleTime: fuelStaleTime(date),
   });
+}
+
+/** Starts the narrative's model call before its screen exists.
+ *
+ * Called on touch-down from the Corpo tab's fuel card: the sentence is the slowest
+ * thing on /body/fuel and the only one the user waits for, and the few hundred
+ * milliseconds between finger-down and the screen mounting are free. On tap, not on
+ * mount, so a visit to Corpo that never opens Carburante costs nothing -- this is the
+ * one query in the app that spends money per call. */
+export function usePrefetchFuelNarrative() {
+  const queryClient = useQueryClient();
+  return (date: string, sessions: TrainingSession[], weightKg: number | null | undefined) => {
+    queryClient.prefetchQuery({
+      queryKey: ["nutrition", "narrative", date, weightKg ?? null, sessions.length ? planFingerprint(sessions) : null],
+      queryFn: ({ signal }) =>
+        apiPost<Narrative>("/nutrition/narrative", { date, sessions, weight_kg: weightKg ?? null }, signal),
+      staleTime: fuelStaleTime(date),
+    });
+  };
 }
 
 export function useFoodDay(date: string) {
@@ -932,12 +972,32 @@ export function useFoodHistory(days = 7, end?: string) {
   return useQuery({
     queryKey: ["nutrition", "history", days, end ?? null],
     queryFn: ({ signal }) => apiGet<FoodHistory>("/nutrition/history", { days: String(days), end }, signal),
+    staleTime: LIVE_STALE_TIME,
   });
 }
 
+/** Every meal logged over a window -- the diary screen's one request, instead of a
+ * `useFoodDay` per day on screen. */
+export function useFoodEntries(days = 14, end?: string) {
+  return useQuery({
+    queryKey: ["nutrition", "entries", days, end ?? null],
+    queryFn: ({ signal }) => apiGet<FoodEntries>("/nutrition/entries", { days: String(days), end }, signal),
+    staleTime: LIVE_STALE_TIME,
+  });
+}
+
+/** Everything a change to the food log makes untrue.
+ *
+ * The narrative is in here because it is written *over* the day's running totals ("hai
+ * già preso 210 g"), so a new meal makes the sentence on screen wrong -- it used to sit
+ * there unchanged until its five minutes were up, which was the one case where caching
+ * it aggressively would have been visible. The server drops its own copy on the same
+ * writes (`invalidate_nutrition`). */
 function invalidateNutrition(queryClient: ReturnType<typeof useQueryClient>, date?: string) {
   queryClient.invalidateQueries({ queryKey: date ? ["nutrition", "day", date] : ["nutrition", "day"] });
   queryClient.invalidateQueries({ queryKey: ["nutrition", "history"] });
+  queryClient.invalidateQueries({ queryKey: ["nutrition", "entries"] });
+  queryClient.invalidateQueries({ queryKey: ["nutrition", "narrative"] });
 }
 
 /** Estimate + store one plate. The entry is written server-side even when the model
@@ -954,6 +1014,18 @@ export function useLogPhoto() {
       if (thumbnail) form.set("thumbnail", thumbnail, "thumbnail.jpg");
       return apiPostForm<FoodEntry>("/nutrition/photo", form);
     },
+    onSuccess: (_entry, vars) => invalidateNutrition(queryClient, vars.date),
+  });
+}
+
+/** Estimate + store one meal from a sentence the user typed. Same contract as
+ * `useLogPhoto`: the row is written even when the model can't answer, and the caller
+ * tells that case apart by `confidence == null`. */
+export function useDescribeMeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ text, date }: { text: string; date: string }) =>
+      apiPost<FoodEntry>("/nutrition/describe", { text, date }),
     onSuccess: (_entry, vars) => invalidateNutrition(queryClient, vars.date),
   });
 }

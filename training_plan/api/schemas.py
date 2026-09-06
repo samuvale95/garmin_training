@@ -764,6 +764,22 @@ class ManualEntryRequest(BaseModel):
     fat_g: float | None = None
 
 
+class DescribeMealRequest(BaseModel):
+    """A meal typed out instead of photographed. The text is the whole input: the model
+    turns it into the same `MacroEstimate` shape a photo produces, so both paths land in
+    the same review screen and the same row."""
+
+    date: date_type
+    text: str = Field(min_length=2, max_length=400)
+
+
+class FoodEntriesResponse(BaseModel):
+    """Every entry in a range, for the meal diary. Flat and newest-first: the client
+    groups by `date`, which it has to do anyway to print day headings."""
+
+    entries: list[FoodEntryOut] = Field(default_factory=list)
+
+
 class EntryPatchRequest(BaseModel):
     """A correction. Every field optional: an untouched field keeps its estimate, and
     sending any of them marks the entry as corrected by the user."""

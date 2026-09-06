@@ -62,7 +62,10 @@ CREATE TABLE IF NOT EXISTS user_plan (
 """
 
 Confidence = Literal["low", "medium", "high"]
-Source = Literal["photo", "manual"]
+# "text": a meal the user typed out and the model read (see `llm.estimate_macros_from_text`).
+# It is its own source rather than "manual" because the numbers are an estimate, not
+# something a human stated -- exactly the distinction `corrected` draws elsewhere.
+Source = Literal["photo", "manual", "text"]
 
 
 @dataclass
@@ -208,6 +211,22 @@ def entries_for_date(user_id: str, date: str) -> list[FoodEntry]:
             cur.execute(
                 "SELECT * FROM food_entry WHERE user_id = %s AND date = %s ORDER BY logged_at",
                 (user_id, date),
+            )
+            rows = cur.fetchall()
+    return [FoodEntry.from_row(row) for row in rows]
+
+
+def entries_between(user_id: str, start: date_type, end: date_type) -> list[FoodEntry]:
+    """Every entry in a date range, newest day first and, within a day, newest first --
+    the order the meal diary reads in. One query instead of the per-day fetch the diary
+    would otherwise make for every day on screen."""
+    with connect() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """SELECT * FROM food_entry
+                   WHERE user_id = %s AND date BETWEEN %s AND %s
+                   ORDER BY date DESC, logged_at DESC""",
+                (user_id, start.isoformat(), end.isoformat()),
             )
             rows = cur.fetchall()
     return [FoodEntry.from_row(row) for row in rows]

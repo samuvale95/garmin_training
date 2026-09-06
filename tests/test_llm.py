@@ -196,3 +196,49 @@ def test_the_base_url_is_configurable(configured):
     calls = _capture(configured, FakeResponse(_reply(VALID_ESTIMATE)))
     llm.estimate_macros_from_photo(b"jpeg-bytes")
     assert calls[0]["url"] == "http://localhost:11434/v1/chat/completions"
+
+
+# ---- the typed-description role -----------------------------------------------------
+
+
+def test_a_typed_meal_is_estimated_by_the_text_model(configured):
+    """The description path is the vision path minus the photograph: same shape out,
+    same retry ladder -- but billed to the cheap text model, since there is no image."""
+    calls = _capture(configured, FakeResponse(_reply(VALID_ESTIMATE)))
+    estimate = llm.estimate_macros_from_text("80 g di pasta al pomodoro")
+
+    assert estimate.carb_g == 95
+    assert calls[0]["json"]["model"] == llm.DEFAULT_TEXT_MODEL
+    # The user's own words reach the model verbatim; nothing summarises them first.
+    assert calls[0]["json"]["messages"][-1]["content"] == "80 g di pasta al pomodoro"
+
+
+def test_an_empty_description_is_not_sent_anywhere(configured):
+    calls = _capture(configured, FakeResponse(_reply(VALID_ESTIMATE)))
+    assert llm.estimate_macros_from_text("   ") is None
+    assert calls == []
+
+
+def test_no_key_means_no_typed_estimate(monkeypatch):
+    calls = _capture(monkeypatch)
+    assert llm.estimate_macros_from_text("due uova") is None
+    assert calls == []
+
+
+def test_the_photo_switch_does_not_disable_the_typed_path(configured):
+    """`PASSO_PHOTO_UPLOAD=0` is about photographs leaving the house, not sentences."""
+    configured.setenv("PASSO_PHOTO_UPLOAD", "0")
+    _capture(configured, FakeResponse(_reply(VALID_ESTIMATE)))
+
+    assert llm.estimate_macros_from_photo(b"jpeg-bytes") is None
+    assert llm.estimate_macros_from_text("due uova").carb_g == 95
+
+
+def test_a_malformed_typed_estimate_is_retried_once(configured):
+    calls = _capture(
+        configured,
+        FakeResponse(_reply("certo! ecco:")),
+        FakeResponse(_reply(VALID_ESTIMATE)),
+    )
+    assert llm.estimate_macros_from_text("due uova").carb_g == 95
+    assert len(calls) == 2
