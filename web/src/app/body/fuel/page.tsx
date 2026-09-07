@@ -10,6 +10,7 @@ import { useMountOnce } from "@/lib/motion";
 import { formatWeekday } from "@/lib/format";
 import { useCalendarAccess } from "@/lib/guards";
 import {
+  useAddManualEntry,
   useDeleteEntry,
   useDescribeMeal,
   useFoodDay,
@@ -104,6 +105,7 @@ export default function FuelPage() {
   const dayQuery = useFoodDay(today);
   const logPhoto = useLogPhoto();
   const describeMeal = useDescribeMeal();
+  const addManualEntry = useAddManualEntry();
   const deleteEntry = useDeleteEntry();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -150,6 +152,23 @@ export default function FuelPage() {
     };
   }
 
+  /** No model, no review: these numbers came from the user, so they are stored exactly
+   * as typed (the backend marks the row `corrected` for the same reason). */
+  function saveManualEntry(fields: { description: string; carb: string; protein: string; fat: string; kcal: string }) {
+    const asNumber = (raw: string) => (raw === "" ? null : Number(raw));
+    addManualEntry.mutate(
+      {
+        date: today,
+        description: fields.description.trim() || null,
+        carb_g: asNumber(fields.carb),
+        protein_g: asNumber(fields.protein),
+        fat_g: asNumber(fields.fat),
+        kcal: asNumber(fields.kcal),
+      },
+      { onSuccess: () => setFlow({ kind: "idle" }) }
+    );
+  }
+
   function submitDescription(text: string) {
     const preview: Preview = { kind: "text", text };
     cancelledRef.current = false;
@@ -184,7 +203,14 @@ export default function FuelPage() {
   }
 
   if (flow.kind === "compose") {
-    return <ComposeScreen onCancel={() => setFlow({ kind: "idle" })} onSubmit={submitDescription} />;
+    return (
+      <ComposeScreen
+        onCancel={() => setFlow({ kind: "idle" })}
+        onSubmit={submitDescription}
+        onSaveManual={saveManualEntry}
+        saving={addManualEntry.isPending}
+      />
+    );
   }
   if (flow.kind === "estimating") {
     return <EstimatingScreen preview={flow.preview} onCancel={cancelEstimating} />;
@@ -372,9 +398,69 @@ function FuelSkeleton() {
 /** The typed way in. The same weight as the camera, not a fallback behind it: most
  * meals are easier to say than to photograph ("80 g di pasta al pomodoro e due uova"),
  * and a stated quantity is a better estimate than any photo of the same plate. */
-function ComposeScreen({ onCancel, onSubmit }: { onCancel: () => void; onSubmit: (text: string) => void }) {
+type ComposeMode = "stima" | "manuale";
+
+function ModeTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="press-soft"
+      style={{
+        flex: 1,
+        background: active ? "var(--crema-card)" : "none",
+        color: active ? "var(--inchiostro)" : "var(--inchiostro-50)",
+        border: "none",
+        borderRadius: "var(--radius-pill)",
+        padding: "10px 14px",
+        fontSize: 13.5,
+        fontWeight: 600,
+        cursor: "pointer",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** The typed way in, in its two forms.
+ *
+ * "Stima": a sentence the model turns into macros. "Manuale": the numbers stated
+ * outright, no model involved, saved as they are typed -- for the meal whose label you
+ * are holding, or the one you have logged fifty times. That second form existed in the
+ * API and in `useAddManualEntry` from the start but had no screen anywhere: the only
+ * way to reach a numeric field was to have an estimate *fail* first, which is not a
+ * feature, it is a dead end you had to be unlucky to find.
+ */
+function ComposeScreen({
+  onCancel,
+  onSubmit,
+  onSaveManual,
+  saving,
+}: {
+  onCancel: () => void;
+  onSubmit: (text: string) => void;
+  onSaveManual: (fields: { description: string; carb: string; protein: string; fat: string; kcal: string }) => void;
+  saving: boolean;
+}) {
+  const [mode, setMode] = useState<ComposeMode>("stima");
   const [text, setText] = useState("");
-  const ready = text.trim().length >= 2;
+  const [description, setDescription] = useState("");
+  const [carb, setCarb] = useState("");
+  const [protein, setProtein] = useState("");
+  const [fat, setFat] = useState("");
+  const [kcal, setKcal] = useState("");
+
+  const ready =
+    mode === "stima"
+      ? text.trim().length >= 2
+      : carb !== "" || protein !== "" || fat !== "" || kcal !== "";
+
+  function submit() {
+    if (!ready || saving) return;
+    if (mode === "stima") onSubmit(text.trim());
+    else onSaveManual({ description, carb, protein, fat, kcal });
+  }
 
   return (
     <div style={{ minHeight: "100dvh", background: "var(--crema)", padding: "22px 20px 28px", display: "flex", flexDirection: "column" }}>
@@ -388,63 +474,118 @@ function ComposeScreen({ onCancel, onSubmit }: { onCancel: () => void; onSubmit:
         >
           ←
         </button>
-        <h1 style={{ font: "600 20px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0 }}>Scrivi il pasto</h1>
+        <h1 style={{ font: "600 20px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0 }}>Aggiungi un pasto</h1>
       </div>
 
-      <p className="font-serif-italic" style={{ fontSize: 16, lineHeight: 1.35, color: "var(--inchiostro-70)", margin: "18px 0 0" }}>
-        Dimmi cosa hai mangiato, con le quantità se le sai. Ai numeri ci penso io.
-      </p>
-
-      <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 16, marginTop: 16 }}>
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          autoFocus
-          rows={5}
-          maxLength={400}
-          placeholder="80 g di pasta al pomodoro, due uova, una mela"
-          style={{
-            width: "100%",
-            border: "none",
-            background: "none",
-            outline: "none",
-            resize: "none",
-            padding: 0,
-            fontSize: 17,
-            lineHeight: 1.4,
-            fontFamily: "inherit",
-            color: "var(--inchiostro)",
-          }}
-        />
-        <p className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-35)", margin: "10px 0 0", textAlign: "right" }}>
-          {text.length}/400
-        </p>
+      <div style={{ display: "flex", gap: 4, background: "var(--sabbia)", borderRadius: "var(--radius-pill)", padding: 4, marginTop: 16 }}>
+        <ModeTab active={mode === "stima"} onClick={() => setMode("stima")}>
+          Lo stimo io
+        </ModeTab>
+        <ModeTab active={mode === "manuale"} onClick={() => setMode("manuale")}>
+          Scrivo i valori
+        </ModeTab>
       </div>
 
-      <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "12px 0 0", lineHeight: 1.4 }}>
-        Con una quantità dichiarata la stima è molto più precisa di una foto. Senza, tiro
-        a una porzione normale e te lo dico.
-      </p>
+      {mode === "stima" ? (
+        <>
+          <p className="font-serif-italic" style={{ fontSize: 16, lineHeight: 1.35, color: "var(--inchiostro-70)", margin: "18px 0 0" }}>
+            Dimmi cosa hai mangiato, con le quantità se le sai. Ai numeri ci penso io.
+          </p>
+
+          <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 16, marginTop: 16 }}>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              autoFocus
+              rows={5}
+              maxLength={400}
+              placeholder="80 g di pasta al pomodoro, due uova, una mela"
+              style={{
+                width: "100%",
+                border: "none",
+                background: "none",
+                outline: "none",
+                resize: "none",
+                padding: 0,
+                fontSize: 17,
+                lineHeight: 1.4,
+                fontFamily: "inherit",
+                color: "var(--inchiostro)",
+              }}
+            />
+            <p className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-35)", margin: "10px 0 0", textAlign: "right" }}>
+              {text.length}/400
+            </p>
+          </div>
+
+          <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "12px 0 0", lineHeight: 1.4 }}>
+            Con una quantità dichiarata la stima è molto più precisa di una foto. Senza,
+            tiro a una porzione normale e te lo dico.
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="font-serif-italic" style={{ fontSize: 16, lineHeight: 1.35, color: "var(--inchiostro-70)", margin: "18px 0 0" }}>
+            I numeri li sai già: scrivili e li tengo esattamente così.
+          </p>
+
+          <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 16 }}>
+            <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "0 0 4px" }}>descrizione</p>
+            <input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              autoFocus
+              placeholder="Cos'era?"
+              style={{ width: "100%", border: "none", background: "none", padding: 0, fontSize: 17, fontWeight: 600, outline: "none", color: "var(--inchiostro)" }}
+            />
+          </div>
+
+          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+            <ReviewMacroField label="carboidrati" value={carb} onChange={setCarb} />
+            <ReviewMacroField label="proteine" value={protein} onChange={setProtein} />
+            <ReviewMacroField label="grassi" value={fat} onChange={setFat} />
+          </div>
+
+          <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>energia</span>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+              <input
+                inputMode="numeric"
+                value={kcal}
+                onChange={(e) => setKcal(e.target.value.replace(/\D/g, ""))}
+                placeholder="—"
+                className="font-mono"
+                style={{ width: 70, textAlign: "right", border: "none", background: "none", fontSize: 20, fontWeight: 600, outline: "none", color: "var(--inchiostro)" }}
+              />
+              <span className="font-mono" style={{ fontSize: 14, color: "var(--inchiostro-50)" }}>kcal</span>
+            </div>
+          </div>
+
+          <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "12px 0 0", lineHeight: 1.4 }}>
+            Anche uno solo dei valori va bene. Quello che scrivi tu non lo ritocco più.
+          </p>
+        </>
+      )}
 
       <button
         type="button"
-        onClick={() => onSubmit(text.trim())}
-        disabled={!ready}
+        onClick={submit}
+        disabled={!ready || saving}
         className="tap-target press-soft"
         style={{
           marginTop: "auto",
           width: "100%",
-          background: ready ? "var(--inchiostro)" : "var(--sabbia-chip)",
-          color: ready ? "var(--crema)" : "var(--inchiostro-35)",
+          background: ready && !saving ? "var(--inchiostro)" : "var(--sabbia-chip)",
+          color: ready && !saving ? "var(--crema)" : "var(--inchiostro-35)",
           border: "none",
           borderRadius: "var(--radius-pill)",
           padding: "17px 22px",
           fontSize: 16,
           fontWeight: 600,
-          cursor: ready ? "pointer" : "default",
+          cursor: ready && !saving ? "pointer" : "default",
         }}
       >
-        Calcola i valori
+        {mode === "stima" ? "Calcola i valori" : saving ? "Salvo…" : "Salva il pasto"}
       </button>
     </div>
   );
