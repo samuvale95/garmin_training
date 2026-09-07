@@ -17,7 +17,13 @@ from training_plan import body_insights, service
 from training_plan.api import app as fastapi_app
 from training_plan.api import garmin_session
 from training_plan.api import routes_garmin
-from training_plan.api.cache import cache
+from training_plan.api.cache import (
+    TTL_GARMIN_ACTIVITIES,
+    TTL_GARMIN_WORKOUTS,
+    TTL_PAST_RANGE,
+    cache,
+    range_ttl,
+)
 from training_plan.garmin_sync import (
     CompletedActivity,
     DeleteResult,
@@ -86,7 +92,10 @@ def counting_garmin(monkeypatch):
     CountingGarminSync.reset_counters()
     monkeypatch.setattr(garmin_session, "GarminSync", CountingGarminSync)
     monkeypatch.setattr(service, "GarminSync", CountingGarminSync)
-    monkeypatch.setattr(routes_garmin, "GarminSync", CountingGarminSync)
+    # `raising=False`: the route module reaches Garmin through `garmin_session`/`service`
+    # and no longer imports `GarminSync` itself, so insisting on the attribute made the
+    # fixture -- and with it every test in this file -- error out at setup.
+    monkeypatch.setattr(routes_garmin, "GarminSync", CountingGarminSync, raising=False)
     return CountingGarminSync
 
 
@@ -177,6 +186,23 @@ def test_a_different_range_is_a_different_entry(client):
     client.get("/garmin/workouts", params={"start": "2026-08-10", "end": "2026-08-16"})
 
     assert CountingGarminSync.calendar_reads == 2
+
+
+def test_a_past_range_is_cached_far_longer_than_the_current_one():
+    """Paging back to a week already looked at must not re-read Garmin.
+
+    A range that has ended cannot change on its own -- only a write from this app can
+    touch it, and that drops the whole namespace (see the invalidation tests below) --
+    so it is held for a day instead of the minute the current week gets.
+    """
+    today = date(2026, 8, 20)
+
+    assert range_ttl(date(2026, 8, 23), TTL_GARMIN_WORKOUTS, today=today) == TTL_GARMIN_WORKOUTS
+    assert range_ttl(today, TTL_GARMIN_WORKOUTS, today=today) == TTL_GARMIN_WORKOUTS
+    # Yesterday still counts as live: the caller's calendar day may be ahead of ours.
+    assert range_ttl(date(2026, 8, 19), TTL_GARMIN_WORKOUTS, today=today) == TTL_GARMIN_WORKOUTS
+    assert range_ttl(date(2026, 8, 18), TTL_GARMIN_WORKOUTS, today=today) == TTL_PAST_RANGE
+    assert range_ttl(date(2026, 7, 5), TTL_GARMIN_ACTIVITIES, today=today) == TTL_PAST_RANGE
 
 
 def test_refresh_bypasses_the_cache(client):

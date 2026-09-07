@@ -266,7 +266,9 @@ export interface FoodEntry {
   id: number;
   date: string;
   logged_at: string;
-  source: "photo" | "manual";
+  // "text": typed out and read by the model -- an estimate like a photo's, not a number
+  // the user stated (that is "manual", and arrives already `corrected`).
+  source: "photo" | "manual" | "text";
   description: string | null;
   kcal: number | null;
   carb_g: number | null;
@@ -298,6 +300,11 @@ export interface DayTotalsForDate extends DayTotals {
 
 export interface FoodHistory {
   days: DayTotalsForDate[];
+}
+
+/** Every entry over a window, newest first -- what the meal diary reads. */
+export interface FoodEntries {
+  entries: FoodEntry[];
 }
 
 export interface NutritionConfig {

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm, apiPut } from "./apiClient";
-import { toDateKey, weekBounds } from "./sessionVisuals";
+import { shiftDateKey, toDateKey, weekBounds } from "./sessionVisuals";
 import type {
   AthleteProfile,
   BodyMetrics,
@@ -13,6 +13,7 @@ import type {
   DeleteResult,
   DeviceInfo,
   FoodDay,
+  FoodEntries,
   FoodEntry,
   FoodHistory,
   FuelTargets,
@@ -28,6 +29,35 @@ import type {
   SyncJobStatus,
   TrainingSession,
 } from "./types";
+
+// ---- how long an answer stays good --------------------------------------------------------
+
+/** The default for anything that tracks "now": five minutes, matching the QueryClient's
+ * own default (providers.tsx). */
+const LIVE_STALE_TIME = 5 * 60_000;
+
+/** ...and the rule for everything that doesn't.
+ *
+ * A date range that has already ended cannot change on its own: a completed activity is
+ * a fact, and Garmin's calendar for a past week only ever changes because *this app*
+ * wrote to it -- which invalidates the `garmin` keys outright (see `useRescheduleWorkout`,
+ * `useApplyDeletion`, the sync job) and so overrides any staleTime set here. Paging back
+ * to a week already looked at therefore costs nothing, however long ago it was looked
+ * at, instead of re-paying a Garmin round-trip every five minutes. `useRefreshServerData`
+ * remains the "ask again anyway" escape hatch, and invalidation ignores staleness too.
+ *
+ * The day of margin is for timezones: this device may be a day ahead of the server that
+ * answers, and a range that is still "today" for anyone involved must not be frozen. */
+const PAST_RANGE_MARGIN_DAYS = 1;
+
+function isPastDate(dateKey: string): boolean {
+  return dateKey < shiftDateKey(toDateKey(new Date()), -PAST_RANGE_MARGIN_DAYS);
+}
+
+/** `Infinity` for a range that has ended, the live default otherwise. */
+function rangeStaleTime(end: string): number {
+  return isPastDate(end) ? Infinity : LIVE_STALE_TIME;
+}
 
 // ---- plan / sessions (server-backed, mirrored to localStorage -- see usePlanQuery below) ---
 
@@ -478,10 +508,20 @@ export function useCancelSync() {
  * range: the cache is keyed by (start, end), so a single-day request is a guaranteed
  * miss against the week Oggi/Settimana already loaded -- which is exactly why opening a
  * day's detail used to trigger a fresh Garmin round-trip for data already on screen. */
+/** One definition of "this range's scheduled workouts", shared by the hook and the
+ * prefetch below so a warmed slot is always the one the screen goes on to read. */
+function workoutsQueryOptions(start: string, end: string) {
+  return {
+    queryKey: ["garmin", "workouts", start, end] as const,
+    queryFn: ({ signal }: { signal?: AbortSignal }) =>
+      apiGet<{ workouts: ScheduledWorkout[] }>("/garmin/workouts", { start, end }, signal),
+    staleTime: rangeStaleTime(end),
+  };
+}
+
 export function useWorkouts(start: string, end: string, enabled = true) {
   return useQuery({
-    queryKey: ["garmin", "workouts", start, end],
-    queryFn: ({ signal }) => apiGet<{ workouts: ScheduledWorkout[] }>("/garmin/workouts", { start, end }, signal),
+    ...workoutsQueryOptions(start, end),
     enabled,
     // Paging through weeks keeps the previous week visible until the next one lands.
     placeholderData: keepPreviousData,
@@ -532,11 +572,19 @@ function fetchWorkoutSession(workout: ScheduledWorkout, signal?: AbortSignal) {
   );
 }
 
+/** A workout's step structure only changes when it is edited here, which invalidates
+ * this key -- so an hour for anything still ahead, and never for a day already run. */
+function workoutSessionStaleTime(workout: ScheduledWorkout | null): number {
+  if (workout && isPastDate(workout.date)) return Infinity;
+  return 60 * 60_000;
+}
+
 export function useWorkoutSession(workout: ScheduledWorkout | null, enabled = true) {
   return useQuery({
     queryKey: workoutSessionKey(workout),
     queryFn: ({ signal }) => fetchWorkoutSession(workout!, signal),
     enabled: enabled && !!workout,
+    staleTime: workoutSessionStaleTime(workout),
   });
 }
 
@@ -552,17 +600,46 @@ export function usePrefetchWorkoutSession() {
     queryClient.prefetchQuery({
       queryKey: workoutSessionKey(workout),
       queryFn: ({ signal }) => fetchWorkoutSession(workout, signal),
+      staleTime: workoutSessionStaleTime(workout),
     });
   };
 }
 
+function activitiesQueryOptions(start: string, end: string) {
+  return {
+    queryKey: ["garmin", "activities", start, end] as const,
+    queryFn: ({ signal }: { signal?: AbortSignal }) =>
+      apiGet<{ activities: CompletedActivity[] }>("/garmin/activities", { start, end }, signal),
+    staleTime: rangeStaleTime(end),
+  };
+}
+
 export function useActivities(start: string, end: string, enabled = true) {
-  return useQuery({
-    queryKey: ["garmin", "activities", start, end],
-    queryFn: ({ signal }) => apiGet<{ activities: CompletedActivity[] }>("/garmin/activities", { start, end }, signal),
-    enabled,
-    staleTime: 5 * 60_000,
+  return useQuery({ ...activitiesQueryOptions(start, end), enabled });
+}
+
+/** Warms whole weeks that haven't been asked for yet -- Settimana calls it for the two
+ * weeks either side of the one on screen, so paging is instant the *first* time too and
+ * not only on the way back. Prefetching respects `staleTime`, so a week already in the
+ * cache costs nothing here. */
+export function usePrefetchWeeks(references: Date[], { workouts, activities }: { workouts: boolean; activities: boolean }) {
+  const queryClient = useQueryClient();
+  const ranges = references.map((reference) => {
+    const { start, end } = weekBounds(reference);
+    return [toDateKey(start), toDateKey(end)] as const;
   });
+  // The effect must run when the *weeks* change, not on every render that rebuilt the
+  // Date objects above.
+  const fingerprint = ranges.map(([start, end]) => `${start}:${end}`).join("|");
+
+  useEffect(() => {
+    for (const range of fingerprint.split("|")) {
+      const [start, end] = range.split(":");
+      if (!start || !end) continue;
+      if (workouts) queryClient.prefetchQuery(workoutsQueryOptions(start, end));
+      if (activities) queryClient.prefetchQuery(activitiesQueryOptions(start, end));
+    }
+  }, [fingerprint, workouts, activities, queryClient]);
 }
 
 export function useDeletionPreview() {
@@ -740,6 +817,7 @@ export function useStravaActivityMatch(session: TrainingSession | null, enabled:
     queryKey: stravaMatchKey(session?.date ?? null),
     queryFn: ({ signal }) => apiPost<StravaActivityMatch>("/strava/activity-match", { session }, signal),
     enabled: enabled && !!session,
+    staleTime: session ? rangeStaleTime(session.date) : LIVE_STALE_TIME,
   });
 }
 
@@ -751,11 +829,15 @@ export function useStravaActivityMatch(session: TrainingSession | null, enabled:
  * day's detail finds its match already there. */
 export function useStravaActivityMatches(sessions: TrainingSession[], enabled: boolean) {
   const queryClient = useQueryClient();
+  // The last day these sessions cover: once it has passed, no new Strava activity can
+  // land on any of them, so the answer is final.
+  const lastDate = sessions.reduce((latest, session) => (session.date > latest ? session.date : latest), "");
   const query = useQuery({
     queryKey: ["strava", "matches", sessions.length ? planFingerprint(sessions) : null],
     queryFn: ({ signal }) =>
       apiPost<{ matches: Record<string, StravaActivityMatch> }>("/strava/activity-matches", { sessions }, signal),
     enabled: enabled && sessions.length > 0,
+    staleTime: lastDate ? rangeStaleTime(lastDate) : LIVE_STALE_TIME,
     placeholderData: keepPreviousData,
   });
 
@@ -796,12 +878,27 @@ export function useBodyMetrics() {
  * lets the backend fall back to Garmin, then to the 70 kg reference (see
  * `_resolve_weight` in routes_nutrition.py). The whole plan travels along, not just
  * today/tomorrow: the back-to-back-hard-days bump needs the day after tomorrow too. */
-export function useFuelTargets(date: string, sessions: TrainingSession[], weightKg: number | null | undefined) {
+/** Everything a day's targets depend on is already in their query key -- the day, the
+ * plan, the weight -- so the answer only goes stale when the *weight source* changes
+ * behind the key (a fresh Garmin scale reading), which is a half-hour-scale event, not a
+ * five-minute one. Past days never change at all. This is what stops /body and
+ * /body/fuel re-asking for the same targets on every visit. */
+function fuelStaleTime(date: string): number {
+  return isPastDate(date) ? Infinity : 30 * 60_000;
+}
+
+/** `enabled` is not optional in practice: the plan is restored asynchronously, so a
+ * screen that asks on its first render asks with an *empty* plan -- a full round-trip
+ * (and, for the narrative, a paid model call) computed against "nothing scheduled",
+ * immediately thrown away when the real plan lands under a different cache key. Callers
+ * pass whatever tells them the plan has arrived. */
+export function useFuelTargets(date: string, sessions: TrainingSession[], weightKg: number | null | undefined, enabled = true) {
   return useQuery({
     queryKey: ["nutrition", "targets", date, weightKg ?? null, sessions.length ? planFingerprint(sessions) : null],
     queryFn: ({ signal }) =>
       apiPost<FuelTargets>("/nutrition/targets", { date, sessions, weight_kg: weightKg ?? null }, signal),
-    staleTime: 5 * 60_000,
+    enabled,
+    staleTime: fuelStaleTime(date),
   });
 }
 
@@ -811,14 +908,15 @@ export function useFuelTargets(date: string, sessions: TrainingSession[], weight
  * length array of `useQuery`-shaped configs, not a loop of `useFuelTargets` calls: the
  * rules of hooks forbid a variable number of hook calls, which is exactly what mapping
  * a hook over a dynamic date list would be. */
-export function useFuelTargetsForDates(dates: string[], sessions: TrainingSession[], weightKg: number | null | undefined) {
+export function useFuelTargetsForDates(dates: string[], sessions: TrainingSession[], weightKg: number | null | undefined, enabled = true) {
   const fingerprint = sessions.length ? planFingerprint(sessions) : null;
   return useQueries({
     queries: dates.map((date) => ({
+      enabled,
       queryKey: ["nutrition", "targets", date, weightKg ?? null, fingerprint] as const,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         apiPost<FuelTargets>("/nutrition/targets", { date, sessions, weight_kg: weightKg ?? null }, signal),
-      staleTime: 5 * 60_000,
+      staleTime: fuelStaleTime(date),
     })),
   });
 }
@@ -833,14 +931,40 @@ export function useFuelNarrative(date: string, sessions: TrainingSession[], weig
     queryFn: ({ signal }) =>
       apiPost<Narrative>("/nutrition/narrative", { date, sessions, weight_kg: weightKg ?? null }, signal),
     enabled,
-    staleTime: 5 * 60_000,
+    // The slowest thing on the screen: a language-model round-trip, three to eight
+    // seconds of it. It is written over the day's targets and what has been eaten so
+    // far, and `invalidateNutrition` drops it the moment either changes -- so there is
+    // nothing for a short staleTime to catch, only a wait to re-pay.
+    staleTime: fuelStaleTime(date),
   });
+}
+
+/** Starts the narrative's model call before its screen exists.
+ *
+ * Called on touch-down from the Corpo tab's fuel card: the sentence is the slowest
+ * thing on /body/fuel and the only one the user waits for, and the few hundred
+ * milliseconds between finger-down and the screen mounting are free. On tap, not on
+ * mount, so a visit to Corpo that never opens Carburante costs nothing -- this is the
+ * one query in the app that spends money per call. */
+export function usePrefetchFuelNarrative() {
+  const queryClient = useQueryClient();
+  return (date: string, sessions: TrainingSession[], weightKg: number | null | undefined) => {
+    queryClient.prefetchQuery({
+      queryKey: ["nutrition", "narrative", date, weightKg ?? null, sessions.length ? planFingerprint(sessions) : null],
+      queryFn: ({ signal }) =>
+        apiPost<Narrative>("/nutrition/narrative", { date, sessions, weight_kg: weightKg ?? null }, signal),
+      staleTime: fuelStaleTime(date),
+    });
+  };
 }
 
 export function useFoodDay(date: string) {
   return useQuery({
     queryKey: ["nutrition", "day", date],
     queryFn: ({ signal }) => apiGet<FoodDay>("/nutrition/day", { date }, signal),
+    // Photographing or correcting a meal invalidates this key (`invalidateNutrition`),
+    // so a day in the past has nothing left to tell us.
+    staleTime: rangeStaleTime(date),
   });
 }
 
@@ -848,12 +972,32 @@ export function useFoodHistory(days = 7, end?: string) {
   return useQuery({
     queryKey: ["nutrition", "history", days, end ?? null],
     queryFn: ({ signal }) => apiGet<FoodHistory>("/nutrition/history", { days: String(days), end }, signal),
+    staleTime: LIVE_STALE_TIME,
   });
 }
 
+/** Every meal logged over a window -- the diary screen's one request, instead of a
+ * `useFoodDay` per day on screen. */
+export function useFoodEntries(days = 14, end?: string) {
+  return useQuery({
+    queryKey: ["nutrition", "entries", days, end ?? null],
+    queryFn: ({ signal }) => apiGet<FoodEntries>("/nutrition/entries", { days: String(days), end }, signal),
+    staleTime: LIVE_STALE_TIME,
+  });
+}
+
+/** Everything a change to the food log makes untrue.
+ *
+ * The narrative is in here because it is written *over* the day's running totals ("hai
+ * già preso 210 g"), so a new meal makes the sentence on screen wrong -- it used to sit
+ * there unchanged until its five minutes were up, which was the one case where caching
+ * it aggressively would have been visible. The server drops its own copy on the same
+ * writes (`invalidate_nutrition`). */
 function invalidateNutrition(queryClient: ReturnType<typeof useQueryClient>, date?: string) {
   queryClient.invalidateQueries({ queryKey: date ? ["nutrition", "day", date] : ["nutrition", "day"] });
   queryClient.invalidateQueries({ queryKey: ["nutrition", "history"] });
+  queryClient.invalidateQueries({ queryKey: ["nutrition", "entries"] });
+  queryClient.invalidateQueries({ queryKey: ["nutrition", "narrative"] });
 }
 
 /** Estimate + store one plate. The entry is written server-side even when the model
@@ -870,6 +1014,18 @@ export function useLogPhoto() {
       if (thumbnail) form.set("thumbnail", thumbnail, "thumbnail.jpg");
       return apiPostForm<FoodEntry>("/nutrition/photo", form);
     },
+    onSuccess: (_entry, vars) => invalidateNutrition(queryClient, vars.date),
+  });
+}
+
+/** Estimate + store one meal from a sentence the user typed. Same contract as
+ * `useLogPhoto`: the row is written even when the model can't answer, and the caller
+ * tells that case apart by `confidence == null`. */
+export function useDescribeMeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ text, date }: { text: string; date: string }) =>
+      apiPost<FoodEntry>("/nutrition/describe", { text, date }),
     onSuccess: (_entry, vars) => invalidateNutrition(queryClient, vars.date),
   });
 }

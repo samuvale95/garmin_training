@@ -7,7 +7,7 @@ import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { ProgressRing, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { useBodyToday, useFuelTargets, usePlanQuery } from "@/lib/queries";
+import { useBodyToday, useFuelTargets, usePlanQuery, usePrefetchFuelNarrative } from "@/lib/queries";
 import { useWatchSyncStatus } from "@/lib/watchSync";
 import { toDateKey } from "@/lib/sessionVisuals";
 import { formatFullDate, hrvCaption, stressCaption } from "@/lib/format";
@@ -28,10 +28,14 @@ export default function RecoveryPage() {
   const router = useRouter();
   const animate = useMountOnce("body-recovery");
   const { data, isLoading } = useBodyToday();
-  const { data: plan } = usePlanQuery();
+  const { data: plan, isHydrated } = usePlanQuery();
   const manualWeight = usePassoStore((s) => s.manualWeight);
   const sessions = plan?.sessions ?? [];
-  const fuelQuery = useFuelTargets(toDateKey(new Date()), sessions, manualWeight?.weightKg);
+  const today = toDateKey(new Date());
+  // Not before the plan is back: asking with an empty plan buys an answer about a day
+  // with nothing scheduled, which is neither true nor the one this card shows.
+  const fuelQuery = useFuelTargets(today, sessions, manualWeight?.weightKg, isHydrated);
+  const prefetchNarrative = usePrefetchFuelNarrative();
   const fuel = fuelQuery.data;
   const fuelDegraded = fuel?.weight_source === "reference" && sessions.length === 0;
 
@@ -169,7 +173,8 @@ export default function RecoveryPage() {
           <SlideUp active={animate} delayMs={500} style={{ marginTop: 10 }}>
             <Link
               href="/body/fuel"
-              className="tap-target"
+              className="tap-target press-soft"
+              onPointerDown={() => prefetchNarrative(today, sessions, manualWeight?.weightKg)}
               style={{ display: "block", background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card)", padding: 16, textDecoration: "none" }}
             >
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>

@@ -16,7 +16,15 @@ import { useState } from "react";
  * doubled the time the user stared at nothing before seeing the error.
  */
 const STALE_TIME = 5 * 60_000;
-const GC_TIME = 24 * 60 * 60_000;
+/** How long an unused answer is kept -- and, since it doubles as the persister's
+ * `maxAge`, how far back the restored cache reaches on a cold start.
+ *
+ * A week, not a day: past weeks and their activities never change (see
+ * `rangeStaleTime` in queries.ts), so a calendar browsed on Monday should still open
+ * instantly on Friday instead of re-paying a Garmin round-trip for the same answer.
+ * The stored payload is small -- a week of workouts is a few hundred bytes of JSON --
+ * and `gcTime` only bounds what is *kept*, never what is shown. */
+const GC_TIME = 7 * 24 * 60 * 60_000;
 
 /** Bump to discard every persisted cache after a shape change to the stored data. */
 const PERSIST_BUSTER = "passo-v1";

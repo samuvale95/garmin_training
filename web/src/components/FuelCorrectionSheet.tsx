@@ -33,6 +33,13 @@ export function FoodThumb({ entry, size = 52 }: { entry: FoodEntry; size?: numbe
   );
 }
 
+/** How each entry says where its numbers came from. */
+export const SOURCE_LABELS: Record<string, string> = {
+  photo: "da foto",
+  text: "dal testo",
+  manual: "scritto a mano",
+};
+
 function digitsOnly(raw: string): string {
   return raw.replace(/[^\d]/g, "");
 }
@@ -63,6 +70,7 @@ export function FuelCorrectionSheet({ entry, onClose }: { entry: FoodEntry; onCl
   const { reduced } = useMotionEnabled();
   const updateEntry = useUpdateEntry();
   const deleteEntry = useDeleteEntry();
+  const [description, setDescription] = useState(entry.description ?? "");
   const [carb, setCarb] = useState(entry.carb_g != null ? String(Math.round(entry.carb_g)) : "");
   const [protein, setProtein] = useState(entry.protein_g != null ? String(Math.round(entry.protein_g)) : "");
   const [fat, setFat] = useState(entry.fat_g != null ? String(Math.round(entry.fat_g)) : "");
@@ -73,6 +81,7 @@ export function FuelCorrectionSheet({ entry, onClose }: { entry: FoodEntry; onCl
     updateEntry.mutate(
       {
         id: entry.id,
+        description: description.trim() || null,
         carb_g: carb === "" ? null : Number(carb),
         protein_g: protein === "" ? null : Number(protein),
         fat_g: fat === "" ? null : Number(fat),
@@ -106,10 +115,17 @@ export function FuelCorrectionSheet({ entry, onClose }: { entry: FoodEntry; onCl
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <FoodThumb entry={entry} />
-          <div>
-            <p style={{ fontWeight: 700, fontSize: 15, margin: "0 0 2px" }}>{entry.description ?? "Pasto"}</p>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Editable, not a heading: a model's description is a guess like its
+                numbers are, and the diary is where a wrong one gets fixed. */}
+            <input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Cos'era?"
+              style={{ width: "100%", fontWeight: 600, fontSize: 15, border: "none", background: "none", padding: 0, outline: "none", color: "var(--inchiostro)", marginBottom: 2 }}
+            />
             <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
-              {formatClockTime(entry.logged_at)} · {entry.source === "photo" ? "da foto" : "scritto a mano"}
+              {formatClockTime(entry.logged_at)} · {SOURCE_LABELS[entry.source] ?? "scritto a mano"}
             </p>
           </div>
         </div>

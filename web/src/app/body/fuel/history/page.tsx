@@ -33,7 +33,10 @@ export default function FuelHistoryPage() {
 
   const dates = weekDateKeys();
   const historyQuery = useFoodHistory(7, dates[6]);
-  const targetQueries = useFuelTargetsForDates(dates, sessions, manualWeight?.weightKg);
+  // Seven target requests, so asking before the plan is back is seven wasted ones (see
+  // `useFuelTargets`).
+  const sessionsReady = access.ready && (!liveMode || !workoutsQuery.isPending);
+  const targetQueries = useFuelTargetsForDates(dates, sessions, manualWeight?.weightKg, sessionsReady);
 
   const isLoading = historyQuery.isLoading || targetQueries.some((q) => q.isLoading);
   const historyByDate = new Map((historyQuery.data?.days ?? []).map((d) => [d.date, d]));

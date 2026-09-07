@@ -13,13 +13,19 @@ Two shapes differ from every other module in this package, both for the same rea
   would put a 3-second third-party round-trip in front of a screen that is fully
   renderable without it. The screen paints from the deterministic advice and the sentence
   replaces it when (and if) it arrives.
+
+Both of those two are also the only *cached* answers in this module (see `api/cache.py`):
+they are what the fuelling screen waits on, they are re-asked every time it opens, and
+every write below drops them, so the cache can never outlive what it describes.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import date as date_type
 from datetime import timedelta
+from hashlib import sha1
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi import Form
@@ -27,6 +33,12 @@ from fastapi import Form
 from .. import db, llm, nutrition
 from . import routes_body, schemas
 from .auth import current_user_id
+from .cache import (
+    TTL_NUTRITION_NARRATIVE,
+    TTL_NUTRITION_TARGETS,
+    cache,
+    invalidate_nutrition,
+)
 from fastapi.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
@@ -63,36 +75,77 @@ async def nutrition_config() -> schemas.NutritionConfigResponse:
     return schemas.NutritionConfigResponse(**llm.config_state())
 
 
+def _plan_key(payload: schemas.FuelTargetsRequest) -> str:
+    """What the answer actually depends on, as a hashable cache key: the sessions this
+    request carried, in order. Hashed rather than kept whole -- a plan is kilobytes, and
+    the cache holds this key for half an hour."""
+    return sha1(
+        json.dumps([s.model_dump(mode="json") for s in payload.sessions], sort_keys=True).encode()
+    ).hexdigest()
+
+
 @router.post("/nutrition/targets", response_model=schemas.FuelTargetsResponse)
 async def nutrition_targets(
-    payload: schemas.FuelTargetsRequest, user_id: str = Depends(current_user_id)
+    payload: schemas.FuelTargetsRequest, refresh: bool = False, user_id: str = Depends(current_user_id)
 ) -> schemas.FuelTargetsResponse:
     day = payload.date or date_type.today()
-    weight, source = await run_in_threadpool(_resolve_weight, user_id, payload.weight_kg)
-    fuelling = nutrition.daily_fuelling(
-        day, [s.to_model() for s in payload.sessions], weight_kg=weight, weight_source=source
+
+    def compute() -> schemas.FuelTargetsResponse:
+        weight, source = _resolve_weight(user_id, payload.weight_kg)
+        fuelling = nutrition.daily_fuelling(
+            day, [s.to_model() for s in payload.sessions], weight_kg=weight, weight_source=source
+        )
+        return schemas.FuelTargetsResponse.from_model(fuelling)
+
+    return await run_in_threadpool(
+        lambda: cache.get_or_call(
+            "nutrition:targets",
+            user_id,
+            (day, _plan_key(payload), payload.weight_kg),
+            TTL_NUTRITION_TARGETS,
+            compute,
+            refresh=refresh,
+        )
     )
-    return schemas.FuelTargetsResponse.from_model(fuelling)
 
 
 @router.post("/nutrition/narrative", response_model=schemas.NarrativeResponse)
 async def nutrition_narrative(
-    payload: schemas.FuelTargetsRequest, user_id: str = Depends(current_user_id)
+    payload: schemas.FuelTargetsRequest, refresh: bool = False, user_id: str = Depends(current_user_id)
 ) -> schemas.NarrativeResponse:
     """The same targets, phrased by the model -- falling back to the template it would
-    have replaced. Never fails: `source` says which one came back."""
-    day = payload.date or date_type.today()
-    weight, source = await run_in_threadpool(_resolve_weight, user_id, payload.weight_kg)
-    fuelling = nutrition.daily_fuelling(
-        day, [s.to_model() for s in payload.sessions], weight_kg=weight, weight_source=source
-    )
-    consumed = await run_in_threadpool(db.totals_for_date, user_id, day.isoformat())
-    facts = nutrition.fuelling_facts(fuelling, consumed if consumed["entries"] else None)
+    have replaced. Never fails: `source` says which one came back.
 
-    text = await run_in_threadpool(llm.write_fuelling_narrative, facts)
-    if text:
-        return schemas.NarrativeResponse(text=text, source="model")
-    return schemas.NarrativeResponse(text=fuelling.advice, source="template")
+    Cached, unlike every other model call in this app, because it is the one the user
+    waits on: three to eight seconds of third-party round-trip in front of a screen they
+    open several times a day. The key carries the day's running totals, so the sentence
+    is recomputed the moment what it describes changes -- and logging a meal invalidates
+    the namespace outright anyway (`invalidate_nutrition`).
+    """
+    day = payload.date or date_type.today()
+
+    def compute(consumed: dict) -> schemas.NarrativeResponse:
+        weight, source = _resolve_weight(user_id, payload.weight_kg)
+        fuelling = nutrition.daily_fuelling(
+            day, [s.to_model() for s in payload.sessions], weight_kg=weight, weight_source=source
+        )
+        facts = nutrition.fuelling_facts(fuelling, consumed if consumed["entries"] else None)
+        text = llm.write_fuelling_narrative(facts)
+        if text:
+            return schemas.NarrativeResponse(text=text, source="model")
+        return schemas.NarrativeResponse(text=fuelling.advice, source="template")
+
+    consumed = await run_in_threadpool(db.totals_for_date, user_id, day.isoformat())
+    return await run_in_threadpool(
+        lambda: cache.get_or_call(
+            "nutrition:narrative",
+            user_id,
+            (day, _plan_key(payload), payload.weight_kg, consumed["entries"], round(consumed["carb_g"])),
+            TTL_NUTRITION_NARRATIVE,
+            lambda: compute(consumed),
+            refresh=refresh,
+        )
+    )
 
 
 @router.get("/nutrition/day", response_model=schemas.FoodDayResponse)
@@ -168,7 +221,52 @@ async def nutrition_photo(
             thumbnail=thumbnail_bytes or None,
         )
     )
+    invalidate_nutrition(user_id)
     return schemas.FoodEntryOut.from_model(entry)
+
+
+@router.post("/nutrition/describe", response_model=schemas.FoodEntryOut)
+async def nutrition_describe(
+    payload: schemas.DescribeMealRequest, user_id: str = Depends(current_user_id)
+) -> schemas.FoodEntryOut:
+    """Estimate one meal from a sentence the user typed.
+
+    The photo path's twin, and deliberately identical in shape: the row is written even
+    when the model can't answer (null macros, no confidence), so the client lands in the
+    same "write the numbers yourself" screen rather than losing what was typed. The
+    user's own words are kept as the description when there is no estimate to name it.
+    """
+    text = payload.text.strip()
+    day = payload.date.isoformat()
+    estimate = await run_in_threadpool(llm.estimate_macros_from_text, text)
+
+    entry = await run_in_threadpool(
+        lambda: db.add_entry(
+            user_id=user_id,
+            date=day,
+            source="text",
+            description=estimate.description if estimate else text[:200],
+            kcal=estimate.kcal if estimate else None,
+            carb_g=estimate.carb_g if estimate else None,
+            protein_g=estimate.protein_g if estimate else None,
+            fat_g=estimate.fat_g if estimate else None,
+            confidence=estimate.confidence if estimate else None,
+        )
+    )
+    invalidate_nutrition(user_id)
+    return schemas.FoodEntryOut.from_model(entry)
+
+
+@router.get("/nutrition/entries", response_model=schemas.FoodEntriesResponse)
+async def nutrition_entries(
+    days: int = 14, end: date_type | None = None, user_id: str = Depends(current_user_id)
+) -> schemas.FoodEntriesResponse:
+    """Every meal logged over a window, for the diary screen -- one request instead of
+    one per day."""
+    last = end or date_type.today()
+    first = last - timedelta(days=max(1, min(days, 120)) - 1)
+    entries = await run_in_threadpool(db.entries_between, user_id, first, last)
+    return schemas.FoodEntriesResponse(entries=[schemas.FoodEntryOut.from_model(e) for e in entries])
 
 
 @router.post("/nutrition/entry", response_model=schemas.FoodEntryOut)
@@ -190,6 +288,7 @@ async def nutrition_add_entry(
             corrected=True,
         )
     )
+    invalidate_nutrition(user_id)
     return schemas.FoodEntryOut.from_model(entry)
 
 
@@ -201,6 +300,7 @@ async def nutrition_update_entry(
     entry = await run_in_threadpool(lambda: db.update_entry(user_id, entry_id, **fields))
     if entry is None:
         raise HTTPException(status_code=404, detail="Entry not found")
+    invalidate_nutrition(user_id)
     return schemas.FoodEntryOut.from_model(entry)
 
 
@@ -211,4 +311,5 @@ async def nutrition_delete_entry(
     deleted = await run_in_threadpool(db.delete_entry, user_id, entry_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Entry not found")
+    invalidate_nutrition(user_id)
     return schemas.DeleteEntryResponse(deleted=True)

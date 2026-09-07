@@ -10,6 +10,7 @@ import { useMotionEnabled, useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import {
   useActivities,
+  usePrefetchWeeks,
   usePrefetchWorkoutSession,
   useRescheduleWorkout,
   useStravaActivityMatches,
@@ -89,6 +90,16 @@ function WeekPageContent() {
         description: null,
         steps: [],
       }));
+  // The weeks either side of this one, warmed while the user is reading this one --
+  // paging is then instant on the first visit too, not only on the way back through
+  // the cache. Nothing is fetched for a week already held (prefetch honours staleTime).
+  const neighbouringWeeks = [-1, 1].map((step) => {
+    const neighbour = new Date(reference);
+    neighbour.setDate(neighbour.getDate() + step * 7);
+    return neighbour;
+  });
+  usePrefetchWeeks(neighbouringWeeks, { workouts: liveMode, activities: showProgress });
+
   const stravaEnabled = !!stravaStatus.data?.connected && planSessions.length > 0;
   const stravaMatches = useStravaActivityMatches(planSessions, stravaEnabled);
   const prefetchWorkoutSession = usePrefetchWorkoutSession();

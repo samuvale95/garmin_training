@@ -340,7 +340,9 @@ export function MealList({ entries, animate, onSelect }: { entries: FoodEntry[];
   );
 }
 
-function MealRow({ entry, onSelect }: { entry: FoodEntry; onSelect: (e: FoodEntry) => void }) {
+/** One logged meal. Shared by the fuel screen's "pasti di oggi" list and the diary,
+ * so a row reads the same wherever it is met. */
+export function MealRow({ entry, onSelect }: { entry: FoodEntry; onSelect: (e: FoodEntry) => void }) {
   const low = entry.confidence === "low";
   return (
     <button
