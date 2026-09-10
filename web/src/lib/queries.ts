@@ -10,6 +10,7 @@ import type {
   BodySnapshot,
   CompletedActivity,
   ConflictAssessment,
+  DayVerdict,
   DeleteResult,
   DeviceInfo,
   FoodDay,
@@ -769,6 +770,39 @@ export function useBodyLoad() {
     queryKey: ["body", "load"],
     queryFn: ({ signal }) => apiGet<LoadSnapshot>("/body/load", undefined, signal),
     staleTime: 5 * 60_000,
+  });
+}
+
+/** Today's state, and what it means for today's session.
+ *
+ * The session and the goal travel in the request because the plan lives on the device.
+ * Keyed on both, so editing the plan (or the race) recomputes rather than serving a
+ * verdict about a session that is no longer today's. */
+export function useDayVerdict(session: TrainingSession | null, goal: RaceGoal | null | undefined, enabled = true) {
+  const goalPayload = goal
+    ? { race_date: goal.race_date, distance_km: goal.distance_km, name: goal.name, target_time_seconds: goal.target_time_seconds }
+    : null;
+  return useQuery({
+    queryKey: ["body", "readiness", session?.date ?? null, session?.title ?? null, goal?.race_date ?? null],
+    queryFn: ({ signal }) => apiPost<DayVerdict>("/body/readiness", { session, goal: goalPayload }, signal),
+    enabled,
+    // Overnight figures are computed once, by Garmin, while you sleep.
+    staleTime: 30 * 60_000,
+  });
+}
+
+/** The same verdict, phrased by the model. Fetched separately, exactly like the
+ * fuelling narrative: the screen paints from the deterministic headline and swaps this
+ * in when (and if) it lands. */
+export function useDayVerdictNarrative(session: TrainingSession | null, goal: RaceGoal | null | undefined, enabled = true) {
+  const goalPayload = goal
+    ? { race_date: goal.race_date, distance_km: goal.distance_km, name: goal.name, target_time_seconds: goal.target_time_seconds }
+    : null;
+  return useQuery({
+    queryKey: ["body", "readiness-narrative", session?.date ?? null, session?.title ?? null, goal?.race_date ?? null],
+    queryFn: ({ signal }) => apiPost<Narrative>("/body/readiness/narrative", { session, goal: goalPayload }, signal),
+    enabled,
+    staleTime: 30 * 60_000,
   });
 }
 

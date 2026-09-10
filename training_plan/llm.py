@@ -199,6 +199,22 @@ Regole assolute:
 - Rispondi solo con la frase, senza virgolette e senza preamboli."""
 
 
+READINESS_SYSTEM_PROMPT = """Sei la voce di Passo, un'app di allenamento per la corsa.
+
+Scrivi UNA frase, al massimo DUE, in italiano, che dica a chi corre come sta oggi e cosa
+farne dell'allenamento previsto.
+
+Regole assolute:
+- La decisione è già presa e te la passo io ("stato", "azione", "alternativa"): la tua
+  frase la spiega, non la ridiscute e non la contraddice mai.
+- Usa i segnali che ti do e i loro numeri. Non inventarne altri e non aggiungere cifre.
+- Non sei un medico: niente diagnosi, niente ipotesi su malattie, niente allarmi. Se il
+  corpo è messo male dillo come lo direbbe un allenatore, non un referto.
+- Tono asciutto e adulto. Niente esclamativi, niente emoji, niente elenchi, niente
+  incoraggiamenti da poster.
+- Rispondi solo con la frase, senza virgolette e senza preamboli."""
+
+
 def _write_sentence(system_prompt: str, facts: dict) -> str | None:
     content = _post_chat(
         os.getenv("LLM_TEXT_MODEL", DEFAULT_TEXT_MODEL),
@@ -219,6 +235,13 @@ def write_fuelling_narrative(facts: dict) -> str | None:
     """The fuelling sentence, or `None` -- the caller falls back to
     `nutrition.templated_advice`, which is written to stand on its own."""
     return _write_sentence(FUELLING_SYSTEM_PROMPT, facts)
+
+
+def write_readiness_narrative(facts: dict) -> str | None:
+    """The day's verdict, phrased. `None` whenever the model is unavailable -- the
+    screen already has `DayVerdict.headline`, which is deterministic, and loses only the
+    prose."""
+    return _write_sentence(READINESS_SYSTEM_PROMPT, facts)
 
 
 def write_goal_narrative(facts: dict) -> str | None:

@@ -13,7 +13,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from .. import body_insights, db, garmin_sync, models, nutrition
+from .. import body_insights, db, garmin_sync, models, nutrition, readiness
 
 
 # ---- plan / steps --------------------------------------------------------------------------
@@ -554,6 +554,70 @@ class LoadSnapshotResponse(BaseModel):
             ],
             acute_chronic_ratio=snapshot.acute_chronic_ratio,
             vo2max=snapshot.vo2max,
+        )
+
+
+# ---- the day's verdict -------------------------------------------------------------------
+
+
+class SignalOut(BaseModel):
+    """One measurement that moved the verdict, carrying the figure that did it -- the
+    screen shows these verbatim so the answer can be checked against the watch."""
+
+    key: str
+    label: str
+    detail: str
+    severity: str
+
+
+class AlternativeOut(BaseModel):
+    kind: str
+    label: str
+    detail: str
+
+
+class DayVerdictRequest(BaseModel):
+    """The plan lives on the device, so the session and the goal travel in the request --
+    the same shape `/body/conflict` and `/nutrition/targets` already use."""
+
+    date: date_type | None = None
+    session: TrainingSessionIn | None = None
+    goal: RaceGoalIn | None = None
+
+
+class DayVerdictResponse(BaseModel):
+    date: date_type
+    state: str
+    headline: str
+    signals: list[SignalOut] = Field(default_factory=list)
+    session_title: str | None = None
+    session_demand: str | None = None
+    action: str | None = None
+    alternative: AlternativeOut | None = None
+    phase: str | None = None
+    has_data: bool = True
+
+    @classmethod
+    def from_model(cls, verdict: "readiness.DayVerdict") -> "DayVerdictResponse":
+        return cls(
+            date=verdict.date,
+            state=verdict.state,
+            headline=verdict.headline,
+            signals=[SignalOut(key=s.key, label=s.label, detail=s.detail, severity=s.severity) for s in verdict.signals],
+            session_title=verdict.session_title,
+            session_demand=verdict.session_demand,
+            action=verdict.action,
+            alternative=(
+                AlternativeOut(
+                    kind=verdict.alternative.kind,
+                    label=verdict.alternative.label,
+                    detail=verdict.alternative.detail,
+                )
+                if verdict.alternative
+                else None
+            ),
+            phase=verdict.phase,
+            has_data=verdict.has_data,
         )
 
 

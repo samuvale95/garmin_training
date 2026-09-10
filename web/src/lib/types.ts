@@ -184,6 +184,39 @@ export interface LoadSnapshot {
   vo2max: number | null;
 }
 
+/** One measurement that moved today's verdict, with the figure that did it. */
+export interface DaySignal {
+  key: string;
+  label: string;
+  detail: string;
+  severity: "info" | "moderato" | "forte";
+}
+
+export interface DayAlternative {
+  kind: "soften" | "reschedule" | "rest" | "easy";
+  label: string;
+  detail: string;
+}
+
+/** How the body reads this morning, and what that means for today's session.
+ *
+ * Everything here is computed by `training_plan/readiness.py` from thresholds the user
+ * can check against their own watch -- see that module's docstring. `state` is
+ * "sconosciuto" (and `has_data` false) whenever there is no overnight reading, which is
+ * a blank, not a verdict. */
+export interface DayVerdict {
+  date: string;
+  state: "pronto" | "cauto" | "scarico" | "sconosciuto";
+  headline: string;
+  signals: DaySignal[];
+  session_title: string | null;
+  session_demand: "riposo" | "facile" | "medio" | "duro" | null;
+  action: "conferma" | "alleggerisci" | "sposta" | "riposa" | null;
+  alternative: DayAlternative | null;
+  phase: string | null;
+  has_data: boolean;
+}
+
 export interface ConflictOption {
   kind: "reschedule" | "soften";
   label: string;

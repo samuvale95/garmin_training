@@ -6,11 +6,20 @@ import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
+import { DayStateCard } from "@/components/DayStateCard";
 import { RaceGoalCard } from "@/components/RaceGoalCard";
 import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
-import { usePlanDiff, useBodyConflict, useBodyToday, useStravaActivityMatches, useStravaStatus, useWeekWorkouts } from "@/lib/queries";
+import {
+  useBodyToday,
+  useDayVerdict,
+  useDayVerdictNarrative,
+  usePlanDiff,
+  useStravaActivityMatches,
+  useStravaStatus,
+  useWeekWorkouts,
+} from "@/lib/queries";
 import { useWatchSyncStatus } from "@/lib/watchSync";
 import { SkeletonTodayHero } from "@/components/skeletons";
 import { usePassoStore } from "@/lib/store";
@@ -39,13 +48,7 @@ export default function TodayPage() {
   const stravaEnabled = !!access.plan && !!stravaStatus.data?.connected && planSessionsThisWeek.length > 0;
   const stravaMatches = useStravaActivityMatches(planSessionsThisWeek, stravaEnabled);
 
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowKey = toDateKey(tomorrow);
-  const nextPlanSession = access.plan?.sessions.find((s) => s.date === tomorrowKey) ?? null;
-  const conflictQuery = useBodyConflict(nextPlanSession);
   const avvisamiSeIlCorpoNonRegge = usePassoStore((s) => s.prefs.avvisamiSeIlCorpoNonRegge);
-  const conflictDismissedDate = usePassoStore((s) => s.conflictDismissedDate);
 
   // "19 L'orologio non ha ancora parlato" replaces Today when the watch hasn't pushed
   // to Garmin's cloud in over 24h: with no overnight data there is nothing to interpret,
@@ -55,17 +58,16 @@ export default function TodayPage() {
     if (watchSync.blocking) router.replace("/watch-sync");
   }, [watchSync.blocking, router]);
 
-  // "13 Il corpo dice no" replaces Today when this morning's readiness conflicts with
-  // tomorrow's session -- dismissed-today check keeps it from re-triggering the moment
-  // the conflict screen sends the user back here (see conflictDismissedDate).
-  useEffect(() => {
-    if (watchSync.blocking) return;
-    if (!avvisamiSeIlCorpoNonRegge) return;
-    if (!nextPlanSession) return;
-    if (!conflictQuery.data?.has_conflict) return;
-    if (conflictDismissedDate === todayKey) return;
-    router.replace("/body/conflict");
-  }, [watchSync.blocking, avvisamiSeIlCorpoNonRegge, nextPlanSession, conflictQuery.data?.has_conflict, conflictDismissedDate, todayKey, router]);
+  // Today's state, and what it says about today's session. It sits on this screen as a
+  // card rather than replacing it: the old behaviour hijacked Oggi with a full-screen
+  // "il corpo dice no" the moment readiness dipped, which is a lot of authority for one
+  // low number -- and it only ever looked at *tomorrow*. The card says the same thing
+  // where the user is already looking, and the verdict screen is one tap behind it.
+  // The "avvisami se il corpo non regge" preference now decides whether it appears.
+  const verdictSession = access.plan?.sessions.find((s) => s.date === todayKey) ?? null;
+  const wantsVerdict = avvisamiSeIlCorpoNonRegge && !watchSync.blocking && access.ready;
+  const verdictQuery = useDayVerdict(verdictSession, access.plan?.goal, wantsVerdict);
+  const verdictNarrative = useDayVerdictNarrative(verdictSession, access.plan?.goal, wantsVerdict && !!verdictQuery.data);
 
   // Until we know whether there's a plan or a live Garmin connection there is nothing
   // real to show -- but "nothing real" used to mean `return null`, i.e. an empty screen
@@ -148,7 +150,9 @@ export default function TodayPage() {
         <Illustration name="corsa" width={150} height={160} right={0} bottom={0} active={animate} delayMs={900} />
       </SlideUp>
 
-      <RaceGoalCard goal={access.plan?.goal} animate={animate} delayMs={280} />
+      <DayStateCard verdict={verdictQuery.data} narrative={verdictNarrative.data?.text} animate={animate} delayMs={260} />
+
+      <RaceGoalCard goal={access.plan?.goal} animate={animate} delayMs={320} />
 
       <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
         <MetricCard
