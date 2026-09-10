@@ -41,6 +41,25 @@ export function flattenSteps(steps: SessionStep[]): Step[] {
   );
 }
 
+/** The race a plan is written for. Optional everywhere: `goal` is null for the many
+ * plans that state none, and every screen that reads it renders without it.
+ *
+ * `phase` and `days_to_race` are computed server-side from `race_date` (see
+ * `models.race_phase`) rather than here -- one implementation, so a countdown and a
+ * phase label can never disagree between two screens. */
+export interface RaceGoal {
+  race_date: string; // YYYY-MM-DD
+  distance_km: number;
+  name: string | null;
+  target_time_seconds: number | null;
+  // Both derived from `race_date` server-side, so they are absent for the moment
+  // between setting a goal in the app and the server answering (see `useSetRaceGoal`).
+  // The countdown is recomputed locally anyway (`raceGoal.ts`); the phase label is the
+  // one thing that waits, and every screen renders without it.
+  phase?: "base" | "costruzione" | "picco" | "scarico" | "gara passata";
+  days_to_race?: number;
+}
+
 export interface TrainingSession {
   date: string; // YYYY-MM-DD
   sport: Sport;
@@ -163,6 +182,77 @@ export interface LoadSnapshot {
   weeks: WeeklyLoad[];
   acute_chronic_ratio: number | null;
   vo2max: number | null;
+}
+
+/** One comparison between the plan and the race, carrying both numbers -- "il più lungo
+ * in programma è 24 km, per questa distanza se ne fanno almeno 30". */
+export interface GoalObservation {
+  key: string;
+  label: string;
+  detail: string;
+  severity: "ok" | "attenzione" | "sconosciuto";
+}
+
+export interface GoalWeekVolume {
+  week_start: string;
+  km: number;
+  sessions: number;
+}
+
+/** How the sessions already in the plan line up with the race, computed by
+ * `training_plan/goal_fit.py` from the plan file alone. `longest_run_km` and
+ * `peak_week_km` are null when the sessions carry no steps (a Garmin calendar), which
+ * is a "I can't see that" and never a zero. */
+export interface GoalFit {
+  race_date: string;
+  days_to_race: number;
+  phase: string;
+  alignment: "in linea" | "da guardare" | "non arriva" | "non valutabile";
+  headline: string;
+  observations: GoalObservation[];
+  sessions_ahead: number;
+  weeks_covered: number;
+  last_session_date: string | null;
+  longest_run_km: number | null;
+  longest_run_date: string | null;
+  longest_run_guide_km: number | null;
+  peak_week_km: number | null;
+  weekly_volume: GoalWeekVolume[];
+  quality_sessions: number;
+  sessions_without_detail: number;
+}
+
+/** One measurement that moved today's verdict, with the figure that did it. */
+export interface DaySignal {
+  key: string;
+  label: string;
+  detail: string;
+  severity: "info" | "moderato" | "forte";
+}
+
+export interface DayAlternative {
+  kind: "soften" | "reschedule" | "rest" | "easy";
+  label: string;
+  detail: string;
+}
+
+/** How the body reads this morning, and what that means for today's session.
+ *
+ * Everything here is computed by `training_plan/readiness.py` from thresholds the user
+ * can check against their own watch -- see that module's docstring. `state` is
+ * "sconosciuto" (and `has_data` false) whenever there is no overnight reading, which is
+ * a blank, not a verdict. */
+export interface DayVerdict {
+  date: string;
+  state: "pronto" | "cauto" | "scarico" | "sconosciuto";
+  headline: string;
+  signals: DaySignal[];
+  session_title: string | null;
+  session_demand: "riposo" | "facile" | "medio" | "duro" | null;
+  action: "conferma" | "alleggerisci" | "sposta" | "riposa" | null;
+  alternative: DayAlternative | null;
+  phase: string | null;
+  has_data: boolean;
 }
 
 export interface ConflictOption {

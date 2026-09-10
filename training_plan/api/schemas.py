@@ -13,7 +13,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from .. import body_insights, db, garmin_sync, models, nutrition
+from .. import body_insights, db, garmin_sync, goal_fit, models, nutrition, readiness
 
 
 # ---- plan / steps --------------------------------------------------------------------------
@@ -138,8 +138,61 @@ class ParsePlanRequest(BaseModel):
     yaml_text: str
 
 
+class RaceGoalOut(BaseModel):
+    """The race the plan is written for. Every screen that reads it must also render
+    without it -- `goal` is null for any plan that doesn't state one."""
+
+    race_date: date_type
+    distance_km: float
+    name: str | None = None
+    target_time_seconds: int | None = None
+    # Derived, not stored: sent along so the phase label and the countdown are computed
+    # in exactly one place (models.race_phase) rather than reimplemented per client.
+    phase: str
+    days_to_race: int
+
+    @classmethod
+    def from_model(cls, goal: models.RaceGoal) -> "RaceGoalOut":
+        return cls(
+            race_date=goal.race_date,
+            distance_km=goal.distance_km,
+            name=goal.name,
+            target_time_seconds=goal.target_time_seconds,
+            phase=models.race_phase(goal),
+            days_to_race=models.days_to_race(goal),
+        )
+
+    def to_model(self) -> models.RaceGoal:
+        return models.RaceGoal(
+            race_date=self.race_date,
+            distance_km=self.distance_km,
+            name=self.name,
+            target_time_seconds=self.target_time_seconds,
+        )
+
+
+class RaceGoalIn(BaseModel):
+    """What a client may state. `phase`/`days_to_race` are absent on purpose: they are
+    derived from the date, and accepting them would let a client claim a phase its own
+    race date contradicts."""
+
+    race_date: date_type
+    distance_km: float = Field(gt=0)
+    name: str | None = None
+    target_time_seconds: int | None = Field(default=None, gt=0)
+
+    def to_model(self) -> models.RaceGoal:
+        return models.RaceGoal(
+            race_date=self.race_date,
+            distance_km=self.distance_km,
+            name=self.name,
+            target_time_seconds=self.target_time_seconds,
+        )
+
+
 class ParsePlanResponse(BaseModel):
     sessions: list[TrainingSessionOut]
+    goal: RaceGoalOut | None = None
 
 
 # ---- the active plan, persisted server-side ---------------------------------------------------
@@ -150,6 +203,7 @@ class PlanIn(BaseModel):
     sessions: list[TrainingSessionIn]
     filename: str | None = None
     imported_at: str
+    goal: RaceGoalIn | None = None
 
 
 class PlanOut(BaseModel):
@@ -157,19 +211,35 @@ class PlanOut(BaseModel):
     sessions: list[TrainingSessionOut]
     filename: str | None = None
     imported_at: str
+    goal: RaceGoalOut | None = None
 
     @classmethod
     def from_model(cls, plan: db.UserPlan) -> "PlanOut":
+        # The stored goal is the three stated facts; `phase` and `days_to_race` are
+        # recomputed on every read, because both change with nothing but the date.
+        goal = RaceGoalIn.model_validate(plan.goal).to_model() if plan.goal else None
         return cls(
             yaml_text=plan.yaml_text,
             sessions=[TrainingSessionOut.model_validate(s) for s in plan.sessions],
             filename=plan.filename,
             imported_at=plan.imported_at,
+            goal=RaceGoalOut.from_model(goal) if goal else None,
         )
 
 
 class PlanResponse(BaseModel):
     plan: PlanOut | None
+
+
+# ---- the race goal, before any plan exists to hold it -------------------------------------
+
+
+class GoalResponse(BaseModel):
+    goal: RaceGoalOut | None = None
+
+
+class SetGoalRequest(BaseModel):
+    goal: RaceGoalIn | None = None
 
 
 class DeletePlanResponse(BaseModel):
@@ -495,6 +565,141 @@ class LoadSnapshotResponse(BaseModel):
             ],
             acute_chronic_ratio=snapshot.acute_chronic_ratio,
             vo2max=snapshot.vo2max,
+        )
+
+
+# ---- the plan, read against the race -------------------------------------------------------
+
+
+class ObservationOut(BaseModel):
+    key: str
+    label: str
+    detail: str
+    severity: str
+
+
+class WeekVolumeOut(BaseModel):
+    week_start: date_type
+    km: float
+    sessions: int
+
+
+class GoalFitRequest(BaseModel):
+    """The sessions travel in the request for the same reason they do everywhere else:
+    the plan lives on the device."""
+
+    sessions: list[TrainingSessionIn] = Field(default_factory=list)
+    goal: RaceGoalIn
+    date: date_type | None = None
+
+
+class GoalFitResponse(BaseModel):
+    race_date: date_type
+    days_to_race: int
+    phase: str
+    alignment: str
+    headline: str
+    observations: list[ObservationOut] = Field(default_factory=list)
+    sessions_ahead: int
+    weeks_covered: int
+    last_session_date: date_type | None = None
+    longest_run_km: float | None = None
+    longest_run_date: date_type | None = None
+    longest_run_guide_km: float | None = None
+    peak_week_km: float | None = None
+    weekly_volume: list[WeekVolumeOut] = Field(default_factory=list)
+    quality_sessions: int = 0
+    sessions_without_detail: int = 0
+
+    @classmethod
+    def from_model(cls, fit: "goal_fit.GoalFit") -> "GoalFitResponse":
+        return cls(
+            race_date=fit.race_date,
+            days_to_race=fit.days_to_race,
+            phase=fit.phase,
+            alignment=fit.alignment,
+            headline=fit.headline,
+            observations=[
+                ObservationOut(key=o.key, label=o.label, detail=o.detail, severity=o.severity)
+                for o in fit.observations
+            ],
+            sessions_ahead=fit.sessions_ahead,
+            weeks_covered=fit.weeks_covered,
+            last_session_date=fit.last_session_date,
+            longest_run_km=fit.longest_run_km,
+            longest_run_date=fit.longest_run_date,
+            longest_run_guide_km=fit.longest_run_guide_km,
+            peak_week_km=fit.peak_week_km,
+            weekly_volume=[
+                WeekVolumeOut(week_start=w.week_start, km=round(w.km, 1), sessions=w.sessions)
+                for w in fit.weekly_volume
+            ],
+            quality_sessions=fit.quality_sessions,
+            sessions_without_detail=fit.sessions_without_detail,
+        )
+
+
+# ---- the day's verdict -------------------------------------------------------------------
+
+
+class SignalOut(BaseModel):
+    """One measurement that moved the verdict, carrying the figure that did it -- the
+    screen shows these verbatim so the answer can be checked against the watch."""
+
+    key: str
+    label: str
+    detail: str
+    severity: str
+
+
+class AlternativeOut(BaseModel):
+    kind: str
+    label: str
+    detail: str
+
+
+class DayVerdictRequest(BaseModel):
+    """The plan lives on the device, so the session and the goal travel in the request --
+    the same shape `/body/conflict` and `/nutrition/targets` already use."""
+
+    date: date_type | None = None
+    session: TrainingSessionIn | None = None
+    goal: RaceGoalIn | None = None
+
+
+class DayVerdictResponse(BaseModel):
+    date: date_type
+    state: str
+    headline: str
+    signals: list[SignalOut] = Field(default_factory=list)
+    session_title: str | None = None
+    session_demand: str | None = None
+    action: str | None = None
+    alternative: AlternativeOut | None = None
+    phase: str | None = None
+    has_data: bool = True
+
+    @classmethod
+    def from_model(cls, verdict: "readiness.DayVerdict") -> "DayVerdictResponse":
+        return cls(
+            date=verdict.date,
+            state=verdict.state,
+            headline=verdict.headline,
+            signals=[SignalOut(key=s.key, label=s.label, detail=s.detail, severity=s.severity) for s in verdict.signals],
+            session_title=verdict.session_title,
+            session_demand=verdict.session_demand,
+            action=verdict.action,
+            alternative=(
+                AlternativeOut(
+                    kind=verdict.alternative.kind,
+                    label=verdict.alternative.label,
+                    detail=verdict.alternative.detail,
+                )
+                if verdict.alternative
+                else None
+            ),
+            phase=verdict.phase,
+            has_data=verdict.has_data,
         )
 
 

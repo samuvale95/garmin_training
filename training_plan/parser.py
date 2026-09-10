@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -11,10 +12,12 @@ from .models import (
     DEFAULT_PACE_TOLERANCE_SECONDS,
     MAX_REPETITIONS,
     MIN_REPETITIONS,
+    NAMED_DISTANCES_KM,
     SUPPORTED_DURATION_TYPES,
     SUPPORTED_SPORTS,
     SUPPORTED_STEP_TYPES,
     PaceTarget,
+    RaceGoal,
     RepeatBlock,
     SessionStep,
     Step,
@@ -201,11 +204,107 @@ def _validate_steps(index: int, raw_entry: dict[str, Any], errors: list[str]) ->
     return steps
 
 
-def parse_training_plan(path: str | Path) -> list[TrainingSession]:
-    """Parse and validate a training-plan YAML file into TrainingSession entries.
+def _validate_goal(raw: dict[str, Any], errors: list[str]) -> RaceGoal | None:
+    """The optional top-level `goal:` block, validated as strictly as a session is.
+
+    A goal the file states wrongly is an error, not something to guess at: a race date
+    that doesn't parse would otherwise silently become "no goal", and every screen
+    downstream would quietly render the no-goal state instead of saying what is wrong.
+    """
+    raw_goal = raw.get("goal")
+    if raw_goal is None:
+        return None
+    if not isinstance(raw_goal, dict):
+        errors.append(f"goal: expected a mapping of fields, got {type(raw_goal).__name__}")
+        return None
+
+    goal_errors: list[str] = []
+
+    race_date: date | None = None
+    raw_date = raw_goal.get("race_date")
+    if raw_date is None:
+        goal_errors.append("goal: 'race_date' is required")
+    elif isinstance(raw_date, date):
+        race_date = raw_date
+    else:
+        try:
+            race_date = date.fromisoformat(str(raw_date))
+        except ValueError:
+            goal_errors.append(f"goal: 'race_date' must be YYYY-MM-DD, got {raw_date!r}")
+
+    distance_km: float | None = None
+    raw_distance = raw_goal.get("distance_km", raw_goal.get("distance"))
+    if raw_distance is None:
+        goal_errors.append("goal: 'distance_km' is required")
+    elif isinstance(raw_distance, str) and raw_distance.strip().lower() in NAMED_DISTANCES_KM:
+        distance_km = NAMED_DISTANCES_KM[raw_distance.strip().lower()]
+    else:
+        try:
+            distance_km = float(raw_distance)
+        except (TypeError, ValueError):
+            named = ", ".join(sorted(NAMED_DISTANCES_KM))
+            goal_errors.append(f"goal: 'distance_km' must be a number or one of {named}, got {raw_distance!r}")
+        else:
+            if distance_km <= 0:
+                goal_errors.append(f"goal: 'distance_km' must be positive, got {distance_km}")
+                distance_km = None
+
+    target_seconds: int | None = None
+    raw_target = raw_goal.get("target_time")
+    if raw_target is not None:
+        target_seconds = _parse_target_time(raw_target)
+        if target_seconds is None:
+            goal_errors.append(f"goal: 'target_time' must be H:MM:SS or MM:SS, got {raw_target!r}")
+
+    raw_name = raw_goal.get("name")
+    if raw_name is not None and not isinstance(raw_name, str):
+        goal_errors.append(f"goal: 'name' must be text, got {type(raw_name).__name__}")
+        raw_name = None
+
+    errors.extend(goal_errors)
+    if goal_errors or race_date is None or distance_km is None:
+        return None
+
+    return RaceGoal(
+        race_date=race_date,
+        distance_km=distance_km,
+        name=raw_name.strip() if isinstance(raw_name, str) and raw_name.strip() else None,
+        target_time_seconds=target_seconds,
+    )
+
+
+def _parse_target_time(raw: Any) -> int | None:
+    """`H:MM:SS` or `MM:SS` as seconds, or None when it is neither.
+
+    A bare number is rejected on purpose: "180" is three minutes to one reader and three
+    hours to another, and a goal time guessed wrong is a pace target guessed wrong.
+    """
+    parts = str(raw).strip().split(":")
+    if len(parts) not in (2, 3) or not all(part.isdigit() for part in parts):
+        return None
+    values = [int(part) for part in parts]
+    if any(v > 59 for v in values[1:]):
+        return None
+    if len(values) == 2:
+        minutes, seconds = values
+        return minutes * 60 + seconds
+    hours, minutes, seconds = values
+    return hours * 3600 + minutes * 60 + seconds
+
+
+@dataclass
+class ParsedPlan:
+    """A plan file's two halves. `goal` is None for the many plans that don't state one."""
+
+    sessions: list[TrainingSession]
+    goal: RaceGoal | None = None
+
+
+def parse_plan_document(path: str | Path) -> ParsedPlan:
+    """Parse and validate a training-plan YAML file: its sessions and its optional goal.
 
     Raises TrainingPlanValidationError, with every entry's problems collected,
-    if any entry is invalid. No entries are returned when validation fails.
+    if anything is invalid. Nothing is returned when validation fails.
     """
     raw = yaml.safe_load(Path(path).read_text()) or {}
     raw_sessions = raw.get("sessions") or []
@@ -238,7 +337,15 @@ def parse_training_plan(path: str | Path) -> list[TrainingSession]:
             )
         )
 
+    goal = _validate_goal(raw, errors)
+
     if errors:
         raise TrainingPlanValidationError(errors)
 
-    return sessions
+    return ParsedPlan(sessions=sessions, goal=goal)
+
+
+def parse_training_plan(path: str | Path) -> list[TrainingSession]:
+    """Just the sessions -- what the CLI and the sync path want, neither of which has
+    anything to do with a race date."""
+    return parse_plan_document(path).sessions

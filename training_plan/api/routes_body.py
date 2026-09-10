@@ -7,10 +7,16 @@ import logging
 from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
-from .. import body_insights
+from .. import body_insights, llm, readiness
 from . import garmin_session, schemas
 from .auth import current_user_id
-from .cache import TTL_BODY_LOAD, TTL_BODY_METRICS, TTL_BODY_TODAY, cache
+from .cache import (
+    TTL_BODY_LOAD,
+    TTL_BODY_METRICS,
+    TTL_BODY_TODAY,
+    TTL_READINESS_NARRATIVE,
+    cache,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +89,90 @@ async def body_metrics(refresh: bool = False, user_id: str = Depends(current_use
         cache.invalidate(["garmin:body_metrics"], user_id)
     metrics = await run_in_threadpool(body_metrics_or_empty, user_id)
     return schemas.BodyMetricsResponse(**metrics)
+
+
+def _load_ratio_or_none(user_id: str) -> float | None:
+    """The acute:chronic ratio, or nothing.
+
+    Its own Garmin read, cached for half an hour like the load screen's -- and wrapped,
+    because a verdict about this morning must not fail because a *training-load* call
+    did. One missing signal narrows the answer; an exception loses it entirely.
+    """
+    try:
+        snapshot = cache.get_or_call(
+            "body:load",
+            user_id,
+            None,
+            TTL_BODY_LOAD,
+            lambda: garmin_session.run(user_id, lambda sync: body_insights.fetch_load_snapshot(sync=sync)),
+        )
+        return snapshot.acute_chronic_ratio
+    except Exception:  # noqa: BLE001 - a missing load reading is a narrower verdict, not an error
+        logger.warning("load snapshot unavailable for the day verdict, degrading", exc_info=True)
+        return None
+
+
+@router.post("/body/readiness", response_model=schemas.DayVerdictResponse)
+async def body_readiness(
+    payload: schemas.DayVerdictRequest, user_id: str = Depends(current_user_id)
+) -> schemas.DayVerdictResponse:
+    """Today's state, and what it means for today's session.
+
+    Every figure in the answer is `readiness.py`'s arithmetic over an already-cached
+    snapshot, so this is cheap and is not cached itself: the plan can change under it
+    (the session is sent by the client) and a cached verdict would outlive that. The
+    sentence a model writes about it is the slow half, and lives at
+    `/body/readiness/narrative`.
+    """
+    snapshot = await run_in_threadpool(_body_snapshot, user_id)
+    ratio = await run_in_threadpool(_load_ratio_or_none, user_id)
+    verdict = readiness.assess_day(
+        snapshot,
+        payload.session.to_model() if payload.session else None,
+        acute_chronic_ratio=ratio,
+        goal=payload.goal.to_model() if payload.goal else None,
+        today=payload.date,
+    )
+    return schemas.DayVerdictResponse.from_model(verdict)
+
+
+@router.post("/body/readiness/narrative", response_model=schemas.NarrativeResponse)
+async def body_readiness_narrative(
+    payload: schemas.DayVerdictRequest, refresh: bool = False, user_id: str = Depends(current_user_id)
+) -> schemas.NarrativeResponse:
+    """The same verdict, phrased -- falling back to its deterministic headline.
+
+    The decision is made before the model is asked (see `readiness.verdict_facts`): it
+    phrases a conclusion, it does not reach one. Cached on the verdict itself, so the
+    sentence changes exactly when what it describes changes.
+    """
+    snapshot = await run_in_threadpool(_body_snapshot, user_id)
+    ratio = await run_in_threadpool(_load_ratio_or_none, user_id)
+    goal = payload.goal.to_model() if payload.goal else None
+    verdict = readiness.assess_day(
+        snapshot,
+        payload.session.to_model() if payload.session else None,
+        acute_chronic_ratio=ratio,
+        goal=goal,
+        today=payload.date,
+    )
+
+    def compute() -> schemas.NarrativeResponse:
+        text = llm.write_readiness_narrative(readiness.verdict_facts(verdict, goal))
+        if text:
+            return schemas.NarrativeResponse(text=text, source="model")
+        return schemas.NarrativeResponse(text=verdict.headline, source="template")
+
+    key = (
+        verdict.date,
+        verdict.state,
+        verdict.action,
+        verdict.session_title,
+        tuple(signal.key for signal in verdict.signals),
+    )
+    return await run_in_threadpool(
+        lambda: cache.get_or_call("body:readiness-narrative", user_id, key, TTL_READINESS_NARRATIVE, compute, refresh=refresh)
+    )
 
 
 @router.post("/body/conflict", response_model=schemas.ConflictResponse)

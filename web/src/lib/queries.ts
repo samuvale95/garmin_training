@@ -10,6 +10,7 @@ import type {
   BodySnapshot,
   CompletedActivity,
   ConflictAssessment,
+  DayVerdict,
   DeleteResult,
   DeviceInfo,
   FoodDay,
@@ -18,9 +19,11 @@ import type {
   FoodHistory,
   FuelTargets,
   GarminStatus,
+  GoalFit,
   LoadSnapshot,
   Narrative,
   PlanDiff,
+  RaceGoal,
   RescheduleResult,
   ScheduledWorkout,
   Shoe,
@@ -77,6 +80,8 @@ export interface PlanState {
   sessions: TrainingSession[];
   filename: string | null;
   importedAt: string | null;
+  /** The race this plan is written for, when it states one (see `RaceGoal`). */
+  goal?: RaceGoal | null;
 }
 
 function readLegacyPlan(): PlanState | null {
@@ -208,21 +213,49 @@ function applyPlanLocally(queryClient: ReturnType<typeof useQueryClient>, next: 
  * before this call) stay this tab's source of truth regardless of whether the request
  * succeeds -- a save made offline reaches the server on the next `writePlan` call, or
  * gets pushed by `restorePersistedPlanOnce`'s own migration path on the next load. */
-function persistPlanToServer(plan: PlanState | null): void {
+function persistPlanToServer(queryClient: ReturnType<typeof useQueryClient>, plan: PlanState | null): void {
   const request = plan
-    ? apiPut("/plan", {
+    ? apiPut<{ goal: RaceGoal | null }>("/plan", {
+        goal: plan.goal
+          ? {
+              // Only the stated facts travel: `phase` and `days_to_race` are derived
+              // from the date, and the server recomputes them on every read.
+              race_date: plan.goal.race_date,
+              distance_km: plan.goal.distance_km,
+              name: plan.goal.name,
+              target_time_seconds: plan.goal.target_time_seconds,
+            }
+          : null,
         yaml_text: plan.yamlText,
         sessions: plan.sessions,
         filename: plan.filename,
         imported_at: plan.importedAt ?? new Date().toISOString(),
       })
-    : apiDelete("/plan");
-  request.catch(() => {});
+    : apiDelete<{ ok: boolean }>("/plan");
+
+  request
+    .then((saved) => {
+      // The goal comes back carrying its derived `phase` and `days_to_race`, computed
+      // in the one place that owns that rule (`models.race_phase`) -- worth adopting
+      // whenever it's an answer to what's still on screen. Two shapes of that: the goal
+      // we sent came back with its derived fields (guard on the race date, so a reply
+      // that arrives after the user has already changed the goal again isn't applied to
+      // a stale race), or we sent no goal at all and this is this plan's first save --
+      // `save_plan` then adopts whatever race was set before any plan existed (see
+      // `training_plan/db.py`), which this client never stated and so must still pick up.
+      if (!plan || !("goal" in saved) || !saved.goal) return;
+      const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
+      if (!current) return;
+      if (plan.goal && current.goal?.race_date !== saved.goal.race_date) return;
+      if (!plan.goal && current.goal) return; // a goal was set locally since this request went out
+      applyPlanLocally(queryClient, { ...current, goal: saved.goal });
+    })
+    .catch(() => {});
 }
 
 function writePlan(queryClient: ReturnType<typeof useQueryClient>, next: PlanState | null): void {
   applyPlanLocally(queryClient, next);
-  persistPlanToServer(next);
+  persistPlanToServer(queryClient, next);
 }
 
 export function useSetPlan() {
@@ -277,6 +310,69 @@ export function useRefreshServerData() {
       });
     },
   });
+}
+
+// ---- the race goal, before any plan exists to hold it -------------------------------------
+
+/** How far ahead a live Garmin calendar is read when there is no race yet to bound the
+ * window by -- long enough to say "you have sessions ahead" honestly, short enough that
+ * a mostly-empty calendar doesn't cost a wide, mostly-empty request. Once a goal is set
+ * the real bound is the race date, not this. */
+export const GOAL_LOOKAHEAD_DAYS = 56;
+
+const STANDALONE_GOAL_KEY = ["standalone-goal"] as const;
+
+/** The race set without an imported plan (`training_plan/db.py`'s `user_goal` table) --
+ * live Garmin-calendar-only mode's only place to keep one, since the plan's own `goal`
+ * column needs a plan row to hang off of. Disabled once a plan exists: `save_plan`
+ * adopts whatever was stored here into a user's first plan, so nothing here can still
+ * be the answer for someone who has one. */
+function useStandaloneGoalQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: STANDALONE_GOAL_KEY,
+    queryFn: ({ signal }) => apiGet<{ goal: RaceGoal | null }>("/goal", undefined, signal),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** The race this account is training for, wherever it actually lives: inside the plan
+ * once one is imported, standalone before that. Every screen that shows or edits a goal
+ * reads it from here rather than `plan?.goal` directly, so a live-mode race doesn't
+ * silently disappear for want of a plan to hold it. `enabled` should track the caller's
+ * own "do we know yet whether there's a plan" flag (`useCalendarAccess`'s `ready`, say)
+ * -- fetching standalone before that would show "no goal" and then a goal blinking in. */
+export function useRaceGoal(plan: PlanState | null, enabled = true): { goal: RaceGoal | null; isLoading: boolean } {
+  const standalone = useStandaloneGoalQuery(enabled && !plan);
+  if (plan) return { goal: plan.goal ?? null, isLoading: false };
+  return { goal: standalone.data?.goal ?? null, isLoading: enabled && standalone.isLoading };
+}
+
+/** Set or clear the race this account is training for.
+ *
+ * With a plan this is an edit like any other: it goes through `writePlan`, so it lands
+ * in the cache, the localStorage mirror and the server in one call, and a plan
+ * downloaded afterwards carries the goal (see `serializePlanToYaml`). Without one --
+ * live Garmin-calendar mode -- there is no plan to edit, so it goes to the standalone
+ * table instead; the moment a plan does get imported, `save_plan` folds it in there and
+ * this table stops being read.
+ */
+export function useSetRaceGoal() {
+  const queryClient = useQueryClient();
+  return (goal: RaceGoal | null) => {
+    const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
+    if (current) {
+      writePlan(queryClient, { ...current, goal });
+      return;
+    }
+    queryClient.setQueryData<{ goal: RaceGoal | null }>(STANDALONE_GOAL_KEY, { goal });
+    const goalPayload = goal
+      ? { race_date: goal.race_date, distance_km: goal.distance_km, name: goal.name, target_time_seconds: goal.target_time_seconds }
+      : null;
+    apiPut<{ goal: RaceGoal | null }>("/goal", { goal: goalPayload })
+      .then((saved) => queryClient.setQueryData(STANDALONE_GOAL_KEY, saved))
+      .catch(() => {});
+  };
 }
 
 export function useUpdateSession() {
@@ -394,12 +490,20 @@ export function useGarminProfile(enabled = true) {
 
 // ---- plan: parse / diff -----------------------------------------------------------------
 
+/** What `/plan/parse` answers: the sessions, and the race the file states (or null).
+ * Both travel together because both come out of the same validation pass -- a file with
+ * a broken `goal:` block is a rejected file, not a plan with no goal. */
+export interface ParsedPlanResponse {
+  sessions: TrainingSession[];
+  goal: RaceGoal | null;
+}
+
 export function useParsePlanText() {
   return useMutation({
     mutationFn: (yamlText: string) => {
       const form = new FormData();
       form.set("yaml_text", yamlText);
-      return apiPostForm<{ sessions: TrainingSession[] }>("/plan/parse", form);
+      return apiPostForm<ParsedPlanResponse>("/plan/parse", form);
     },
   });
 }
@@ -409,7 +513,7 @@ export function useParsePlanFile() {
     mutationFn: (file: File) => {
       const form = new FormData();
       form.set("file", file);
-      return apiPostForm<{ sessions: TrainingSession[] }>("/plan/parse", form);
+      return apiPostForm<ParsedPlanResponse>("/plan/parse", form);
     },
   });
 }
@@ -446,6 +550,37 @@ export function usePlanDiff(sessions: TrainingSession[] | null) {
     // Keep showing the previous answer while a plan edit recomputes the new one,
     // instead of dropping back to "no data" (and an empty screen) in between.
     placeholderData: keepPreviousData,
+  });
+}
+
+/** How the sessions already in the plan line up with the race.
+ *
+ * The point of this endpoint is that nothing needs re-importing: a goal named today is
+ * read against the sessions written last month. Keyed on both, so editing either
+ * recomputes. */
+export function useGoalFit(sessions: TrainingSession[], goal: RaceGoal | null | undefined, enabled = true) {
+  const goalPayload = goal
+    ? { race_date: goal.race_date, distance_km: goal.distance_km, name: goal.name, target_time_seconds: goal.target_time_seconds }
+    : null;
+  return useQuery({
+    queryKey: ["plan-goal-fit", goal?.race_date ?? null, goal?.distance_km ?? null, sessions.length ? planFingerprint(sessions) : null],
+    queryFn: ({ signal }) => apiPost<GoalFit>("/plan/goal-fit", { sessions, goal: goalPayload }, signal),
+    enabled: enabled && !!goal,
+    staleTime: 30 * 60_000,
+  });
+}
+
+/** The same reading, phrased. Separate request, same reason as everywhere else: the
+ * screen paints from the deterministic headline and swaps this in when it lands. */
+export function useGoalFitNarrative(sessions: TrainingSession[], goal: RaceGoal | null | undefined, enabled = true) {
+  const goalPayload = goal
+    ? { race_date: goal.race_date, distance_km: goal.distance_km, name: goal.name, target_time_seconds: goal.target_time_seconds }
+    : null;
+  return useQuery({
+    queryKey: ["plan-goal-fit-narrative", goal?.race_date ?? null, goal?.distance_km ?? null, sessions.length ? planFingerprint(sessions) : null],
+    queryFn: ({ signal }) => apiPost<Narrative>("/plan/goal-fit/narrative", { sessions, goal: goalPayload }, signal),
+    enabled: enabled && !!goal,
+    staleTime: 30 * 60_000,
   });
 }
 
@@ -719,6 +854,39 @@ export function useBodyLoad() {
     queryKey: ["body", "load"],
     queryFn: ({ signal }) => apiGet<LoadSnapshot>("/body/load", undefined, signal),
     staleTime: 5 * 60_000,
+  });
+}
+
+/** Today's state, and what it means for today's session.
+ *
+ * The session and the goal travel in the request because the plan lives on the device.
+ * Keyed on both, so editing the plan (or the race) recomputes rather than serving a
+ * verdict about a session that is no longer today's. */
+export function useDayVerdict(session: TrainingSession | null, goal: RaceGoal | null | undefined, enabled = true) {
+  const goalPayload = goal
+    ? { race_date: goal.race_date, distance_km: goal.distance_km, name: goal.name, target_time_seconds: goal.target_time_seconds }
+    : null;
+  return useQuery({
+    queryKey: ["body", "readiness", session?.date ?? null, session?.title ?? null, goal?.race_date ?? null],
+    queryFn: ({ signal }) => apiPost<DayVerdict>("/body/readiness", { session, goal: goalPayload }, signal),
+    enabled,
+    // Overnight figures are computed once, by Garmin, while you sleep.
+    staleTime: 30 * 60_000,
+  });
+}
+
+/** The same verdict, phrased by the model. Fetched separately, exactly like the
+ * fuelling narrative: the screen paints from the deterministic headline and swaps this
+ * in when (and if) it lands. */
+export function useDayVerdictNarrative(session: TrainingSession | null, goal: RaceGoal | null | undefined, enabled = true) {
+  const goalPayload = goal
+    ? { race_date: goal.race_date, distance_km: goal.distance_km, name: goal.name, target_time_seconds: goal.target_time_seconds }
+    : null;
+  return useQuery({
+    queryKey: ["body", "readiness-narrative", session?.date ?? null, session?.title ?? null, goal?.race_date ?? null],
+    queryFn: ({ signal }) => apiPost<Narrative>("/body/readiness/narrative", { session, goal: goalPayload }, signal),
+    enabled,
+    staleTime: 30 * 60_000,
   });
 }
 
