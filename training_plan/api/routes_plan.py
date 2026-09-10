@@ -52,6 +52,29 @@ async def delete_plan(user_id: str = Depends(current_user_id)) -> schemas.Delete
     return schemas.DeletePlanResponse(ok=True)
 
 
+@router.get("/goal", response_model=schemas.GoalResponse)
+async def get_goal(user_id: str = Depends(current_user_id)) -> schemas.GoalResponse:
+    """The race set before any plan exists to hold it -- a live Garmin-calendar-only
+    account's only place to keep one. Once a plan is imported its own `goal` (returned
+    by `/plan`, not here) takes over; `save_plan` adopts whatever is stored here into
+    that first plan, so this is never the answer for a user who has one."""
+    raw = await run_in_threadpool(db.get_standalone_goal, user_id)
+    if not raw:
+        return schemas.GoalResponse(goal=None)
+    goal = schemas.RaceGoalIn.model_validate(raw).to_model()
+    return schemas.GoalResponse(goal=schemas.RaceGoalOut.from_model(goal))
+
+
+@router.put("/goal", response_model=schemas.GoalResponse)
+async def set_goal(payload: schemas.SetGoalRequest, user_id: str = Depends(current_user_id)) -> schemas.GoalResponse:
+    raw = payload.goal.model_dump(mode="json") if payload.goal else None
+    saved = await run_in_threadpool(db.set_standalone_goal, user_id, raw)
+    if not saved:
+        return schemas.GoalResponse(goal=None)
+    goal = schemas.RaceGoalIn.model_validate(saved).to_model()
+    return schemas.GoalResponse(goal=schemas.RaceGoalOut.from_model(goal))
+
+
 @router.post("/plan/parse", response_model=schemas.ParsePlanResponse)
 async def parse_plan(
     file: UploadFile | None = File(None), yaml_text: str | None = Form(None)

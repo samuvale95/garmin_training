@@ -6,11 +6,11 @@ import { PageHeader } from "@/components/PageHeader";
 import { SlideUp } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
-import { useGoalFit, useGoalFitNarrative, usePlanQuery, useSetRaceGoal, useWeekWorkouts } from "@/lib/queries";
+import { GOAL_LOOKAHEAD_DAYS, useGoalFit, useGoalFitNarrative, usePlanQuery, useRaceGoal, useSetRaceGoal, useWorkouts } from "@/lib/queries";
 import { GoalFitBlock } from "@/components/GoalFitBlock";
 import { countdownLabel, distanceLabel, formatPaceSecPerKm, formatTargetTime, targetPaceSecPerKm } from "@/lib/raceGoal";
 import { formatFullDate } from "@/lib/format";
-import { toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
+import { shiftDateKey, toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
 import type { RaceGoal } from "@/lib/types";
 
 /** The distances offered as one tap. Anything else is typed in km -- these are only
@@ -46,18 +46,32 @@ export default function RaceGoalSettingsPage() {
   const router = useRouter();
   const { data: plan, isHydrated } = usePlanQuery();
   const setRaceGoal = useSetRaceGoal();
-  const goal = plan?.goal ?? null;
 
-  // The sessions already in the plan, read against whatever race is set. This is the
-  // whole point of the block below: a goal named today is compared with workouts
-  // written weeks ago, without importing anything again.
+  // Live Garmin-calendar mode has no plan to hold a goal, so it gets its own storage
+  // (see `useRaceGoal`) -- this is the one thing on this screen that works with or
+  // without a plan; everything below it still needs one.
   const access = useCalendarAccess();
-  const liveMode = !access.plan && access.garminConnected;
-  const workoutsQuery = useWeekWorkouts(new Date(), liveMode);
+  const liveMode = !plan && access.garminConnected;
+  const hasTrainingContext = !!plan || access.garminConnected;
+  // Neither answer is final until the plan has been restored *and*, if there wasn't
+  // one, the Garmin status check has landed -- otherwise a live-mode account would
+  // flash the "prima serve un piano" wall for a tick before its calendar shows up.
+  const stillDeciding = !isHydrated || (!plan && !access.ready);
+  const { goal } = useRaceGoal(plan ?? null, isHydrated && (!!plan || access.ready));
+
+  const todayKey = toDateKey(new Date());
+  // The sessions already there, read against whatever race is set. This is the whole
+  // point of the block below: a goal named today is compared with workouts written
+  // weeks (or, for a live calendar, days) ago, without importing anything again. With
+  // no plan the range is bounded by the race once one exists, or a fixed lookahead
+  // before that -- just enough to say "you have sessions ahead" honestly.
+  const liveRangeEnd = goal ? goal.race_date : shiftDateKey(todayKey, GOAL_LOOKAHEAD_DAYS);
+  const workoutsQuery = useWorkouts(todayKey, liveRangeEnd, liveMode);
   const sessions = useMemo(
     () => (plan?.sessions ?? workoutsToSessions(workoutsQuery.data?.workouts ?? [])),
     [plan?.sessions, workoutsQuery.data]
   );
+  const upcomingSessions = sessions.filter((s) => s.date >= todayKey).length;
 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
@@ -65,9 +79,6 @@ export default function RaceGoalSettingsPage() {
   const [distanceKm, setDistanceKm] = useState("");
   const [targetTime, setTargetTime] = useState("");
   const [error, setError] = useState<string | null>(null);
-
-  const todayKey = toDateKey(new Date());
-  const upcomingSessions = sessions.filter((s) => s.date >= todayKey).length;
 
   const fitQuery = useGoalFit(sessions, goal, !!goal && !editing);
   const fitNarrative = useGoalFitNarrative(sessions, goal, !!goal && !editing && !!fitQuery.data);
@@ -112,13 +123,14 @@ export default function RaceGoalSettingsPage() {
         <h1 style={{ font: "600 20px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Obiettivo</h1>
       </div>
 
-      {!isHydrated ? (
-        <p style={{ marginTop: 20, color: "var(--inchiostro-50)" }}>Carico il piano…</p>
-      ) : !plan ? (
+      {stillDeciding ? (
+        <p style={{ marginTop: 20, color: "var(--inchiostro-50)" }}>Carico…</p>
+      ) : !hasTrainingContext ? (
         <SlideUp active={animate} delayMs={100} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 18 }}>
-          <p style={{ font: "600 17px/1.2 var(--font-outfit)", margin: 0 }}>Prima serve un piano</p>
+          <p style={{ font: "600 17px/1.2 var(--font-outfit)", margin: 0 }}>Prima serve un allenamento</p>
           <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-70)", margin: "10px 0 0", lineHeight: 1.35 }}>
-            La gara sta dentro il piano, non di fianco: importane uno e poi torna qui.
+            La gara si legge contro sedute che esistono già: importa un piano, o collega Garmin
+            e torna qui.
           </p>
           <button
             type="button"
@@ -161,14 +173,14 @@ export default function RaceGoalSettingsPage() {
         </>
       ) : (
         <SlideUp active={animate} delayMs={100} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 18 }}>
-          <p style={{ font: "600 17px/1.2 var(--font-outfit)", margin: 0 }}>Nessuna gara nel piano</p>
+          <p style={{ font: "600 17px/1.2 var(--font-outfit)", margin: 0 }}>{plan ? "Nessuna gara nel piano" : "Nessuna gara impostata"}</p>
           <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-70)", margin: "10px 0 0", lineHeight: 1.35 }}>
             Si allena meglio sapendo per cosa. Dimmi che gara stai preparando e quando:
             serve a capire in che punto della preparazione sei, e cosa proporti quando una
             giornata storta consiglia di cambiare la seduta.
           </p>
           {/* The same promise the card on Oggi makes, kept where it gets fulfilled:
-              nothing is re-imported, the sessions already written get read again. */}
+              nothing is re-imported, the sessions already there get read again. */}
           {upcomingSessions > 0 && (
             <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-70)", margin: "10px 0 0", lineHeight: 1.35 }}>
               Le <span className="font-mono" style={{ fontSize: 14, fontStyle: "normal" }}>{upcomingSessions}</span> sedute che
@@ -398,7 +410,7 @@ function GoalForm({
           className="press-soft"
           style={{ width: "100%", background: "none", border: "none", color: "var(--rosso-avviso)", padding: "14px 0 0", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
         >
-          Togli la gara dal piano
+          Togli la gara
         </button>
       )}
     </SlideUp>

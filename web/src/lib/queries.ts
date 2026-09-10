@@ -236,13 +236,18 @@ function persistPlanToServer(queryClient: ReturnType<typeof useQueryClient>, pla
   request
     .then((saved) => {
       // The goal comes back carrying its derived `phase` and `days_to_race`, computed
-      // in the one place that owns that rule (`models.race_phase`). Adopting them here
-      // is what spares this client a second implementation of it -- guarded on the race
-      // date, so an answer that arrives after the user has already changed the goal
-      // again is dropped rather than applied to a different race.
+      // in the one place that owns that rule (`models.race_phase`) -- worth adopting
+      // whenever it's an answer to what's still on screen. Two shapes of that: the goal
+      // we sent came back with its derived fields (guard on the race date, so a reply
+      // that arrives after the user has already changed the goal again isn't applied to
+      // a stale race), or we sent no goal at all and this is this plan's first save --
+      // `save_plan` then adopts whatever race was set before any plan existed (see
+      // `training_plan/db.py`), which this client never stated and so must still pick up.
       if (!plan || !("goal" in saved) || !saved.goal) return;
       const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
-      if (!current?.goal || current.goal.race_date !== saved.goal.race_date) return;
+      if (!current) return;
+      if (plan.goal && current.goal?.race_date !== saved.goal.race_date) return;
+      if (!plan.goal && current.goal) return; // a goal was set locally since this request went out
       applyPlanLocally(queryClient, { ...current, goal: saved.goal });
     })
     .catch(() => {});
@@ -307,19 +312,66 @@ export function useRefreshServerData() {
   });
 }
 
-/** Set or clear the race this plan is written for.
+// ---- the race goal, before any plan exists to hold it -------------------------------------
+
+/** How far ahead a live Garmin calendar is read when there is no race yet to bound the
+ * window by -- long enough to say "you have sessions ahead" honestly, short enough that
+ * a mostly-empty calendar doesn't cost a wide, mostly-empty request. Once a goal is set
+ * the real bound is the race date, not this. */
+export const GOAL_LOOKAHEAD_DAYS = 56;
+
+const STANDALONE_GOAL_KEY = ["standalone-goal"] as const;
+
+/** The race set without an imported plan (`training_plan/db.py`'s `user_goal` table) --
+ * live Garmin-calendar-only mode's only place to keep one, since the plan's own `goal`
+ * column needs a plan row to hang off of. Disabled once a plan exists: `save_plan`
+ * adopts whatever was stored here into a user's first plan, so nothing here can still
+ * be the answer for someone who has one. */
+function useStandaloneGoalQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: STANDALONE_GOAL_KEY,
+    queryFn: ({ signal }) => apiGet<{ goal: RaceGoal | null }>("/goal", undefined, signal),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** The race this account is training for, wherever it actually lives: inside the plan
+ * once one is imported, standalone before that. Every screen that shows or edits a goal
+ * reads it from here rather than `plan?.goal` directly, so a live-mode race doesn't
+ * silently disappear for want of a plan to hold it. `enabled` should track the caller's
+ * own "do we know yet whether there's a plan" flag (`useCalendarAccess`'s `ready`, say)
+ * -- fetching standalone before that would show "no goal" and then a goal blinking in. */
+export function useRaceGoal(plan: PlanState | null, enabled = true): { goal: RaceGoal | null; isLoading: boolean } {
+  const standalone = useStandaloneGoalQuery(enabled && !plan);
+  if (plan) return { goal: plan.goal ?? null, isLoading: false };
+  return { goal: standalone.data?.goal ?? null, isLoading: enabled && standalone.isLoading };
+}
+
+/** Set or clear the race this account is training for.
  *
- * A plan edit like any other: it goes through `writePlan`, so it lands in the cache,
- * the localStorage mirror and the server in one call, and a plan downloaded afterwards
- * carries the goal (see `serializePlanToYaml`). Editing it here rather than only in the
- * YAML matches what the app already does to sessions -- it has been writing to the plan
- * since the day the calendar let you drag one to another day. */
+ * With a plan this is an edit like any other: it goes through `writePlan`, so it lands
+ * in the cache, the localStorage mirror and the server in one call, and a plan
+ * downloaded afterwards carries the goal (see `serializePlanToYaml`). Without one --
+ * live Garmin-calendar mode -- there is no plan to edit, so it goes to the standalone
+ * table instead; the moment a plan does get imported, `save_plan` folds it in there and
+ * this table stops being read.
+ */
 export function useSetRaceGoal() {
   const queryClient = useQueryClient();
   return (goal: RaceGoal | null) => {
     const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
-    if (!current) return;
-    writePlan(queryClient, { ...current, goal });
+    if (current) {
+      writePlan(queryClient, { ...current, goal });
+      return;
+    }
+    queryClient.setQueryData<{ goal: RaceGoal | null }>(STANDALONE_GOAL_KEY, { goal });
+    const goalPayload = goal
+      ? { race_date: goal.race_date, distance_km: goal.distance_km, name: goal.name, target_time_seconds: goal.target_time_seconds }
+      : null;
+    apiPut<{ goal: RaceGoal | null }>("/goal", { goal: goalPayload })
+      .then((saved) => queryClient.setQueryData(STANDALONE_GOAL_KEY, saved))
+      .catch(() => {});
   };
 }
 

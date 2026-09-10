@@ -231,6 +231,17 @@ class PlanResponse(BaseModel):
     plan: PlanOut | None
 
 
+# ---- the race goal, before any plan exists to hold it -------------------------------------
+
+
+class GoalResponse(BaseModel):
+    goal: RaceGoalOut | None = None
+
+
+class SetGoalRequest(BaseModel):
+    goal: RaceGoalIn | None = None
+
+
 class DeletePlanResponse(BaseModel):
     ok: bool
 

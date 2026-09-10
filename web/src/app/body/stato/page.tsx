@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Skeleton, SlideUp } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
-import { useBodyToday, useDayVerdict, useDayVerdictNarrative, useUpdateSession, useWeekWorkouts } from "@/lib/queries";
+import { useBodyToday, useDayVerdict, useDayVerdictNarrative, useRaceGoal, useUpdateSession, useWeekWorkouts } from "@/lib/queries";
 import { shiftDateKey, toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
 import { countdownLabel, goalTitle } from "@/lib/raceGoal";
 import { isRepeatBlock, type DayVerdict, type DaySignal, type SessionStep, type TrainingSession } from "@/lib/types";
@@ -98,7 +98,7 @@ export default function DayStatePage() {
 
   const todayIndex = sessions.findIndex((s) => s.date === todayKey);
   const todaySession = todayIndex >= 0 ? sessions[todayIndex] : null;
-  const goal = access.plan?.goal ?? null;
+  const { goal } = useRaceGoal(access.plan, access.ready);
 
   const ready = access.ready && (!liveMode || !workoutsQuery.isPending);
   const verdictQuery = useDayVerdict(todaySession, goal, ready);
@@ -203,7 +203,7 @@ export default function DayStatePage() {
                 <p style={{ background: "var(--verde)", color: "var(--verde-testo)", borderRadius: "var(--radius-card)", padding: "12px 14px", fontSize: 13.5, fontWeight: 600, margin: "14px 0 0" }}>
                   Fatto, il piano è aggiornato.
                 </p>
-              ) : todayIndex >= 0 ? (
+              ) : todayIndex >= 0 && access.plan ? (
                 <button
                   type="button"
                   onClick={() => applyAlternative(verdict)}
@@ -224,7 +224,7 @@ export default function DayStatePage() {
           {/* The alternative is chosen by phase -- base, build, peak, taper -- and with
               no race there is no phase, so it falls back to a generic easy day. Saying
               so where the weaker proposal is, rather than as a banner somewhere else. */}
-          {!goal && access.plan && (
+          {!goal && (access.plan || access.garminConnected) && (
             <SlideUp active={animate} delayMs={300} style={{ marginTop: 12 }}>
               <Link
                 href="/settings/goal"

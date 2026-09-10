@@ -12,18 +12,21 @@ import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/mot
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import {
+  GOAL_LOOKAHEAD_DAYS,
   useBodyToday,
   useDayVerdict,
   useDayVerdictNarrative,
   usePlanDiff,
+  useRaceGoal,
   useStravaActivityMatches,
   useStravaStatus,
   useWeekWorkouts,
+  useWorkouts,
 } from "@/lib/queries";
 import { useWatchSyncStatus } from "@/lib/watchSync";
 import { SkeletonTodayHero } from "@/components/skeletons";
 import { usePassoStore } from "@/lib/store";
-import { classifySession, isoWeekNumber, sessionDistanceKm, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
+import { classifySession, isoWeekNumber, sessionDistanceKm, shiftDateKey, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
 import { capitalize, formatFullDate, groupSteps, numberToItalianWords, relativeDayLabel, stepGroupLine } from "@/lib/format";
 
 export default function TodayPage() {
@@ -50,6 +53,13 @@ export default function TodayPage() {
 
   const avvisamiSeIlCorpoNonRegge = usePassoStore((s) => s.prefs.avvisamiSeIlCorpoNonRegge);
 
+  // The race this account trains for, in the plan or standalone -- see useRaceGoal.
+  // Without a plan there is no bounded "rest of the calendar" to count, so a live
+  // lookahead stands in for it, but only while there's no goal yet to ask the prompt
+  // about; once one is set, the goal screen reads the calendar bounded by the race date.
+  const { goal } = useRaceGoal(access.plan, access.ready);
+  const liveLookahead = useWorkouts(todayKey, shiftDateKey(todayKey, GOAL_LOOKAHEAD_DAYS), liveMode && !goal);
+
   // "19 L'orologio non ha ancora parlato" replaces Today when the watch hasn't pushed
   // to Garmin's cloud in over 24h: with no overnight data there is nothing to interpret,
   // and half this screen would be em dashes.
@@ -66,8 +76,8 @@ export default function TodayPage() {
   // The "avvisami se il corpo non regge" preference now decides whether it appears.
   const verdictSession = access.plan?.sessions.find((s) => s.date === todayKey) ?? null;
   const wantsVerdict = avvisamiSeIlCorpoNonRegge && !watchSync.blocking && access.ready;
-  const verdictQuery = useDayVerdict(verdictSession, access.plan?.goal, wantsVerdict);
-  const verdictNarrative = useDayVerdictNarrative(verdictSession, access.plan?.goal, wantsVerdict && !!verdictQuery.data);
+  const verdictQuery = useDayVerdict(verdictSession, goal, wantsVerdict);
+  const verdictNarrative = useDayVerdictNarrative(verdictSession, goal, wantsVerdict && !!verdictQuery.data);
 
   // Until we know whether there's a plan or a live Garmin connection there is nothing
   // real to show -- but "nothing real" used to mean `return null`, i.e. an empty screen
@@ -152,12 +162,13 @@ export default function TodayPage() {
 
       <DayStateCard verdict={verdictQuery.data} narrative={verdictNarrative.data?.text} animate={animate} delayMs={260} />
 
-      {/* Without a race this asks for one -- but only with a plan behind it, since a
-          goal is stored *inside* the plan and there is nowhere to put one in live
-          Garmin mode. Counted from today forward: a finished block shouldn't ask. */}
+      {/* Without a race this asks for one -- counted from today forward, plan or live
+          calendar alike, so a finished block or a bare Garmin connection doesn't ask. */}
       <RaceGoalCard
-        goal={access.plan?.goal}
-        upcomingSessions={access.plan ? access.plan.sessions.filter((s) => s.date >= todayKey).length : 0}
+        goal={goal}
+        upcomingSessions={
+          access.plan ? access.plan.sessions.filter((s) => s.date >= todayKey).length : liveLookahead.data?.workouts.length ?? 0
+        }
         animate={animate}
         delayMs={320}
       />
