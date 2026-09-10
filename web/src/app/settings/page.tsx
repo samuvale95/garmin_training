@@ -13,6 +13,7 @@ import { useAthleteIdentity } from "@/lib/identity";
 import { signOut } from "@/lib/auth";
 import { usePassoStore } from "@/lib/store";
 import { downloadPlanYaml } from "@/lib/planYaml";
+import { countdownLabel, goalTitle } from "@/lib/raceGoal";
 import { minutesAgo } from "@/lib/format";
 
 export default function SettingsPage() {
@@ -166,6 +167,18 @@ export default function SettingsPage() {
       </Card>
 
       <Card>
+        <Link href="/settings/goal" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ flex: 1 }}>
+            <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Obiettivo</span>
+            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
+              {plan?.goal ? `${goalTitle(plan.goal)} · ${countdownLabel(plan.goal)}` : "la gara che stai preparando"}
+            </span>
+          </span>
+          <span aria-hidden="true">›</span>
+        </Link>
+      </Card>
+
+      <Card>
         <Link href="/settings/body" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ flex: 1 }}>
             <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Il tuo corpo</span>
@@ -190,7 +203,7 @@ export default function SettingsPage() {
         <button
           type="button"
           disabled={!plan}
-          onClick={() => plan && downloadPlanYaml(plan.sessions, plan.filename ?? "piano.yaml")}
+          onClick={() => plan && downloadPlanYaml(plan.sessions, plan.filename ?? "piano.yaml", plan.goal)}
           className="tap-target"
           style={{
             background: "none",

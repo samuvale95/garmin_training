@@ -21,6 +21,7 @@ import type {
   LoadSnapshot,
   Narrative,
   PlanDiff,
+  RaceGoal,
   RescheduleResult,
   ScheduledWorkout,
   Shoe,
@@ -77,6 +78,8 @@ export interface PlanState {
   sessions: TrainingSession[];
   filename: string | null;
   importedAt: string | null;
+  /** The race this plan is written for, when it states one (see `RaceGoal`). */
+  goal?: RaceGoal | null;
 }
 
 function readLegacyPlan(): PlanState | null {
@@ -208,21 +211,44 @@ function applyPlanLocally(queryClient: ReturnType<typeof useQueryClient>, next: 
  * before this call) stay this tab's source of truth regardless of whether the request
  * succeeds -- a save made offline reaches the server on the next `writePlan` call, or
  * gets pushed by `restorePersistedPlanOnce`'s own migration path on the next load. */
-function persistPlanToServer(plan: PlanState | null): void {
+function persistPlanToServer(queryClient: ReturnType<typeof useQueryClient>, plan: PlanState | null): void {
   const request = plan
-    ? apiPut("/plan", {
+    ? apiPut<{ goal: RaceGoal | null }>("/plan", {
+        goal: plan.goal
+          ? {
+              // Only the stated facts travel: `phase` and `days_to_race` are derived
+              // from the date, and the server recomputes them on every read.
+              race_date: plan.goal.race_date,
+              distance_km: plan.goal.distance_km,
+              name: plan.goal.name,
+              target_time_seconds: plan.goal.target_time_seconds,
+            }
+          : null,
         yaml_text: plan.yamlText,
         sessions: plan.sessions,
         filename: plan.filename,
         imported_at: plan.importedAt ?? new Date().toISOString(),
       })
-    : apiDelete("/plan");
-  request.catch(() => {});
+    : apiDelete<{ ok: boolean }>("/plan");
+
+  request
+    .then((saved) => {
+      // The goal comes back carrying its derived `phase` and `days_to_race`, computed
+      // in the one place that owns that rule (`models.race_phase`). Adopting them here
+      // is what spares this client a second implementation of it -- guarded on the race
+      // date, so an answer that arrives after the user has already changed the goal
+      // again is dropped rather than applied to a different race.
+      if (!plan || !("goal" in saved) || !saved.goal) return;
+      const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
+      if (!current?.goal || current.goal.race_date !== saved.goal.race_date) return;
+      applyPlanLocally(queryClient, { ...current, goal: saved.goal });
+    })
+    .catch(() => {});
 }
 
 function writePlan(queryClient: ReturnType<typeof useQueryClient>, next: PlanState | null): void {
   applyPlanLocally(queryClient, next);
-  persistPlanToServer(next);
+  persistPlanToServer(queryClient, next);
 }
 
 export function useSetPlan() {
@@ -277,6 +303,22 @@ export function useRefreshServerData() {
       });
     },
   });
+}
+
+/** Set or clear the race this plan is written for.
+ *
+ * A plan edit like any other: it goes through `writePlan`, so it lands in the cache,
+ * the localStorage mirror and the server in one call, and a plan downloaded afterwards
+ * carries the goal (see `serializePlanToYaml`). Editing it here rather than only in the
+ * YAML matches what the app already does to sessions -- it has been writing to the plan
+ * since the day the calendar let you drag one to another day. */
+export function useSetRaceGoal() {
+  const queryClient = useQueryClient();
+  return (goal: RaceGoal | null) => {
+    const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
+    if (!current) return;
+    writePlan(queryClient, { ...current, goal });
+  };
 }
 
 export function useUpdateSession() {
@@ -394,12 +436,20 @@ export function useGarminProfile(enabled = true) {
 
 // ---- plan: parse / diff -----------------------------------------------------------------
 
+/** What `/plan/parse` answers: the sessions, and the race the file states (or null).
+ * Both travel together because both come out of the same validation pass -- a file with
+ * a broken `goal:` block is a rejected file, not a plan with no goal. */
+export interface ParsedPlanResponse {
+  sessions: TrainingSession[];
+  goal: RaceGoal | null;
+}
+
 export function useParsePlanText() {
   return useMutation({
     mutationFn: (yamlText: string) => {
       const form = new FormData();
       form.set("yaml_text", yamlText);
-      return apiPostForm<{ sessions: TrainingSession[] }>("/plan/parse", form);
+      return apiPostForm<ParsedPlanResponse>("/plan/parse", form);
     },
   });
 }
@@ -409,7 +459,7 @@ export function useParsePlanFile() {
     mutationFn: (file: File) => {
       const form = new FormData();
       form.set("file", file);
-      return apiPostForm<{ sessions: TrainingSession[] }>("/plan/parse", form);
+      return apiPostForm<ParsedPlanResponse>("/plan/parse", form);
     },
   });
 }

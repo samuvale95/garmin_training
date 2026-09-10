@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
+import { RaceGoalCard } from "@/components/RaceGoalCard";
 import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
@@ -146,6 +147,8 @@ export default function TodayPage() {
         </div>
         <Illustration name="corsa" width={150} height={160} right={0} bottom={0} active={animate} delayMs={900} />
       </SlideUp>
+
+      <RaceGoalCard goal={access.plan?.goal} animate={animate} delayMs={280} />
 
       <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
         <MetricCard

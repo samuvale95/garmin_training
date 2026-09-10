@@ -7,6 +7,7 @@ import { useMountOnce } from "@/lib/motion";
 import { numberToItalianWords } from "@/lib/format";
 import { useBodyLoad, usePlanQuery } from "@/lib/queries";
 import { isoWeekNumber, sessionDistanceKm, toDateKey } from "@/lib/sessionVisuals";
+import { countdownLabel, goalTitle } from "@/lib/raceGoal";
 
 const ROW_HEIGHT = 100;
 
@@ -177,6 +178,16 @@ export default function LoadPage() {
             <WordIn active={animate} style={{ font: "600 30px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>{headline}</WordIn>
           </div>
           <p className="font-serif-italic" style={{ fontSize: 15.5, color: "var(--inchiostro-70)" }}>{caption}</p>
+
+          {/* Where this sits relative to the race, when the plan states one. A label on
+              the calendar, not a verdict on the shape above it -- the two are computed
+              from different things and are allowed to disagree. */}
+          {plan?.goal && plan.goal.phase !== "gara passata" && (
+            <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>
+              {goalTitle(plan.goal)} {countdownLabel(plan.goal)}
+              {plan.goal.phase && ` · ${plan.goal.phase}`}
+            </p>
+          )}
 
           <SlideUp
             active={animate}

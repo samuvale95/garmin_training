@@ -1,5 +1,5 @@
 import { isRepeatBlock } from "./types";
-import type { Step, TrainingSession } from "./types";
+import type { RaceGoal, Step, TrainingSession } from "./types";
 
 function y(value: string): string {
   // YAML double-quoted scalars follow JSON escaping rules, so this is a safe,
@@ -28,10 +28,30 @@ function stepLines(step: Step, indent: string): string[] {
   return lines;
 }
 
+function formatTargetTime(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = seconds % 60;
+  const mmss = `${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
+  return hours > 0 ? `${hours}:${mmss}` : mmss;
+}
+
 /** Reflects the current in-browser plan (including edits from the body-conflict
- * screen) back into the file format described in the project README. */
-export function serializePlanToYaml(sessions: TrainingSession[]): string {
-  const lines: string[] = ["sessions:"];
+ * screen) back into the file format described in the project README.
+ *
+ * The goal goes out first, as it does in the file: leaving it out would mean a plan
+ * downloaded from the app comes back without the race it was written for -- the
+ * round-trip silently losing the one field the user can't re-derive. */
+export function serializePlanToYaml(sessions: TrainingSession[], goal?: RaceGoal | null): string {
+  const lines: string[] = [];
+  if (goal) {
+    lines.push("goal:");
+    lines.push(`  race_date: ${y(goal.race_date)}`);
+    if (goal.name) lines.push(`  name: ${y(goal.name)}`);
+    lines.push(`  distance_km: ${goal.distance_km}`);
+    if (goal.target_time_seconds != null) lines.push(`  target_time: ${y(formatTargetTime(goal.target_time_seconds))}`);
+  }
+  lines.push("sessions:");
   for (const session of sessions) {
     lines.push(`  - date: ${y(session.date)}`);
     lines.push(`    sport: ${session.sport}`);
@@ -53,8 +73,8 @@ export function serializePlanToYaml(sessions: TrainingSession[]): string {
   return `${lines.join("\n")}\n`;
 }
 
-export function downloadPlanYaml(sessions: TrainingSession[], filename = "piano.yaml") {
-  const blob = new Blob([serializePlanToYaml(sessions)], { type: "text/yaml" });
+export function downloadPlanYaml(sessions: TrainingSession[], filename = "piano.yaml", goal?: RaceGoal | null) {
+  const blob = new Blob([serializePlanToYaml(sessions, goal)], { type: "text/yaml" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

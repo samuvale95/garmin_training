@@ -47,7 +47,7 @@ export default function ImportPlanPage() {
     try {
       const text = await file.text();
       const result = await parseFile.mutateAsync(file);
-      setPlan({ yamlText: text, sessions: result.sessions, filename: file.name, importedAt: new Date().toISOString() });
+      setPlan({ yamlText: text, sessions: result.sessions, goal: result.goal, filename: file.name, importedAt: new Date().toISOString() });
       router.push("/diff");
     } catch (err) {
       setErrors(err instanceof ApiError ? (err.details.length ? err.details : [err.message]) : ["Errore inatteso durante l'importazione."]);
@@ -58,7 +58,7 @@ export default function ImportPlanPage() {
     setErrors([]);
     try {
       const result = await parseText.mutateAsync(pastedText);
-      setPlan({ yamlText: pastedText, sessions: result.sessions, filename: "piano incollato", importedAt: new Date().toISOString() });
+      setPlan({ yamlText: pastedText, sessions: result.sessions, goal: result.goal, filename: "piano incollato", importedAt: new Date().toISOString() });
       router.push("/diff");
     } catch (err) {
       setErrors(err instanceof ApiError ? (err.details.length ? err.details : [err.message]) : ["Errore inatteso durante l'importazione."]);

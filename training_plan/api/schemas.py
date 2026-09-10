@@ -138,8 +138,61 @@ class ParsePlanRequest(BaseModel):
     yaml_text: str
 
 
+class RaceGoalOut(BaseModel):
+    """The race the plan is written for. Every screen that reads it must also render
+    without it -- `goal` is null for any plan that doesn't state one."""
+
+    race_date: date_type
+    distance_km: float
+    name: str | None = None
+    target_time_seconds: int | None = None
+    # Derived, not stored: sent along so the phase label and the countdown are computed
+    # in exactly one place (models.race_phase) rather than reimplemented per client.
+    phase: str
+    days_to_race: int
+
+    @classmethod
+    def from_model(cls, goal: models.RaceGoal) -> "RaceGoalOut":
+        return cls(
+            race_date=goal.race_date,
+            distance_km=goal.distance_km,
+            name=goal.name,
+            target_time_seconds=goal.target_time_seconds,
+            phase=models.race_phase(goal),
+            days_to_race=models.days_to_race(goal),
+        )
+
+    def to_model(self) -> models.RaceGoal:
+        return models.RaceGoal(
+            race_date=self.race_date,
+            distance_km=self.distance_km,
+            name=self.name,
+            target_time_seconds=self.target_time_seconds,
+        )
+
+
+class RaceGoalIn(BaseModel):
+    """What a client may state. `phase`/`days_to_race` are absent on purpose: they are
+    derived from the date, and accepting them would let a client claim a phase its own
+    race date contradicts."""
+
+    race_date: date_type
+    distance_km: float = Field(gt=0)
+    name: str | None = None
+    target_time_seconds: int | None = Field(default=None, gt=0)
+
+    def to_model(self) -> models.RaceGoal:
+        return models.RaceGoal(
+            race_date=self.race_date,
+            distance_km=self.distance_km,
+            name=self.name,
+            target_time_seconds=self.target_time_seconds,
+        )
+
+
 class ParsePlanResponse(BaseModel):
     sessions: list[TrainingSessionOut]
+    goal: RaceGoalOut | None = None
 
 
 # ---- the active plan, persisted server-side ---------------------------------------------------
@@ -150,6 +203,7 @@ class PlanIn(BaseModel):
     sessions: list[TrainingSessionIn]
     filename: str | None = None
     imported_at: str
+    goal: RaceGoalIn | None = None
 
 
 class PlanOut(BaseModel):
@@ -157,14 +211,19 @@ class PlanOut(BaseModel):
     sessions: list[TrainingSessionOut]
     filename: str | None = None
     imported_at: str
+    goal: RaceGoalOut | None = None
 
     @classmethod
     def from_model(cls, plan: db.UserPlan) -> "PlanOut":
+        # The stored goal is the three stated facts; `phase` and `days_to_race` are
+        # recomputed on every read, because both change with nothing but the date.
+        goal = RaceGoalIn.model_validate(plan.goal).to_model() if plan.goal else None
         return cls(
             yaml_text=plan.yaml_text,
             sessions=[TrainingSessionOut.model_validate(s) for s in plan.sessions],
             filename=plan.filename,
             imported_at=plan.imported_at,
+            goal=RaceGoalOut.from_model(goal) if goal else None,
         )
 
 

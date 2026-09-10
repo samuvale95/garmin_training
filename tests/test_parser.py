@@ -6,6 +6,7 @@ import pytest
 from training_plan.models import PaceTarget, flatten_steps
 from training_plan.parser import (
     TrainingPlanValidationError,
+    parse_plan_document,
     parse_target_pace,
     parse_training_plan,
 )
@@ -387,3 +388,108 @@ def test_bad_step_inside_a_block_names_the_block(tmp_path):
     with pytest.raises(TrainingPlanValidationError) as exc_info:
         parse_training_plan(path)
     assert any("block #1, step #1" in error for error in exc_info.value.errors)
+
+
+# ---- the optional race goal ---------------------------------------------------------
+
+
+# Unindented on purpose: these tests concatenate it after a `goal:` block, and YAML
+# only tolerates a uniformly indented document, not two different indentations in one.
+GOAL_SESSIONS = """sessions:
+  - date: "2026-08-01"
+    sport: running
+    title: Easy run
+"""
+
+
+def test_a_plan_without_a_goal_is_still_valid(tmp_path):
+    """The normal case: most plans state no race, and that is not a missing field."""
+    parsed = parse_plan_document(_write(tmp_path, GOAL_SESSIONS))
+    assert parsed.goal is None
+    assert len(parsed.sessions) == 1
+
+
+def test_a_full_goal_is_parsed(tmp_path):
+    path = _write(
+        tmp_path,
+        """goal:
+  race_date: "2026-11-15"
+  name: "Maratona di Firenze"
+  distance_km: 42.195
+  target_time: "3:15:00"
+"""
+        + GOAL_SESSIONS,
+    )
+    goal = parse_plan_document(path).goal
+    assert goal.race_date == date(2026, 11, 15)
+    assert goal.name == "Maratona di Firenze"
+    assert goal.distance_km == pytest.approx(42.195)
+    assert goal.target_time_seconds == 3 * 3600 + 15 * 60
+
+
+def test_named_distances_are_sugar_for_the_number(tmp_path):
+    """The file is written by hand, so "marathon" has to work as well as 42.195."""
+    for named, expected in (("marathon", 42.195), ("mezza", 21.0975), ("10k", 10.0)):
+        path = _write(tmp_path, f'goal:\n  race_date: "2026-11-15"\n  distance_km: {named}\n' + GOAL_SESSIONS)
+        assert parse_plan_document(path).goal.distance_km == pytest.approx(expected)
+
+
+def test_a_goal_without_a_target_time_is_valid(tmp_path):
+    """"Arrivare in fondo" is a goal too, and must not become a pace."""
+    path = _write(tmp_path, 'goal:\n  race_date: "2026-11-15"\n  distance_km: 21.0975\n' + GOAL_SESSIONS)
+    goal = parse_plan_document(path).goal
+    assert goal.target_time_seconds is None
+    assert goal.name is None
+
+
+def test_mm_ss_target_times_are_accepted(tmp_path):
+    path = _write(tmp_path, 'goal:\n  race_date: "2026-11-15"\n  distance_km: 10\n  target_time: "42:30"\n' + GOAL_SESSIONS)
+    assert parse_plan_document(path).goal.target_time_seconds == 42 * 60 + 30
+
+
+def test_a_broken_goal_is_an_error_not_a_missing_goal(tmp_path):
+    """The failure that matters: a date that doesn't parse must not degrade to "no
+    goal", or every screen downstream renders the no-goal state and says nothing."""
+    path = _write(tmp_path, 'goal:\n  race_date: "15/11/2026"\n  distance_km: 42.195\n' + GOAL_SESSIONS)
+    with pytest.raises(TrainingPlanValidationError) as excinfo:
+        parse_plan_document(path)
+    assert any("race_date" in error for error in excinfo.value.errors)
+
+
+def test_a_goal_needs_a_date_and_a_distance(tmp_path):
+    path = _write(tmp_path, 'goal:\n  name: "Una gara"\n' + GOAL_SESSIONS)
+    with pytest.raises(TrainingPlanValidationError) as excinfo:
+        parse_plan_document(path)
+    assert len(excinfo.value.errors) == 2
+
+
+def test_an_ambiguous_bare_target_time_is_rejected(tmp_path):
+    """"180" is three minutes to one reader and three hours to another."""
+    path = _write(tmp_path, 'goal:\n  race_date: "2026-11-15"\n  distance_km: 10\n  target_time: 180\n' + GOAL_SESSIONS)
+    with pytest.raises(TrainingPlanValidationError) as excinfo:
+        parse_plan_document(path)
+    assert any("target_time" in error for error in excinfo.value.errors)
+
+
+def test_a_negative_distance_is_rejected(tmp_path):
+    path = _write(tmp_path, 'goal:\n  race_date: "2026-11-15"\n  distance_km: -5\n' + GOAL_SESSIONS)
+    with pytest.raises(TrainingPlanValidationError):
+        parse_plan_document(path)
+
+
+def test_session_errors_and_goal_errors_are_reported_together(tmp_path):
+    """One pass, every problem -- the same promise the session validator already makes."""
+    path = _write(
+        tmp_path,
+        """goal:
+  race_date: "non una data"
+  distance_km: 42.195
+sessions:
+  - date: "2026-08-01"
+    sport: nuoto sincronizzato
+    title: Easy run
+""",
+    )
+    with pytest.raises(TrainingPlanValidationError) as excinfo:
+        parse_plan_document(path)
+    assert len(excinfo.value.errors) == 2

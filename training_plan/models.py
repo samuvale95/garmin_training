@@ -251,3 +251,72 @@ def session_duration_minutes(session: TrainingSession) -> float:
     steps = flatten_steps(session.steps)
     fallback = session_fallback_pace(steps)
     return sum(step_duration_minutes(step, fallback) for step in steps)
+
+
+# ---- race goal ------------------------------------------------------------------------
+
+# The named distances a plan may write instead of a number, in km. Both the English and
+# the Italian spelling, since the file is written by hand and the app speaks Italian.
+NAMED_DISTANCES_KM = {
+    "5k": 5.0,
+    "10k": 10.0,
+    "half": 21.0975,
+    "mezza": 21.0975,
+    "half_marathon": 21.0975,
+    "mezza_maratona": 21.0975,
+    "marathon": 42.195,
+    "maratona": 42.195,
+}
+
+# Where the calendar says you are, relative to the race. Deliberately crude: it labels
+# the distance to the start line, not what the plan actually periodises -- see
+# `race_phase`.
+PHASE_BASE = "base"
+PHASE_BUILD = "costruzione"
+PHASE_PEAK = "picco"
+PHASE_TAPER = "scarico"
+PHASE_DONE = "gara passata"
+
+
+@dataclass
+class RaceGoal:
+    """The race the plan is written for.
+
+    Optional everywhere: a plan without one still works, and every screen that reads a
+    goal has to render without it. `target_time_seconds` is separately optional --
+    "arrivare in fondo" is a goal too, and one the app must not turn into a pace.
+    """
+
+    race_date: date_type
+    distance_km: float
+    name: str | None = None
+    target_time_seconds: int | None = None
+
+
+def days_to_race(goal: RaceGoal, today: date_type | None = None) -> int:
+    """Negative once the race has been run."""
+    return (goal.race_date - (today or date_type.today())).days
+
+
+def weeks_to_race(goal: RaceGoal, today: date_type | None = None) -> float:
+    return days_to_race(goal, today) / 7
+
+
+def race_phase(goal: RaceGoal, today: date_type | None = None) -> str:
+    """Which block of the calendar today falls in.
+
+    This is arithmetic on a date, not an assessment of the plan: it says how far the
+    race is, in the vocabulary a runner already uses for it. Nothing here reads the
+    sessions, so it cannot and must not be presented as "you are in your build phase"
+    in the coaching sense -- only as "the race is eight weeks out".
+    """
+    weeks = weeks_to_race(goal, today)
+    if weeks < 0:
+        return PHASE_DONE
+    if weeks > 12:
+        return PHASE_BASE
+    if weeks > 4:
+        return PHASE_BUILD
+    if weeks > 1:
+        return PHASE_PEAK
+    return PHASE_TAPER

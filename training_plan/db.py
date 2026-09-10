@@ -59,6 +59,10 @@ CREATE TABLE IF NOT EXISTS user_plan (
   imported_at  TEXT NOT NULL,
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- The race the plan is written for: {race_date, distance_km, name, target_time_seconds}.
+-- Nullable, and added separately from the table above so an existing row keeps working
+-- -- a plan without a goal is the normal case, not a broken one.
+ALTER TABLE user_plan ADD COLUMN IF NOT EXISTS goal JSONB;
 """
 
 Confidence = Literal["low", "medium", "high"]
@@ -349,6 +353,9 @@ class UserPlan:
     sessions: list[dict[str, Any]]
     filename: str | None
     imported_at: str
+    # `{race_date, distance_km, name, target_time_seconds}` or None -- the three facts
+    # the user stated, never the derived phase (see `schemas.RaceGoalOut`).
+    goal: dict[str, Any] | None = None
 
     @classmethod
     def from_row(cls, row: DictRow) -> "UserPlan":
@@ -357,6 +364,7 @@ class UserPlan:
             sessions=row["sessions"],
             filename=row["filename"],
             imported_at=row["imported_at"],
+            goal=row.get("goal"),
         )
 
 
@@ -369,21 +377,28 @@ def get_plan(user_id: str) -> UserPlan | None:
 
 
 def save_plan(
-    *, user_id: str, yaml_text: str, sessions: list[dict[str, Any]], filename: str | None, imported_at: str
+    *,
+    user_id: str,
+    yaml_text: str,
+    sessions: list[dict[str, Any]],
+    filename: str | None,
+    imported_at: str,
+    goal: dict[str, Any] | None = None,
 ) -> UserPlan:
     with connect() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
-                """INSERT INTO user_plan (user_id, yaml_text, sessions, filename, imported_at, updated_at)
-                   VALUES (%s, %s, %s, %s, %s, now())
+                """INSERT INTO user_plan (user_id, yaml_text, sessions, filename, imported_at, goal, updated_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, now())
                    ON CONFLICT (user_id) DO UPDATE SET
                      yaml_text = EXCLUDED.yaml_text,
                      sessions = EXCLUDED.sessions,
                      filename = EXCLUDED.filename,
                      imported_at = EXCLUDED.imported_at,
+                     goal = EXCLUDED.goal,
                      updated_at = now()
                    RETURNING *""",
-                (user_id, yaml_text, Jsonb(sessions), filename, imported_at),
+                (user_id, yaml_text, Jsonb(sessions), filename, imported_at, Jsonb(goal) if goal else None),
             )
             row = cur.fetchone()
     return UserPlan.from_row(row)

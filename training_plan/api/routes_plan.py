@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
 from .. import db, service
-from ..parser import parse_training_plan
+from ..parser import parse_plan_document
 from . import garmin_session, schemas
 from .auth import current_user_id
 from .cache import TTL_PLAN_DIFF, cache
@@ -39,6 +39,7 @@ async def save_plan(payload: schemas.PlanIn, user_id: str = Depends(current_user
             sessions=[s.model_dump(mode="json") for s in payload.sessions],
             filename=payload.filename,
             imported_at=payload.imported_at,
+            goal=payload.goal.model_dump(mode="json") if payload.goal else None,
         )
     )
     return schemas.PlanOut.from_model(plan)
@@ -66,11 +67,14 @@ async def parse_plan(
         tmp_path = tmp.name
     try:
         # TrainingPlanValidationError propagates to the app-level exception handler.
-        sessions = await run_in_threadpool(parse_training_plan, tmp_path)
+        parsed = await run_in_threadpool(parse_plan_document, tmp_path)
     finally:
         Path(tmp_path).unlink(missing_ok=True)
 
-    return schemas.ParsePlanResponse(sessions=[schemas.TrainingSessionOut.from_model(s) for s in sessions])
+    return schemas.ParsePlanResponse(
+        sessions=[schemas.TrainingSessionOut.from_model(s) for s in parsed.sessions],
+        goal=schemas.RaceGoalOut.from_model(parsed.goal) if parsed.goal else None,
+    )
 
 
 @router.post("/plan/diff", response_model=schemas.DiffResponse)
