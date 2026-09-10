@@ -253,6 +253,20 @@ def session_duration_minutes(session: TrainingSession) -> float:
     return sum(step_duration_minutes(step, fallback) for step in steps)
 
 
+def session_distance_km(session: TrainingSession) -> float:
+    """The other half of the same sum: kilometres, with time-based steps converted
+    through their pace (see `step_distance_km`).
+
+    Zero for a session with no steps -- a live Garmin calendar entry carries only a
+    title, and calling that "0 km" in a total is exactly the lie every consumer of this
+    has to be able to spot. Callers that add these up are expected to say how many of
+    the sessions they counted had no detail at all.
+    """
+    steps = flatten_steps(session.steps)
+    fallback = session_fallback_pace(steps)
+    return sum(step_distance_km(step, fallback) for step in steps)
+
+
 # ---- race goal ------------------------------------------------------------------------
 
 # The named distances a plan may write instead of a number, in km. Both the English and

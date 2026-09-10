@@ -215,6 +215,24 @@ Regole assolute:
 - Rispondi solo con la frase, senza virgolette e senza preamboli."""
 
 
+GOAL_FIT_SYSTEM_PROMPT = """Sei la voce di Passo, un'app di allenamento per la corsa.
+
+Chi corre ha appena detto qual è la sua gara obiettivo, e nel piano ci sono già degli
+allenamenti scritti prima. Scrivi UNA frase, al massimo DUE, in italiano, che dica come
+quel piano si rapporta a quella gara.
+
+Regole assolute:
+- Il giudizio è già calcolato e te lo passo io ("giudizio", "osservazioni"): la tua frase
+  lo spiega, non lo ribalta e non ne aggiunge di nuovi.
+- Usa solo i numeri che ti do. Non inventare chilometri, ritmi, tempi o percentuali.
+- Se qualcosa risulta "sconosciuto", dillo come un limite tuo ("non vedo i passi delle
+  sedute"), non come un difetto del piano.
+- Non riscrivere il piano e non elencare allenamenti da fare: qui si constata, non si
+  programma.
+- Tono asciutto e adulto. Niente esclamativi, niente emoji, niente elenchi.
+- Rispondi solo con la frase, senza virgolette e senza preamboli."""
+
+
 def _write_sentence(system_prompt: str, facts: dict) -> str | None:
     content = _post_chat(
         os.getenv("LLM_TEXT_MODEL", DEFAULT_TEXT_MODEL),
@@ -242,6 +260,13 @@ def write_readiness_narrative(facts: dict) -> str | None:
     screen already has `DayVerdict.headline`, which is deterministic, and loses only the
     prose."""
     return _write_sentence(READINESS_SYSTEM_PROMPT, facts)
+
+
+def write_goal_fit_narrative(facts: dict) -> str | None:
+    """How the plan already in the app lines up with the race just named. `None` when
+    the model is unavailable -- the screen keeps `GoalFit.headline`, which is
+    deterministic."""
+    return _write_sentence(GOAL_FIT_SYSTEM_PROMPT, facts)
 
 
 def write_goal_narrative(facts: dict) -> str | None:

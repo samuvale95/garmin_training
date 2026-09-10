@@ -15,10 +15,11 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
 from .. import db, service
+from .. import goal_fit, llm
 from ..parser import parse_plan_document
 from . import garmin_session, schemas
 from .auth import current_user_id
-from .cache import TTL_PLAN_DIFF, cache
+from .cache import TTL_GOAL_FIT_NARRATIVE, TTL_PLAN_DIFF, cache
 from .jobs import job_store
 
 router = APIRouter()
@@ -74,6 +75,52 @@ async def parse_plan(
     return schemas.ParsePlanResponse(
         sessions=[schemas.TrainingSessionOut.from_model(s) for s in parsed.sessions],
         goal=schemas.RaceGoalOut.from_model(parsed.goal) if parsed.goal else None,
+    )
+
+
+@router.post("/plan/goal-fit", response_model=schemas.GoalFitResponse)
+async def plan_goal_fit(
+    payload: schemas.GoalFitRequest, user_id: str = Depends(current_user_id)
+) -> schemas.GoalFitResponse:
+    """Read the sessions already in the plan against the race just named.
+
+    Pure arithmetic over what the client sent -- no Garmin, no database, nothing cached:
+    the answer depends only on the request, and the request changes every time the plan
+    does.
+    """
+    fit = await run_in_threadpool(
+        goal_fit.assess_plan_fit,
+        [s.to_model() for s in payload.sessions],
+        payload.goal.to_model(),
+        payload.date,
+    )
+    return schemas.GoalFitResponse.from_model(fit)
+
+
+@router.post("/plan/goal-fit/narrative", response_model=schemas.NarrativeResponse)
+async def plan_goal_fit_narrative(
+    payload: schemas.GoalFitRequest, refresh: bool = False, user_id: str = Depends(current_user_id)
+) -> schemas.NarrativeResponse:
+    """The same reading, phrased. Cached on the conclusion it describes, so the model is
+    asked once per plan-and-race rather than once per screen open."""
+    goal = payload.goal.to_model()
+    sessions = [s.to_model() for s in payload.sessions]
+    fit = await run_in_threadpool(goal_fit.assess_plan_fit, sessions, goal, payload.date)
+
+    def compute() -> schemas.NarrativeResponse:
+        text = llm.write_goal_fit_narrative(goal_fit.fit_facts(fit, goal))
+        if text:
+            return schemas.NarrativeResponse(text=text, source="model")
+        return schemas.NarrativeResponse(text=fit.headline, source="template")
+
+    key = (
+        fit.race_date,
+        fit.alignment,
+        fit.sessions_ahead,
+        tuple(observation.key for observation in fit.observations),
+    )
+    return await run_in_threadpool(
+        lambda: cache.get_or_call("plan:goal-fit-narrative", user_id, key, TTL_GOAL_FIT_NARRATIVE, compute, refresh=refresh)
     )
 
 

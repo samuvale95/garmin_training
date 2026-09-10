@@ -72,6 +72,10 @@ TTL_NUTRITION_NARRATIVE = 30 * 60
 # by the verdict it describes, so it changes exactly when the verdict does.
 TTL_READINESS_NARRATIVE = 30 * 60
 
+# How the plan lines up with the race: arithmetic, so not cached -- but the sentence
+# written about it is a model call, keyed on the conclusion it describes.
+TTL_GOAL_FIT_NARRATIVE = 30 * 60
+
 # A date range that has already ended has nothing left to say: a completed activity is a
 # fact, and the calendar for a past week only changes when this app writes to it -- which
 # drops CALENDAR_NAMESPACES wholesale, so a long TTL here can never serve a stale answer

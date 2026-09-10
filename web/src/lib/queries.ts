@@ -19,6 +19,7 @@ import type {
   FoodHistory,
   FuelTargets,
   GarminStatus,
+  GoalFit,
   LoadSnapshot,
   Narrative,
   PlanDiff,
@@ -497,6 +498,37 @@ export function usePlanDiff(sessions: TrainingSession[] | null) {
     // Keep showing the previous answer while a plan edit recomputes the new one,
     // instead of dropping back to "no data" (and an empty screen) in between.
     placeholderData: keepPreviousData,
+  });
+}
+
+/** How the sessions already in the plan line up with the race.
+ *
+ * The point of this endpoint is that nothing needs re-importing: a goal named today is
+ * read against the sessions written last month. Keyed on both, so editing either
+ * recomputes. */
+export function useGoalFit(sessions: TrainingSession[], goal: RaceGoal | null | undefined, enabled = true) {
+  const goalPayload = goal
+    ? { race_date: goal.race_date, distance_km: goal.distance_km, name: goal.name, target_time_seconds: goal.target_time_seconds }
+    : null;
+  return useQuery({
+    queryKey: ["plan-goal-fit", goal?.race_date ?? null, goal?.distance_km ?? null, sessions.length ? planFingerprint(sessions) : null],
+    queryFn: ({ signal }) => apiPost<GoalFit>("/plan/goal-fit", { sessions, goal: goalPayload }, signal),
+    enabled: enabled && !!goal,
+    staleTime: 30 * 60_000,
+  });
+}
+
+/** The same reading, phrased. Separate request, same reason as everywhere else: the
+ * screen paints from the deterministic headline and swaps this in when it lands. */
+export function useGoalFitNarrative(sessions: TrainingSession[], goal: RaceGoal | null | undefined, enabled = true) {
+  const goalPayload = goal
+    ? { race_date: goal.race_date, distance_km: goal.distance_km, name: goal.name, target_time_seconds: goal.target_time_seconds }
+    : null;
+  return useQuery({
+    queryKey: ["plan-goal-fit-narrative", goal?.race_date ?? null, goal?.distance_km ?? null, sessions.length ? planFingerprint(sessions) : null],
+    queryFn: ({ signal }) => apiPost<Narrative>("/plan/goal-fit/narrative", { sessions, goal: goalPayload }, signal),
+    enabled: enabled && !!goal,
+    staleTime: 30 * 60_000,
   });
 }
 

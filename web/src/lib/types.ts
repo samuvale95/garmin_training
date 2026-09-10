@@ -184,6 +184,44 @@ export interface LoadSnapshot {
   vo2max: number | null;
 }
 
+/** One comparison between the plan and the race, carrying both numbers -- "il più lungo
+ * in programma è 24 km, per questa distanza se ne fanno almeno 30". */
+export interface GoalObservation {
+  key: string;
+  label: string;
+  detail: string;
+  severity: "ok" | "attenzione" | "sconosciuto";
+}
+
+export interface GoalWeekVolume {
+  week_start: string;
+  km: number;
+  sessions: number;
+}
+
+/** How the sessions already in the plan line up with the race, computed by
+ * `training_plan/goal_fit.py` from the plan file alone. `longest_run_km` and
+ * `peak_week_km` are null when the sessions carry no steps (a Garmin calendar), which
+ * is a "I can't see that" and never a zero. */
+export interface GoalFit {
+  race_date: string;
+  days_to_race: number;
+  phase: string;
+  alignment: "in linea" | "da guardare" | "non arriva" | "non valutabile";
+  headline: string;
+  observations: GoalObservation[];
+  sessions_ahead: number;
+  weeks_covered: number;
+  last_session_date: string | null;
+  longest_run_km: number | null;
+  longest_run_date: string | null;
+  longest_run_guide_km: number | null;
+  peak_week_km: number | null;
+  weekly_volume: GoalWeekVolume[];
+  quality_sessions: number;
+  sessions_without_detail: number;
+}
+
 /** One measurement that moved today's verdict, with the figure that did it. */
 export interface DaySignal {
   key: string;

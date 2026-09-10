@@ -152,7 +152,15 @@ export default function TodayPage() {
 
       <DayStateCard verdict={verdictQuery.data} narrative={verdictNarrative.data?.text} animate={animate} delayMs={260} />
 
-      <RaceGoalCard goal={access.plan?.goal} animate={animate} delayMs={320} />
+      {/* Without a race this asks for one -- but only with a plan behind it, since a
+          goal is stored *inside* the plan and there is nowhere to put one in live
+          Garmin mode. Counted from today forward: a finished block shouldn't ask. */}
+      <RaceGoalCard
+        goal={access.plan?.goal}
+        upcomingSessions={access.plan ? access.plan.sessions.filter((s) => s.date >= todayKey).length : 0}
+        animate={animate}
+        delayMs={320}
+      />
 
       <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
         <MetricCard

@@ -13,7 +13,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from .. import body_insights, db, garmin_sync, models, nutrition, readiness
+from .. import body_insights, db, garmin_sync, goal_fit, models, nutrition, readiness
 
 
 # ---- plan / steps --------------------------------------------------------------------------
@@ -554,6 +554,77 @@ class LoadSnapshotResponse(BaseModel):
             ],
             acute_chronic_ratio=snapshot.acute_chronic_ratio,
             vo2max=snapshot.vo2max,
+        )
+
+
+# ---- the plan, read against the race -------------------------------------------------------
+
+
+class ObservationOut(BaseModel):
+    key: str
+    label: str
+    detail: str
+    severity: str
+
+
+class WeekVolumeOut(BaseModel):
+    week_start: date_type
+    km: float
+    sessions: int
+
+
+class GoalFitRequest(BaseModel):
+    """The sessions travel in the request for the same reason they do everywhere else:
+    the plan lives on the device."""
+
+    sessions: list[TrainingSessionIn] = Field(default_factory=list)
+    goal: RaceGoalIn
+    date: date_type | None = None
+
+
+class GoalFitResponse(BaseModel):
+    race_date: date_type
+    days_to_race: int
+    phase: str
+    alignment: str
+    headline: str
+    observations: list[ObservationOut] = Field(default_factory=list)
+    sessions_ahead: int
+    weeks_covered: int
+    last_session_date: date_type | None = None
+    longest_run_km: float | None = None
+    longest_run_date: date_type | None = None
+    longest_run_guide_km: float | None = None
+    peak_week_km: float | None = None
+    weekly_volume: list[WeekVolumeOut] = Field(default_factory=list)
+    quality_sessions: int = 0
+    sessions_without_detail: int = 0
+
+    @classmethod
+    def from_model(cls, fit: "goal_fit.GoalFit") -> "GoalFitResponse":
+        return cls(
+            race_date=fit.race_date,
+            days_to_race=fit.days_to_race,
+            phase=fit.phase,
+            alignment=fit.alignment,
+            headline=fit.headline,
+            observations=[
+                ObservationOut(key=o.key, label=o.label, detail=o.detail, severity=o.severity)
+                for o in fit.observations
+            ],
+            sessions_ahead=fit.sessions_ahead,
+            weeks_covered=fit.weeks_covered,
+            last_session_date=fit.last_session_date,
+            longest_run_km=fit.longest_run_km,
+            longest_run_date=fit.longest_run_date,
+            longest_run_guide_km=fit.longest_run_guide_km,
+            peak_week_km=fit.peak_week_km,
+            weekly_volume=[
+                WeekVolumeOut(week_start=w.week_start, km=round(w.km, 1), sessions=w.sessions)
+                for w in fit.weekly_volume
+            ],
+            quality_sessions=fit.quality_sessions,
+            sessions_without_detail=fit.sessions_without_detail,
         )
 
 

@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { SlideUp } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { usePlanQuery, useSetRaceGoal } from "@/lib/queries";
+import { useCalendarAccess } from "@/lib/guards";
+import { useGoalFit, useGoalFitNarrative, usePlanQuery, useSetRaceGoal, useWeekWorkouts } from "@/lib/queries";
+import { GoalFitBlock } from "@/components/GoalFitBlock";
 import { countdownLabel, distanceLabel, formatPaceSecPerKm, formatTargetTime, targetPaceSecPerKm } from "@/lib/raceGoal";
 import { formatFullDate } from "@/lib/format";
+import { toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
 import type { RaceGoal } from "@/lib/types";
 
 /** The distances offered as one tap. Anything else is typed in km -- these are only
@@ -45,12 +48,29 @@ export default function RaceGoalSettingsPage() {
   const setRaceGoal = useSetRaceGoal();
   const goal = plan?.goal ?? null;
 
+  // The sessions already in the plan, read against whatever race is set. This is the
+  // whole point of the block below: a goal named today is compared with workouts
+  // written weeks ago, without importing anything again.
+  const access = useCalendarAccess();
+  const liveMode = !access.plan && access.garminConnected;
+  const workoutsQuery = useWeekWorkouts(new Date(), liveMode);
+  const sessions = useMemo(
+    () => (plan?.sessions ?? workoutsToSessions(workoutsQuery.data?.workouts ?? [])),
+    [plan?.sessions, workoutsQuery.data]
+  );
+
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
   const [raceDate, setRaceDate] = useState("");
   const [distanceKm, setDistanceKm] = useState("");
   const [targetTime, setTargetTime] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const todayKey = toDateKey(new Date());
+  const upcomingSessions = sessions.filter((s) => s.date >= todayKey).length;
+
+  const fitQuery = useGoalFit(sessions, goal, !!goal && !editing);
+  const fitNarrative = useGoalFitNarrative(sessions, goal, !!goal && !editing && !!fitQuery.data);
 
   function startEdit() {
     setName(goal?.name ?? "");
@@ -126,7 +146,19 @@ export default function RaceGoalSettingsPage() {
           animate={animate}
         />
       ) : goal ? (
-        <GoalSummary goal={goal} animate={animate} onEdit={startEdit} />
+        <>
+          <GoalSummary goal={goal} animate={animate} onEdit={startEdit} />
+          {fitQuery.data ? (
+            <>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: "22px 0 0" }}>
+                Il piano che hai già
+              </p>
+              <GoalFitBlock fit={fitQuery.data} narrative={fitNarrative.data?.text} animate={animate} delayMs={240} />
+            </>
+          ) : fitQuery.isLoading ? (
+            <p style={{ fontSize: 13, color: "var(--inchiostro-50)", marginTop: 20 }}>Sto rileggendo il piano…</p>
+          ) : null}
+        </>
       ) : (
         <SlideUp active={animate} delayMs={100} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 18 }}>
           <p style={{ font: "600 17px/1.2 var(--font-outfit)", margin: 0 }}>Nessuna gara nel piano</p>
@@ -135,6 +167,14 @@ export default function RaceGoalSettingsPage() {
             serve a capire in che punto della preparazione sei, e cosa proporti quando una
             giornata storta consiglia di cambiare la seduta.
           </p>
+          {/* The same promise the card on Oggi makes, kept where it gets fulfilled:
+              nothing is re-imported, the sessions already written get read again. */}
+          {upcomingSessions > 0 && (
+            <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-70)", margin: "10px 0 0", lineHeight: 1.35 }}>
+              Le <span className="font-mono" style={{ fontSize: 14, fontStyle: "normal" }}>{upcomingSessions}</span> sedute che
+              hai già in calendario restano dove sono: le rileggo per dirti se ti portano lì.
+            </p>
+          )}
           <button
             type="button"
             onClick={startEdit}

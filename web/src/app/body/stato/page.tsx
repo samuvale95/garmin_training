@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton, SlideUp } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
@@ -217,6 +218,28 @@ export default function DayStatePage() {
                   lascio fare da Settimana.
                 </p>
               )}
+            </SlideUp>
+          )}
+
+          {/* The alternative is chosen by phase -- base, build, peak, taper -- and with
+              no race there is no phase, so it falls back to a generic easy day. Saying
+              so where the weaker proposal is, rather than as a banner somewhere else. */}
+          {!goal && access.plan && (
+            <SlideUp active={animate} delayMs={300} style={{ marginTop: 12 }}>
+              <Link
+                href="/settings/goal"
+                className="press-soft"
+                style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--sabbia)", border: "1px dashed var(--inchiostro-35)", borderRadius: "var(--radius-card)", padding: "15px 18px", textDecoration: "none", color: "inherit" }}
+              >
+                <div style={{ flex: 1 }}>
+                  <p style={{ font: "600 15.5px/1.2 var(--font-outfit)", margin: 0 }}>Non so per che gara ti alleni</p>
+                  <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-70)", margin: "6px 0 0", lineHeight: 1.35 }}>
+                    Con una data e una distanza so a che punto della preparazione sei, e l&apos;alternativa
+                    che ti propongo cambia di conseguenza.
+                  </p>
+                </div>
+                <span aria-hidden="true" className="anim-chev" style={{ flex: "none", fontSize: 18 }}>→</span>
+              </Link>
             </SlideUp>
           )}
 
