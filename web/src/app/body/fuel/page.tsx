@@ -5,7 +5,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { PulseRing, Skeleton, SlideUp } from "@/components/motion/primitives";
 import { FuelCorrectionSheet } from "@/components/FuelCorrectionSheet";
-import { FuelComment, FuelHero, MealList, TodayFuelBlock } from "@/components/FuelBlocks";
+import { EnergyBlock, FuelComment, FuelHero, MealList, MealPlanBlock, TodayFuelBlock } from "@/components/FuelBlocks";
 import { useMountOnce } from "@/lib/motion";
 import { formatWeekday } from "@/lib/format";
 import { useCalendarAccess } from "@/lib/guards";
@@ -275,6 +275,13 @@ export default function FuelPage() {
           )}
 
           <TodayFuelBlock animate={animate} fuel={fuel} totals={day?.totals} hasPlan={hasPlan} />
+
+          {/* The cross-check, then the plan. In that order on purpose: the grams above
+              have to stop looking arbitrary before a list of plates built on them is
+              worth reading. */}
+          <EnergyBlock animate={animate} target={fuel.today} />
+
+          <MealPlanBlock animate={animate} meals={fuel.meals} during={fuel.during} recovery={fuel.recovery} />
 
           <MealList entries={entries} animate={animate} onSelect={setCorrecting} />
 

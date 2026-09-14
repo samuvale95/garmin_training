@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
+import { HrvCard, ReadinessMeaning, SleepCard } from "@/components/BodyCards";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { ProgressRing, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useBodyToday, useFuelTargets, usePlanQuery, usePrefetchFuelNarrative } from "@/lib/queries";
 import { useWatchSyncStatus } from "@/lib/watchSync";
 import { toDateKey } from "@/lib/sessionVisuals";
-import { formatFullDate, hrvCaption, stressCaption } from "@/lib/format";
+import { formatFullDate, stressCaption } from "@/lib/format";
 import { usePassoStore } from "@/lib/store";
 import type { DayTarget } from "@/lib/types";
 
@@ -78,73 +79,67 @@ export default function RecoveryPage() {
             <ProgressRing value={(data.readiness_score ?? 0) / 100} size={104} strokeWidth={10} trackColor="rgba(31,51,16,.15)" color="var(--verde-testo)">
               <p className="font-mono" style={{ fontSize: 26, fontWeight: 500, margin: 0 }}>{data.readiness_score ?? "—"}</p>
             </ProgressRing>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <p style={{ fontWeight: 700, fontSize: 16, margin: "0 0 4px" }}>
                 {(data.readiness_score ?? 0) >= 65 ? "Pronto a lavorare" : "Vacci piano oggi"}
               </p>
-              <p className="font-serif-italic" style={{ fontSize: 14, margin: 0 }}>{data.readiness_message ?? "Nessun commento disponibile."}</p>
+              {/* The score used to sit here as a bare ring with a Garmin lookup key
+                  under it. The key is decoded server-side now, and when it cannot be,
+                  this says what the number is instead of printing an identifier. */}
+              {data.readiness_score != null && <ReadinessMeaning score={data.readiness_score} href="/body/prontezza" />}
+              <p className="font-serif-italic" style={{ fontSize: 14, margin: "6px 0 0" }}>
+                {data.readiness_message ?? "Tocca il punteggio per vedere da cosa nasce."}
+              </p>
             </div>
           </SlideUp>
 
-          <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
-            <SlideUp active={animate} delayMs={280} style={{ flex: 1, background: "var(--azzurro)", color: "var(--azzurro-testo)", borderRadius: "var(--radius-card)", padding: 14 }}>
-              <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", margin: "0 0 8px" }}>Sonno</p>
-              {data.sleep ? (
-                <>
-                  <p className="font-mono" style={{ fontSize: 18, margin: "0 0 8px" }}>
-                    {Math.floor((data.sleep.total_minutes ?? 0) / 60)}h{String((data.sleep.total_minutes ?? 0) % 60).padStart(2, "0")}
-                  </p>
-                  <SleepBar phases={data.sleep} />
-                  {data.sleep.deep_minutes != null && (
-                    <p style={{ fontSize: 11, margin: "8px 0 0" }}>
-                      profondo {Math.floor(data.sleep.deep_minutes / 60)}h{String(data.sleep.deep_minutes % 60).padStart(2, "0")}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p style={{ fontSize: 12 }}>Non disponibile</p>
-              )}
-            </SlideUp>
-            <SlideUp active={animate} delayMs={340} style={{ flex: 1, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14 }}>
-              <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", margin: "0 0 8px", color: "var(--inchiostro-50)" }}>Variabilità</p>
-              {data.hrv_last_night_ms != null && (
-                <p className="font-mono" style={{ fontSize: 18, margin: "0 0 8px" }}>{data.hrv_last_night_ms}<span style={{ fontSize: 12 }}>ms</span></p>
-              )}
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 40 }}>
-                {data.hrv_seven_day.map((point, i) => {
-                  const isLast = i === data.hrv_seven_day.length - 1;
-                  const value = point.value_ms ?? 0;
-                  const maxValue = Math.max(...data.hrv_seven_day.map((p) => p.value_ms ?? 0), 1);
-                  return (
-                    <div
-                      key={point.date}
-                      className={isLast ? "anim-tip-grow" : undefined}
-                      style={{ flex: 1, height: `${Math.max(6, (value / maxValue) * 40)}px`, background: isLast ? "var(--verde-tratto-scuro)" : "var(--neutro-barra)", borderRadius: 2 }}
-                    />
-                  );
-                })}
-              </div>
-              {hrvCaption(data.hrv_last_night_ms, data.hrv_seven_day) && (
-                <p style={{ fontSize: 10, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>{hrvCaption(data.hrv_last_night_ms, data.hrv_seven_day)}</p>
-              )}
-            </SlideUp>
+          {/* Two cards that used to show one number each with nothing to read it
+              against: a sleep total with a single phase under it, and seven unlabelled
+              bars. Stacked rather than side by side -- there is no way to fit a phase
+              breakdown and a dated axis into half a phone's width. */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 14 }}>
+            {data.sleep ? (
+              <SleepCard sleep={data.sleep} animate={animate} delayMs={280} />
+            ) : (
+              <SlideUp active={animate} delayMs={280} style={{ background: "var(--azzurro)", color: "var(--azzurro-testo)", borderRadius: "var(--radius-card)", padding: 16 }}>
+                <p className="font-mono" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", margin: 0 }}>Sonno</p>
+                <p style={{ fontSize: 13, margin: "8px 0 0" }}>Non disponibile</p>
+              </SlideUp>
+            )}
+            <HrvCard points={data.hrv_seven_day} lastNight={data.hrv_last_night_ms} animate={animate} delayMs={340} />
           </div>
 
           <div style={{ display: "flex", gap: 9, marginTop: 9 }}>
             <SmallMetric
               label="Cuore a riposo"
               value={data.resting_heart_rate != null ? `${data.resting_heart_rate}` : "—"}
-              caption={data.resting_heart_rate_delta != null ? `${data.resting_heart_rate_delta > 0 ? "+" : ""}${data.resting_heart_rate_delta} sulla settimana` : undefined}
+              unit="bpm"
+              caption={
+                data.resting_heart_rate_delta != null
+                  ? `${data.resting_heart_rate_delta > 0 ? "+" : ""}${data.resting_heart_rate_delta} sulla tua media di 7 giorni`
+                  : undefined
+              }
               background="var(--crema-card)"
             />
-            <SmallMetric label="Batteria" value={data.battery_percent != null ? `${data.battery_percent}%` : "—"} background="var(--giallo)">
+            <SmallMetric
+              label="Batteria"
+              value={data.battery_percent != null ? `${data.battery_percent}%` : "—"}
+              caption="energia rimasta ora, su 100"
+              background="var(--giallo)"
+            >
               {data.battery_percent != null && (
                 <div style={{ height: 3, borderRadius: 100, background: "rgba(31,51,16,.15)", marginTop: 8, overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${data.battery_percent}%`, background: "var(--giallo-testo)", borderRadius: 100 }} />
                 </div>
               )}
             </SmallMetric>
-            <SmallMetric label="Stress" value={data.stress_level != null ? `${data.stress_level}` : "—"} caption={stressCaption(data.stress_level) ?? undefined} background="var(--crema-card)" />
+            <SmallMetric
+              label="Stress"
+              value={data.stress_level != null ? `${data.stress_level}` : "—"}
+              unit="su 100"
+              caption={stressCaption(data.stress_level) ?? undefined}
+              background="var(--crema-card)"
+            />
           </div>
 
           <SlideUp active={animate} delayMs={460} style={{ background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14 }}>
@@ -162,6 +157,7 @@ export default function RecoveryPage() {
 
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 4 }}>
         <NavRow href="/body/load" label="Carico 4 settimane" />
+        <NavRow href="/coach" label="Tecnica e allenamento" />
       </div>
 
       {fuel && (
@@ -201,39 +197,29 @@ export default function RecoveryPage() {
   );
 }
 
-function SleepBar({ phases }: { phases: { deep_minutes: number | null; light_minutes: number | null; rem_minutes: number | null; awake_minutes: number | null } }) {
-  const total = (phases.deep_minutes ?? 0) + (phases.light_minutes ?? 0) + (phases.rem_minutes ?? 0) + (phases.awake_minutes ?? 0) || 1;
-  const segments = [
-    { value: phases.deep_minutes ?? 0, color: "var(--azzurro-testo)" },
-    { value: phases.rem_minutes ?? 0, color: "var(--lilla)" },
-    { value: phases.light_minutes ?? 0, color: "var(--azzurro)" },
-    { value: phases.awake_minutes ?? 0, color: "var(--giallo)" },
-  ];
-  return (
-    <div style={{ display: "flex", height: 4, borderRadius: 100, overflow: "hidden" }}>
-      {segments.map((s, i) => (
-        <div key={i} style={{ width: `${(s.value / total) * 100}%`, background: s.color }} />
-      ))}
-    </div>
-  );
-}
-
 function SmallMetric({
   label,
   value,
+  unit,
   caption,
   background,
   children,
 }: {
   label: string;
   value: string;
+  /** The unit, where the number has one that isn't obvious from the figure itself.
+   * "53" and "53 bpm" are not the same amount of information. */
+  unit?: string;
   caption?: string;
   background: string;
   children?: ReactNode;
 }) {
   return (
     <div style={{ flex: 1, background, borderRadius: "var(--radius-chip)", padding: 12 }}>
-      <p className="font-mono" style={{ fontSize: 16, margin: "0 0 2px" }}>{value}</p>
+      <p className="font-mono" style={{ fontSize: 16, margin: "0 0 2px" }}>
+        {value}
+        {unit && <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}> {unit}</span>}
+      </p>
       <p style={{ fontSize: 10, color: "var(--inchiostro-50)", margin: 0 }}>{label}</p>
       {caption && <p style={{ fontSize: 10, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>{caption}</p>}
       {children}

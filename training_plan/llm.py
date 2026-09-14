@@ -233,6 +233,24 @@ Regole assolute:
 - Rispondi solo con la frase, senza virgolette e senza preamboli."""
 
 
+COACH_SYSTEM_PROMPT = """Sei l'allenatore personale di chi usa Passo, un'app di allenamento.
+
+Hai davanti le misure di tecnica di una seduta appena finita. Scrivi DUE frasi, al
+massimo TRE, in italiano, che dicano come è andata e cosa provare nella prossima.
+
+Regole assolute:
+- Le misure, i giudizi e l'esercizio da fare te li passo io già decisi: la tua risposta
+  li spiega, non li ribalta e non ne aggiunge di nuovi.
+- Non inventare numeri. Usa solo quelli che ti do, e solo se servono davvero.
+- Parla come un allenatore che conosce l'atleta: diretto, concreto, niente complimenti
+  di circostanza e niente allarmi. Se una cosa va bene, una riga basta.
+- Un solo punto su cui lavorare, quello che ti do. Non elencarne altri.
+- Non sei un medico e non sei un fisioterapista: niente diagnosi, niente ipotesi su
+  infortuni, niente esercizi di riabilitazione.
+- Niente esclamativi, niente emoji, niente elenchi puntati.
+- Rispondi solo con le frasi, senza virgolette e senza preamboli."""
+
+
 def _write_sentence(system_prompt: str, facts: dict) -> str | None:
     content = _post_chat(
         os.getenv("LLM_TEXT_MODEL", DEFAULT_TEXT_MODEL),
@@ -267,6 +285,13 @@ def write_goal_fit_narrative(facts: dict) -> str | None:
     the model is unavailable -- the screen keeps `GoalFit.headline`, which is
     deterministic."""
     return _write_sentence(GOAL_FIT_SYSTEM_PROMPT, facts)
+
+
+def write_coach_narrative(facts: dict) -> str | None:
+    """The technique read, phrased by a coach. `None` when the model is unavailable --
+    the screen keeps `ActivityForm.headline` and `focus`, both deterministic, and loses
+    only the prose around them."""
+    return _write_sentence(COACH_SYSTEM_PROMPT, facts)
 
 
 def write_goal_narrative(facts: dict) -> str | None:

@@ -4,7 +4,17 @@ import type { CSSProperties, ReactNode } from "react";
 import { BarGrow, ProgressRing, SlideUp } from "@/components/motion/primitives";
 import { FoodThumb } from "@/components/FuelCorrectionSheet";
 import { capitalize, formatClockTime, formatFullDate } from "@/lib/format";
-import type { DayTarget, DayTotals, FoodEntry, FuelTargets, SessionLoad } from "@/lib/types";
+import type {
+  DayTarget,
+  DayTotals,
+  DuringSession,
+  FoodEntry,
+  FuelTargets,
+  MealSlot,
+  Portion,
+  RecoveryWindow,
+  SessionLoad,
+} from "@/lib/types";
 
 // The presentational half of /body/fuel: everything the screen shows when it is *not*
 // in the middle of the photo flow. Kept out of the route file so the flow states
@@ -20,8 +30,9 @@ const LOAD_LABELS: Record<SessionLoad, string> = {
 };
 
 /** The g/kg scale the hero's range bar is drawn on. 12 is above anything
- * `nutrition.py` ever answers (the top band is 8-10 g/kg), so a real range always
- * lands inside the track with room to spare rather than pinning to its right edge. */
+ * `nutrition.py` ever answers -- its top band is 8-10 g/kg, plus at most the 1 g/kg
+ * back-to-back bonus -- so a real range always lands inside the track with room to
+ * spare rather than pinning to its right edge. */
 const CARB_SCALE_MAX = 12;
 
 function formatRange(range: [number, number]): string {
@@ -405,5 +416,187 @@ export function FuelComment({ animate, text, style }: { animate: boolean; text: 
         {text}
       </p>
     </SlideUp>
+  );
+}
+
+// ---- C6: energy, and the day as meals -------------------------------------------------------
+//
+// The two blocks that answer "these numbers look made up".
+//
+// The old screen showed a carbohydrate range in grams and nothing else -- no energy to
+// check it against, and no way to turn 500 g into lunch. A number that can be neither
+// verified nor spent is a number you either believe or don't, which is exactly the
+// position a user should never be put in by their own app.
+
+/** What the day costs, against what the targets provide.
+ *
+ * Deliberately framed as arithmetic, not as a budget: the caption says where the
+ * figure comes from (resting metabolism + living + the session), and the targets sit
+ * next to it as a total rather than as an allowance with a ceiling. */
+export function EnergyBlock({ animate, target }: { animate: boolean; target: DayTarget }) {
+  const energy = target.energy;
+  if (!energy || energy.need_kcal == null) return null;
+
+  const midpoint = Math.round((energy.target_kcal[0] + energy.target_kcal[1]) / 2);
+  const living = energy.need_kcal - energy.training_kcal;
+
+  return (
+    <SlideUp active={animate} delayMs={280} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 18, marginTop: 12 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+        <p style={{ font: "600 18px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0 }}>I conti tornano?</p>
+        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>stima</span>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 18, marginTop: 14 }}>
+        <div>
+          <p className="font-mono" style={{ fontSize: 28, fontWeight: 500, letterSpacing: "-.02em", margin: 0 }}>
+            {energy.need_kcal.toLocaleString("it-IT")}
+          </p>
+          <p style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>kcal spese oggi</p>
+        </div>
+        <span aria-hidden="true" style={{ fontSize: 18, color: "var(--inchiostro-35)", paddingBottom: 14 }}>·</span>
+        <div>
+          <p className="font-mono" style={{ fontSize: 28, fontWeight: 500, letterSpacing: "-.02em", margin: 0, color: "var(--corallo)" }}>
+            {midpoint.toLocaleString("it-IT")}
+          </p>
+          <p style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>kcal nei target qui sopra</p>
+        </div>
+      </div>
+
+      {/* The split is the point: "2.200 per vivere, 1.100 per la seduta" is what makes
+          a big carbohydrate number stop looking arbitrary. */}
+      <div style={{ display: "flex", height: 7, borderRadius: 100, overflow: "hidden", marginTop: 14 }}>
+        <div style={{ width: `${(living / energy.need_kcal) * 100}%`, background: "var(--azzurro)" }} />
+        <div style={{ width: `${(energy.training_kcal / energy.need_kcal) * 100}%`, background: "var(--corallo)" }} />
+      </div>
+      <div style={{ display: "flex", gap: 14, marginTop: 9, flexWrap: "wrap" }}>
+        <MacroLabel color="var(--azzurro)">
+          {living.toLocaleString("it-IT")} kcal per vivere
+        </MacroLabel>
+        <MacroLabel color="var(--corallo)">
+          {energy.training_kcal.toLocaleString("it-IT")} kcal per la seduta
+        </MacroLabel>
+      </div>
+
+      {energy.trimmed && (
+        <p style={{ background: "var(--giallo)", color: "var(--giallo-testo)", borderRadius: "var(--radius-chip)", padding: "11px 13px", fontSize: 12.5, margin: "14px 0 0", lineHeight: 1.4 }}>
+          I carboidrati qui sopra sono già stati abbassati: la tabella da sola ne chiedeva più
+          di quanti la giornata ne spenda.
+        </p>
+      )}
+
+      <p style={{ fontSize: 11.5, color: "var(--inchiostro-35)", margin: "12px 0 0", lineHeight: 1.45 }}>
+        Metabolismo a riposo dal tuo peso, altezza ed età, più il movimento di una giornata
+        normale, più i minuti di allenamento in programma. È una stima con un margine largo:
+        serve a controllare che i grammi qui sopra abbiano senso, non a contare le calorie.
+      </p>
+    </SlideUp>
+  );
+}
+
+function PortionLine({ portions }: { portions: Portion[] }) {
+  if (portions.length === 0) return null;
+  return (
+    <p className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-70)", margin: "8px 0 0", lineHeight: 1.5 }}>
+      {portions
+        .map((p) => (p.grams == null ? p.food : `${p.food} ${p.grams} g${p.note ? ` (${p.note})` : ""}`))
+        .join("  +  ")}
+    </p>
+  );
+}
+
+/** The day's targets, spent across the meals a person actually eats.
+ *
+ * One worked example, not a prescription -- the copy says so, and the ranges stay on
+ * screen above it. The portions are sized on the midpoint of each range, which is why
+ * they can be added up and checked against the targets. */
+export function MealPlanBlock({
+  animate,
+  meals,
+  during,
+  recovery,
+}: {
+  animate: boolean;
+  meals: MealSlot[];
+  during: DuringSession | null;
+  recovery: RecoveryWindow | null;
+}) {
+  if (meals.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 22 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+          Come spenderli oggi
+        </span>
+        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
+          {meals.length} pasti
+        </span>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+        {meals.map((meal, i) => (
+          <SlideUp
+            key={meal.key}
+            active={animate}
+            delayMs={300 + i * 50}
+            row
+            style={{ background: "var(--crema-card)", borderRadius: "var(--radius-row)", padding: "14px 16px" }}
+          >
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+              <p style={{ fontWeight: 600, fontSize: 15, margin: 0 }}>{meal.name}</p>
+              <span className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", flex: "none" }}>
+                {meal.timing}
+              </span>
+            </div>
+            <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "5px 0 0" }}>
+              {meal.carb_g} g carboidrati · {meal.protein_g} g proteine
+            </p>
+            <PortionLine portions={meal.portions} />
+            {meal.note && (
+              <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-70)", margin: "8px 0 0", lineHeight: 1.35 }}>
+                {meal.note}
+              </p>
+            )}
+          </SlideUp>
+        ))}
+      </div>
+
+      {during && (
+        <SlideUp active={animate} delayMs={520} style={{ background: "var(--corallo)", color: "var(--inchiostro)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 10 }}>
+          <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", opacity: 0.7, margin: 0 }}>
+            durante la seduta
+          </p>
+          <p className="font-mono" style={{ fontSize: 22, fontWeight: 500, letterSpacing: "-.02em", margin: "7px 0 0" }}>
+            {during.carb_g_per_hour[0]}–{during.carb_g_per_hour[1]} <span style={{ fontSize: 13 }}>g all&apos;ora</span>
+          </p>
+          <p style={{ fontSize: 12.5, margin: "3px 0 0", opacity: 0.8 }}>
+            in tutto {during.total_carb_g[0]}–{during.total_carb_g[1]} g
+          </p>
+          <p className="font-serif-italic" style={{ fontSize: 14, margin: "9px 0 0", lineHeight: 1.35 }}>{during.note}</p>
+        </SlideUp>
+      )}
+
+      {recovery && (
+        <SlideUp active={animate} delayMs={560} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 10 }}>
+          <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
+            dopo la seduta
+          </p>
+          <p className="font-mono" style={{ fontSize: 15, margin: "7px 0 0" }}>
+            {recovery.carb_g} g carboidrati · {recovery.protein_g} g proteine
+          </p>
+          <PortionLine portions={recovery.portions} />
+          <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-70)", margin: "9px 0 0", lineHeight: 1.35 }}>
+            {recovery.note}
+          </p>
+        </SlideUp>
+      )}
+
+      <p style={{ fontSize: 11.5, color: "var(--inchiostro-35)", margin: "12px 0 0", lineHeight: 1.45 }}>
+        Un esempio di giornata, non una prescrizione: le quantità stanno al centro degli
+        intervalli qui sopra, e gli alimenti sono intercambiabili con altri che portano gli
+        stessi grammi. Orientamento sportivo generale, non un piano alimentare.
+      </p>
+    </div>
   );
 }

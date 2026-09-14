@@ -5,6 +5,7 @@ import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } f
 import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm, apiPut } from "./apiClient";
 import { shiftDateKey, toDateKey, weekBounds } from "./sessionVisuals";
 import type {
+  ActivityForm,
   AthleteProfile,
   BodyMetrics,
   BodySnapshot,
@@ -900,6 +901,34 @@ export function useBodyConflict(nextSession: TrainingSession | null) {
     queryKey: ["body", "conflict", nextSession?.date ?? null],
     queryFn: ({ signal }) => apiPost<ConflictAssessment>("/body/conflict", { next_session: nextSession }, signal),
     enabled: !!nextSession,
+  });
+}
+
+// ---- coach / technique ---------------------------------------------------------------------
+
+/** How one finished activity was actually done: form metrics against their reference
+ * bands, plus how the effort was distributed.
+ *
+ * A finished activity is a fact -- its numbers never change again -- so this is the one
+ * query in the app with no reason ever to go stale. */
+export function useActivityForm(activityId: number | null) {
+  return useQuery({
+    queryKey: ["coach", "technique", activityId],
+    queryFn: ({ signal }) => apiGet<ActivityForm>(`/coach/technique/${activityId}`, undefined, signal),
+    enabled: activityId != null,
+    staleTime: Infinity,
+  });
+}
+
+/** The same read, phrased by a coach. Fetched separately for the same reason as every
+ * other narrative here: the screen paints from the deterministic headline and swaps
+ * this in when (and if) it lands. */
+export function useCoachNarrative(activityId: number | null, enabled = true) {
+  return useQuery({
+    queryKey: ["coach", "narrative", activityId],
+    queryFn: ({ signal }) => apiGet<Narrative>(`/coach/technique/${activityId}/narrative`, undefined, signal),
+    enabled: enabled && activityId != null,
+    staleTime: Infinity,
   });
 }
 

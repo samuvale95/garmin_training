@@ -351,6 +351,28 @@ export function formatClockTime(isoTimestamp: string): string {
   return new Date(isoTimestamp).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** "1h24" / "48 min" -- a duration in minutes, written the way a night of sleep or a
+ * session is actually said out loud. Under an hour it stays in minutes: "0h48" is a
+ * clock reading, not a length of time. */
+export function formatMinutes(minutes: number): string {
+  if (minutes < 60) return `${Math.round(minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h${String(Math.round(minutes % 60)).padStart(2, "0")}`;
+}
+
+/** "L" / "M" -- the single-letter weekday initial the HRV bar chart labels its seven
+ * nights with. Taken from the locale rather than a hand-written array so it stays
+ * right if the app is ever read in another one. */
+export function weekdayInitial(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("it-IT", { weekday: "short" }).charAt(0).toUpperCase();
+}
+
+/** "4:24/km" from seconds per km, or an em dash. Same format as `formatPaceValue`,
+ * but tolerant of the nulls the technique read is full of. */
+export function formatPaceOrDash(secPerKm: number | null | undefined): string {
+  return secPerKm == null ? "—" : formatPaceValue(secPerKm);
+}
+
 // ---- body-insight captions ----------------------------------------------------------------
 // Small qualitative labels derived client-side from thresholds -- the same pattern the
 // body screens already used for readiness ("Pronto a lavorare" vs "Vacci piano oggi"),

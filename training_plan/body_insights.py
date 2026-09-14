@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from datetime import date as date_type
 from datetime import timedelta
 
+from .garmin_labels import readiness_feedback, readiness_level_label
 from .garmin_sync import GarminSync
 from .models import TrainingSession
 
@@ -53,6 +54,29 @@ class SleepPhases:
     rem_minutes: int | None
     awake_minutes: int | None
     total_minutes: int | None
+    # Garmin's own 0-100 sleep score, and the word it puts next to it. Separate from the
+    # phases because it is a composite of them plus movement and respiration -- the
+    # screen shows both, and they can disagree.
+    score: int | None = None
+    score_label: str | None = None
+
+
+@dataclass
+class ReadinessFactor:
+    """One input behind Garmin's readiness score, with the weight it carried.
+
+    The score is a black box -- Garmin does not publish the formula -- but it *does*
+    return the per-factor contribution, and a number with its inputs listed underneath
+    is a different object from a bare 64. This is the whole answer to "64 what?".
+    """
+
+    key: str
+    label: str
+    # 0-100: how much this factor is helping today, by Garmin's own reckoning.
+    percent: int | None
+    # Garmin's verdict on it, already in Italian, or None when it returned a key this
+    # app cannot read.
+    verdict: str | None = None
 
 
 @dataclass
@@ -61,6 +85,9 @@ class BodySnapshot:
     has_overnight_data: bool
     readiness_score: int | None = None
     readiness_message: str | None = None
+    # The band the score falls in ("media", "alta"), in Italian.
+    readiness_level: str | None = None
+    readiness_factors: list[ReadinessFactor] = field(default_factory=list)
     sleep: SleepPhases | None = None
     hrv_last_night_ms: int | None = None
     hrv_seven_day: list[tuple[date_type, int | None]] = field(default_factory=list)
@@ -120,6 +147,65 @@ def _fetch_hrv_last_night(client, day: date_type) -> int | None:
     return _get(summary, "lastNightAvg", "lastNight5MinHigh")
 
 
+# The inputs Garmin's readiness score is built from, in the order its own card lists
+# them, with the response fields each one lives in. Undocumented like everything else on
+# these endpoints, so a renamed field costs one row of the breakdown and nothing more.
+READINESS_FACTOR_FIELDS: tuple[tuple[str, str, str, str], ...] = (
+    # key, Italian label, percent field, feedback field
+    ("sonno", "Sonno di stanotte", "sleepScoreFactorPercent", "sleepScoreFactorFeedback"),
+    ("storia_sonno", "Sonno delle ultime notti", "sleepHistoryFactorPercent", "sleepHistoryFactorFeedback"),
+    ("recupero", "Recupero ancora da smaltire", "recoveryTimeFactorPercent", "recoveryTimeFactorFeedback"),
+    ("hrv", "Variabilità cardiaca", "hrvFactorPercent", "hrvFactorFeedback"),
+    ("carico", "Carico delle ultime settimane", "acwrFactorPercent", "acwrFactorFeedback"),
+    ("stress", "Stress recente", "stressHistoryFactorPercent", "stressHistoryFactorFeedback"),
+)
+
+# Garmin's own word for how a single factor is doing. Same treatment as the composite
+# feedback key: recognised values are translated, everything else degrades to no word
+# rather than to an identifier on screen.
+FACTOR_FEEDBACK_LABELS: dict[str, str] = {
+    "GOOD": "buono",
+    "MODERATE": "nella media",
+    "MOD": "nella media",
+    "FAIR": "così così",
+    "POOR": "scarso",
+    "LOW": "basso",
+    "HIGH": "alto",
+    "VERY_LOW": "molto basso",
+    "VERY_HIGH": "molto alto",
+    "NONE": "non disponibile",
+    "EXCELLENT": "ottimo",
+    "BALANCED": "in equilibrio",
+    "UNBALANCED": "sbilanciato",
+}
+
+
+def _factor_verdict(raw) -> str | None:
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    return FACTOR_FEEDBACK_LABELS.get(raw.strip().upper())
+
+
+def _readiness_factors(readiness) -> list[ReadinessFactor]:
+    """What Garmin says went into the score, dropping every factor it had nothing to say
+    about -- a breakdown of six em dashes explains nothing."""
+    factors: list[ReadinessFactor] = []
+    for key, label, percent_field, feedback_field in READINESS_FACTOR_FIELDS:
+        percent = _get(readiness, percent_field)
+        verdict = _factor_verdict(_get(readiness, feedback_field))
+        if percent is None and verdict is None:
+            continue
+        factors.append(
+            ReadinessFactor(
+                key=key,
+                label=label,
+                percent=round(percent) if isinstance(percent, (int, float)) else None,
+                verdict=verdict,
+            )
+        )
+    return factors
+
+
 def fetch_body_snapshot(
     target_date: date_type | None = None,
     prompt_mfa: Callable[[], str] | None = None,
@@ -160,6 +246,8 @@ def fetch_body_snapshot(
 
     sleep_dto = _get(sleep, "dailySleepDTO", default=sleep)
     total_minutes = _seconds_to_minutes(_get(sleep_dto, "sleepTimeSeconds"))
+    overall_score = _get(_get(sleep_dto, "sleepScores"), "overall")
+    sleep_score = _get(overall_score, "value")
     sleep_phases = (
         SleepPhases(
             deep_minutes=_seconds_to_minutes(_get(sleep_dto, "deepSleepSeconds")),
@@ -167,6 +255,8 @@ def fetch_body_snapshot(
             rem_minutes=_seconds_to_minutes(_get(sleep_dto, "remSleepSeconds")),
             awake_minutes=_seconds_to_minutes(_get(sleep_dto, "awakeSleepSeconds")),
             total_minutes=total_minutes,
+            score=round(sleep_score) if isinstance(sleep_score, (int, float)) else None,
+            score_label=_factor_verdict(_get(overall_score, "qualifierKey")),
         )
         if total_minutes is not None
         else None
@@ -195,7 +285,13 @@ def fetch_body_snapshot(
         date=day,
         has_overnight_data=has_overnight_data,
         readiness_score=_get(readiness, "score"),
-        readiness_message=_get(readiness, "feedbackLong", "feedbackShort"),
+        # Garmin returns a lookup key here (`MOD_RT_LOW_SS_GOOD`), not a sentence. It
+        # used to be printed verbatim under the day's score; `garmin_labels` decodes it,
+        # and anything it cannot decode becomes no sentence at all rather than an
+        # identifier on screen.
+        readiness_message=readiness_feedback(_get(readiness, "feedbackLong", "feedbackShort")),
+        readiness_level=readiness_level_label(_get(readiness, "level")),
+        readiness_factors=_readiness_factors(readiness),
         sleep=sleep_phases,
         hrv_last_night_ms=hrv_last_night_ms,
         hrv_seven_day=hrv_seven_day,

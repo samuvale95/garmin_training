@@ -70,6 +70,35 @@ def _resolve_weight(user_id: str, requested: float | None) -> tuple[float | None
     return (weight, metrics.get("source")) if weight else (None, None)
 
 
+def _resolve_profile(user_id: str) -> nutrition.BodyProfile | None:
+    """Height, age and sex, for the energy cross-check -- or `None`, which only costs
+    that cross-check.
+
+    Same Garmin read the weight comes from, and cached the same way, so this adds no
+    round-trip. A profile missing any of the three is still returned: `nutrition`
+    decides what it can do with what is there.
+    """
+    metrics = routes_body.body_metrics_or_empty(user_id)
+    if not metrics:
+        return None
+    return nutrition.BodyProfile(
+        height_cm=metrics.get("height_cm"),
+        age_years=_age_from(metrics.get("birth_date")),
+        sex=metrics.get("gender"),
+    )
+
+
+def _age_from(birth_date: str | None) -> int | None:
+    if not birth_date:
+        return None
+    try:
+        born = date_type.fromisoformat(str(birth_date)[:10])
+    except ValueError:
+        return None
+    today = date_type.today()
+    return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+
+
 @router.get("/nutrition/config", response_model=schemas.NutritionConfigResponse)
 async def nutrition_config() -> schemas.NutritionConfigResponse:
     return schemas.NutritionConfigResponse(**llm.config_state())
@@ -93,7 +122,11 @@ async def nutrition_targets(
     def compute() -> schemas.FuelTargetsResponse:
         weight, source = _resolve_weight(user_id, payload.weight_kg)
         fuelling = nutrition.daily_fuelling(
-            day, [s.to_model() for s in payload.sessions], weight_kg=weight, weight_source=source
+            day,
+            [s.to_model() for s in payload.sessions],
+            weight_kg=weight,
+            weight_source=source,
+            profile=_resolve_profile(user_id),
         )
         return schemas.FuelTargetsResponse.from_model(fuelling)
 
@@ -127,7 +160,11 @@ async def nutrition_narrative(
     def compute(consumed: dict) -> schemas.NarrativeResponse:
         weight, source = _resolve_weight(user_id, payload.weight_kg)
         fuelling = nutrition.daily_fuelling(
-            day, [s.to_model() for s in payload.sessions], weight_kg=weight, weight_source=source
+            day,
+            [s.to_model() for s in payload.sessions],
+            weight_kg=weight,
+            weight_source=source,
+            profile=_resolve_profile(user_id),
         )
         facts = nutrition.fuelling_facts(fuelling, consumed if consumed["entries"] else None)
         text = llm.write_fuelling_narrative(facts)

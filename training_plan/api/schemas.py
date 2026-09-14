@@ -13,7 +13,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from .. import body_insights, db, garmin_sync, goal_fit, models, nutrition, readiness
+from .. import body_insights, db, garmin_sync, goal_fit, models, nutrition, readiness, technique
 
 
 # ---- plan / steps --------------------------------------------------------------------------
@@ -486,6 +486,8 @@ class SleepPhasesOut(BaseModel):
     rem_minutes: int | None = None
     awake_minutes: int | None = None
     total_minutes: int | None = None
+    score: int | None = None
+    score_label: str | None = None
 
     @classmethod
     def from_model(cls, phases: "body_insights.SleepPhases | None") -> "SleepPhasesOut | None":
@@ -497,7 +499,16 @@ class SleepPhasesOut(BaseModel):
             rem_minutes=phases.rem_minutes,
             awake_minutes=phases.awake_minutes,
             total_minutes=phases.total_minutes,
+            score=phases.score,
+            score_label=phases.score_label,
         )
+
+
+class ReadinessFactorOut(BaseModel):
+    key: str
+    label: str
+    percent: int | None = None
+    verdict: str | None = None
 
 
 class HrvPointOut(BaseModel):
@@ -510,6 +521,8 @@ class BodySnapshotResponse(BaseModel):
     has_overnight_data: bool
     readiness_score: int | None = None
     readiness_message: str | None = None
+    readiness_level: str | None = None
+    readiness_factors: list[ReadinessFactorOut] = Field(default_factory=list)
     sleep: SleepPhasesOut | None = None
     hrv_last_night_ms: int | None = None
     hrv_seven_day: list[HrvPointOut] = Field(default_factory=list)
@@ -525,6 +538,11 @@ class BodySnapshotResponse(BaseModel):
             has_overnight_data=snapshot.has_overnight_data,
             readiness_score=snapshot.readiness_score,
             readiness_message=snapshot.readiness_message,
+            readiness_level=snapshot.readiness_level,
+            readiness_factors=[
+                ReadinessFactorOut(key=f.key, label=f.label, percent=f.percent, verdict=f.verdict)
+                for f in snapshot.readiness_factors
+            ],
             sleep=SleepPhasesOut.from_model(snapshot.sleep),
             hrv_last_night_ms=snapshot.hrv_last_night_ms,
             hrv_seven_day=[HrvPointOut(date=d, value_ms=v) for d, v in snapshot.hrv_seven_day],
@@ -821,6 +839,32 @@ class BodyMetricsResponse(BaseModel):
     gender: str | None = None
 
 
+class EnergyCheckOut(BaseModel):
+    """What the day costs against what the targets provide.
+
+    On the wire, and on screen, because it is the figure that makes a carbohydrate
+    number checkable -- see `nutrition.EnergyCheck`.
+    """
+
+    need_kcal: int | None = None
+    resting_kcal: int | None = None
+    training_kcal: int
+    target_kcal: tuple[int, int]
+    trimmed: bool
+
+    @classmethod
+    def from_model(cls, energy: "nutrition.EnergyCheck | None") -> "EnergyCheckOut | None":
+        if energy is None:
+            return None
+        return cls(
+            need_kcal=energy.need_kcal,
+            resting_kcal=energy.resting_kcal,
+            training_kcal=energy.training_kcal,
+            target_kcal=energy.target_kcal,
+            trimmed=energy.trimmed,
+        )
+
+
 class DayTargetOut(BaseModel):
     date: date_type
     session_title: str | None = None
@@ -832,6 +876,8 @@ class DayTargetOut(BaseModel):
     carb_g: tuple[int, int] | None = None
     protein_g: tuple[int, int] | None = None
     fat_g: tuple[int, int] | None = None
+    sport: str | None = None
+    energy: EnergyCheckOut | None = None
 
     @classmethod
     def from_model(cls, target: "nutrition.DayTarget") -> "DayTargetOut":
@@ -846,6 +892,72 @@ class DayTargetOut(BaseModel):
             carb_g=target.carb_g,
             protein_g=target.protein_g,
             fat_g=target.fat_g,
+            sport=target.sport,
+            energy=EnergyCheckOut.from_model(target.energy),
+        )
+
+
+class PortionOut(BaseModel):
+    food: str
+    grams: int | None = None
+    note: str | None = None
+
+    @classmethod
+    def from_model(cls, portion: "nutrition.Portion") -> "PortionOut":
+        return cls(food=portion.food, grams=portion.grams, note=portion.note)
+
+
+class MealSlotOut(BaseModel):
+    key: str
+    name: str
+    timing: str
+    carb_g: int
+    protein_g: int
+    portions: list[PortionOut] = Field(default_factory=list)
+    note: str | None = None
+
+    @classmethod
+    def from_model(cls, slot: "nutrition.MealSlot") -> "MealSlotOut":
+        return cls(
+            key=slot.key,
+            name=slot.name,
+            timing=slot.timing,
+            carb_g=slot.carb_g,
+            protein_g=slot.protein_g,
+            portions=[PortionOut.from_model(p) for p in slot.portions],
+            note=slot.note,
+        )
+
+
+class DuringSessionOut(BaseModel):
+    carb_g_per_hour: tuple[int, int]
+    total_carb_g: tuple[int, int]
+    note: str
+
+    @classmethod
+    def from_model(cls, during: "nutrition.DuringSession | None") -> "DuringSessionOut | None":
+        if during is None:
+            return None
+        return cls(
+            carb_g_per_hour=during.carb_g_per_hour, total_carb_g=during.total_carb_g, note=during.note
+        )
+
+
+class RecoveryWindowOut(BaseModel):
+    carb_g: int
+    protein_g: int
+    note: str
+    portions: list[PortionOut] = Field(default_factory=list)
+
+    @classmethod
+    def from_model(cls, window: "nutrition.RecoveryWindow | None") -> "RecoveryWindowOut | None":
+        if window is None:
+            return None
+        return cls(
+            carb_g=window.carb_g,
+            protein_g=window.protein_g,
+            note=window.note,
+            portions=[PortionOut.from_model(p) for p in window.portions],
         )
 
 
@@ -871,6 +983,11 @@ class FuelTargetsResponse(BaseModel):
     today: DayTargetOut
     tomorrow: DayTargetOut
     advice: str
+    # How today's numbers become actual plates. Empty only when there is no weight to
+    # size one by.
+    meals: list[MealSlotOut] = Field(default_factory=list)
+    during: DuringSessionOut | None = None
+    recovery: RecoveryWindowOut | None = None
     # The model's sentence is fetched separately (/nutrition/narrative) so this response
     # stays instant; it is null here by construction, never "not yet loaded".
     narrative: str | None = None
@@ -884,6 +1001,9 @@ class FuelTargetsResponse(BaseModel):
             today=DayTargetOut.from_model(fuelling.today),
             tomorrow=DayTargetOut.from_model(fuelling.tomorrow),
             advice=fuelling.advice,
+            meals=[MealSlotOut.from_model(m) for m in fuelling.meals],
+            during=DuringSessionOut.from_model(fuelling.during),
+            recovery=RecoveryWindowOut.from_model(fuelling.recovery),
         )
 
 
@@ -1009,6 +1129,91 @@ class NutritionConfigResponse(BaseModel):
     text_model: str
     vision_model: str
     photo_upload_enabled: bool
+
+
+# ---- coach / technique ----------------------------------------------------------------------
+
+
+class FormMetricOut(BaseModel):
+    key: str
+    label: str
+    value: float
+    unit: str
+    display: str
+    verdict: str
+    reference: str
+    meaning: str
+    cue: str | None = None
+
+    @classmethod
+    def from_model(cls, metric: "technique.FormMetric") -> "FormMetricOut":
+        return cls(
+            key=metric.key,
+            label=metric.label,
+            value=metric.value,
+            unit=metric.unit,
+            display=metric.display,
+            verdict=metric.verdict,
+            reference=metric.reference,
+            meaning=metric.meaning,
+            cue=metric.cue,
+        )
+
+
+class PacingReadOut(BaseModel):
+    kind: str
+    first_half_pace_sec_per_km: float | None = None
+    second_half_pace_sec_per_km: float | None = None
+    drift_percent: float | None = None
+    detail: str
+    verdict: str
+
+    @classmethod
+    def from_model(cls, pacing: "technique.PacingRead | None") -> "PacingReadOut | None":
+        if pacing is None:
+            return None
+        return cls(
+            kind=pacing.kind,
+            first_half_pace_sec_per_km=pacing.first_half_pace_sec_per_km,
+            second_half_pace_sec_per_km=pacing.second_half_pace_sec_per_km,
+            drift_percent=pacing.drift_percent,
+            detail=pacing.detail,
+            verdict=pacing.verdict,
+        )
+
+
+class ActivityFormResponse(BaseModel):
+    activity_id: int
+    date: date_type
+    sport: str
+    title: str
+    distance_km: float | None = None
+    duration_min: float | None = None
+    average_pace_sec_per_km: float | None = None
+    average_heart_rate: int | None = None
+    metrics: list[FormMetricOut] = Field(default_factory=list)
+    pacing: PacingReadOut | None = None
+    headline: str
+    focus: str | None = None
+    has_metrics: bool
+
+    @classmethod
+    def from_model(cls, form: "technique.ActivityForm") -> "ActivityFormResponse":
+        return cls(
+            activity_id=form.activity_id,
+            date=form.date,
+            sport=form.sport,
+            title=form.title,
+            distance_km=form.distance_km,
+            duration_min=form.duration_min,
+            average_pace_sec_per_km=form.average_pace_sec_per_km,
+            average_heart_rate=form.average_heart_rate,
+            metrics=[FormMetricOut.from_model(m) for m in form.metrics],
+            pacing=PacingReadOut.from_model(form.pacing),
+            headline=form.headline,
+            focus=form.focus,
+            has_metrics=form.has_metrics,
+        )
 
 
 # ---- errors -----------------------------------------------------------------------------------

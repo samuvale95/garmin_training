@@ -76,6 +76,12 @@ TTL_READINESS_NARRATIVE = 30 * 60
 # written about it is a model call, keyed on the conclusion it describes.
 TTL_GOAL_FIT_NARRATIVE = 30 * 60
 
+# A finished activity is a fact and its form metrics never change again, so the only
+# thing bounding this TTL is how long the process should hold the answer at all. The
+# coach narrative on top of it is a model call, keyed by the same activity.
+TTL_COACH_TECHNIQUE = 24 * 60 * 60
+TTL_COACH_NARRATIVE = 24 * 60 * 60
+
 # A date range that has already ended has nothing left to say: a completed activity is a
 # fact, and the calendar for a past week only changes when this app writes to it -- which
 # drops CALENDAR_NAMESPACES wholesale, so a long TTL here can never serve a stale answer

@@ -151,6 +151,10 @@ export interface SleepPhases {
   rem_minutes: number | null;
   awake_minutes: number | null;
   total_minutes: number | null;
+  /** Garmin's own 0-100 sleep score and the word next to it. A composite of the phases
+   * plus movement and respiration, so it can disagree with them -- both are shown. */
+  score: number | null;
+  score_label: string | null;
 }
 
 export interface HrvPoint {
@@ -158,11 +162,25 @@ export interface HrvPoint {
   value_ms: number | null;
 }
 
+/** One input behind Garmin's readiness score, with the weight it carried. The answer
+ * to "64 out of what, made of what". */
+export interface ReadinessFactor {
+  key: string;
+  label: string;
+  percent: number | null;
+  verdict: string | null;
+}
+
 export interface BodySnapshot {
   date: string;
   has_overnight_data: boolean;
   readiness_score: number | null;
+  /** Already decoded into Italian by `garmin_labels.py` -- Garmin sends a lookup key
+   * (`MOD_RT_LOW_SS_GOOD`), and anything undecodable arrives as null rather than as an
+   * identifier to print. */
   readiness_message: string | null;
+  readiness_level: string | null;
+  readiness_factors: ReadinessFactor[];
   sleep: SleepPhases | null;
   hrv_last_night_ms: number | null;
   hrv_seven_day: HrvPoint[];
@@ -321,6 +339,17 @@ export interface BodyMetrics {
 
 export type SessionLoad = "riposo" | "facile" | "moderato" | "duro" | "molto_lungo";
 
+/** What the day costs against what the targets provide. The figure that makes a
+ * carbohydrate number checkable instead of something to take on faith. */
+export interface EnergyCheck {
+  need_kcal: number | null;
+  resting_kcal: number | null;
+  training_kcal: number;
+  target_kcal: [number, number];
+  /** True when the carbohydrate band was pulled down to fit the day's real cost. */
+  trimmed: boolean;
+}
+
 export interface DayTarget {
   date: string;
   session_title: string | null;
@@ -332,6 +361,39 @@ export interface DayTarget {
   carb_g: [number, number] | null;
   protein_g: [number, number] | null;
   fat_g: [number, number] | null;
+  sport: string | null;
+  energy: EnergyCheck | null;
+}
+
+export interface Portion {
+  food: string;
+  grams: number | null;
+  note: string | null;
+}
+
+/** One meal of the day, with the share of the targets it carries and the food that
+ * gets it there. */
+export interface MealSlot {
+  key: string;
+  name: string;
+  timing: string;
+  carb_g: number;
+  protein_g: number;
+  portions: Portion[];
+  note: string | null;
+}
+
+export interface DuringSession {
+  carb_g_per_hour: [number, number];
+  total_carb_g: [number, number];
+  note: string;
+}
+
+export interface RecoveryWindow {
+  carb_g: number;
+  protein_g: number;
+  note: string;
+  portions: Portion[];
 }
 
 export interface FuelTargets {
@@ -341,8 +403,56 @@ export interface FuelTargets {
   today: DayTarget;
   tomorrow: DayTarget;
   advice: string;
+  /** Today's numbers as actual plates. Empty only when there is no weight to size one by. */
+  meals: MealSlot[];
+  during: DuringSession | null;
+  recovery: RecoveryWindow | null;
   // Fetched separately (/nutrition/narrative) -- always null on the targets response.
   narrative: string | null;
+}
+
+// ---- coach / technique ---------------------------------------------------------------
+
+export type FormVerdict = "buono" | "nella norma" | "da lavorarci" | "da leggere";
+
+/** One form measurement, the band it was read against, and what to do about it. */
+export interface FormMetric {
+  key: string;
+  label: string;
+  value: number;
+  unit: string;
+  display: string;
+  verdict: FormVerdict;
+  reference: string;
+  meaning: string;
+  cue: string | null;
+}
+
+export interface PacingRead {
+  kind: "negativo" | "regolare" | "positivo";
+  first_half_pace_sec_per_km: number | null;
+  second_half_pace_sec_per_km: number | null;
+  drift_percent: number | null;
+  detail: string;
+  verdict: FormVerdict;
+}
+
+export interface ActivityForm {
+  activity_id: number;
+  date: string;
+  sport: string;
+  title: string;
+  distance_km: number | null;
+  duration_min: number | null;
+  average_pace_sec_per_km: number | null;
+  average_heart_rate: number | null;
+  metrics: FormMetric[];
+  pacing: PacingRead | null;
+  headline: string;
+  focus: string | null;
+  /** False when the watch recorded nothing readable -- the screen says so instead of
+   * showing an empty analysis. */
+  has_metrics: boolean;
 }
 
 export interface Narrative {
