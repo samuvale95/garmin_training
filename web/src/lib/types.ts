@@ -437,6 +437,34 @@ export interface PacingRead {
   verdict: FormVerdict;
 }
 
+export interface TrendPoint {
+  date: string;
+  value: number;
+}
+
+export type TrendDirection = "in miglioramento" | "stabile" | "in peggioramento" | "cambiato";
+
+/** One metric followed across recent sessions of the same sport. `direction` is
+ * "cambiato" for a metric with no better direction (stride length, pedalling cadence):
+ * the number moved and the app declines to say whether that is good news. */
+export interface MetricTrend {
+  key: string;
+  label: string;
+  unit: string;
+  points: TrendPoint[];
+  current: number;
+  baseline: number;
+  delta: number;
+  delta_percent: number;
+  direction: TrendDirection;
+  detail: string;
+}
+
+export interface CoachTrend {
+  sessions_read: number;
+  trends: MetricTrend[];
+}
+
 export interface ActivityForm {
   activity_id: number;
   date: string;

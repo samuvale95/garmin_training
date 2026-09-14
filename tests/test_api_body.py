@@ -17,6 +17,14 @@ def fake_garmin_sync(monkeypatch):
     return FakeGarminSync
 
 
+@pytest.fixture(autouse=True)
+def authenticated(monkeypatch):
+    """Every route is auth-gated now (see `api/app.py`). `DEV_AUTH_BYPASS_USER_ID` is
+    the escape hatch `api/auth.py` already carries for running without a Supabase
+    project, which is exactly a test's situation."""
+    monkeypatch.setenv("DEV_AUTH_BYPASS_USER_ID", "test-user")
+
+
 @pytest.fixture
 def client():
     return TestClient(fastapi_app)

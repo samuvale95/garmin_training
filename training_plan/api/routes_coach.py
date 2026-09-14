@@ -19,7 +19,7 @@ from fastapi.concurrency import run_in_threadpool
 from .. import llm, technique
 from . import garmin_session, schemas
 from .auth import current_user_id
-from .cache import TTL_COACH_NARRATIVE, TTL_COACH_TECHNIQUE, cache
+from .cache import TTL_COACH_NARRATIVE, TTL_COACH_TECHNIQUE, TTL_COACH_TREND, cache
 
 logger = logging.getLogger(__name__)
 
@@ -65,4 +65,34 @@ async def coach_technique_narrative(
 
     return await run_in_threadpool(
         lambda: cache.get_or_call("coach:narrative", user_id, activity_id, TTL_COACH_NARRATIVE, compute, refresh=refresh)
+    )
+
+
+@router.post("/coach/trend", response_model=schemas.CoachTrendResponse)
+async def coach_trend(
+    payload: schemas.CoachTrendRequest, refresh: bool = False, user_id: str = Depends(current_user_id)
+) -> schemas.CoachTrendResponse:
+    """The same metrics, followed across recent sessions of one sport.
+
+    Reads several activities behind one request, so it is the expensive endpoint here --
+    but every activity it touches lands in the same per-activity cache
+    `/coach/technique/{id}` fills, so opening a single session afterwards is free, and
+    so is coming back to this one.
+    """
+
+    def compute() -> schemas.CoachTrendResponse:
+        forms = garmin_session.run(user_id, lambda sync: technique.fetch_trend(payload.activity_ids, sync))
+        # Seed the per-activity cache with what this already paid for. Without it the
+        # claim above is false: tapping a session right after viewing the trend would
+        # re-read the very activity that was just fetched.
+        for form in forms:
+            cache.put("coach:technique", user_id, form.activity_id, TTL_COACH_TECHNIQUE, form)
+        return schemas.CoachTrendResponse(
+            sessions_read=len(forms),
+            trends=[schemas.MetricTrendOut.from_model(t) for t in technique.build_trends(forms)],
+        )
+
+    key = tuple(payload.activity_ids[: technique.MAX_TREND_ACTIVITIES])
+    return await run_in_threadpool(
+        lambda: cache.get_or_call("coach:trend", user_id, key, TTL_COACH_TREND, compute, refresh=refresh)
     )

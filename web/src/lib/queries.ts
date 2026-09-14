@@ -6,6 +6,7 @@ import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm, apiPut } from "./api
 import { shiftDateKey, toDateKey, weekBounds } from "./sessionVisuals";
 import type {
   ActivityForm,
+  CoachTrend,
   AthleteProfile,
   BodyMetrics,
   BodySnapshot,
@@ -928,6 +929,21 @@ export function useCoachNarrative(activityId: number | null, enabled = true) {
     queryKey: ["coach", "narrative", activityId],
     queryFn: ({ signal }) => apiGet<Narrative>(`/coach/technique/${activityId}/narrative`, undefined, signal),
     enabled: enabled && activityId != null,
+    staleTime: Infinity,
+  });
+}
+
+/** The same metrics, followed across recent sessions of one sport.
+ *
+ * The activity ids travel in the request because the screen already has the list on
+ * screen -- having the server re-derive it would be two sources of truth for which
+ * sessions the trend covers. Keyed on that list, so picking a different sport (or a
+ * new session syncing) recomputes rather than serving a trend about other runs. */
+export function useSportTrend(activityIds: number[], enabled = true) {
+  return useQuery({
+    queryKey: ["coach", "trend", activityIds.join(",")],
+    queryFn: ({ signal }) => apiPost<CoachTrend>("/coach/trend", { activity_ids: activityIds }, signal),
+    enabled: enabled && activityIds.length > 0,
     staleTime: Infinity,
   });
 }

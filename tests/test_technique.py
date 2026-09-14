@@ -173,3 +173,88 @@ def test_the_facts_carry_the_conclusion_already_reached():
     assert set(facts) <= {"sport", "seduta", "distanza_km", "durata_min", "misure", "andatura", "da_fare"}
     assert facts["andatura"]["tipo"] == "positivo"
     assert all(set(m) == {"cosa", "valore", "giudizio", "riferimento"} for m in facts["misure"])
+
+
+# ---- the same metric across sessions --------------------------------------------------
+
+
+def _run(day, **summary):
+    """One September run, dated by `day` -- the trend needs several, on different days."""
+    return technique.analyse_activity(
+        {**RUN_SUMMARY, **summary}, activity_id=day, sport="running", title="Run", day=date(2026, 9, day)
+    )
+
+
+def test_a_metric_moving_the_right_way_is_an_improvement():
+    forms = [_run(d, avgGroundContactTime=gct) for d, gct in [(1, 285), (4, 280), (8, 276), (12, 255)]]
+    contact = next(t for t in technique.build_trends(forms) if t.key == "contatto")
+    assert contact.direction == technique.DIRECTION_BETTER
+    assert contact.delta < 0
+
+
+def test_the_same_movement_the_other_way_is_not():
+    forms = [_run(d, averageRunningCadenceInStepsPerMinute=c) for d, c in [(1, 180), (4, 178), (8, 176), (12, 162)]]
+    cadence = next(t for t in technique.build_trends(forms) if t.key == "cadenza")
+    assert cadence.direction == technique.DIRECTION_WORSE
+
+
+def test_noise_is_not_a_trend():
+    """Session-to-session scatter -- terrain, shoes, how the watch sat -- explains a
+    couple of percent just as well as any change in form does."""
+    forms = [_run(d, avgGroundContactTime=gct) for d, gct in [(1, 268), (4, 270), (8, 267), (12, 266)]]
+    contact = next(t for t in technique.build_trends(forms) if t.key == "contatto")
+    assert contact.direction == technique.DIRECTION_STABLE
+
+
+def test_a_metric_with_no_better_direction_gets_no_verdict():
+    """Stride length grows with pace. A green arrow on it would be inventing a
+    judgement this module has no basis for."""
+    forms = [_run(d, avgStrideLength=s) for d, s in [(1, 110.0), (4, 112.0), (8, 115.0), (12, 130.0)]]
+    stride = next(t for t in technique.build_trends(forms) if t.key == "passo")
+    assert stride.direction == technique.DIRECTION_MOVED
+
+
+def test_two_sessions_are_not_a_trend():
+    forms = [_run(1), _run(4)]
+    assert technique.build_trends(forms) == []
+
+
+def test_the_sparkline_runs_forwards_in_time():
+    """`forms` arrives newest-first, and a chart that reads right-to-left is a chart
+    read backwards."""
+    forms = [_run(12), _run(8), _run(4), _run(1)]
+    points = technique.build_trends(forms)[0].points
+    assert [p.date.day for p in points] == [1, 4, 8, 12]
+
+
+def test_the_latest_reading_is_the_current_value():
+    forms = [_run(d, avgGroundContactTime=gct) for d, gct in [(1, 285), (12, 255), (4, 280), (8, 276)]]
+    contact = next(t for t in technique.build_trends(forms) if t.key == "contatto")
+    assert contact.current == 255
+    assert contact.baseline == round((285 + 280 + 276) / 3, 2)
+
+
+def test_a_metric_missing_from_some_sessions_still_trends_on_the_rest():
+    """A watch that recorded running dynamics on four runs out of six has four data
+    points, not zero."""
+    forms = [
+        _run(1),
+        technique.analyse_activity(
+            {"distance": 8000, "duration": 2700}, activity_id=2, sport="running", title="Tapis", day=date(2026, 9, 2)
+        ),
+        _run(4),
+        _run(8),
+    ]
+    cadence = next(t for t in technique.build_trends(forms) if t.key == "cadenza")
+    assert len(cadence.points) == 3
+
+
+def test_the_movers_come_before_the_stable_ones():
+    """A list sorted by metric name buries the only row worth reading."""
+    forms = [
+        _run(d, avgGroundContactTime=gct, averageRunningCadenceInStepsPerMinute=178)
+        for d, gct in [(1, 285), (4, 282), (8, 280), (12, 240)]
+    ]
+    trends = technique.build_trends(forms)
+    assert trends[0].key == "contatto"
+    assert trends[-1].direction == technique.DIRECTION_STABLE

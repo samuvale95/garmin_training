@@ -109,7 +109,7 @@ async def _unhandled_error_handler(request: Request, exc: Exception) -> JSONResp
     )
 
 
-# Every route in these five routers needs a signed-in caller -- `/health` is the one
+# Every route in these routers needs a signed-in caller -- `/health` is the one
 # deliberate exception, checked by hosting platforms before any user ever gets there.
 # The dependency's return value (the user id) isn't consumed at this level; handlers
 # that need it declare their own `Depends(current_user_id)` parameter, which FastAPI

@@ -4,9 +4,9 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton, SlideUp } from "@/components/motion/primitives";
-import { FocusBlock, MetricRow, PacingBlock } from "@/components/TechniqueBlocks";
+import { FocusBlock, MetricRow, PacingBlock, TrendSection } from "@/components/TechniqueBlocks";
 import { useMountOnce } from "@/lib/motion";
-import { useActivities, useActivityForm, useCoachNarrative } from "@/lib/queries";
+import { useActivities, useActivityForm, useCoachNarrative, useSportTrend } from "@/lib/queries";
 import { shiftDateKey, toDateKey } from "@/lib/sessionVisuals";
 import { formatPaceOrDash, formatShortDate } from "@/lib/format";
 import type { CompletedActivity } from "@/lib/types";
@@ -19,8 +19,10 @@ import type { CompletedActivity } from "@/lib/types";
  * vertical ratio, pedalling cadence, SWOLF -- and says what each one is, what band it
  * falls in, and the one drill worth trying next.
  *
- * Deliberately one activity at a time. A dashboard of every metric across every session
- * is a dashboard nobody acts on; a coach looks at the last run and names one thing.
+ * One session at a time, with one thing to work on -- a dashboard of every metric across
+ * every session is a dashboard nobody acts on. The trend section is the exception, and
+ * it earns it: "il contatto è 268 ms" is a readout, "il contatto è sceso di 17 ms in un
+ * mese" is the only half of that a coach would actually say.
  */
 
 // Four weeks back. Far enough to always have something to read even for someone who
@@ -56,6 +58,15 @@ export default function CoachPage() {
   const formQuery = useActivityForm(activityId);
   const narrativeQuery = useCoachNarrative(activityId, !!formQuery.data?.has_metrics);
   const form = formQuery.data;
+
+  // The trend follows the *selected session's own sport*, not whatever sport the last
+  // activity happened to be: comparing a run's cadence against a ride's would be
+  // comparing two different measurements that share a word.
+  const sameSport = useMemo(
+    () => (form ? readable.filter((a) => a.sport === form.sport).map((a) => a.activity_id) : []),
+    [readable, form]
+  );
+  const trendQuery = useSportTrend(sameSport, !!form?.has_metrics);
 
   return (
     <div style={{ padding: "22px 20px 40px" }}>
@@ -102,6 +113,14 @@ export default function CoachPage() {
               )}
 
               {form.pacing && <PacingBlock pacing={form.pacing} animate={animate} delayMs={220} />}
+
+              {trendQuery.data && (
+                <TrendSection
+                  trends={trendQuery.data.trends}
+                  sessionsRead={trendQuery.data.sessions_read}
+                  animate={animate}
+                />
+              )}
 
               {form.metrics.length > 0 && (
                 <div style={{ marginTop: 22 }}>

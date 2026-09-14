@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date as date_type
 from datetime import datetime
@@ -37,6 +38,10 @@ from .garmin_sync import GarminSync
 from .models import sport_from_garmin_key
 
 logger = logging.getLogger(__name__)
+
+# Garmin rate-limits per IP, so a trend's fan-out stays as narrow as the one
+# `body_insights.py` uses for the morning snapshot, and for the same reason.
+MAX_PARALLEL_ACTIVITY_READS = 4
 
 VERDICT_GOOD = "buono"
 VERDICT_OK = "nella norma"
@@ -695,6 +700,180 @@ def fetch_activity_form(activity_id: int, sync: GarminSync) -> ActivityForm:
         day=_activity_date(summary, activity),
         laps=laps,
     )
+
+
+# ---- the same metric, across sessions -----------------------------------------------------
+#
+# One activity says how a session went. It cannot say whether anything is changing,
+# which is the only question that separates a coach from a readout -- "il contatto è
+# 268 ms" is a fact, "il contatto è sceso di 12 ms in un mese" is coaching.
+#
+# The comparison is deliberately crude: the latest value against the mean of the
+# earlier ones, with a noise floor under it. Anything cleverer (a regression, a
+# confidence interval) would imply a precision that four to eight noisy sessions per
+# metric do not carry.
+
+# Which way is better, per metric. `None` means the metric has no better direction --
+# stride length grows with pace, pedalling cadence has a band rather than a maximum,
+# and printing a green arrow on either would be inventing a judgement.
+METRIC_POLARITY: dict[str, str | None] = {
+    "cadenza": "higher",
+    "contatto": "lower",
+    "oscillazione": "lower",
+    "rapporto_verticale": "lower",
+    "swolf": "lower",
+    "potenza": "higher",
+    # Closer to 1.00 is steadier, and a ride cannot go below it in practice, so less is
+    # better here in the only direction the number moves.
+    "regolarita": "lower",
+    "passo": None,
+    "cadenza_bici": None,
+    "bilanciamento": None,
+    "bilanciamento_bici": None,
+    "bracciate": None,
+    "frequenza_bracciata": None,
+}
+
+# How far the latest value has to sit from the earlier mean, as a fraction, before the
+# change is called a change. Under this, session-to-session noise (terrain, shoes,
+# weather, how the watch sat on the wrist) explains it just as well.
+TREND_NOISE_FLOOR = 0.03
+
+# Fewer than this many earlier sessions and there is no baseline worth comparing to.
+TREND_MIN_SESSIONS = 3
+
+DIRECTION_BETTER = "in miglioramento"
+DIRECTION_STABLE = "stabile"
+DIRECTION_WORSE = "in peggioramento"
+# For a metric with no better direction: the number moved, and this module declines to
+# say whether that is good news.
+DIRECTION_MOVED = "cambiato"
+
+
+@dataclass
+class TrendPoint:
+    date: date_type
+    value: float
+
+
+@dataclass
+class MetricTrend:
+    """One metric followed across recent sessions of the same sport."""
+
+    key: str
+    label: str
+    unit: str
+    points: list[TrendPoint]
+    current: float
+    # The mean of every session before the latest one.
+    baseline: float
+    delta: float
+    delta_percent: float
+    direction: str
+    detail: str
+
+
+def _direction(key: str, delta_percent: float) -> str:
+    polarity = METRIC_POLARITY.get(key)
+    if abs(delta_percent) < TREND_NOISE_FLOOR * 100:
+        return DIRECTION_STABLE
+    if polarity is None:
+        return DIRECTION_MOVED
+    improving = delta_percent > 0 if polarity == "higher" else delta_percent < 0
+    return DIRECTION_BETTER if improving else DIRECTION_WORSE
+
+
+def build_trends(forms: list[ActivityForm]) -> list[MetricTrend]:
+    """Every metric that appears in enough of `forms` to have a trend at all.
+
+    `forms` arrives newest-first (the order the activity list comes in) and is read
+    oldest-first here, so the sparkline runs left to right in time like every other
+    chart in the app.
+
+    A metric measured in only some of the sessions still gets a trend from the ones it
+    was measured in -- a watch that recorded running dynamics on four runs out of six
+    has four data points, not zero.
+    """
+    ordered = sorted(forms, key=lambda f: f.date)
+    by_key: dict[str, tuple[FormMetric, list[TrendPoint]]] = {}
+
+    for form in ordered:
+        for metric in form.metrics:
+            existing = by_key.get(metric.key)
+            points = existing[1] if existing else []
+            points.append(TrendPoint(date=form.date, value=metric.value))
+            # The latest form's own metric carries the label and unit, so a trend always
+            # describes itself in the terms the most recent reading used.
+            by_key[metric.key] = (metric, points)
+
+    trends: list[MetricTrend] = []
+    for key, (metric, points) in by_key.items():
+        if len(points) < TREND_MIN_SESSIONS:
+            continue
+        earlier = [p.value for p in points[:-1]]
+        baseline = sum(earlier) / len(earlier)
+        if baseline == 0:
+            continue
+        current = points[-1].value
+        delta = current - baseline
+        delta_percent = delta / baseline * 100
+        direction = _direction(key, delta_percent)
+
+        if direction == DIRECTION_STABLE:
+            detail = f"fermo intorno a {baseline:.1f} {metric.unit}".strip() + f" sulle ultime {len(points)} sedute"
+        else:
+            movement = "sopra" if delta > 0 else "sotto"
+            detail = (
+                f"{abs(delta):.1f} {metric.unit} {movement} la media delle {len(earlier)} sedute precedenti"
+            ).replace("  ", " ")
+
+        trends.append(
+            MetricTrend(
+                key=key,
+                label=metric.label,
+                unit=metric.unit,
+                points=points,
+                current=current,
+                baseline=round(baseline, 2),
+                delta=round(delta, 2),
+                delta_percent=round(delta_percent, 1),
+                direction=direction,
+                detail=detail,
+            )
+        )
+
+    # The ones that moved first, largest movement at the top: a list of trends sorted
+    # by metric name buries the only row worth reading.
+    trends.sort(key=lambda t: (t.direction == DIRECTION_STABLE, -abs(t.delta_percent)))
+    return trends
+
+
+# At most this many activities are read for one trend. Each is a pair of Garmin calls
+# (cached for a day afterwards), and Garmin rate-limits by IP -- past about eight
+# sessions the extra points change no verdict this module is willing to reach.
+MAX_TREND_ACTIVITIES = 8
+
+
+def fetch_trend(activity_ids: list[int], sync: GarminSync) -> list[ActivityForm]:
+    """Read several activities for the same sport, concurrently and few at a time.
+
+    Same fan-out discipline as `body_insights.fetch_body_snapshot`: these are
+    independent reads, and issued serially they would dominate the screen's latency --
+    but a wide pool trades one kind of slowness for a rate-limit ban.
+    """
+    wanted = activity_ids[:MAX_TREND_ACTIVITIES]
+    if not wanted:
+        return []
+
+    forms: list[ActivityForm] = []
+    with ThreadPoolExecutor(max_workers=MAX_PARALLEL_ACTIVITY_READS) as pool:
+        futures = [(activity_id, pool.submit(fetch_activity_form, activity_id, sync)) for activity_id in wanted]
+        for activity_id, future in futures:
+            try:
+                forms.append(future.result())
+            except Exception:  # noqa: BLE001 - one unreadable activity narrows the trend, it does not lose it
+                logger.warning("activity %s unreadable, leaving it out of the trend", activity_id, exc_info=True)
+    return forms
 
 
 def coach_facts(form: ActivityForm) -> dict:

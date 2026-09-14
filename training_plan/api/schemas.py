@@ -1216,6 +1216,56 @@ class ActivityFormResponse(BaseModel):
         )
 
 
+class TrendPointOut(BaseModel):
+    date: date_type
+    value: float
+
+
+class MetricTrendOut(BaseModel):
+    key: str
+    label: str
+    unit: str
+    points: list[TrendPointOut]
+    current: float
+    baseline: float
+    delta: float
+    delta_percent: float
+    direction: str
+    detail: str
+
+    @classmethod
+    def from_model(cls, trend: "technique.MetricTrend") -> "MetricTrendOut":
+        return cls(
+            key=trend.key,
+            label=trend.label,
+            unit=trend.unit,
+            points=[TrendPointOut(date=p.date, value=p.value) for p in trend.points],
+            current=trend.current,
+            baseline=trend.baseline,
+            delta=trend.delta,
+            delta_percent=trend.delta_percent,
+            direction=trend.direction,
+            detail=trend.detail,
+        )
+
+
+class CoachTrendRequest(BaseModel):
+    """The activities to follow, newest first.
+
+    The ids travel in the request rather than being re-derived server-side for the same
+    reason the plan does on `/nutrition/targets`: the client already has the activity
+    list on screen, and having the server list them again would mean two sources of
+    truth for which sessions the trend covers.
+    """
+
+    activity_ids: list[int] = Field(default_factory=list)
+
+
+class CoachTrendResponse(BaseModel):
+    sessions_read: int
+    trends: list[MetricTrendOut] = Field(default_factory=list)
+
+
 # ---- errors -----------------------------------------------------------------------------------
 
 

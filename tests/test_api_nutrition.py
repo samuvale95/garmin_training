@@ -17,6 +17,14 @@ from training_plan.api import app as fastapi_app
 from training_plan.api import routes_body
 
 
+@pytest.fixture(autouse=True)
+def authenticated(monkeypatch):
+    """Every route is auth-gated now (see `api/app.py`). `DEV_AUTH_BYPASS_USER_ID` is
+    the escape hatch `api/auth.py` already carries for running without a Supabase
+    project, which is exactly a test's situation."""
+    monkeypatch.setenv("DEV_AUTH_BYPASS_USER_ID", "test-user")
+
+
 @pytest.fixture
 def client():
     return TestClient(fastapi_app)
@@ -30,7 +38,7 @@ def no_garmin(monkeypatch):
     over the network, which is slow, rate-limited, and makes the assertions depend on
     whoever's `.env` is sitting in the checkout.
     """
-    monkeypatch.setattr(routes_body, "body_metrics_or_empty", lambda: {})
+    monkeypatch.setattr(routes_body, "body_metrics_or_empty", lambda user_id: {})
 
 
 @pytest.fixture
@@ -38,7 +46,7 @@ def weighed(monkeypatch):
     monkeypatch.setattr(
         routes_body,
         "body_metrics_or_empty",
-        lambda: {"weight_kg": 64.0, "source": "scale", "measured_on": "2026-08-05"},
+        lambda user_id: {"weight_kg": 64.0, "source": "scale", "measured_on": "2026-08-05"},
     )
 
 
@@ -85,7 +93,9 @@ def test_tomorrows_session_drives_the_target(client, weighed):
     body = response.json()
     assert body["tomorrow"]["load"] == "molto_lungo"
     assert body["tomorrow"]["session_title"] == "Lungo 35 km"
-    assert body["tomorrow"]["carb_g"] == [640, 768]
+    # 64 kg against the top band, 8-10 g/kg. It used to be 10-12 -- the row belonging to
+    # athletes training four hours a day, which a 35 km long run is not.
+    assert body["tomorrow"]["carb_g"] == [512, 640]
     assert body["advice"]
 
 

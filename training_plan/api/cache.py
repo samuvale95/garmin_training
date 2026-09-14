@@ -81,6 +81,9 @@ TTL_GOAL_FIT_NARRATIVE = 30 * 60
 # coach narrative on top of it is a model call, keyed by the same activity.
 TTL_COACH_TECHNIQUE = 24 * 60 * 60
 TTL_COACH_NARRATIVE = 24 * 60 * 60
+# The trend is keyed by the exact activity list it covers, and that list changes the
+# moment a new session syncs -- so a shorter TTL buys nothing the key does not already.
+TTL_COACH_TREND = 24 * 60 * 60
 
 # A date range that has already ended has nothing left to say: a completed activity is a
 # fact, and the calendar for a past week only changes when this app writes to it -- which
@@ -131,6 +134,17 @@ class TTLCache:
         with self._lock:
             self._entries[(namespace, user_id, key)] = (time.monotonic() + ttl, value)
         return value
+
+    def put(self, namespace: str, user_id: str, key: Hashable, ttl: float, value: Any) -> None:
+        """Store a value someone else already paid for.
+
+        The one caller is `/coach/trend`, which reads several activities in one fan-out
+        and seeds each one into the per-activity namespace `/coach/technique/{id}`
+        reads from -- without this, the two endpoints would fetch the same activity
+        twice within a second of each other.
+        """
+        with self._lock:
+            self._entries[(namespace, user_id, key)] = (time.monotonic() + ttl, value)
 
     def invalidate(self, namespaces: Iterable[str], user_id: str) -> None:
         """Drop this user's entries in these namespaces (used after a write)."""

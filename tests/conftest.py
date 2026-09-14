@@ -6,11 +6,21 @@ to the next. Garmin/Strava sessions and the food log no longer live in process s
 all (they're per-user, materialized from Postgres per call -- see `garmin_session.py`
 and `user_tokenstore.py`), so there is nothing left to reset for those.
 
-NOTE: `test_db.py`, `test_api.py`, `test_api_body.py`, and `test_api_caching.py` predate
-the Postgres/per-user rewrite and are not updated yet -- see the TODO tracked alongside
-this change. They need a real (or fake) Postgres to run against, which the old
-`PASSO_DATA_DIR`/SQLite-per-test-directory fixture this file used to provide can no
-longer stand in for.
+NOTE: `test_db.py`, and parts of `test_api.py`, `test_api_caching.py`,
+`test_api_nutrition.py` and `test_api_strava.py`, still predate the Postgres/per-user
+rewrite. Two separate problems, and only the first is solved:
+
+1. **Auth.** Every route is gated now, so an unauthenticated `TestClient` got a 401 on
+   every request. Each of those modules carries an `authenticated` fixture setting
+   `DEV_AUTH_BYPASS_USER_ID` -- the escape hatch `api/auth.py` already had.
+2. **Postgres, and the API drift around it.** What remains needs a real (or fake)
+   Postgres -- the old `PASSO_DATA_DIR`/SQLite-per-test-directory fixture this file
+   used to provide cannot stand in for it -- plus a pass over the call sites that moved
+   with it (`db.add_entry`'s signature, `cache.get_or_call`'s `user_id`, the
+   `garmin_session.reset` that no longer exists). Still the tracked TODO.
+
+`test_api_body.py` and `test_api_coach.py` are fully green: neither touches the
+database, so fixing their auth was the whole job.
 """
 
 from __future__ import annotations
