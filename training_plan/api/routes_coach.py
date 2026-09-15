@@ -16,10 +16,10 @@ import logging
 from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
-from .. import llm, technique
-from . import garmin_session, schemas
+from .. import history, intensity, llm, nutrition, technique
+from . import garmin_session, routes_strava, schemas
 from .auth import current_user_id
-from .cache import TTL_COACH_NARRATIVE, TTL_COACH_TECHNIQUE, TTL_COACH_TREND, cache
+from .cache import TTL_COACH_EXECUTION, TTL_COACH_NARRATIVE, TTL_COACH_TECHNIQUE, TTL_COACH_TREND, cache
 
 logger = logging.getLogger(__name__)
 
@@ -95,4 +95,102 @@ async def coach_trend(
     key = tuple(payload.activity_ids[: technique.MAX_TREND_ACTIVITIES])
     return await run_in_threadpool(
         lambda: cache.get_or_call("coach:trend", user_id, key, TTL_COACH_TREND, compute, refresh=refresh)
+    )
+
+
+# ---- planned against executed ----------------------------------------------------------
+
+
+def _zones(user_id: str) -> intensity.Zones | None:
+    """The athlete's own zone boundaries, or nothing.
+
+    Nothing is a supported answer and the screen says so: zones guessed from an age
+    formula would carry an error wider than the bands they define, so this module would
+    rather show no analysis than a confident wrong one.
+    """
+    threshold = garmin_session.run(user_id, lambda sync: sync.lactate_threshold())
+    heart_rate = threshold.get("threshold_hr")
+    if not heart_rate:
+        return None
+    return intensity.Zones.from_threshold(heart_rate, source="garmin")
+
+
+@router.post("/coach/execution", response_model=schemas.ExecutionBlockResponse)
+async def coach_execution(
+    payload: schemas.ExecutionRequest, refresh: bool = False, user_id: str = Depends(current_user_id)
+) -> schemas.ExecutionBlockResponse:
+    """What the plan asked for, against what the streams say happened.
+
+    The one screen in this app that can catch a mistake the athlete is certain they are
+    not making -- easy days run too hard -- because it is the only one that reads the
+    session second by second instead of through an average.
+
+    The plan travels in the request, as it does for `/nutrition/targets` and
+    `/body/readiness`: it lives on the device and the server holds no copy.
+    """
+
+    def compute() -> schemas.ExecutionBlockResponse:
+        zones = _zones(user_id)
+        if zones is None:
+            return schemas.ExecutionBlockResponse(zones=None, block=None, sessions=[])
+
+        sessions = [s.to_model() for s in payload.sessions]
+        if not sessions:
+            return schemas.ExecutionBlockResponse(zones=None, block=None, sessions=[])
+
+        # The stored history first. Before it existed this endpoint matched against
+        # Strava live and fetched a stream per session on every single view -- dozens of
+        # third-party calls to redraw a screen about sessions that finished weeks ago.
+        # Now the backfill has already paid for all of it, and a miss falls back to the
+        # network only for the sessions the job has not reached yet.
+        stored = {
+            row["day"]: row
+            for row in history.activities_between(
+                user_id, min(s.date for s in sessions), max(s.date for s in sessions)
+            )
+        }
+
+        executions = []
+        for session in sessions:
+            activity_id = None
+            row = stored.get(session.date)
+            if row:
+                activity_id = int(row["activity_id"])
+                streams = history.load_streams(user_id, activity_id) or {}
+            else:
+                streams = {}
+
+            if not streams.get("heartrate"):
+                match = routes_strava._run(
+                    user_id, lambda sync: sync.find_activity_matches_for_range([session])
+                )
+                activity = (match.get(session.date.isoformat()) or {}).get("activity") or {}
+                if not activity.get("id"):
+                    continue
+                activity_id = int(activity["id"])
+                streams = routes_strava._run(user_id, lambda sync: sync.get_activity_streams(activity_id))
+
+            heart_rates = streams.get("heartrate")
+            if not heart_rates or activity_id is None:
+                continue
+
+            execution = intensity.read_execution(
+                activity_id=activity_id,
+                day=session.date,
+                title=session.title,
+                # The same load vocabulary the fuelling module already classifies by, so
+                # "easy" means one thing across the app rather than three.
+                intent=nutrition.classify_load(session),
+                heart_rates=heart_rates,
+                times=streams.get("time"),
+                zones=zones,
+            )
+            if execution is not None:
+                executions.append(execution)
+
+        return schemas.ExecutionBlockResponse.from_models(zones, intensity.read_block(executions), executions)
+
+    key = (payload.date_key(), len(payload.sessions))
+    return await run_in_threadpool(
+        lambda: cache.get_or_call("coach:execution", user_id, key, TTL_COACH_EXECUTION, compute, refresh=refresh)
     )

@@ -84,6 +84,26 @@ export default function CoachPage() {
         <EmptyState />
       ) : (
         <>
+          {/* The block-level read sits above the per-session one on purpose: a single
+              session's form metrics are interesting, but the distribution across eight
+              weeks is the thing that actually changes how someone trains. */}
+          <SlideUp active={animate} delayMs={40} style={{ marginTop: 18 }}>
+            <Link
+              href="/coach/esecuzione"
+              className="press-soft"
+              style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "15px 18px", textDecoration: "none", color: "inherit" }}
+            >
+              <div style={{ flex: 1 }}>
+                <p style={{ font: "600 15.5px/1.2 var(--font-outfit)", margin: 0 }}>Come ti alleni davvero</p>
+                <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-70)", margin: "6px 0 0", lineHeight: 1.35 }}>
+                  Otto settimane di sedute lette secondo per secondo, contro quello che il piano
+                  chiedeva e contro il riferimento della ricerca.
+                </p>
+              </div>
+              <span aria-hidden="true" className="anim-chev" style={{ flex: "none", fontSize: 18 }}>→</span>
+            </Link>
+          </SlideUp>
+
           <ActivityPicker activities={readable} selectedId={activityId} onSelect={setSelectedId} animate={animate} />
 
           {formQuery.isPending || !form ? (

@@ -11,6 +11,7 @@ import type {
   BodyMetrics,
   BodySnapshot,
   CompletedActivity,
+  ExecutionBlock,
   ConflictAssessment,
   DayVerdict,
   DeleteResult,
@@ -944,6 +945,19 @@ export function useSportTrend(activityIds: number[], enabled = true) {
     queryKey: ["coach", "trend", activityIds.join(",")],
     queryFn: ({ signal }) => apiPost<CoachTrend>("/coach/trend", { activity_ids: activityIds }, signal),
     enabled: enabled && activityIds.length > 0,
+    staleTime: Infinity,
+  });
+}
+
+/** What the plan asked for, against what the streams say happened.
+ *
+ * The most expensive answer in the app -- a Strava match plus a stream fetch per session
+ * -- so it is keyed on the block it describes and never refetched on its own. */
+export function useExecutionBlock(sessions: TrainingSession[], enabled = true) {
+  return useQuery({
+    queryKey: ["coach", "execution", sessions.length ? planFingerprint(sessions) : null],
+    queryFn: ({ signal }) => apiPost<ExecutionBlock>("/coach/execution", { sessions }, signal),
+    enabled: enabled && sessions.length > 0,
     staleTime: Infinity,
   });
 }

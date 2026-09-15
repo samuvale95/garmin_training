@@ -84,6 +84,10 @@ TTL_COACH_NARRATIVE = 24 * 60 * 60
 # The trend is keyed by the exact activity list it covers, and that list changes the
 # moment a new session syncs -- so a shorter TTL buys nothing the key does not already.
 TTL_COACH_TREND = 24 * 60 * 60
+# The execution read is the most expensive answer this app produces -- a Strava match
+# plus one stream fetch per session in the block. It describes finished sessions, so the
+# only thing that can change it is a new activity syncing, which changes the key.
+TTL_COACH_EXECUTION = 24 * 60 * 60
 
 # A date range that has already ended has nothing left to say: a completed activity is a
 # fact, and the calendar for a past week only changes when this app writes to it -- which

@@ -145,11 +145,35 @@ def _get_pool() -> ConnectionPool:
     against a local file" reasoning) would make every request pay a full handshake.
     The pool is safe to share across FastAPI's threadpool threads; `psycopg_pool`
     hands out one physical connection per checkout and returns it on release.
+
+    **Server-side prepared statements are switched off**, and that is not a tuning
+    choice. Supabase's connection string is the transaction-mode pooler, where a
+    "connection" is a slot that pgbouncer multiplexes across backends: psycopg3
+    auto-prepares a statement once it has seen it five times, the prepared name is
+    scoped to a backend the pooler may hand to someone else, and the sixth execution
+    comes back `DuplicatePreparedStatement: prepared statement "_pg3_0" already exists`.
+    It surfaces only after a handful of identical queries, which is why it looked like
+    a flaky test rather than a broken write path.
     """
     global _pool
     if _pool is None:
-        _pool = ConnectionPool(conninfo=_database_url(), min_size=1, max_size=5, open=True)
+        _pool = ConnectionPool(
+            conninfo=_database_url(),
+            min_size=1,
+            max_size=5,
+            open=True,
+            configure=_configure_connection,
+            # Ping before handing a connection out. Supabase closes idle pooled
+            # connections, and without this the pool cheerfully serves a dead socket --
+            # which surfaces as `server closed the connection unexpectedly` on the first
+            # query after a quiet spell, and killed an hour-long backfill mid-run.
+            check=ConnectionPool.check_connection,
+        )
     return _pool
+
+
+def _configure_connection(conn: psycopg.Connection) -> None:
+    conn.prepare_threshold = None
 
 
 def connect() -> psycopg.Connection:

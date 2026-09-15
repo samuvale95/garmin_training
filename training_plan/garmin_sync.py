@@ -554,6 +554,63 @@ class GarminSync:
 
         return result
 
+    def lactate_threshold(self, lookback_days: int = 180) -> dict:
+        """Garmin's own estimate of lactate-threshold heart rate and speed.
+
+        The anchor every training zone in `intensity.py` is derived from, and the reason
+        that module refuses to fall back on 220-minus-age: this figure comes out of the
+        athlete's own guided tests and hard sessions, while the age formula carries a
+        standard error wider than the zones it would be defining.
+
+        Degrades to `{}` like every other wellness read here -- `intensity` has a
+        "no zones, no analysis" state, and a missing estimate is a supported outcome.
+        """
+        today = date_type.today()
+        try:
+            data = self.client.get_lactate_threshold(
+                start_date=(today - timedelta(days=lookback_days)).isoformat(),
+                end_date=today.isoformat(),
+                latest=True,
+            )
+        except Exception:  # noqa: BLE001 - an unsupported watch simply has no estimate
+            logger.warning("lactate threshold unavailable, zones will need another anchor", exc_info=True)
+            return {}
+
+        # Undocumented shape, and not the flat one it looks like it should be: the
+        # figures arrive nested under `speed_and_heart_rate` (running and cycling in the
+        # same object) with running power alongside them under `power`. Reading the top
+        # level -- which the first version of this did -- finds nothing at all and
+        # silently reports "no threshold", which is how the zones screen ended up in its
+        # empty state on an account that has the number.
+        if isinstance(data, list):
+            data = data[-1] if data else None
+        if not isinstance(data, dict):
+            return {}
+
+        nested = data.get("speed_and_heart_rate")
+        source = nested if isinstance(nested, dict) else data
+        power = data.get("power") if isinstance(data.get("power"), dict) else {}
+
+        result: dict = {}
+        heart_rate = source.get("heartRate") or source.get("lactateThresholdHeartRate")
+        if isinstance(heart_rate, (int, float)) and heart_rate > 0:
+            result["threshold_hr"] = round(heart_rate)
+
+        cycling_hr = source.get("heartRateCycling")
+        if isinstance(cycling_hr, (int, float)) and cycling_hr > 0:
+            result["threshold_hr_cycling"] = round(cycling_hr)
+
+        ftp = power.get("functionalThresholdPower")
+        if isinstance(ftp, (int, float)) and ftp > 0:
+            result["threshold_power_w"] = round(ftp)
+
+        # `speed` comes back on a scale this API does not document and which does not
+        # read as metres per second (a threshold "speed" of 0.35 would be a walk). It is
+        # deliberately not converted into a pace: publishing a number whose unit is a
+        # guess is exactly what the rest of this codebase refuses to do. The heart rate
+        # is unambiguous, and it is the one the zones are built on.
+        return result
+
     def device_info(self) -> dict:
         """Best-effort primary-device name + last-sync time (settings screen 15).
 

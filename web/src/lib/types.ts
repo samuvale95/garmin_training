@@ -437,6 +437,67 @@ export interface PacingRead {
   verdict: FormVerdict;
 }
 
+// ---- planned against executed --------------------------------------------------------
+
+export interface Zones {
+  threshold_hr: number;
+  aerobic_hr: number;
+  source: "garmin" | "stimato";
+  describe: string;
+}
+
+export interface TimeInZone {
+  easy_seconds: number;
+  grey_seconds: number;
+  hard_seconds: number;
+}
+
+export interface SessionExecution {
+  activity_id: number;
+  date: string;
+  title: string;
+  intent: string;
+  zones: TimeInZone;
+  /** null for anything the plan did not bill as easy -- a quality session above
+   * threshold is the session working, not a discrepancy. */
+  honoured: boolean | null;
+  detail: string;
+}
+
+/** One thing the data says, with the strength of the claim attached.
+ *
+ * `evidence` is what keeps the screen honest: a measurement, a population finding and a
+ * correlation in one person's uncontrolled data must not be read in the same voice. */
+export interface Finding {
+  key: string;
+  headline: string;
+  measured: string;
+  evidence: "misurato" | "ricerca" | "tuoi dati";
+  standard: string | null;
+  action: string | null;
+  severity: "info" | "attenzione";
+}
+
+export interface BlockDistribution {
+  sessions: number;
+  from_date: string;
+  to_date: string;
+  zones: TimeInZone;
+  easy_share: number;
+  grey_share: number;
+  hard_share: number;
+  easy_planned: number;
+  easy_honoured: number;
+  findings: Finding[];
+}
+
+export interface ExecutionBlock {
+  /** null when there is no lactate-threshold estimate to anchor zones on. */
+  zones: Zones | null;
+  block: BlockDistribution | null;
+  sessions: SessionExecution[];
+}
+
 export interface TrendPoint {
   date: string;
   value: number;

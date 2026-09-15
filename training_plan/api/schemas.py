@@ -13,7 +13,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from .. import body_insights, db, garmin_sync, goal_fit, models, nutrition, readiness, technique
+from .. import body_insights, db, garmin_sync, goal_fit, intensity, models, nutrition, readiness, technique
 
 
 # ---- plan / steps --------------------------------------------------------------------------
@@ -1264,6 +1264,145 @@ class CoachTrendRequest(BaseModel):
 class CoachTrendResponse(BaseModel):
     sessions_read: int
     trends: list[MetricTrendOut] = Field(default_factory=list)
+
+
+# ---- planned against executed ------------------------------------------------------------
+
+
+class ExecutionRequest(BaseModel):
+    """The sessions to check, with their steps.
+
+    The whole block travels, not a date range: the intent of each session comes from its
+    own steps (`nutrition.classify_load`), and the server holds no copy of the plan.
+    """
+
+    sessions: list[TrainingSessionIn] = Field(default_factory=list)
+
+    def date_key(self) -> str:
+        days = sorted(s.date.isoformat() for s in self.sessions)
+        return f"{days[0]}:{days[-1]}" if days else "vuoto"
+
+
+class ZonesOut(BaseModel):
+    threshold_hr: int
+    aerobic_hr: int
+    source: str
+    describe: str
+
+    @classmethod
+    def from_model(cls, zones: "intensity.Zones") -> "ZonesOut":
+        return cls(
+            threshold_hr=zones.threshold_hr,
+            aerobic_hr=zones.aerobic_hr,
+            source=zones.source,
+            describe=zones.describe(),
+        )
+
+
+class TimeInZoneOut(BaseModel):
+    easy_seconds: int
+    grey_seconds: int
+    hard_seconds: int
+
+    @classmethod
+    def from_model(cls, zones: "intensity.TimeInZone") -> "TimeInZoneOut":
+        return cls(
+            easy_seconds=zones.easy_seconds, grey_seconds=zones.grey_seconds, hard_seconds=zones.hard_seconds
+        )
+
+
+class SessionExecutionOut(BaseModel):
+    activity_id: int
+    date: date_type
+    title: str
+    intent: str
+    zones: TimeInZoneOut
+    honoured: bool | None = None
+    detail: str
+
+    @classmethod
+    def from_model(cls, execution: "intensity.SessionExecution") -> "SessionExecutionOut":
+        return cls(
+            activity_id=execution.activity_id,
+            date=execution.date,
+            title=execution.title,
+            intent=execution.intent,
+            zones=TimeInZoneOut.from_model(execution.zones),
+            honoured=execution.honoured,
+            detail=execution.detail,
+        )
+
+
+class FindingOut(BaseModel):
+    key: str
+    headline: str
+    measured: str
+    evidence: str
+    standard: str | None = None
+    action: str | None = None
+    severity: str
+
+    @classmethod
+    def from_model(cls, finding: "intensity.Finding") -> "FindingOut":
+        return cls(
+            key=finding.key,
+            headline=finding.headline,
+            measured=finding.measured,
+            evidence=finding.evidence,
+            standard=finding.standard,
+            action=finding.action,
+            severity=finding.severity,
+        )
+
+
+class BlockDistributionOut(BaseModel):
+    sessions: int
+    from_date: date_type
+    to_date: date_type
+    zones: TimeInZoneOut
+    easy_share: float
+    grey_share: float
+    hard_share: float
+    easy_planned: int
+    easy_honoured: int
+    findings: list[FindingOut] = Field(default_factory=list)
+
+    @classmethod
+    def from_model(cls, block: "intensity.BlockDistribution") -> "BlockDistributionOut":
+        return cls(
+            sessions=block.sessions,
+            from_date=block.from_date,
+            to_date=block.to_date,
+            zones=TimeInZoneOut.from_model(block.zones),
+            easy_share=block.easy_share,
+            grey_share=block.grey_share,
+            hard_share=block.hard_share,
+            easy_planned=block.easy_planned,
+            easy_honoured=block.easy_honoured,
+            findings=[FindingOut.from_model(f) for f in block.findings],
+        )
+
+
+class ExecutionBlockResponse(BaseModel):
+    """Null `zones` means there is no lactate-threshold estimate to anchor on, which the
+    screen reports rather than papering over with an age formula."""
+
+    zones: ZonesOut | None = None
+    block: BlockDistributionOut | None = None
+    sessions: list[SessionExecutionOut] = Field(default_factory=list)
+
+    @classmethod
+    def from_models(
+        cls,
+        zones: "intensity.Zones | None",
+        block: "intensity.BlockDistribution | None",
+        executions: list["intensity.SessionExecution"],
+    ) -> "ExecutionBlockResponse":
+        return cls(
+            zones=ZonesOut.from_model(zones) if zones else None,
+            block=BlockDistributionOut.from_model(block) if block else None,
+            sessions=[SessionExecutionOut.from_model(e) for e in executions],
+        )
 
 
 # ---- errors -----------------------------------------------------------------------------------

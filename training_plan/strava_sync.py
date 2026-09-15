@@ -13,6 +13,7 @@ own (read-only, from this app's perspective) gear list.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 import time
@@ -41,6 +42,8 @@ DEFAULT_SHOESTORE_PATH = str(Path.home() / ".garmin_training_strava_shoes.json")
 STRAVA_AUTHORIZE_URL = "https://www.strava.com/oauth/authorize"
 STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
 STRAVA_DEAUTHORIZE_URL = "https://www.strava.com/oauth/deauthorize"
+logger = logging.getLogger(__name__)
+
 STRAVA_API_BASE = "https://www.strava.com/api/v3"
 STRAVA_SCOPE = "activity:read_all,profile:read_all"
 
@@ -281,6 +284,48 @@ class StravaSync:
 
     def get_activity_detail(self, activity_id: int) -> dict:
         return self._get(f"/activities/{activity_id}").json()
+
+    # Channels worth asking for. `time` is not optional despite looking like it: Strava
+    # records at "smart" intervals that stretch when nothing changes, so without the time
+    # axis every other channel is a list of samples with no idea how long each one lasted
+    # -- and a time-in-zone computed from that systematically under-weights the steady
+    # parts of a run (see `intensity.time_in_zone`).
+    STREAM_KEYS = ("time", "heartrate", "velocity_smooth", "cadence", "watts", "altitude")
+
+    def get_activity_streams(self, activity_id: int, keys: tuple[str, ...] | None = None) -> dict[str, list]:
+        """One activity's raw channels, as `{channel: [samples]}`.
+
+        This is the endpoint the whole execution analysis rests on, and the one thing
+        neither Garmin's summaries nor Strava's own screens will tell you: an average
+        heart rate of 150 is equally consistent with an hour of steady aerobic running
+        and with half an hour easy followed by half an hour hard. Only the stream
+        separates them.
+
+        Returns `{}` rather than raising when the activity has no streams at all -- a
+        manually-entered activity, or one recorded by a phone with no strap. The caller
+        has a "nothing to read here" state and an exception would cost it the whole
+        screen for one unreadable session.
+        """
+        wanted = keys or self.STREAM_KEYS
+        try:
+            payload = self._get(
+                f"/activities/{activity_id}/streams",
+                params={"keys": ",".join(wanted), "key_by_type": "true"},
+            ).json()
+        except StravaAuthError:
+            # A 404 here means "this activity has no streams", which Strava reports the
+            # same way as a missing activity. Not a failure worth propagating: an
+            # authorization problem will resurface on the next call that needs one.
+            logger.warning("no streams for activity %s, degrading to no analysis", activity_id, exc_info=True)
+            return {}
+
+        if not isinstance(payload, dict):
+            return {}
+        return {
+            channel: content["data"]
+            for channel, content in payload.items()
+            if isinstance(content, dict) and isinstance(content.get("data"), list)
+        }
 
     def find_activity_match(self, session: TrainingSession) -> dict:
         """Best-effort match of one Strava activity to a planned session -- a single-
