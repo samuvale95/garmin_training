@@ -88,6 +88,9 @@ TTL_COACH_TREND = 24 * 60 * 60
 # plus one stream fetch per session in the block. It describes finished sessions, so the
 # only thing that can change it is a new activity syncing, which changes the key.
 TTL_COACH_EXECUTION = 24 * 60 * 60
+# The diagnosis reads a year of stored streams, so it is the heaviest computation here --
+# but it is all local, and what it describes only changes when a new session syncs.
+TTL_COACH_PLAN = 6 * 60 * 60
 
 # A date range that has already ended has nothing left to say: a completed activity is a
 # fact, and the calendar for a past week only changes when this app writes to it -- which

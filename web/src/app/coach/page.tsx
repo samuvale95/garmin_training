@@ -87,7 +87,27 @@ export default function CoachPage() {
           {/* The block-level read sits above the per-session one on purpose: a single
               session's form metrics are interesting, but the distribution across eight
               weeks is the thing that actually changes how someone trains. */}
-          <SlideUp active={animate} delayMs={40} style={{ marginTop: 18 }}>
+          {/* The diagnosis-and-prescription screen leads: it is the only one here that
+              goes from a measurement to a session in the plan, and it needs no imported
+              plan to work. */}
+          <SlideUp active={animate} delayMs={30} style={{ marginTop: 18 }}>
+            <Link
+              href="/coach/allenarsi"
+              className="press-soft"
+              style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card)", padding: "16px 18px", textDecoration: "none" }}
+            >
+              <div style={{ flex: 1 }}>
+                <p style={{ font: "600 15.5px/1.2 var(--font-outfit)", margin: 0 }}>Come ti alleni</p>
+                <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-su-scuro)", margin: "6px 0 0", lineHeight: 1.35 }}>
+                  Un anno di corse contro il riferimento della ricerca, e le sedute che
+                  cambierebbero il quadro.
+                </p>
+              </div>
+              <span aria-hidden="true" className="anim-chev" style={{ flex: "none", fontSize: 18 }}>→</span>
+            </Link>
+          </SlideUp>
+
+          <SlideUp active={animate} delayMs={40} style={{ marginTop: 10 }}>
             <Link
               href="/coach/esecuzione"
               className="press-soft"

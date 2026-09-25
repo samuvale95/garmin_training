@@ -10,6 +10,7 @@ import type {
   AthleteProfile,
   BodyMetrics,
   BodySnapshot,
+  CoachPlan,
   CompletedActivity,
   ExecutionBlock,
   ConflictAssessment,
@@ -959,6 +960,18 @@ export function useExecutionBlock(sessions: TrainingSession[], enabled = true) {
     queryFn: ({ signal }) => apiPost<ExecutionBlock>("/coach/execution", { sessions }, signal),
     enabled: enabled && sessions.length > 0,
     staleTime: Infinity,
+  });
+}
+
+/** How this athlete actually trains, and the sessions that would change it.
+ *
+ * Reads the stored history and needs no imported plan -- which is the point: the
+ * diagnosis is about what was done, and a plan file only says what was intended. */
+export function useCoachPlan(days = 365) {
+  return useQuery({
+    queryKey: ["coach", "plan", days],
+    queryFn: ({ signal }) => apiGet<CoachPlan>("/coach/plan", { days: String(days) }, signal),
+    staleTime: 60 * 60_000,
   });
 }
 

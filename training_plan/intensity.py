@@ -85,6 +85,22 @@ MIN_ANALYSABLE_SECONDS = 600
 # day is.
 EASY_INTENTS = ("riposo", "facile")
 
+# A session read out of the history with no plan behind it. Deliberately outside
+# EASY_INTENTS: calling every run "meant to be easy" would count each interval session
+# as a failed easy day and fire "I tuoi lenti non sono lenti" on a history that simply
+# has quality in it.
+NO_INTENT = "non_pianificata"
+
+# The sports these zones mean anything for. Heart-rate zones are anchored on a *running*
+# lactate threshold, so folding a ski tour or a hike into the distribution is not a
+# rounding error -- it is a different physiology measured against the wrong ruler.
+#
+# The first version of this module had no such filter, and on a real two-year history it
+# reported 74% easy where running alone was 54%: ninety hours of skiing, hiking, sailing
+# and climbing, almost all of it under the aerobic threshold, quietly flattered a
+# distribution that was actually a problem.
+RUNNING_SPORTS = ("Run", "TrailRun", "VirtualRun", "running")
+
 
 @dataclass
 class Zones:
@@ -189,6 +205,85 @@ def time_in_zone(
     )
 
 
+def heart_rate_histogram(
+    heart_rates: Sequence[float | None], times: Sequence[float] | None
+) -> dict[int, float]:
+    """Seconds spent at each whole bpm.
+
+    The same walk as `time_in_zone`, kept before the zones are applied. It is what makes
+    the threshold-sensitivity table affordable: asking "and what if the threshold were
+    172 instead of 183" is then a re-bucketing of a few hundred integers rather than a
+    second pass over six hundred thousand samples, and the honest answer to a verdict
+    that pivots on one estimated number is to show how much it moves.
+
+    Histograms add, so a whole history folds into one with `collections.Counter`-style
+    accumulation and costs nothing to keep.
+    """
+    if not heart_rates:
+        return {}
+    axis = list(times) if times is not None else list(range(len(heart_rates)))
+    if len(axis) != len(heart_rates):
+        axis = list(range(len(heart_rates)))
+
+    histogram: dict[int, float] = {}
+    for i, heart_rate in enumerate(heart_rates):
+        if heart_rate is None or heart_rate <= 0:
+            continue
+        weight = max(float(axis[i + 1]) - float(axis[i]), 0.0) if i + 1 < len(axis) else 1.0
+        bucket = int(round(heart_rate))
+        histogram[bucket] = histogram.get(bucket, 0.0) + weight
+    return histogram
+
+
+def merge_histograms(histograms: Iterable[dict[int, float]]) -> dict[int, float]:
+    merged: dict[int, float] = {}
+    for histogram in histograms:
+        for bucket, seconds in histogram.items():
+            merged[bucket] = merged.get(bucket, 0.0) + seconds
+    return merged
+
+
+def time_in_zone_from_histogram(histogram: dict[int, float], zones: Zones) -> TimeInZone:
+    buckets = {ZONE_EASY: 0.0, ZONE_GREY: 0.0, ZONE_HARD: 0.0}
+    for heart_rate, seconds in histogram.items():
+        buckets[zones.zone_of(heart_rate)] += seconds
+    return TimeInZone(
+        easy_seconds=round(buckets[ZONE_EASY]),
+        grey_seconds=round(buckets[ZONE_GREY]),
+        hard_seconds=round(buckets[ZONE_HARD]),
+    )
+
+
+# How far either side of the estimated threshold the sensitivity table reaches, in bpm.
+# Garmin's estimate is an estimate, and this is roughly the spread between it and a
+# field test -- wide enough to show whether the verdict survives being wrong.
+SENSITIVITY_OFFSETS = (-11, -6, 0, +5)
+
+
+def threshold_sensitivity(histogram: dict[int, float], threshold_hr: int) -> list[dict]:
+    """The same distribution read against neighbouring thresholds.
+
+    On a real history eleven beats moved the verdict from "roughly polarized" to "living
+    in the grey zone". A screen that shows the first number without this one is claiming
+    a precision the input does not have.
+    """
+    rows = []
+    for offset in SENSITIVITY_OFFSETS:
+        candidate = Zones.from_threshold(threshold_hr + offset)
+        in_zone = time_in_zone_from_histogram(histogram, candidate)
+        rows.append(
+            {
+                "threshold_hr": candidate.threshold_hr,
+                "aerobic_hr": candidate.aerobic_hr,
+                "is_estimate": offset == 0,
+                "easy_share": round(in_zone.share(ZONE_EASY), 3),
+                "grey_share": round(in_zone.share(ZONE_GREY), 3),
+                "hard_share": round(in_zone.share(ZONE_HARD), 3),
+            }
+        )
+    return rows
+
+
 # ---- one session: what it was for, and what it became ----------------------------------
 
 
@@ -199,6 +294,7 @@ class SessionExecution:
     activity_id: int
     date: date_type
     title: str
+    sport: str
     intent: str  # the plan's own load word: riposo / facile / moderato / duro / molto_lungo
     zones: TimeInZone
     # True only for a session the plan billed as easy that was, in fact, easy.
@@ -212,6 +308,7 @@ def read_execution(
     day: date_type,
     title: str,
     intent: str,
+    sport: str = "Run",
     heart_rates: Sequence[float | None],
     times: Sequence[float] | None,
     zones: Zones,
@@ -248,6 +345,7 @@ def read_execution(
         activity_id=activity_id,
         date=day,
         title=title,
+        sport=sport,
         intent=intent,
         zones=in_zone,
         honoured=honoured,
@@ -372,6 +470,9 @@ def read_block(executions: list[SessionExecution]) -> BlockDistribution | None:
     80/20 split, and counting sessions instead of minutes is the most common way the
     polarized rule gets misquoted.
     """
+    # Running only, and not as a convenience: see RUNNING_SPORTS for the two-year
+    # history where skiing and hiking turned a 54% easy share into a reassuring 74%.
+    executions = [e for e in executions if e.sport in RUNNING_SPORTS]
     if not executions:
         return None
 

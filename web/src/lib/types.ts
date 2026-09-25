@@ -437,6 +437,54 @@ export interface PacingRead {
   verdict: FormVerdict;
 }
 
+// ---- the coach plan ------------------------------------------------------------------
+
+/** A pace measured out of this athlete's own streams. `samples` matters: a pace from
+ * four hundred samples and one from eighty thousand are not the same claim. */
+export interface PaceEstimate {
+  heart_rate: number;
+  sec_per_km: number;
+  slower_sec_per_km: number;
+  faster_sec_per_km: number;
+  samples: number;
+}
+
+export interface PaceProfile {
+  easy: PaceEstimate | null;
+  threshold: PaceEstimate | null;
+}
+
+/** One session to do, and the measurement that asked for it. */
+export interface Prescription {
+  key: string;
+  title: string;
+  rationale: string;
+  expected: string;
+  evidence: "misurato" | "ricerca" | "tuoi dati";
+  heart_rate_cap: number | null;
+  priority: number;
+  session: TrainingSession;
+}
+
+/** The same distribution read against a neighbouring threshold -- the whole verdict
+ * pivots on one number Garmin estimated, and this says how much that matters. */
+export interface SensitivityRow {
+  threshold_hr: number;
+  aerobic_hr: number;
+  is_estimate: boolean;
+  easy_share: number;
+  grey_share: number;
+  hard_share: number;
+}
+
+export interface CoachPlan {
+  zones: Zones | null;
+  block: BlockDistribution | null;
+  profile: PaceProfile | null;
+  prescriptions: Prescription[];
+  sensitivity: SensitivityRow[];
+}
+
 // ---- planned against executed --------------------------------------------------------
 
 export interface Zones {

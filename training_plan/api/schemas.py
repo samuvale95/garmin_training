@@ -13,7 +13,19 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from .. import body_insights, db, garmin_sync, goal_fit, intensity, models, nutrition, readiness, technique
+from .. import (
+    body_insights,
+    db,
+    garmin_sync,
+    goal_fit,
+    intensity,
+    models,
+    nutrition,
+    paces,
+    prescription,
+    readiness,
+    technique,
+)
 
 
 # ---- plan / steps --------------------------------------------------------------------------
@@ -1402,6 +1414,95 @@ class ExecutionBlockResponse(BaseModel):
             zones=ZonesOut.from_model(zones) if zones else None,
             block=BlockDistributionOut.from_model(block) if block else None,
             sessions=[SessionExecutionOut.from_model(e) for e in executions],
+        )
+
+
+# ---- the coach plan ------------------------------------------------------------------------
+
+
+class PaceEstimateOut(BaseModel):
+    heart_rate: int
+    sec_per_km: int
+    slower_sec_per_km: int
+    faster_sec_per_km: int
+    samples: int
+
+    @classmethod
+    def from_model(cls, estimate: "paces.PaceEstimate | None") -> "PaceEstimateOut | None":
+        if estimate is None:
+            return None
+        return cls(
+            heart_rate=estimate.heart_rate,
+            sec_per_km=estimate.sec_per_km,
+            slower_sec_per_km=estimate.slower_sec_per_km,
+            faster_sec_per_km=estimate.faster_sec_per_km,
+            samples=estimate.samples,
+        )
+
+
+class PaceProfileOut(BaseModel):
+    """The paces measured out of this athlete's own streams, with the sample count that
+    backs each -- a pace from four hundred samples and one from eighty thousand are not
+    the same claim."""
+
+    easy: PaceEstimateOut | None = None
+    threshold: PaceEstimateOut | None = None
+
+
+class PrescriptionOut(BaseModel):
+    key: str
+    title: str
+    rationale: str
+    expected: str
+    evidence: str
+    heart_rate_cap: int | None = None
+    priority: int
+    session: TrainingSessionOut
+
+    @classmethod
+    def from_model(cls, item: "prescription.Prescription") -> "PrescriptionOut":
+        return cls(
+            key=item.key,
+            title=item.title,
+            rationale=item.rationale,
+            expected=item.expected,
+            evidence=item.evidence,
+            heart_rate_cap=item.heart_rate_cap,
+            priority=item.priority,
+            session=TrainingSessionOut.from_model(item.session),
+        )
+
+
+class SensitivityRowOut(BaseModel):
+    threshold_hr: int
+    aerobic_hr: int
+    is_estimate: bool
+    easy_share: float
+    grey_share: float
+    hard_share: float
+
+
+class CoachPlanResponse(BaseModel):
+    """Null `zones` means no lactate-threshold estimate to anchor on; null `block` means
+    the threshold is there but no running with a heart-rate stream is."""
+
+    zones: ZonesOut | None = None
+    block: BlockDistributionOut | None = None
+    profile: PaceProfileOut | None = None
+    prescriptions: list[PrescriptionOut] = Field(default_factory=list)
+    sensitivity: list[SensitivityRowOut] = Field(default_factory=list)
+
+    @classmethod
+    def from_model(cls, plan: "prescription.CoachPlan") -> "CoachPlanResponse":
+        return cls(
+            zones=ZonesOut.from_model(plan.zones),
+            block=BlockDistributionOut.from_model(plan.block),
+            profile=PaceProfileOut(
+                easy=PaceEstimateOut.from_model(plan.profile.easy),
+                threshold=PaceEstimateOut.from_model(plan.profile.threshold),
+            ),
+            prescriptions=[PrescriptionOut.from_model(p) for p in plan.prescriptions],
+            sensitivity=[SensitivityRowOut(**row) for row in plan.sensitivity],
         )
 
 

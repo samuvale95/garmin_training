@@ -12,14 +12,22 @@ cached harder still, because it is the one that costs money.
 from __future__ import annotations
 
 import logging
+from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.concurrency import run_in_threadpool
 
-from .. import history, intensity, llm, nutrition, technique
+from .. import history, intensity, llm, nutrition, paces, prescription, technique
 from . import garmin_session, routes_strava, schemas
 from .auth import current_user_id
-from .cache import TTL_COACH_EXECUTION, TTL_COACH_NARRATIVE, TTL_COACH_TECHNIQUE, TTL_COACH_TREND, cache
+from .cache import (
+    TTL_COACH_EXECUTION,
+    TTL_COACH_NARRATIVE,
+    TTL_COACH_PLAN,
+    TTL_COACH_TECHNIQUE,
+    TTL_COACH_TREND,
+    cache,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -194,3 +202,100 @@ async def coach_execution(
     return await run_in_threadpool(
         lambda: cache.get_or_call("coach:execution", user_id, key, TTL_COACH_EXECUTION, compute, refresh=refresh)
     )
+
+
+# ---- the coach plan ------------------------------------------------------------------------
+
+# How far back the diagnosis looks. Long enough for a distribution to be a habit rather
+# than a phase, short enough to still describe the athlete as they are now.
+PLAN_LOOKBACK_DAYS = 365
+
+
+class _NoZones(Exception):
+    """No threshold to anchor on -- raised out of the cached computation so it is not stored."""
+
+
+@router.get("/coach/plan", response_model=schemas.CoachPlanResponse)
+async def coach_plan(
+    # Bounded: every distinct value is its own cache entry and its own full read of the
+    # history, and nothing on the screen asks for more than two years.
+    days: int = Query(PLAN_LOOKBACK_DAYS, ge=28, le=730),
+    refresh: bool = False,
+    user_id: str = Depends(current_user_id),
+) -> schemas.CoachPlanResponse:
+    """How this athlete actually trains, and the sessions that would change it.
+
+    Reads the stored history and nothing else -- no imported plan required, which is the
+    point: the diagnosis is about what was *done*, and the plan file only ever says what
+    was intended. It was the missing piece that made the execution screen unusable for
+    an account training off the Garmin calendar.
+    """
+
+    def compute() -> schemas.CoachPlanResponse:
+        zones = _zones(user_id)
+        if zones is None:
+            raise _NoZones
+
+        today = date.today()
+        executions: list[intensity.SessionExecution] = []
+        histogram: dict[int, float] = {}
+        samples: list[tuple[float | None, float | None]] = []
+
+        # Running only, filtered in SQL: the zones are anchored on a running threshold,
+        # so every other sport would be decoded here only to be dropped by `read_block`.
+        for row, streams in history.streams_between(
+            user_id, today - timedelta(days=days), today, intensity.RUNNING_SPORTS
+        ):
+            if not streams.get("heartrate"):
+                continue
+
+            execution = intensity.read_execution(
+                activity_id=int(row["activity_id"]),
+                day=row["day"],
+                title=row["title"] or "Seduta",
+                # Without an imported plan there is no stated intent, and inventing one
+                # would be the app marking its own homework. The block still answers
+                # "quanto del tuo tempo è davvero facile", which is a question about time
+                # and needs no intent -- but no session is judged against a plan it never had.
+                intent=intensity.NO_INTENT,
+                sport=row["sport"],
+                heart_rates=streams["heartrate"],
+                times=streams.get("time"),
+                zones=zones,
+            )
+            if execution is None:
+                continue
+            executions.append(execution)
+            histogram = intensity.merge_histograms(
+                [histogram, intensity.heart_rate_histogram(streams["heartrate"], streams.get("time"))]
+            )
+            samples.extend(
+                paces.samples_from_streams(streams, near=(zones.aerobic_hr, zones.threshold_hr))
+            )
+
+        block = intensity.read_block(executions)
+        if block is None:
+            return schemas.CoachPlanResponse(zones=schemas.ZonesOut.from_model(zones))
+
+        profile = paces.build_profile(samples, aerobic_hr=zones.aerobic_hr, threshold_hr=zones.threshold_hr)
+        plan = prescription.CoachPlan(
+            zones=zones,
+            block=block,
+            profile=profile,
+            prescriptions=prescription.prescribe(block, zones, profile, today=today),
+            sensitivity=intensity.threshold_sensitivity(histogram, zones.threshold_hr),
+        )
+        return schemas.CoachPlanResponse.from_model(plan)
+
+    def cached() -> schemas.CoachPlanResponse:
+        # Keyed on the stored streams as well as the range, so a run that syncs shows up
+        # on the next view rather than whenever the TTL happens to lapse.
+        key = (days, history.streams_version(user_id))
+        return cache.get_or_call("coach:plan", user_id, key, TTL_COACH_PLAN, compute, refresh=refresh)
+
+    try:
+        return await run_in_threadpool(cached)
+    except _NoZones:
+        # Not cached: `lactate_threshold` degrades a timeout or a rate limit to "no
+        # estimate", and caching that would hide real zones for the whole TTL.
+        return schemas.CoachPlanResponse(zones=None)

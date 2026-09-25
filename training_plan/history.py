@@ -381,6 +381,44 @@ def load_streams(user_id: str, activity_id: int) -> dict[str, list[float | None]
     return unpack_streams(header, bytes(blob))
 
 
+def streams_between(
+    user_id: str, start: date_type, end: date_type, sports: Sequence[str]
+) -> Iterable[tuple[dict, dict[str, list[float | None]]]]:
+    """Every stored activity of these sports in the range, with its decoded streams.
+
+    One query instead of `activities_between` plus a `load_streams` round-trip per row:
+    a year of history is hundreds of activities, and the per-row version paid a pool
+    checkout and a query for each -- including the ski tours and hikes the caller was
+    about to throw away. Filtering on sport in SQL means those blobs never leave the
+    database, and decoding lazily keeps one activity's streams in memory at a time.
+    """
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT a.activity_id, a.day, a.sport, a.title, s.header, s.blob "
+            "FROM activity a JOIN activity_stream s "
+            "ON s.user_id = a.user_id AND s.activity_id = a.activity_id "
+            "WHERE a.user_id = %s AND a.day BETWEEN %s AND %s AND a.sport = ANY(%s) "
+            "ORDER BY a.day",
+            [user_id, start, end, list(sports)],
+        )
+        rows = cur.fetchall()
+    for activity_id, day, sport, title, header, blob in rows:
+        row = {"activity_id": activity_id, "day": day, "sport": sport, "title": title}
+        yield row, unpack_streams(header, bytes(blob))
+
+
+def streams_version(user_id: str) -> tuple[int, str | None]:
+    """A cheap fingerprint of this user's stored streams. It changes whenever a new
+    activity syncs, so a cache keyed on it drops a stale diagnosis as soon as there is
+    something new to diagnose instead of hours later."""
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT count(*), max(fetched_at) FROM activity_stream WHERE user_id = %s", [user_id]
+        )
+        count, latest = cur.fetchone()
+    return int(count), latest.isoformat() if latest else None
+
+
 def wellness_between(user_id: str, start: date_type, end: date_type) -> list[dict]:
     columns = ("day", *_WELLNESS_COLUMNS)
     with db.connect() as conn, conn.cursor() as cur:

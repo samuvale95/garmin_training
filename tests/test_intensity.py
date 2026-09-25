@@ -203,3 +203,41 @@ def test_every_finding_declares_how_strong_its_evidence_is():
 
 def test_no_sessions_is_no_block():
     assert intensity.read_block([]) is None
+
+
+# ---- the wrong ruler ---------------------------------------------------------------------
+
+
+def _ski(day):
+    """A ski tour: hours of it, almost all under the aerobic threshold."""
+    heart_rates, times = _stream((110, 10800))
+    return intensity.read_execution(
+        activity_id=900 + day,
+        day=date(2026, 9, day),
+        title="Sciata",
+        intent="facile",
+        sport="AlpineSki",
+        heart_rates=heart_rates,
+        times=times,
+        zones=_zones(),
+    )
+
+
+def test_another_sport_is_not_folded_into_a_running_distribution():
+    """The bug this filter exists for, from a real two-year history: ninety hours of
+    skiing, hiking and sailing turned a 54% easy share into a reassuring 74%. The zones
+    are anchored on a *running* threshold -- another sport is a different physiology
+    measured against the wrong ruler."""
+    runs = [
+        _execution("facile", [(135, 1800), (158, 1800)], activity_id=i, day=date(2026, 9, i))
+        for i in range(1, 5)
+    ]
+    running_only = intensity.read_block(runs)
+    with_skiing = intensity.read_block([*runs, _ski(20), _ski(21)])
+
+    assert with_skiing.sessions == running_only.sessions == 4
+    assert with_skiing.easy_share == running_only.easy_share
+
+
+def test_a_history_with_no_running_at_all_is_no_block():
+    assert intensity.read_block([_ski(20), _ski(21)]) is None
