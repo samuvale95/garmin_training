@@ -52,6 +52,12 @@ DEFAULT_LOGIN_STATE_PATH = str(Path.home() / ".garmin_training_login_state.json"
 # are therefore expensive against Garmin's IP-based rate limiter, so a failure here
 # puts the CLI into a local cooldown instead of letting the user hammer retries.
 RATE_LIMIT_COOLDOWN_SECONDS = 15 * 60
+
+# How many samples an activity detail may come back with. Garmin records about one a
+# second, so this is roughly two hours forty-five of activity at full resolution; longer
+# ones come back thinned. Every reader weights samples by the gap in `time`, so a
+# thinned stream still gives the right time in each zone.
+ACTIVITY_DETAIL_MAX_SAMPLES = 10_000
 AUTH_FAILURE_COOLDOWN_SECONDS = [0, 60, 5 * 60, 15 * 60]
 
 # Independent read-only calls are issued concurrently, a few at a time. Writes are
@@ -132,6 +138,14 @@ class CompletedActivity:
     title: str
     distance_km: float | None
     duration_min: float | None
+    # Everything below is what the stored history needs and the calendar screens do not;
+    # defaulted so the calendar-side constructors stay as they are.
+    start_time: datetime | None = None
+    avg_hr: int | None = None
+    max_hr: int | None = None
+    avg_cadence: float | None = None
+    avg_power: float | None = None
+    elevation_gain: float | None = None
 
 
 @dataclass
@@ -866,6 +880,28 @@ class GarminSync:
         results.sort(key=lambda a: a.date)
         return results
 
+    def get_activity_streams(self, activity_id: int) -> dict[str, list] | None:
+        """One activity's heart rate, speed and time, sample by sample.
+
+        Returned under Strava's channel names (`heartrate`, `velocity_smooth`, `time`) so
+        the stored history has one shape whichever source wrote it, and nothing that reads
+        it has to know. `None` when Garmin has no usable detail for the activity.
+
+        No polyline: the GPS track is the bulk of the payload and nothing here reads it.
+        """
+        try:
+            details = self.client.get_activity_details(
+                str(activity_id), maxchart=ACTIVITY_DETAIL_MAX_SAMPLES, maxpoly=0
+            )
+        except GarminConnectTooManyRequestsError as exc:
+            raise GarminRateLimitError(
+                f"Garmin rate-limited this IP (HTTP 429) reading activity {activity_id}: {exc}",
+                retry_after_seconds=RATE_LIMIT_COOLDOWN_SECONDS,
+            ) from exc
+        except Exception as exc:  # noqa: BLE001 - surfaced as a clean per-activity error
+            raise GarminSyncError(f"Could not read Garmin activity {activity_id}: {exc}") from exc
+        return parse_activity_streams(details)
+
     def select_workouts(
         self,
         workouts: list[ScheduledWorkout],
@@ -1160,4 +1196,102 @@ def _parse_activity_item(item: dict) -> CompletedActivity | None:
         title=str(item.get("activityName") or ""),
         distance_km=round(distance_m / 1000, 2) if isinstance(distance_m, (int, float)) else None,
         duration_min=round(duration_s / 60, 1) if isinstance(duration_s, (int, float)) else None,
+        start_time=_parse_gmt(item.get("startTimeGMT")),
+        avg_hr=_whole(item.get("averageHR")),
+        max_hr=_whole(item.get("maxHR")),
+        avg_cadence=_number(item.get("averageRunningCadenceInStepsPerMinute")),
+        avg_power=_number(item.get("avgPower")),
+        elevation_gain=_number(item.get("elevationGain")),
     )
+
+
+def _parse_gmt(raw: object) -> datetime | None:
+    """Garmin's `startTimeGMT` ("2026-09-24 17:26:47") as an aware UTC datetime. UTC, not
+    local: it is what gets compared against Strava's start time to spot the same workout
+    recorded twice, and two local clocks are not guaranteed to agree."""
+    if not raw:
+        return None
+    try:
+        return datetime.strptime(str(raw)[:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _number(value: object) -> float | None:
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _whole(value: object) -> int | None:
+    number = _number(value)
+    return round(number) if number is not None else None
+
+
+# Garmin metric key -> the channel name the stored history uses (Strava's).
+_DETAIL_CHANNELS = {
+    "directHeartRate": "heartrate",
+    "directSpeed": "velocity_smooth",
+    "sumDuration": "time",
+}
+
+
+def parse_activity_streams(details: object) -> dict[str, list] | None:
+    """`get_activity_details`' payload as `{heartrate, velocity_smooth, time}` lists.
+
+    The payload is undocumented: `metricDescriptors` says which position in each sample's
+    `metrics` array holds which metric, and the order differs between activities. So the
+    positions are always looked up, never assumed. Anything unrecognised is `None` --
+    an activity stored without a stream is a gap; one stored with the wrong stream is a
+    wrong number on every screen that reads it.
+    """
+    if not isinstance(details, dict):
+        return None
+    descriptors = details.get("metricDescriptors")
+    samples = details.get("activityDetailMetrics")
+    if not isinstance(descriptors, list) or not isinstance(samples, list) or not samples:
+        return None
+
+    index: dict[str, int] = {}
+    for descriptor in descriptors:
+        if isinstance(descriptor, dict) and descriptor.get("key") in _DETAIL_CHANNELS:
+            position = descriptor.get("metricsIndex")
+            if isinstance(position, int):
+                index[_DETAIL_CHANNELS[descriptor["key"]]] = position
+
+    timestamp_index = next(
+        (
+            d.get("metricsIndex")
+            for d in descriptors
+            if isinstance(d, dict) and d.get("key") == "directTimestamp"
+        ),
+        None,
+    )
+    if "heartrate" not in index or ("time" not in index and timestamp_index is None):
+        return None
+
+    streams: dict[str, list] = {channel: [] for channel in (*index, "time")}
+    first_timestamp: float | None = None
+    for sample in samples:
+        metrics = sample.get("metrics") if isinstance(sample, dict) else None
+        if not isinstance(metrics, list):
+            return None
+        for channel, position in index.items():
+            if channel == "time":
+                continue
+            value = metrics[position] if position < len(metrics) else None
+            streams[channel].append(value if isinstance(value, (int, float)) else None)
+
+        if "time" in index:
+            value = metrics[index["time"]] if index["time"] < len(metrics) else None
+        else:
+            # No elapsed-duration channel: fall back on the wall clock, in milliseconds,
+            # relative to the first sample. Pauses then count as time, which is what
+            # Strava's own `time` channel does too.
+            stamp = metrics[timestamp_index] if timestamp_index < len(metrics) else None
+            if isinstance(stamp, (int, float)) and first_timestamp is None:
+                first_timestamp = stamp
+            value = (stamp - first_timestamp) / 1000 if isinstance(stamp, (int, float)) else None
+        streams["time"].append(value if isinstance(value, (int, float)) else None)
+
+    if not any(value is not None for value in streams["heartrate"]):
+        return None
+    return streams

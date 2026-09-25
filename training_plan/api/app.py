@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .. import db
+from .. import db, history
 from ..garmin_sync import GarminRateLimitError, GarminSyncError
 from ..parser import TrainingPlanValidationError
 from ..strava_sync import StravaAuthError
@@ -24,6 +24,7 @@ from .cache import cache
 from .routes_body import router as body_router
 from .routes_coach import router as coach_router
 from .routes_garmin import router as garmin_router
+from .routes_history import router as history_router
 from .routes_nutrition import router as nutrition_router
 from .routes_plan import router as plan_router
 from .routes_strava import router as strava_router
@@ -53,6 +54,9 @@ def _ensure_schema() -> None:
     start rather than gating it behind a separate migration step for a two-table app."""
     db.ensure_schema()
     user_tokenstore.ensure_schema()
+    # The stored history too: readers filter on columns its migration adds, so it has to
+    # have run before the first request, not whenever a backfill next happens.
+    history.ensure_schema()
 
 
 @app.exception_handler(AuthError)
@@ -121,6 +125,7 @@ app.include_router(body_router, tags=["body"], dependencies=_auth_gate)
 app.include_router(strava_router, tags=["strava"], dependencies=_auth_gate)
 app.include_router(nutrition_router, tags=["nutrition"], dependencies=_auth_gate)
 app.include_router(coach_router, tags=["coach"], dependencies=_auth_gate)
+app.include_router(history_router, tags=["history"], dependencies=_auth_gate)
 
 
 @app.get("/health")

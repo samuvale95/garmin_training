@@ -34,6 +34,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date as date_type
+from datetime import datetime
 from datetime import timedelta
 
 from . import history
@@ -299,6 +300,51 @@ def backfill_wellness(
 
 # ---- activities and their streams --------------------------------------------------------
 
+# Seconds between two Garmin activity-detail fetches. One request each, like Strava's
+# streams, and Garmin's limit is the undocumented, per-IP one this module is built around.
+GARMIN_DETAIL_PAUSE_S = 2.0
+
+
+def backfill_garmin_activities(
+    user_id: str, *, days: int, end: date_type | None = None, sync: GarminSync
+) -> BackfillReport:
+    """Every Garmin activity in the window, as summary rows.
+
+    The primary source: this is what the watch recorded, and it is the only source an
+    account without Strava has. One ranged call (the client pages through it), and it has
+    to run before the streams, which need the ids it writes.
+    """
+    report = BackfillReport()
+    last = end or date_type.today()
+    first = last - timedelta(days=days)
+
+    for activity in sync.list_activities(first, last):
+        written = _write_with_retry(
+            lambda: history.save_activity(
+                user_id,
+                "garmin",
+                activity.activity_id,
+                activity.date,
+                {
+                    "sport": activity.sport,
+                    "title": activity.title,
+                    "distance_km": activity.distance_km,
+                    "duration_min": activity.duration_min,
+                    "avg_hr": activity.avg_hr,
+                    "max_hr": activity.max_hr,
+                    "avg_cadence": activity.avg_cadence,
+                    "avg_power": activity.avg_power,
+                    "elevation_gain": activity.elevation_gain,
+                    "start_time": activity.start_time,
+                },
+            )
+        )
+        if written:
+            report.activities_written += 1
+
+    history.set_progress(user_id, "garmin_activities", done=True, note=f"{report.activities_written} attività")
+    return report
+
 
 def backfill_activities(
     user_id: str, *, days: int, end: date_type | None = None, strava: StravaSync
@@ -340,6 +386,12 @@ def backfill_activities(
                 "avg_cadence": _float(activity.get("average_cadence")),
                 "avg_power": _float(activity.get("average_watts")),
                 "elevation_gain": _float(activity.get("total_elevation_gain")),
+                # UTC, not local: it is compared against Garmin's start to spot the same
+                # workout recorded twice.
+                "start_time": _utc(activity.get("start_date")),
+                # Set by Strava when the activity was uploaded from elsewhere -- for a
+                # Garmin upload it names the Garmin activity, the strongest duplicate signal.
+                "external_id": activity.get("external_id"),
                 "summary": {
                     "has_heartrate": activity.get("has_heartrate"),
                     "elapsed_time": activity.get("elapsed_time"),
@@ -353,38 +405,55 @@ def backfill_activities(
     return report
 
 
+def _utc(raw) -> datetime | None:
+    """Strava's `start_date` ("2026-09-24T17:26:47Z") as an aware datetime."""
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
 def backfill_streams(
     user_id: str,
     *,
+    source: str,
     activity_ids: list[int],
-    strava: StravaSync,
-    pause_s: float = STRAVA_STREAM_PAUSE_S,
+    fetch: Callable[[int], dict | None],
+    pause_s: float,
     on_progress: Callable[[int, int, int], None] | None = None,
 ) -> BackfillReport:
-    """One stream fetch per activity, packed on the way in.
+    """One stream fetch per activity, packed on the way in, for either source.
 
     The packing happens here rather than at read time so the uncompressed JSON never
     touches the database at all -- which is the whole reason the history fits in
     megabytes instead of gigabytes.
+
+    `activity_ids` is fetched in the order given, so callers pass it newest first: a run
+    that gets cut short keeps the part worth having. A rate limit ends the run rather
+    than being retried -- every stream so far is already written, and the next run skips
+    them.
     """
     report = BackfillReport()
-    already = history.stored_stream_ids(user_id)
+    already = history.stored_stream_ids(user_id, source)
     todo = [activity_id for activity_id in activity_ids if activity_id not in already]
 
     for index, activity_id in enumerate(todo, start=1):
         try:
-            streams = _with_retry(
-                lambda: strava.get_activity_streams(activity_id), f"stream {activity_id}"
-            )
+            streams = _with_retry(lambda: fetch(activity_id), f"stream {source} {activity_id}")
+        except GarminRateLimitError as error:
+            logger.warning("rate limit reading %s stream %s; stopping this run", source, activity_id)
+            report.stopped_early = str(error)
+            break
         except Exception as error:  # noqa: BLE001 - one unreadable activity is not a failed run
-            logger.warning("streams failed for %s", activity_id, exc_info=True)
-            report.errors.append(f"{activity_id}: {type(error).__name__}")
+            logger.warning("streams failed for %s %s", source, activity_id, exc_info=True)
+            report.errors.append(f"{source} {activity_id}: {type(error).__name__}")
             time.sleep(pause_s)
             continue
 
-        packed = history.pack_streams(streams)
-        if packed is not None:
-            history.save_stream(user_id, activity_id, packed)
+        packed = history.pack_streams(streams) if streams else None
+        if packed is not None and _write_with_retry(lambda: history.save_stream(user_id, source, activity_id, packed)):
             report.streams_written += 1
             report.stream_packed_bytes += packed.packed_bytes
             report.stream_raw_bytes += packed.raw_bytes
@@ -392,8 +461,21 @@ def backfill_streams(
             on_progress(index, len(todo), activity_id)
         time.sleep(pause_s)
 
-    history.set_progress(user_id, "streams", done=True, note=f"{report.streams_written} stream")
+    history.set_progress(user_id, f"{source}_streams", done=report.stopped_early is None,
+                         note=f"{report.streams_written} stream")
     return report
+
+
+def _stream_candidates(user_id: str, source: str, days: int, end: date_type) -> list[int]:
+    """Ids of this source's stored activities worth a stream fetch, newest first.
+
+    Only activities with a recorded heart rate: a stream without one feeds none of the
+    analysis, and skipping them keeps a strength session from costing a request on every
+    run just to come back empty again.
+    """
+    rows = history.activities_between(user_id, end - timedelta(days=days), end, canonical_only=False)
+    rows = [row for row in rows if row["source"] == source and row["avg_hr"]]
+    return [int(row["activity_id"]) for row in reversed(rows)]
 
 
 # ---- the whole thing ----------------------------------------------------------------------
@@ -403,13 +485,18 @@ def run(
     user_id: str,
     *,
     days: int = 730,
+    end: date_type | None = None,
     wellness: bool = True,
     activities: bool = True,
     streams: bool = True,
     pause_s: float = GARMIN_DAY_PAUSE_S,
     on_progress: Callable[[str, int, int, object], None] | None = None,
 ) -> BackfillReport:
-    """Everything, for one user, against their stored sessions.
+    """Everything, for one user: Garmin first, then Strava if it is connected.
+
+    Garmin first because it is the source every user has. Strava fills in what the watch
+    did not record, and is skipped without complaint when it is not connected -- a
+    Garmin-only account is the normal case, not an error.
 
     Opens each provider's tokenstore once for the life of the run rather than per call:
     materializing an encrypted tokenstore out of Postgres is a round trip and a temp
@@ -417,38 +504,95 @@ def run(
     """
     history.ensure_schema()
     report = BackfillReport()
+    last = end or date_type.today()
 
-    if wellness:
-        with user_tokenstore.materialized_garmin_tokenstore(user_id) as tokenstore:
-            sync = GarminSync(tokenstore=str(tokenstore))
-            sync.login()
+    def progress(phase: str):
+        return (lambda i, n, item: on_progress(phase, i, n, item)) if on_progress else None
+
+    with user_tokenstore.materialized_garmin_tokenstore(user_id) as tokenstore:
+        sync = GarminSync(tokenstore=str(tokenstore))
+        sync.login()
+        if wellness:
             report.merge(
-                backfill_wellness(
+                backfill_wellness(user_id, days=days, pause_s=pause_s, sync=sync, on_progress=progress("wellness"))
+            )
+        if activities:
+            report.merge(backfill_garmin_activities(user_id, days=days, end=last, sync=sync))
+        if streams and not report.stopped_early:
+            report.merge(
+                backfill_streams(
                     user_id,
-                    days=days,
-                    pause_s=pause_s,
-                    sync=sync,
-                    on_progress=(lambda i, n, day: on_progress("wellness", i, n, day)) if on_progress else None,
+                    source="garmin",
+                    activity_ids=_stream_candidates(user_id, "garmin", days, last),
+                    fetch=sync.get_activity_streams,
+                    pause_s=GARMIN_DETAIL_PAUSE_S,
+                    on_progress=progress("garmin_streams"),
                 )
             )
 
     if activities or streams:
         with user_tokenstore.materialized_strava_paths(user_id) as (tokenstore, shoestore):
             strava = StravaSync(tokenstore=str(tokenstore), shoestore=str(shoestore))
-            if activities:
-                report.merge(backfill_activities(user_id, days=days, strava=strava))
-            if streams:
-                stored = history.activities_between(
-                    user_id, date_type.today() - timedelta(days=days), date_type.today()
-                )
-                ids = [int(row["activity_id"]) for row in stored if row["source"] == "strava"]
-                report.merge(
-                    backfill_streams(
-                        user_id,
-                        activity_ids=ids,
-                        strava=strava,
-                        on_progress=(lambda i, n, a: on_progress("streams", i, n, a)) if on_progress else None,
+            if strava.connection_status()["connected"]:
+                if activities:
+                    report.merge(backfill_activities(user_id, days=days, end=last, strava=strava))
+                if streams:
+                    report.merge(
+                        backfill_streams(
+                            user_id,
+                            source="strava",
+                            activity_ids=_stream_candidates(user_id, "strava", days, last),
+                            fetch=strava.get_activity_streams,
+                            pause_s=STRAVA_STREAM_PAUSE_S,
+                            on_progress=progress("strava_streams"),
+                        )
                     )
-                )
 
+    history.resolve_duplicates(user_id, last - timedelta(days=days), last)
+    return report
+
+
+# ---- keeping it current ------------------------------------------------------------------
+
+# How recent an incremental sync reaches. A week covers someone who opens the app once a
+# week, and it is only one ranged list call per source plus a detail per new activity.
+INCREMENTAL_DAYS = 7
+
+# The shortest gap between two syncs for one user. Opening the app five times in an hour
+# should cost Garmin one sync, not five.
+SYNC_THROTTLE_S = 30 * 60
+
+# A sync still marked running after this long belongs to a process that died. The full
+# first backfill -- two years of wellness at five calls a day -- is the long case, at
+# roughly an hour.
+SYNC_STALE_S = 3 * 60 * 60
+
+FULL_DAYS = 730
+
+
+def sync_mode(user_id: str) -> str:
+    """"full" until the history has Garmin activities in it, "incremental" after.
+
+    Keyed on Garmin specifically, not on "any activity": an account whose history was
+    filled from Strava before Garmin became a source still needs the full pass once --
+    it is also what fills in the start times the duplicate matching needs.
+    """
+    return "incremental" if history.has_activities(user_id, "garmin") else "full"
+
+
+def sync_user(user_id: str, mode: str) -> BackfillReport:
+    """One sync, already claimed through `history.claim_sync`; always released."""
+    try:
+        if mode == "full":
+            report = run(user_id, days=FULL_DAYS)
+        else:
+            report = run(user_id, days=INCREMENTAL_DAYS, wellness=False)
+    except Exception:
+        logger.warning("history sync (%s) failed", mode, exc_info=True)
+        history.release_sync(user_id, note=f"{mode}: failed")
+        raise
+    note = f"{mode}: {report.activities_written} attività, {report.streams_written} stream"
+    if report.stopped_early:
+        note += " (interrotto: rate limit)"
+    history.release_sync(user_id, note=note)
     return report

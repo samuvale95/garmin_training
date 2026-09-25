@@ -54,11 +54,13 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 import zlib
 from array import array
 from dataclasses import dataclass
 from datetime import date as date_type
+from datetime import timedelta
 from typing import Any, Iterable, Sequence
 
 from . import db
@@ -105,6 +107,10 @@ CREATE TABLE IF NOT EXISTS activity (
     avg_power       REAL,
     elevation_gain  REAL,
     summary         JSONB,
+    start_time      TIMESTAMPTZ,
+    external_id     TEXT,
+    -- The Garmin activity this row records a second time; NULL means canonical.
+    duplicate_of    BIGINT,
     fetched_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, source, activity_id)
 );
@@ -113,6 +119,7 @@ CREATE INDEX IF NOT EXISTS activity_day_idx ON activity (user_id, day);
 
 CREATE TABLE IF NOT EXISTS activity_stream (
     user_id      TEXT NOT NULL,
+    source       TEXT NOT NULL,
     activity_id  BIGINT NOT NULL,
     samples      INTEGER NOT NULL,
     header       JSONB NOT NULL,
@@ -120,7 +127,7 @@ CREATE TABLE IF NOT EXISTS activity_stream (
     raw_bytes    INTEGER NOT NULL,
     packed_bytes INTEGER NOT NULL,
     fetched_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (user_id, activity_id)
+    PRIMARY KEY (user_id, source, activity_id)
 );
 
 CREATE TABLE IF NOT EXISTS backfill_progress (
@@ -135,9 +142,39 @@ CREATE TABLE IF NOT EXISTS backfill_progress (
 """
 
 
+# Brings a database created before Garmin became a source up to the shape above. Every
+# statement is a no-op on a database that is already there, so this runs on every startup
+# like SCHEMA does.
+#
+# The stream key is the one that matters: it used to be (user_id, activity_id), which was
+# fine while Strava was the only writer, and becomes a silent overwrite the day a Garmin id
+# and a Strava id happen to share a number. Rows written before this were all Strava's,
+# which is what the column default says.
+MIGRATIONS = """
+ALTER TABLE activity ADD COLUMN IF NOT EXISTS start_time TIMESTAMPTZ;
+ALTER TABLE activity ADD COLUMN IF NOT EXISTS external_id TEXT;
+ALTER TABLE activity ADD COLUMN IF NOT EXISTS duplicate_of BIGINT;
+ALTER TABLE activity_stream ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'strava';
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_index i
+        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+        WHERE i.indrelid = 'activity_stream'::regclass AND i.indisprimary AND a.attname = 'source'
+    ) THEN
+        ALTER TABLE activity_stream DROP CONSTRAINT IF EXISTS activity_stream_pkey;
+        ALTER TABLE activity_stream ADD PRIMARY KEY (user_id, source, activity_id);
+    END IF;
+END $$;
+"""
+
+
 def ensure_schema() -> None:
     with db.connect() as conn:
         conn.execute(SCHEMA)
+        conn.execute(MIGRATIONS)
 
 
 # ---- the stream codec --------------------------------------------------------------------
@@ -322,14 +359,15 @@ def save_activity(user_id: str, source: str, activity_id: int, day: date_type, v
         conn.execute(
             """INSERT INTO activity (user_id, source, activity_id, day, sport, title, distance_km,
                                      duration_min, avg_hr, max_hr, avg_cadence, avg_power,
-                                     elevation_gain, summary)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                     elevation_gain, summary, start_time, external_id)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                ON CONFLICT (user_id, source, activity_id) DO UPDATE SET
                    day = EXCLUDED.day, sport = EXCLUDED.sport, title = EXCLUDED.title,
                    distance_km = EXCLUDED.distance_km, duration_min = EXCLUDED.duration_min,
                    avg_hr = EXCLUDED.avg_hr, max_hr = EXCLUDED.max_hr,
                    avg_cadence = EXCLUDED.avg_cadence, avg_power = EXCLUDED.avg_power,
                    elevation_gain = EXCLUDED.elevation_gain, summary = EXCLUDED.summary,
+                   start_time = EXCLUDED.start_time, external_id = EXCLUDED.external_id,
                    fetched_at = now()""",
             [
                 user_id,
@@ -346,21 +384,23 @@ def save_activity(user_id: str, source: str, activity_id: int, day: date_type, v
                 values.get("avg_power"),
                 values.get("elevation_gain"),
                 json.dumps(values.get("summary") or {}),
+                values.get("start_time"),
+                values.get("external_id"),
             ],
         )
 
 
-def save_stream(user_id: str, activity_id: int, packed: PackedStream) -> None:
+def save_stream(user_id: str, source: str, activity_id: int, packed: PackedStream) -> None:
     with db.connect() as conn:
         conn.execute(
-            """INSERT INTO activity_stream (user_id, activity_id, samples, header, blob,
+            """INSERT INTO activity_stream (user_id, source, activity_id, samples, header, blob,
                                             raw_bytes, packed_bytes)
-               VALUES (%s, %s, %s, %s, %s, %s, %s)
-               ON CONFLICT (user_id, activity_id) DO UPDATE SET
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+               ON CONFLICT (user_id, source, activity_id) DO UPDATE SET
                    samples = EXCLUDED.samples, header = EXCLUDED.header, blob = EXCLUDED.blob,
                    raw_bytes = EXCLUDED.raw_bytes, packed_bytes = EXCLUDED.packed_bytes,
                    fetched_at = now()""",
-            [user_id, activity_id, packed.samples, json.dumps(packed.header), packed.blob,
+            [user_id, source, activity_id, packed.samples, json.dumps(packed.header), packed.blob,
              packed.raw_bytes, packed.packed_bytes],
         )
 
@@ -368,11 +408,12 @@ def save_stream(user_id: str, activity_id: int, packed: PackedStream) -> None:
 # ---- reads ------------------------------------------------------------------------------
 
 
-def load_streams(user_id: str, activity_id: int) -> dict[str, list[float | None]] | None:
+def load_streams(user_id: str, source: str, activity_id: int) -> dict[str, list[float | None]] | None:
     with db.connect() as conn, conn.cursor() as cur:
         cur.execute(
-            "SELECT header, blob FROM activity_stream WHERE user_id = %s AND activity_id = %s",
-            [user_id, activity_id],
+            "SELECT header, blob FROM activity_stream "
+            "WHERE user_id = %s AND source = %s AND activity_id = %s",
+            [user_id, source, activity_id],
         )
         row = cur.fetchone()
     if not row:
@@ -384,27 +425,45 @@ def load_streams(user_id: str, activity_id: int) -> dict[str, list[float | None]
 def streams_between(
     user_id: str, start: date_type, end: date_type, sports: Sequence[str]
 ) -> Iterable[tuple[dict, dict[str, list[float | None]]]]:
-    """Every stored activity of these sports in the range, with its decoded streams.
+    """Every workout of these sports in the range, once, with its decoded streams.
 
     One query instead of `activities_between` plus a `load_streams` round-trip per row:
     a year of history is hundreds of activities, and the per-row version paid a pool
     checkout and a query for each -- including the ski tours and hikes the caller was
     about to throw away. Filtering on sport in SQL means those blobs never leave the
     database, and decoding lazily keeps one activity's streams in memory at a time.
+
+    Canonical rows only, so a run recorded by the watch and uploaded to Strava counts
+    once. When the canonical row has no stream of its own (its detail fetch failed) the
+    stream of a row that duplicates it stands in: it is the same workout.
     """
     with db.connect() as conn, conn.cursor() as cur:
         cur.execute(
-            "SELECT a.activity_id, a.day, a.sport, a.title, s.header, s.blob "
-            "FROM activity a JOIN activity_stream s "
-            "ON s.user_id = a.user_id AND s.activity_id = a.activity_id "
+            "SELECT a.activity_id, a.source, a.day, a.sport, a.title, "
+            "       coalesce(s.header, d.header), coalesce(s.blob, d.blob) "
+            "FROM activity a "
+            "LEFT JOIN activity_stream s "
+            "  ON s.user_id = a.user_id AND s.source = a.source AND s.activity_id = a.activity_id "
+            f"LEFT JOIN LATERAL ({_DUPLICATE_STREAM}) d ON s.blob IS NULL "
             "WHERE a.user_id = %s AND a.day BETWEEN %s AND %s AND a.sport = ANY(%s) "
-            "ORDER BY a.day",
+            "  AND a.duplicate_of IS NULL AND coalesce(s.blob, d.blob) IS NOT NULL "
+            "ORDER BY a.day, a.start_time",
             [user_id, start, end, list(sports)],
         )
         rows = cur.fetchall()
-    for activity_id, day, sport, title, header, blob in rows:
-        row = {"activity_id": activity_id, "day": day, "sport": sport, "title": title}
+    for activity_id, source, day, sport, title, header, blob in rows:
+        row = {"activity_id": activity_id, "source": source, "day": day, "sport": sport, "title": title}
         yield row, unpack_streams(header, bytes(blob))
+
+
+# The stream of a Strava row that records the same workout as the Garmin row `a`.
+_DUPLICATE_STREAM = (
+    "SELECT ds.header, ds.blob FROM activity dup "
+    "JOIN activity_stream ds "
+    "  ON ds.user_id = dup.user_id AND ds.source = dup.source AND ds.activity_id = dup.activity_id "
+    "WHERE dup.user_id = a.user_id AND a.source = 'garmin' AND dup.duplicate_of = a.activity_id "
+    "LIMIT 1"
+)
 
 
 def streams_version(user_id: str) -> tuple[int, str | None]:
@@ -430,16 +489,147 @@ def wellness_between(user_id: str, start: date_type, end: date_type) -> list[dic
         return [dict(zip(columns, row)) for row in cur.fetchall()]
 
 
-def activities_between(user_id: str, start: date_type, end: date_type) -> list[dict]:
+def activities_between(
+    user_id: str, start: date_type, end: date_type, *, canonical_only: bool = True
+) -> list[dict]:
+    """Stored activities in the range. By default one row per real workout: a Strava row
+    that duplicates a Garmin one is left out (see `resolve_duplicates`)."""
     columns = ("source", "activity_id", "day", "sport", "title", "distance_km", "duration_min",
-               "avg_hr", "max_hr", "avg_cadence", "avg_power", "elevation_gain")
+               "avg_hr", "max_hr", "avg_cadence", "avg_power", "elevation_gain", "start_time")
+    canonical = "AND duplicate_of IS NULL " if canonical_only else ""
     with db.connect() as conn, conn.cursor() as cur:
         cur.execute(
             f"SELECT {', '.join(columns)} FROM activity "
-            "WHERE user_id = %s AND day BETWEEN %s AND %s ORDER BY day",
+            f"WHERE user_id = %s AND day BETWEEN %s AND %s {canonical}ORDER BY day, start_time",
             [user_id, start, end],
         )
         return [dict(zip(columns, row)) for row in cur.fetchall()]
+
+
+def load_workout_streams(user_id: str, source: str, activity_id: int) -> dict[str, list[float | None]] | None:
+    """`load_streams`, falling back on a duplicate's stream when this row has none."""
+    streams = load_streams(user_id, source, activity_id)
+    if streams is not None or source != "garmin":
+        return streams
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT ds.header, ds.blob FROM activity dup JOIN activity_stream ds "
+            "  ON ds.user_id = dup.user_id AND ds.source = dup.source AND ds.activity_id = dup.activity_id "
+            "WHERE dup.user_id = %s AND dup.duplicate_of = %s LIMIT 1",
+            [user_id, activity_id],
+        )
+        row = cur.fetchone()
+    return unpack_streams(row[0], bytes(row[1])) if row else None
+
+
+# ---- one workout, two sources ----------------------------------------------------------------
+
+# How close two recordings have to be to be the same workout. Two minutes absorbs the
+# watch and the phone disagreeing on when "start" was pressed; ten percent absorbs Strava
+# counting moving time where Garmin counts timer time. Neither is loose enough to merge
+# the morning run with the evening one.
+DUPLICATE_START_TOLERANCE_S = 120
+DUPLICATE_DURATION_TOLERANCE = 0.10
+
+# Strava's `external_id` for an activity Garmin pushed to it.
+_GARMIN_EXTERNAL_ID = re.compile(r"^garmin_(?:ping|push)_(\d+)")
+
+# Families across both vocabularies, so a Garmin `trail_running` and a Strava `TrailRun`
+# can be the same workout and a run and a ride never can. Anything unlisted is its own
+# family, compared by its lowercased name.
+_SPORT_FAMILIES = {
+    "run": ("Run", "TrailRun", "VirtualRun", "running", "trail_running", "treadmill_running",
+            "track_running", "indoor_running", "street_running", "virtual_run"),
+    "ride": ("Ride", "VirtualRide", "EBikeRide", "MountainBikeRide", "GravelRide", "EMountainBikeRide",
+             "cycling", "road_biking", "mountain_biking", "gravel_cycling", "indoor_cycling",
+             "virtual_ride", "e_bike_fitness", "e_bike_mountain"),
+    "swim": ("Swim", "swimming", "lap_swimming", "open_water_swimming"),
+    "hike": ("Hike", "hiking"),
+    "walk": ("Walk", "walking"),
+    "strength": ("WeightTraining", "strength_training"),
+    "ski": ("AlpineSki", "BackcountrySki", "NordicSki", "resort_skiing_snowboarding_ws",
+            "backcountry_skiing", "skate_skiing_ws", "cross_country_skiing_ws"),
+}
+_FAMILY_OF = {sport: family for family, sports in _SPORT_FAMILIES.items() for sport in sports}
+
+
+def sport_family(sport: str | None) -> str:
+    return _FAMILY_OF.get(sport or "", (sport or "").lower())
+
+
+def match_duplicates(garmin: Sequence[dict], strava: Sequence[dict]) -> dict[int, int | None]:
+    """For each Strava row, the Garmin activity id it records a second time, or `None`.
+
+    Pure, so the rules are tested without a database. Rows carry `activity_id`, `sport`,
+    `start_time`, `duration_min` and, for Strava, `external_id`.
+
+    1. An `external_id` naming a Garmin activity we have: the same workout, whatever the
+       times say -- Garmin itself sent it.
+    2. Otherwise the same sport family, starts within two minutes, durations within ten
+       percent. With several candidates, the closest start wins.
+    3. Otherwise it is its own workout -- for instance one recorded on the phone.
+    """
+    garmin_ids = {row["activity_id"] for row in garmin}
+    out: dict[int, int | None] = {}
+
+    for row in strava:
+        match: int | None = None
+        external = _GARMIN_EXTERNAL_ID.match(str(row.get("external_id") or ""))
+        if external and int(external.group(1)) in garmin_ids:
+            match = int(external.group(1))
+        elif row.get("start_time") is not None:
+            best: tuple[float, int] | None = None
+            for candidate in garmin:
+                if candidate.get("start_time") is None:
+                    continue
+                if sport_family(candidate.get("sport")) != sport_family(row.get("sport")):
+                    continue
+                gap = abs((candidate["start_time"] - row["start_time"]).total_seconds())
+                if gap > DUPLICATE_START_TOLERANCE_S:
+                    continue
+                if not _durations_agree(candidate.get("duration_min"), row.get("duration_min")):
+                    continue
+                if best is None or gap < best[0]:
+                    best = (gap, candidate["activity_id"])
+            match = best[1] if best else None
+        out[row["activity_id"]] = match
+    return out
+
+
+def _durations_agree(a: float | None, b: float | None) -> bool:
+    if not a or not b:
+        return False
+    return abs(a - b) <= DUPLICATE_DURATION_TOLERANCE * max(a, b)
+
+
+def resolve_duplicates(user_id: str, start: date_type, end: date_type) -> int:
+    """Recompute which Strava rows in the range duplicate a Garmin row. Returns how many do.
+
+    Stored rather than worked out on every read, so readers stay one plain filter
+    (`duplicate_of IS NULL`) and the decision can be inspected in the table. Deterministic
+    and cheap, so it simply runs again after every sync. The window is widened by a day on
+    each side: a workout just after midnight can land on different days in two time zones.
+    """
+    columns = ("source", "activity_id", "sport", "start_time", "duration_min", "external_id")
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"SELECT {', '.join(columns)} FROM activity "
+            "WHERE user_id = %s AND day BETWEEN %s AND %s",
+            [user_id, start - timedelta(days=1), end + timedelta(days=1)],
+        )
+        rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+    garmin = [row for row in rows if row["source"] == "garmin"]
+    strava = [row for row in rows if row["source"] == "strava"]
+    matches = match_duplicates(garmin, strava)
+    if matches:
+        with db.connect() as conn, conn.cursor() as cur:
+            cur.executemany(
+                "UPDATE activity SET duplicate_of = %s "
+                "WHERE user_id = %s AND source = 'strava' AND activity_id = %s",
+                [(garmin_id, user_id, strava_id) for strava_id, garmin_id in matches.items()],
+            )
+    return sum(1 for garmin_id in matches.values() if garmin_id is not None)
 
 
 def stored_days(user_id: str) -> set[date_type]:
@@ -449,9 +639,11 @@ def stored_days(user_id: str) -> set[date_type]:
         return {row[0] for row in cur.fetchall()}
 
 
-def stored_stream_ids(user_id: str) -> set[int]:
+def stored_stream_ids(user_id: str, source: str) -> set[int]:
     with db.connect() as conn, conn.cursor() as cur:
-        cur.execute("SELECT activity_id FROM activity_stream WHERE user_id = %s", [user_id])
+        cur.execute(
+            "SELECT activity_id FROM activity_stream WHERE user_id = %s AND source = %s", [user_id, source]
+        )
         return {row[0] for row in cur.fetchall()}
 
 
@@ -507,3 +699,44 @@ def set_progress(user_id: str, task: str, *, cursor: str | None = None, done: bo
                    updated_at = now()""",
             [user_id, task, cursor, done, note],
         )
+
+
+# ---- keeping the history current -----------------------------------------------------------
+
+# The one row that says when this user's history last started syncing, and whether a sync
+# is running now. Claimed with a single conditional upsert, so two tabs, two workers or
+# two quick reloads can never start two syncs for the same user.
+SYNC_TASK = "sync"
+
+
+def claim_sync(user_id: str, *, throttle_s: int, stale_s: int) -> bool:
+    """True when this caller now owns the user's next sync.
+
+    Refused while a sync is running (unless it has been "running" for longer than
+    `stale_s` -- a process that died mid-run must not block the history forever) and
+    within `throttle_s` of the last one starting.
+    """
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO backfill_progress (user_id, task, cursor, done, note)
+               VALUES (%s, %s, 'running', FALSE, NULL)
+               ON CONFLICT (user_id, task) DO UPDATE SET
+                   cursor = 'running', done = FALSE, note = NULL, updated_at = now()
+               WHERE (backfill_progress.cursor IS DISTINCT FROM 'running'
+                      AND backfill_progress.updated_at < now() - make_interval(secs => %s))
+                  OR backfill_progress.updated_at < now() - make_interval(secs => %s)
+               RETURNING 1""",
+            [user_id, SYNC_TASK, throttle_s, stale_s],
+        )
+        return cur.fetchone() is not None
+
+
+def release_sync(user_id: str, note: str | None = None) -> None:
+    """Mark the sync finished. The throttle counts from here."""
+    set_progress(user_id, SYNC_TASK, cursor="idle", done=True, note=note)
+
+
+def has_activities(user_id: str, source: str) -> bool:
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM activity WHERE user_id = %s AND source = %s LIMIT 1", [user_id, source])
+        return cur.fetchone() is not None

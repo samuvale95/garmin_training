@@ -1,5 +1,6 @@
 import { TabBar } from "@/components/TabBar";
 import { TabContentTransition } from "@/components/motion/RouteTransition";
+import { HistorySync } from "@/components/HistorySync";
 
 export default function TabsLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,6 +11,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
         <TabContentTransition>{children}</TabContentTransition>
       </div>
       <TabBar />
+      <HistorySync />
     </div>
   );
 }

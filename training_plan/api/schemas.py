@@ -1509,6 +1509,17 @@ class CoachPlanResponse(BaseModel):
 # ---- errors -----------------------------------------------------------------------------------
 
 
+# ---- history sync ----------------------------------------------------------------------------
+
+
+class HistorySyncResponse(BaseModel):
+    """Whether this request started a sync. `started: false` is the normal answer: one
+    is already running, or the last one was recent enough."""
+
+    started: bool
+    mode: str | None = None
+
+
 class ErrorResponse(BaseModel):
     category: str  # "validation_failed" | "auth_failed" | "rate_limited" | "mfa_required"
     message: str

@@ -99,7 +99,21 @@ NO_INTENT = "non_pianificata"
 # reported 74% easy where running alone was 54%: ninety hours of skiing, hiking, sailing
 # and climbing, almost all of it under the aerobic threshold, quietly flattered a
 # distribution that was actually a problem.
-RUNNING_SPORTS = ("Run", "TrailRun", "VirtualRun", "running")
+RUNNING_SPORTS = (
+    # Strava's `sport_type`
+    "Run",
+    "TrailRun",
+    "VirtualRun",
+    # Garmin's `typeKey`. An explicit list rather than "anything ending in running": a new
+    # Garmin sport stays out until someone decides the running zones apply to it.
+    "running",
+    "trail_running",
+    "treadmill_running",
+    "track_running",
+    "indoor_running",
+    "street_running",
+    "virtual_run",
+)
 
 
 @dataclass

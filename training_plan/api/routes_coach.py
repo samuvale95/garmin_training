@@ -164,7 +164,7 @@ async def coach_execution(
             row = stored.get(session.date)
             if row:
                 activity_id = int(row["activity_id"])
-                streams = history.load_streams(user_id, activity_id) or {}
+                streams = history.load_workout_streams(user_id, row["source"], activity_id) or {}
             else:
                 streams = {}
 

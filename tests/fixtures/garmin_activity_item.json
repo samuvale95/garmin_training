@@ -1,0 +1,18 @@
+{
+ "activityId": 1000000001,
+ "activityName": "Corsa",
+ "startTimeLocal": "2026-09-24 19:26:47",
+ "startTimeGMT": "2026-09-24 17:26:47",
+ "activityType": {
+  "typeKey": "running"
+ },
+ "distance": 6958.18017578125,
+ "duration": 2466.634033203125,
+ "movingDuration": 2450.897008895874,
+ "elapsedDuration": 2567.429931640625,
+ "elevationGain": 36.0,
+ "averageHR": 156.0,
+ "maxHR": 179.0,
+ "averageRunningCadenceInStepsPerMinute": 168.234375,
+ "avgPower": 356.0
+}
