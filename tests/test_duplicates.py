@@ -22,13 +22,36 @@ def _strava(activity_id, start=T0, minutes=41.0, sport="Run", external_id=None):
     }
 
 
-def test_garmin_upload_is_matched_by_external_id_whatever_the_times_say():
-    out = match_duplicates([_garmin(111)], [_strava(9, start=T0 + timedelta(hours=3), external_id="garmin_ping_111")])
+def test_a_garmin_upload_matches_even_when_strava_counts_moving_time():
+    """A ride with stops: 62 minutes moving on Strava, 81 on the watch's timer."""
+    out = match_duplicates(
+        [_garmin(111, minutes=81, sport="cycling")],
+        [_strava(9, minutes=62.5, sport="Ride", external_id="garmin_ping_596672941049")],
+    )
     assert out == {9: 111}
 
 
-def test_push_uploads_are_recognised_too():
-    assert match_duplicates([_garmin(111)], [_strava(9, external_id="garmin_push_111")]) == {9: 111}
+def test_a_garmin_upload_goes_to_the_closest_start_that_day():
+    """A ski day: several Garmin runs, Strava's copy re-cut to start eight minutes later."""
+    garmin = [
+        _garmin(1, start=T0, minutes=9, sport="resort_skiing"),
+        _garmin(2, start=T0 - timedelta(hours=2), minutes=52, sport="resort_skiing"),
+    ]
+    strava = [_strava(9, start=T0 + timedelta(minutes=8), minutes=6.8, sport="AlpineSki", external_id="garmin_push_1")]
+    assert match_duplicates(garmin, strava) == {9: 1}
+
+
+def test_a_garmin_upload_prefers_the_same_sport():
+    """The evening run and the afternoon ride of the same day, both within reach."""
+    garmin = [_garmin(1, start=T0 + timedelta(minutes=5), sport="running"), _garmin(2, start=T0, sport="cycling")]
+    strava = [_strava(9, start=T0 + timedelta(minutes=1), sport="Ride", external_id="garmin_ping_5")]
+    assert match_duplicates(garmin, strava) == {9: 2}
+
+
+def test_a_garmin_upload_with_no_watch_activity_nearby_stays_its_own():
+    """The watch activity is outside the stored window, or was deleted."""
+    out = match_duplicates([_garmin(1, start=T0 + timedelta(hours=2))], [_strava(9, external_id="garmin_ping_5")])
+    assert out == {9: None}
 
 
 def test_match_by_start_and_duration_when_there_is_no_external_id():
@@ -61,14 +84,18 @@ def test_the_closest_start_wins_among_several_candidates():
     assert match_duplicates(garmin, [_strava(9)]) == {9: 222}
 
 
-def test_an_external_id_for_an_activity_we_do_not_have_falls_back_on_times():
-    out = match_duplicates([_garmin(111)], [_strava(9, external_id="garmin_ping_999")])
-    assert out == {9: 111}
+def test_another_devices_upload_is_matched_only_by_the_strict_rule():
+    """An Apple Watch file (`<uuid>.fit`) is a different device: same start and duration or nothing."""
+    other_device = "43497756-8130-459B-BE04-E11ACB9A8E27.fit"
+    near = [_strava(9, start=T0 + timedelta(minutes=8), external_id=other_device)]
+    assert match_duplicates([_garmin(111)], near) == {9: None}
 
 
 def test_sport_families_span_both_vocabularies():
     assert sport_family("TrailRun") == sport_family("trail_running") == "run"
     assert sport_family("Tennis") == sport_family("tennis")
+    assert sport_family("Tennis") == sport_family("tennis_v2")
+    assert sport_family("AlpineSki") == sport_family("resort_skiing")
     assert sport_family("Tennis") != sport_family("Hike")
 
 

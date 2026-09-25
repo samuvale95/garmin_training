@@ -531,8 +531,16 @@ def load_workout_streams(user_id: str, source: str, activity_id: int) -> dict[st
 DUPLICATE_START_TOLERANCE_S = 120
 DUPLICATE_DURATION_TOLERANCE = 0.10
 
-# Strava's `external_id` for an activity Garmin pushed to it.
-_GARMIN_EXTERNAL_ID = re.compile(r"^garmin_(?:ping|push)_(\d+)")
+# Strava's `external_id` for an activity Garmin pushed to it. The number is *not* the
+# Garmin activity id (checked against a real two-year history: none of 368 matched), so
+# it cannot be joined on -- but the prefix alone proves the watch recorded the workout.
+_GARMIN_EXTERNAL_ID = re.compile(r"^garmin_(?:ping|push)_\d+")
+
+# For a Strava row Garmin itself uploaded, how far apart the two starts may be. Wider than
+# the blind rule because the question is no longer "is this the same workout" (it is)
+# but "which of that day's Garmin activities" -- and Strava re-cuts some of them: a ski
+# day or a paused ride can start minutes later there than on the watch.
+GARMIN_UPLOAD_START_TOLERANCE_S = 15 * 60
 
 # Families across both vocabularies, so a Garmin `trail_running` and a Strava `TrailRun`
 # can be the same workout and a run and a ride never can. Anything unlisted is its own
@@ -547,8 +555,12 @@ _SPORT_FAMILIES = {
     "hike": ("Hike", "hiking"),
     "walk": ("Walk", "walking"),
     "strength": ("WeightTraining", "strength_training"),
-    "ski": ("AlpineSki", "BackcountrySki", "NordicSki", "resort_skiing_snowboarding_ws",
+    "ski": ("AlpineSki", "BackcountrySki", "NordicSki", "resort_skiing", "resort_skiing_snowboarding_ws",
             "backcountry_skiing", "skate_skiing_ws", "cross_country_skiing_ws"),
+    "tennis": ("Tennis", "tennis", "tennis_v2"),
+    "climb": ("RockClimbing", "rock_climbing", "indoor_climbing", "bouldering"),
+    "paddle": ("StandUpPaddling", "stand_up_paddleboarding", "stand_up_paddleboarding_v2"),
+    "sail": ("Sail", "sailing", "sailing_v2"),
 }
 _FAMILY_OF = {sport: family for family, sports in _SPORT_FAMILIES.items() for sport in sports}
 
@@ -563,37 +575,57 @@ def match_duplicates(garmin: Sequence[dict], strava: Sequence[dict]) -> dict[int
     Pure, so the rules are tested without a database. Rows carry `activity_id`, `sport`,
     `start_time`, `duration_min` and, for Strava, `external_id`.
 
-    1. An `external_id` naming a Garmin activity we have: the same workout, whatever the
-       times say -- Garmin itself sent it.
+    1. Uploaded by Garmin (`external_id` `garmin_ping_…` / `garmin_push_…`): it *is* one
+       of the watch's activities. It goes to the Garmin activity with the closest start
+       within fifteen minutes, preferring the same sport family, and with no duration
+       check -- Strava counts moving time where Garmin counts the timer, and on a ride
+       with stops the two differ by a quarter.
     2. Otherwise the same sport family, starts within two minutes, durations within ten
-       percent. With several candidates, the closest start wins.
-    3. Otherwise it is its own workout -- for instance one recorded on the phone.
+       percent. With several candidates, the closest start wins. This is the case of two
+       devices recording the same workout.
+    3. Otherwise it is its own workout -- for instance one recorded on another watch.
     """
-    garmin_ids = {row["activity_id"] for row in garmin}
     out: dict[int, int | None] = {}
-
     for row in strava:
         match: int | None = None
-        external = _GARMIN_EXTERNAL_ID.match(str(row.get("external_id") or ""))
-        if external and int(external.group(1)) in garmin_ids:
-            match = int(external.group(1))
-        elif row.get("start_time") is not None:
-            best: tuple[float, int] | None = None
-            for candidate in garmin:
-                if candidate.get("start_time") is None:
-                    continue
-                if sport_family(candidate.get("sport")) != sport_family(row.get("sport")):
-                    continue
-                gap = abs((candidate["start_time"] - row["start_time"]).total_seconds())
-                if gap > DUPLICATE_START_TOLERANCE_S:
-                    continue
-                if not _durations_agree(candidate.get("duration_min"), row.get("duration_min")):
-                    continue
-                if best is None or gap < best[0]:
-                    best = (gap, candidate["activity_id"])
-            match = best[1] if best else None
+        if row.get("start_time") is not None:
+            if _GARMIN_EXTERNAL_ID.match(str(row.get("external_id") or "")):
+                match = _closest_garmin_upload(garmin, row)
+            else:
+                match = _closest(
+                    garmin,
+                    row,
+                    tolerance_s=DUPLICATE_START_TOLERANCE_S,
+                    accept=lambda candidate: sport_family(candidate.get("sport")) == sport_family(row.get("sport"))
+                    and _durations_agree(candidate.get("duration_min"), row.get("duration_min")),
+                )
         out[row["activity_id"]] = match
     return out
+
+
+def _closest_garmin_upload(garmin: Sequence[dict], row: dict) -> int | None:
+    same_family = _closest(
+        garmin,
+        row,
+        tolerance_s=GARMIN_UPLOAD_START_TOLERANCE_S,
+        accept=lambda candidate: sport_family(candidate.get("sport")) == sport_family(row.get("sport")),
+    )
+    if same_family is not None:
+        return same_family
+    # The two apps sometimes name the sport differently in ways no table anticipates;
+    # Garmin sent this one, so a Garmin activity starting at the same moment is it.
+    return _closest(garmin, row, tolerance_s=DUPLICATE_START_TOLERANCE_S, accept=lambda candidate: True)
+
+
+def _closest(garmin: Sequence[dict], row: dict, *, tolerance_s: float, accept) -> int | None:
+    best: tuple[float, int] | None = None
+    for candidate in garmin:
+        if candidate.get("start_time") is None or not accept(candidate):
+            continue
+        gap = abs((candidate["start_time"] - row["start_time"]).total_seconds())
+        if gap <= tolerance_s and (best is None or gap < best[0]):
+            best = (gap, candidate["activity_id"])
+    return best[1] if best else None
 
 
 def _durations_agree(a: float | None, b: float | None) -> bool:
@@ -740,3 +772,31 @@ def has_activities(user_id: str, source: str) -> bool:
     with db.connect() as conn, conn.cursor() as cur:
         cur.execute("SELECT 1 FROM activity WHERE user_id = %s AND source = %s LIMIT 1", [user_id, source])
         return cur.fetchone() is not None
+
+
+def activities_needing_stream(user_id: str, source: str, start: date_type, end: date_type) -> list[int]:
+    """Ids of this source's activities whose stream is worth fetching, newest first.
+
+    - only activities with a recorded heart rate: a stream without one feeds none of the
+      analysis, and skipping them keeps a strength session from costing a request on
+      every run just to come back empty again;
+    - only those without a stream of their own yet;
+    - for Strava, only workouts the watch did not already cover: a Strava row that
+      duplicates a Garmin row with a stream would be the same workout fetched twice.
+      Strava allows about a hundred requests a quarter of an hour, so on a history
+      synced from both this is the difference between ten requests and three hundred.
+    """
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT a.activity_id FROM activity a "
+            "WHERE a.user_id = %s AND a.source = %s AND a.day BETWEEN %s AND %s "
+            "  AND a.avg_hr IS NOT NULL "
+            "  AND NOT EXISTS (SELECT 1 FROM activity_stream s WHERE s.user_id = a.user_id "
+            "                  AND s.source = a.source AND s.activity_id = a.activity_id) "
+            "  AND (a.duplicate_of IS NULL OR NOT EXISTS ("
+            "       SELECT 1 FROM activity_stream g WHERE g.user_id = a.user_id "
+            "       AND g.source = 'garmin' AND g.activity_id = a.duplicate_of)) "
+            "ORDER BY a.day DESC, a.start_time DESC NULLS LAST",
+            [user_id, source, start, end],
+        )
+        return [int(row[0]) for row in cur.fetchall()]

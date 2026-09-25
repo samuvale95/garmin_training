@@ -42,6 +42,9 @@ DEFAULT_SHOESTORE_PATH = str(Path.home() / ".garmin_training_strava_shoes.json")
 STRAVA_AUTHORIZE_URL = "https://www.strava.com/oauth/authorize"
 STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
 STRAVA_DEAUTHORIZE_URL = "https://www.strava.com/oauth/deauthorize"
+
+# Strava's maximum page size for the activity list.
+STRAVA_PAGE_SIZE = 200
 logger = logging.getLogger(__name__)
 
 STRAVA_API_BASE = "https://www.strava.com/api/v3"
@@ -76,6 +79,12 @@ STRAVA_SPORT_TO_OURS = {
 
 class StravaAuthError(Exception):
     """Raised when Strava isn't connected, or a token/refresh/API call fails."""
+
+
+class StravaRateLimitError(StravaAuthError):
+    """Strava answered 429. A subclass so every existing handler still maps it; the
+    backfill catches it on its own to stop the run instead of spending the rest of the
+    quarter-hour window on requests that will all fail the same way."""
 
 
 @dataclass
@@ -268,6 +277,8 @@ class StravaSync:
         if response.status_code == 401:
             self._tokenstore.unlink(missing_ok=True)
             raise StravaAuthError("Strava authorization expired; reconnect from Settings.")
+        if response.status_code == 429:
+            raise StravaRateLimitError(f"Strava rate limit reached ({path})")
         if response.status_code != 200:
             raise StravaAuthError(f"Strava API error ({response.status_code}): {response.text}")
         return response
@@ -279,8 +290,19 @@ class StravaSync:
         before = int(
             datetime.combine(end + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc).timestamp()
         )
-        response = self._get("/athlete/activities", params={"after": after, "before": before, "per_page": 200})
-        return response.json()
+        # Paged: Strava returns at most `per_page` activities per call, and a two-year window
+        # is several pages. Reading only the first one silently capped the history at 200.
+        activities: list[dict] = []
+        page = 1
+        while True:
+            batch = self._get(
+                "/athlete/activities",
+                params={"after": after, "before": before, "per_page": STRAVA_PAGE_SIZE, "page": page},
+            ).json()
+            activities.extend(batch)
+            if len(batch) < STRAVA_PAGE_SIZE:
+                return activities
+            page += 1
 
     def get_activity_detail(self, activity_id: int) -> dict:
         return self._get(f"/activities/{activity_id}").json()

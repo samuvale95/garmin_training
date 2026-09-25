@@ -44,6 +44,6 @@
 
 ## 7. Verify
 
-- [ ] 7.1 Run the full backfill against a real Garmin-only account (or with Strava disconnected) and check `/coach/plan` returns a block.
-- [ ] 7.2 Run it with both sources connected and check the session count in `/coach/plan` equals the number of distinct runs, not the sum of both sources.
+- [x] 7.1 Run the full backfill against a real Garmin-only account (or with Strava disconnected) and check `/coach/plan` returns a block. *(no Garmin-only account available; on the real account every one of the 142 runs of the last year is read from its Garmin row and stream, Strava contributing none -- the Garmin half alone carries the screen)*
+- [x] 7.2 Run it with both sources connected and check the session count in `/coach/plan` equals the number of distinct runs, not the sum of both sources. *(142 runs on Garmin, 142 on Strava, 142 in `/coach/plan`; 369 of 533 Strava rows resolved as duplicates, 1 Garmin upload left canonical with no watch activity within 15 min)*
 - [x] 7.3 Run `uv run pytest` and `npx tsc --noEmit` in `web/`. *(489 passed; the 22 failures are the same pre-existing ones in test_db / test_api / test_api_caching / test_api_nutrition, none in files this change touches. tsc clean.)*

@@ -37,10 +37,12 @@ from datetime import date as date_type
 from datetime import datetime
 from datetime import timedelta
 
+import httpx
+
 from . import history
 from .api import user_tokenstore
 from .garmin_sync import GarminRateLimitError, GarminSync
-from .strava_sync import StravaSync
+from .strava_sync import StravaRateLimitError, StravaSync
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +113,9 @@ def _float(value) -> float | None:
 # The failures that are worth a second try: the network dropped, not "this endpoint has
 # nothing for that date". Over several hundred days a transient reset is a certainty, and
 # treating one as no-data would leave a hole no later run would ever fill.
-TRANSIENT_ERRORS = (ConnectionError, TimeoutError, OSError)
+# `httpx.TransportError` is the Strava client's version of the same thing: it does not
+# derive from OSError, so without it a reset socket on Strava was never retried.
+TRANSIENT_ERRORS = (ConnectionError, TimeoutError, OSError, httpx.TransportError)
 TRANSIENT_ATTEMPTS = 3
 TRANSIENT_PAUSE_S = 3.0
 
@@ -442,7 +446,7 @@ def backfill_streams(
     for index, activity_id in enumerate(todo, start=1):
         try:
             streams = _with_retry(lambda: fetch(activity_id), f"stream {source} {activity_id}")
-        except GarminRateLimitError as error:
+        except (GarminRateLimitError, StravaRateLimitError) as error:
             logger.warning("rate limit reading %s stream %s; stopping this run", source, activity_id)
             report.stopped_early = str(error)
             break
@@ -464,18 +468,6 @@ def backfill_streams(
     history.set_progress(user_id, f"{source}_streams", done=report.stopped_early is None,
                          note=f"{report.streams_written} stream")
     return report
-
-
-def _stream_candidates(user_id: str, source: str, days: int, end: date_type) -> list[int]:
-    """Ids of this source's stored activities worth a stream fetch, newest first.
-
-    Only activities with a recorded heart rate: a stream without one feeds none of the
-    analysis, and skipping them keeps a strength session from costing a request on every
-    run just to come back empty again.
-    """
-    rows = history.activities_between(user_id, end - timedelta(days=days), end, canonical_only=False)
-    rows = [row for row in rows if row["source"] == source and row["avg_hr"]]
-    return [int(row["activity_id"]) for row in reversed(rows)]
 
 
 # ---- the whole thing ----------------------------------------------------------------------
@@ -523,7 +515,9 @@ def run(
                 backfill_streams(
                     user_id,
                     source="garmin",
-                    activity_ids=_stream_candidates(user_id, "garmin", days, last),
+                    activity_ids=history.activities_needing_stream(
+                        user_id, "garmin", last - timedelta(days=days), last
+                    ),
                     fetch=sync.get_activity_streams,
                     pause_s=GARMIN_DETAIL_PAUSE_S,
                     on_progress=progress("garmin_streams"),
@@ -531,24 +525,53 @@ def run(
             )
 
     if activities or streams:
-        with user_tokenstore.materialized_strava_paths(user_id) as (tokenstore, shoestore):
-            strava = StravaSync(tokenstore=str(tokenstore), shoestore=str(shoestore))
-            if strava.connection_status()["connected"]:
-                if activities:
-                    report.merge(backfill_activities(user_id, days=days, end=last, strava=strava))
-                if streams:
-                    report.merge(
-                        backfill_streams(
-                            user_id,
-                            source="strava",
-                            activity_ids=_stream_candidates(user_id, "strava", days, last),
-                            fetch=strava.get_activity_streams,
-                            pause_s=STRAVA_STREAM_PAUSE_S,
-                            on_progress=progress("strava_streams"),
-                        )
-                    )
+        try:
+            report.merge(_strava_half(user_id, days=days, end=last, activities=activities, streams=streams,
+                                      on_progress=progress("strava_streams")))
+        except Exception as error:  # noqa: BLE001 - Strava is optional; the Garmin half stands
+            # A Strava failure used to end the whole run after the Garmin half had already
+            # done the expensive part -- and skip the duplicate pass below, leaving every
+            # workout on both sources counted twice until the next successful sync.
+            logger.warning("Strava half of the history sync failed", exc_info=True)
+            report.errors.append(f"strava: {type(error).__name__}")
 
     history.resolve_duplicates(user_id, last - timedelta(days=days), last)
+    return report
+
+
+def _strava_half(
+    user_id: str,
+    *,
+    days: int,
+    end: date_type,
+    activities: bool,
+    streams: bool,
+    on_progress: Callable[[int, int, int], None] | None,
+) -> BackfillReport:
+    """Strava's activities and streams, when Strava is connected; nothing when it is not."""
+    report = BackfillReport()
+    with user_tokenstore.materialized_strava_paths(user_id) as (tokenstore, shoestore):
+        strava = StravaSync(tokenstore=str(tokenstore), shoestore=str(shoestore))
+        if not strava.connection_status()["connected"]:
+            return report
+        if activities:
+            report.merge(backfill_activities(user_id, days=days, end=end, strava=strava))
+            # Before the streams, so the candidates below already know which Strava rows
+            # are workouts the watch has covered.
+            history.resolve_duplicates(user_id, end - timedelta(days=days), end)
+        if streams:
+            report.merge(
+                backfill_streams(
+                    user_id,
+                    source="strava",
+                    activity_ids=history.activities_needing_stream(
+                        user_id, "strava", end - timedelta(days=days), end
+                    ),
+                    fetch=strava.get_activity_streams,
+                    pause_s=STRAVA_STREAM_PAUSE_S,
+                    on_progress=on_progress,
+                )
+            )
     return report
 
 
@@ -570,14 +593,20 @@ SYNC_STALE_S = 3 * 60 * 60
 FULL_DAYS = 730
 
 
-def sync_mode(user_id: str) -> str:
-    """"full" until the history has Garmin activities in it, "incremental" after.
+# The progress row that records a full pass finishing cleanly.
+FULL_SYNC_TASK = "full_sync"
 
-    Keyed on Garmin specifically, not on "any activity": an account whose history was
-    filled from Strava before Garmin became a source still needs the full pass once --
-    it is also what fills in the start times the duplicate matching needs.
+
+def sync_mode(user_id: str) -> str:
+    """"full" until one full pass has finished cleanly, "incremental" after.
+
+    Not "until there are Garmin activities": a full pass that stored the Garmin half and
+    then failed on Strava would otherwise never be repeated, and the Strava rows it did
+    not re-list would stay without the start times duplicate matching needs. Repeating a
+    full pass is cheap once most of it is stored -- every stream already there is skipped.
     """
-    return "incremental" if history.has_activities(user_id, "garmin") else "full"
+    progress = history.get_progress(user_id, FULL_SYNC_TASK)
+    return "incremental" if progress and progress.get("done") else "full"
 
 
 def sync_user(user_id: str, mode: str) -> BackfillReport:
@@ -591,6 +620,11 @@ def sync_user(user_id: str, mode: str) -> BackfillReport:
         logger.warning("history sync (%s) failed", mode, exc_info=True)
         history.release_sync(user_id, note=f"{mode}: failed")
         raise
+    # A single activity that will not parse is not a reason to repeat the whole pass;
+    # a rate limit or a Strava half that never ran is.
+    whole_phase_failed = any(error.startswith("strava:") for error in report.errors)
+    if mode == "full" and not report.stopped_early and not whole_phase_failed:
+        history.set_progress(user_id, FULL_SYNC_TASK, done=True, note="completo")
     note = f"{mode}: {report.activities_written} attività, {report.streams_written} stream"
     if report.stopped_early:
         note += " (interrotto: rate limit)"

@@ -6,15 +6,38 @@ from training_plan import backfill, history
 from training_plan.api import routes_history
 
 
-def test_a_history_without_garmin_activities_gets_the_full_backfill(monkeypatch):
-    """Including one filled from Strava before Garmin was a source."""
-    monkeypatch.setattr(history, "has_activities", lambda user_id, source: source == "strava")
+def test_the_full_pass_repeats_until_it_has_finished_once(monkeypatch):
+    monkeypatch.setattr(history, "get_progress", lambda user_id, task: None)
+    assert backfill.sync_mode("u") == "full"
+    monkeypatch.setattr(history, "get_progress", lambda user_id, task: {"done": False})
     assert backfill.sync_mode("u") == "full"
 
 
-def test_a_history_with_garmin_activities_gets_the_incremental_pass(monkeypatch):
-    monkeypatch.setattr(history, "has_activities", lambda user_id, source: True)
+def test_after_one_clean_full_pass_it_is_incremental(monkeypatch):
+    monkeypatch.setattr(history, "get_progress", lambda user_id, task: {"done": True})
     assert backfill.sync_mode("u") == "incremental"
+
+
+def _run_returning(report):
+    return lambda user_id, **kw: report
+
+
+@pytest.mark.parametrize(
+    ("report", "marked"),
+    [
+        (backfill.BackfillReport(), True),
+        (backfill.BackfillReport(errors=["garmin 12: GarminSyncError"]), True),
+        (backfill.BackfillReport(errors=["strava: ConnectError"]), False),
+        (backfill.BackfillReport(stopped_early="rate limit"), False),
+    ],
+)
+def test_only_a_clean_full_pass_is_recorded_as_done(monkeypatch, report, marked):
+    recorded = []
+    monkeypatch.setattr(backfill, "run", _run_returning(report))
+    monkeypatch.setattr(history, "release_sync", lambda user_id, note=None: None)
+    monkeypatch.setattr(history, "set_progress", lambda user_id, task, **kw: recorded.append(task))
+    backfill.sync_user("u", "full")
+    assert (backfill.FULL_SYNC_TASK in recorded) is marked
 
 
 def test_the_incremental_pass_is_short_and_skips_wellness(monkeypatch):
@@ -53,7 +76,7 @@ async def test_a_refused_claim_starts_nothing(monkeypatch):
 @pytest.mark.anyio
 async def test_a_granted_claim_starts_one_background_sync(monkeypatch):
     monkeypatch.setattr(history, "claim_sync", lambda user_id, **kw: True)
-    monkeypatch.setattr(history, "has_activities", lambda user_id, source: False)
+    monkeypatch.setattr(history, "get_progress", lambda user_id, task: None)
     started = []
 
     class FakeThread:
@@ -67,3 +90,42 @@ async def test_a_granted_claim_starts_one_background_sync(monkeypatch):
     response = await routes_history.history_sync(user_id="u")
     assert (response.started, response.mode) == (True, "full")
     assert started == [("u", "full")]
+
+
+def test_a_strava_failure_does_not_undo_the_garmin_half(monkeypatch):
+    """Strava is optional: its half failing is recorded, and the duplicate pass still runs."""
+    import contextlib
+
+    resolved = []
+    monkeypatch.setattr(history, "ensure_schema", lambda: None)
+    monkeypatch.setattr(history, "resolve_duplicates", lambda user_id, start, end: resolved.append(True))
+    monkeypatch.setattr(
+        backfill.user_tokenstore, "materialized_garmin_tokenstore", lambda user_id: contextlib.nullcontext("/tmp")
+    )
+
+    class FakeGarmin:
+        def __init__(self, tokenstore):
+            pass
+
+        def login(self):
+            pass
+
+        def get_activity_streams(self, activity_id):
+            return None
+
+    monkeypatch.setattr(backfill, "GarminSync", FakeGarmin)
+    monkeypatch.setattr(
+        backfill, "backfill_garmin_activities", lambda *a, **kw: backfill.BackfillReport(activities_written=3)
+    )
+    monkeypatch.setattr(history, "activities_needing_stream", lambda *a: [])
+    monkeypatch.setattr(backfill, "backfill_streams", lambda *a, **kw: backfill.BackfillReport())
+
+    def strava_down(*a, **kw):
+        raise ConnectionResetError("reset by peer")
+
+    monkeypatch.setattr(backfill, "_strava_half", strava_down)
+
+    report = backfill.run("u", days=7, wellness=False)
+    assert report.activities_written == 3
+    assert report.errors == ["strava: ConnectionResetError"]
+    assert resolved == [True]

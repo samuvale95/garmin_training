@@ -51,11 +51,13 @@ ALTER TABLE activity_stream ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAUL
 
 `activity` gains `start_time TIMESTAMPTZ`, `external_id TEXT` and `duplicate_of BIGINT` (the Garmin activity id this row duplicates; `NULL` means canonical). After every sync, `history.resolve_duplicates(user_id, start, end)` recomputes `duplicate_of` for the Strava rows in the synced window:
 
-1. `external_id` of the form `garmin_ping_<id>` / `garmin_push_<id>` naming a stored Garmin activity: duplicate.
+1. `external_id` of the form `garmin_ping_<n>` / `garmin_push_<n>`: Garmin uploaded it, so it is one of the watch's activities. It goes to the Garmin activity with the closest start within 15 minutes, same sport family preferred, no duration check.
 2. Otherwise, a Garmin activity of the same sport family whose `start_time` is within 2 minutes and whose duration is within 10%: duplicate. If several match, the closest start time wins.
 3. Otherwise: canonical.
 
 Garmin rows are always canonical. Only Strava rows can point to a Garmin row.
+
+*Changed during implementation*: the first version assumed `<n>` was the Garmin activity id and joined on it. On a real two-year history none of 368 matched: `<n>` is an upload id. Matching those rows by time alone then missed 48 of them, because Strava counts moving time where Garmin counts the timer (a ride with stops: 62 against 81 minutes) and re-cuts some activities (ski days). Knowing Garmin sent the row is what justifies dropping the duration check for it.
 
 Why store it: readers stay plain SQL (`WHERE duplicate_of IS NULL`), the decision is inspectable in the database, and re-running the pass is cheap and deterministic. Resolving at read time would put the matching logic inside every query.
 

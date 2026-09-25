@@ -34,14 +34,14 @@ The system SHALL key stored streams by `(user_id, source, activity_id)`, and SHA
 - **THEN** every existing stream is still readable, tagged `source = 'strava'`
 
 ### Requirement: The same workout from two sources is counted once
-The system SHALL recognise a Strava activity as a duplicate of a Garmin activity when Strava's `external_id` names that Garmin activity, or, failing that, when both have the same sport family, start times within 2 minutes of each other and durations within 10% of each other. When a duplicate is recognised, the Garmin row SHALL be the canonical one.
+The system SHALL recognise a Strava activity as a duplicate of a Garmin activity when Strava's `external_id` shows Garmin uploaded it (`garmin_ping_…` / `garmin_push_…`) and a Garmin activity starts within 15 minutes of it (closest start wins, same sport family preferred, no duration check), or, for any other Strava activity, when both have the same sport family, start times within 2 minutes of each other and durations within 10% of each other. When a duplicate is recognised, the Garmin row SHALL be the canonical one.
 
 #### Scenario: Garmin-uploaded activity on Strava
-- **WHEN** a stored Strava activity has an `external_id` referencing a stored Garmin activity id
-- **THEN** the Strava row is marked as a duplicate of the Garmin row
+- **WHEN** a stored Strava activity has an `external_id` starting with `garmin_ping_` or `garmin_push_`, and a Garmin activity starts within 15 minutes of it
+- **THEN** the Strava row is marked as a duplicate of that Garmin row, even when Strava's moving time and Garmin's timer disagree by more than 10%
 
 #### Scenario: Match by start time and duration
-- **WHEN** a Strava activity has no usable `external_id`, and a Garmin activity of the same sport family starts within 2 minutes and lasts within 10% of it
+- **WHEN** a Strava activity was not uploaded by Garmin, and a Garmin activity of the same sport family starts within 2 minutes and lasts within 10% of it
 - **THEN** the Strava row is marked as a duplicate of the Garmin row
 
 #### Scenario: Two different workouts on the same day

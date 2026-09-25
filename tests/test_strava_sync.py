@@ -400,3 +400,30 @@ def test_athlete_profile_with_no_name_at_all(monkeypatch, tmp_path):
     monkeypatch.setattr(strava_sync.httpx, "get", lambda *a, **k: FakeResponse(200, {}))
 
     assert sync.athlete_profile() == {"name": None, "image_url": None}
+
+
+def test_the_activity_list_reads_every_page(tmp_path, monkeypatch):
+    """Strava returns at most one page per call; stopping at the first capped the history at 200."""
+    from datetime import date
+
+    from training_plan import strava_sync
+
+    sync = strava_sync.StravaSync(tokenstore=str(tmp_path / "t.json"), shoestore=str(tmp_path / "s.json"))
+    pages = {1: [{"id": i} for i in range(strava_sync.STRAVA_PAGE_SIZE)], 2: [{"id": "last"}]}
+    seen = []
+
+    class Response:
+        def __init__(self, body):
+            self._body = body
+
+        def json(self):
+            return self._body
+
+    def fake_get(path, params=None):
+        seen.append(params["page"])
+        return Response(pages.get(params["page"], []))
+
+    monkeypatch.setattr(sync, "_get", fake_get)
+    activities = sync.list_activities(date(2024, 9, 1), date(2026, 9, 1))
+    assert len(activities) == strava_sync.STRAVA_PAGE_SIZE + 1
+    assert seen == [1, 2]
