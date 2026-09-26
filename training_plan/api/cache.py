@@ -91,6 +91,10 @@ TTL_COACH_EXECUTION = 24 * 60 * 60
 # The diagnosis reads a year of stored streams, so it is the heaviest computation here --
 # but it is all local, and what it describes only changes when a new session syncs.
 TTL_COACH_PLAN = 6 * 60 * 60
+# The level is keyed on the stored activities, so a new session recomputes it on the next
+# read; the TTL only bounds how stale the Garmin threshold part can get. The day matters
+# too -- weeks complete and pauses begin without any new activity -- so it is in the key.
+TTL_PROFILE_LEVEL = 6 * 60 * 60
 
 # A date range that has already ended has nothing left to say: a completed activity is a
 # fact, and the calendar for a past week only changes when this app writes to it -- which

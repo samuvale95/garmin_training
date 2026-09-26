@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 from datetime import date as date_type
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -19,6 +20,7 @@ from .. import (
     garmin_sync,
     goal_fit,
     intensity,
+    levels,
     models,
     nutrition,
     paces,
@@ -1507,6 +1509,66 @@ class CoachPlanResponse(BaseModel):
 
 
 # ---- errors -----------------------------------------------------------------------------------
+
+
+# ---- the athlete's level ---------------------------------------------------------------------
+
+
+class CriterionOut(BaseModel):
+    key: str
+    label: str
+    measured: float
+    required: float
+    unit: str
+    met: bool
+
+    @classmethod
+    def from_model(cls, criterion: "levels.Criterion") -> "CriterionOut":
+        return cls(
+            key=criterion.key,
+            label=criterion.label,
+            measured=criterion.measured,
+            required=criterion.required,
+            unit=criterion.unit,
+            met=criterion.met,
+        )
+
+
+class AthleteLevelResponse(BaseModel):
+    """`current` is what the level rests on (at level 3: what keeps you there); `next` is
+    what the following level asks for, empty at level 3."""
+
+    level: int
+    level_name: str
+    level_meaning: str
+    effective_level: int
+    state: Literal["attivo", "pausa", "ripresa"]
+    current: list[CriterionOut]
+    next: list[CriterionOut]
+    missing: list[str]
+    adaptation_mode: Literal["automatico", "proposta"]
+    adaptation_mode_is_default: bool
+
+    @classmethod
+    def from_model(cls, assessment: "levels.LevelAssessment") -> "AthleteLevelResponse":
+        return cls(
+            level=assessment.level,
+            level_name=assessment.name,
+            level_meaning=levels.LEVEL_MEANINGS[assessment.level],
+            effective_level=assessment.effective_level,
+            state=assessment.state,
+            current=[CriterionOut.from_model(c) for c in assessment.current],
+            next=[CriterionOut.from_model(c) for c in assessment.next],
+            missing=assessment.missing,
+            adaptation_mode=assessment.adaptation_mode,
+            adaptation_mode_is_default=assessment.adaptation_mode_is_default,
+        )
+
+
+class AdaptationModeRequest(BaseModel):
+    """`null` goes back to the level's default."""
+
+    mode: Literal["automatico", "proposta"] | None = None
 
 
 # ---- history sync ----------------------------------------------------------------------------

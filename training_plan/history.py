@@ -130,6 +130,16 @@ CREATE TABLE IF NOT EXISTS activity_stream (
     PRIMARY KEY (user_id, source, activity_id)
 );
 
+-- Per-user state derived from the history: the highest level reached (never lowered,
+-- see levels.py) and the plan-adaptation preference (NULL: the level's default).
+CREATE TABLE IF NOT EXISTS athlete_profile (
+    user_id          TEXT PRIMARY KEY,
+    reached_level    SMALLINT NOT NULL DEFAULT 1,
+    reached_at       TIMESTAMPTZ,
+    adaptation_mode  TEXT,
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS backfill_progress (
     user_id     TEXT NOT NULL,
     task        TEXT NOT NULL,
@@ -800,3 +810,77 @@ def activities_needing_stream(user_id: str, source: str, start: date_type, end: 
             [user_id, source, start, end],
         )
         return [int(row[0]) for row in cur.fetchall()]
+
+
+# ---- the athlete's level ----------------------------------------------------------------------
+
+
+def daily_training(
+    user_id: str, start: date_type, end: date_type, *, running_sports: Sequence[str], min_minutes: float
+) -> list[dict]:
+    """Per-day totals for `levels.py`: sessions, runs with a heart rate, running minutes.
+
+    Canonical rows only (a run on both Garmin and Strava is one session) and at least
+    `min_minutes` long. One grouped query; the level logic itself stays in Python where
+    it can be tested without a database.
+    """
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT day, count(*), "
+            "       count(*) FILTER (WHERE sport = ANY(%s) AND avg_hr IS NOT NULL), "
+            "       coalesce(sum(duration_min) FILTER (WHERE sport = ANY(%s)), 0) "
+            "FROM activity "
+            "WHERE user_id = %s AND day BETWEEN %s AND %s AND duplicate_of IS NULL "
+            "  AND duration_min >= %s "
+            "GROUP BY day ORDER BY day",
+            [list(running_sports), list(running_sports), user_id, start, end, min_minutes],
+        )
+        return [
+            {"day": day, "sessions": int(sessions), "runs_with_hr": int(runs), "run_minutes": float(minutes)}
+            for day, sessions, runs, minutes in cur.fetchall()
+        ]
+
+
+def activities_version(user_id: str) -> tuple[int, str | None]:
+    """Like `streams_version`, over activities: a tennis session has no stream but still
+    counts towards the level."""
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute("SELECT count(*), max(fetched_at) FROM activity WHERE user_id = %s", [user_id])
+        count, latest = cur.fetchone()
+    return int(count), latest.isoformat() if latest else None
+
+
+def load_profile(user_id: str) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT reached_level, adaptation_mode FROM athlete_profile WHERE user_id = %s", [user_id]
+        )
+        row = cur.fetchone()
+    return {"reached_level": row[0], "adaptation_mode": row[1]} if row else {"reached_level": 1, "adaptation_mode": None}
+
+
+def raise_reached_level(user_id: str, level: int) -> None:
+    """Store `level` if it is higher than what is stored. `GREATEST`, so two reads racing
+    each other can never lower it."""
+    with db.connect() as conn:
+        conn.execute(
+            """INSERT INTO athlete_profile (user_id, reached_level, reached_at)
+               VALUES (%s, %s, now())
+               ON CONFLICT (user_id) DO UPDATE SET
+                   reached_at = CASE WHEN EXCLUDED.reached_level > athlete_profile.reached_level
+                                     THEN now() ELSE athlete_profile.reached_at END,
+                   reached_level = GREATEST(athlete_profile.reached_level, EXCLUDED.reached_level),
+                   updated_at = now()""",
+            [user_id, level],
+        )
+
+
+def set_adaptation_mode(user_id: str, mode: str | None) -> None:
+    """`None` goes back to the level's default."""
+    with db.connect() as conn:
+        conn.execute(
+            """INSERT INTO athlete_profile (user_id, adaptation_mode) VALUES (%s, %s)
+               ON CONFLICT (user_id) DO UPDATE SET
+                   adaptation_mode = EXCLUDED.adaptation_mode, updated_at = now()""",
+            [user_id, mode],
+        )

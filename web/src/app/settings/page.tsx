@@ -8,7 +8,7 @@ import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
 import { RefreshButton } from "@/components/RefreshButton";
 import { StatusDot } from "@/components/motion/primitives";
-import { useClearPlan, useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, usePlanQuery, useResetAllLocalData, useStravaStatus } from "@/lib/queries";
+import { useAthleteLevel, useClearPlan, useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, usePlanQuery, useResetAllLocalData, useStravaStatus } from "@/lib/queries";
 import { useAthleteIdentity } from "@/lib/identity";
 import { signOut } from "@/lib/auth";
 import { usePassoStore } from "@/lib/store";
@@ -24,6 +24,7 @@ export default function SettingsPage() {
   const { data: stravaStatus } = useStravaStatus();
   const disconnectStrava = useDisconnectStrava();
   const { data: plan } = usePlanQuery();
+  const { data: athleteLevel } = useAthleteLevel();
   const identity = useAthleteIdentity();
   const prefs = usePassoStore((s) => s.prefs);
   const setPref = usePassoStore((s) => s.setPref);
@@ -172,6 +173,18 @@ export default function SettingsPage() {
             <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Obiettivo</span>
             <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
               {plan?.goal ? `${goalTitle(plan.goal)} · ${countdownLabel(plan.goal)}` : "la gara che stai preparando"}
+            </span>
+          </span>
+          <span aria-hidden="true">›</span>
+        </Link>
+      </Card>
+
+      <Card>
+        <Link href="/settings/level" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ flex: 1 }}>
+            <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Livello</span>
+            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
+              {athleteLevel ? `Livello ${athleteLevel.level} · ${athleteLevel.level_name}` : "da abitudine ad atleta"}
             </span>
           </span>
           <span aria-hidden="true">›</span>

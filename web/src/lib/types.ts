@@ -657,3 +657,29 @@ export interface ApiErrorBody {
   details: string[];
   retry_after_seconds?: number | null;
 }
+
+// ---- the athlete's level -------------------------------------------------------------
+
+export interface LevelCriterion {
+  key: string;
+  label: string;
+  measured: number;
+  required: number;
+  unit: string;
+  met: boolean;
+}
+
+/** Computed from the history, never chosen; it only goes up. `effective_level` is one
+ * lower during `pausa` and `ripresa`: what loads and warnings are sized for. */
+export interface AthleteLevel {
+  level: 1 | 2 | 3;
+  level_name: string;
+  level_meaning: string;
+  effective_level: number;
+  state: "attivo" | "pausa" | "ripresa";
+  current: LevelCriterion[];
+  next: LevelCriterion[];
+  missing: string[];
+  adaptation_mode: "automatico" | "proposta";
+  adaptation_mode_is_default: boolean;
+}

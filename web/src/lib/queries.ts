@@ -7,6 +7,7 @@ import { shiftDateKey, toDateKey, weekBounds } from "./sessionVisuals";
 import type {
   ActivityForm,
   CoachTrend,
+  AthleteLevel,
   AthleteProfile,
   BodyMetrics,
   BodySnapshot,
@@ -972,6 +973,16 @@ export function useCoachPlan(days = 365) {
     queryKey: ["coach", "plan", days],
     queryFn: ({ signal }) => apiGet<CoachPlan>("/coach/plan", { days: String(days) }, signal),
     staleTime: 60 * 60_000,
+  });
+}
+
+/** Where the user is from a first run to athlete level, with what the next level asks
+ * for. Computed server-side from the stored history; there is no way to set it. */
+export function useAthleteLevel() {
+  return useQuery({
+    queryKey: ["profile", "level"],
+    queryFn: ({ signal }) => apiGet<AthleteLevel>("/profile/level", undefined, signal),
+    staleTime: 10 * 60_000,
   });
 }
 

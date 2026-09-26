@@ -25,6 +25,7 @@ from .routes_body import router as body_router
 from .routes_coach import router as coach_router
 from .routes_garmin import router as garmin_router
 from .routes_history import router as history_router
+from .routes_profile import router as profile_router
 from .routes_nutrition import router as nutrition_router
 from .routes_plan import router as plan_router
 from .routes_strava import router as strava_router
@@ -126,6 +127,7 @@ app.include_router(strava_router, tags=["strava"], dependencies=_auth_gate)
 app.include_router(nutrition_router, tags=["nutrition"], dependencies=_auth_gate)
 app.include_router(coach_router, tags=["coach"], dependencies=_auth_gate)
 app.include_router(history_router, tags=["history"], dependencies=_auth_gate)
+app.include_router(profile_router, tags=["profile"], dependencies=_auth_gate)
 
 
 @app.get("/health")
