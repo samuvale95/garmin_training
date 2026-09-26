@@ -349,3 +349,70 @@ def parse_training_plan(path: str | Path) -> list[TrainingSession]:
     """Just the sessions -- what the CLI and the sync path want, neither of which has
     anything to do with a race date."""
     return parse_plan_document(path).sessions
+
+
+# ---- the other direction ----------------------------------------------------------------
+
+
+def _pace_token(sec_per_km: int) -> str:
+    return f"{sec_per_km // 60}:{sec_per_km % 60:02d}"
+
+
+def _number(value: float) -> float | int:
+    return int(value) if float(value).is_integer() else value
+
+
+def _step_out(step: Step) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "type": step.type,
+        "duration_type": step.duration_type,
+        "duration_value": _number(step.duration_value),
+    }
+    if step.target_pace is not None:
+        # Always the explicit range: a single pace is widened on the way in, so writing
+        # the range back is the only form that re-imports to exactly the same target.
+        out["target_pace"] = (
+            f"{_pace_token(step.target_pace.slower_sec_per_km)}-{_pace_token(step.target_pace.faster_sec_per_km)}"
+        )
+    return out
+
+
+def _hms(seconds: int) -> str:
+    hours, rest = divmod(seconds, 3600)
+    minutes, secs = divmod(rest, 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}"
+
+
+def serialize_plan(sessions: list[TrainingSession], goal: RaceGoal | None = None) -> str:
+    """A plan as YAML that `parse_plan_document` reads back to the same sessions and goal.
+
+    What makes the file the export as well as the import: a plan edited in the app,
+    added to by `/coach/plan` or written by the AI can always be taken out, read, kept or
+    moved elsewhere in the same format it came in.
+    """
+    document: dict[str, Any] = {}
+    if goal is not None:
+        document["goal"] = {
+            "race_date": goal.race_date.isoformat(),
+            "distance_km": _number(goal.distance_km),
+            **({"name": goal.name} if goal.name else {}),
+            **({"target_time": _hms(goal.target_time_seconds)} if goal.target_time_seconds else {}),
+        }
+
+    entries = []
+    for session in sessions:
+        entry: dict[str, Any] = {"date": session.date.isoformat(), "sport": session.sport, "title": session.title}
+        if session.description:
+            entry["description"] = session.description
+        steps = []
+        for step in session.steps:
+            if isinstance(step, RepeatBlock):
+                steps.append({"repeat": step.reps, "steps": [_step_out(s) for s in step.steps]})
+            else:
+                steps.append(_step_out(step))
+        if steps:
+            entry["steps"] = steps
+        entries.append(entry)
+    document["sessions"] = entries
+
+    return yaml.safe_dump(document, allow_unicode=True, sort_keys=False)

@@ -415,11 +415,12 @@ def save_plan(
     *,
     user_id: str,
     yaml_text: str,
-    sessions: list[dict[str, Any]],
     filename: str | None,
     imported_at: str,
     goal: dict[str, Any] | None = None,
 ) -> UserPlan:
+    """The plan-level facts: the last imported file, and the goal. The sessions are
+    `plan_store`'s."""
     with connect() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             # A race named before any plan existed yet: this is the plan's first save
@@ -435,27 +436,43 @@ def save_plan(
                     if standalone:
                         goal = standalone["goal"]
                         cur.execute("DELETE FROM user_goal WHERE user_id = %s", (user_id,))
+            # The sessions themselves live in `plan_session` now (see plan_store.py). A
+            # new row starts with an empty array and already migrated; an existing row
+            # keeps whatever array it had, untouched, so rolling the code back still
+            # finds the plan as it was before the move.
             cur.execute(
-                """INSERT INTO user_plan (user_id, yaml_text, sessions, filename, imported_at, goal, updated_at)
-                   VALUES (%s, %s, %s, %s, %s, %s, now())
+                """INSERT INTO user_plan (user_id, yaml_text, sessions, filename, imported_at, goal, updated_at,
+                                          sessions_migrated)
+                   VALUES (%s, %s, '[]'::jsonb, %s, %s, %s, now(), TRUE)
                    ON CONFLICT (user_id) DO UPDATE SET
                      yaml_text = EXCLUDED.yaml_text,
-                     sessions = EXCLUDED.sessions,
                      filename = EXCLUDED.filename,
                      imported_at = EXCLUDED.imported_at,
                      goal = EXCLUDED.goal,
                      updated_at = now()
                    RETURNING *""",
-                (user_id, yaml_text, Jsonb(sessions), filename, imported_at, Jsonb(goal) if goal else None),
+                (user_id, yaml_text, filename, imported_at, Jsonb(goal) if goal else None),
             )
             row = cur.fetchone()
     return UserPlan.from_row(row)
+
+
+def ensure_plan(user_id: str) -> None:
+    """A plan row for a user who starts adding sessions with no file ever imported."""
+    with connect() as conn:
+        conn.execute(
+            """INSERT INTO user_plan (user_id, yaml_text, sessions, filename, imported_at, sessions_migrated)
+               VALUES (%s, '', '[]'::jsonb, NULL, %s, TRUE)
+               ON CONFLICT (user_id) DO NOTHING""",
+            (user_id, datetime.now(timezone.utc).isoformat()),
+        )
 
 
 def delete_plan(user_id: str) -> None:
     with connect() as conn:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM user_plan WHERE user_id = %s", (user_id,))
+            cur.execute("DELETE FROM plan_session WHERE user_id = %s", (user_id,))
 
 
 # ---- the race goal, before any plan exists to hold it ------------------------------------------

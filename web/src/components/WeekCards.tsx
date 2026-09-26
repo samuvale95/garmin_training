@@ -13,7 +13,8 @@ import type { ScheduledWorkout } from "@/lib/types";
 export interface DayCardData {
   id: string;
   session: DisplaySession;
-  planIndex?: number;
+  /** The plan session's id; absent for a live Garmin calendar entry. */
+  planId?: string;
   workout?: ScheduledWorkout;
 }
 
@@ -220,8 +221,8 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
   );
 
   const href =
-    card.planIndex != null
-      ? `/session/${card.planIndex}`
+    card.planId != null
+      ? `/session/${card.planId}`
       : card.workout?.scheduled_workout_id != null
         ? `/workout/${card.workout.scheduled_workout_id}?date=${card.session.date}`
         : null;

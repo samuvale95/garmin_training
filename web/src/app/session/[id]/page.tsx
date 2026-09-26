@@ -12,6 +12,7 @@ import { useMountOnce } from "@/lib/motion";
 import { useRequirePlan } from "@/lib/guards";
 import { ApiError } from "@/lib/apiClient";
 import {
+  findPlanSession,
   useApplyDeletion,
   useRemoveSession,
   useStartSync,
@@ -32,8 +33,12 @@ export default function SessionDetailPage() {
   const animate = useMountOnce(`session-${params.id}`);
   const updateSession = useUpdateSession();
   const removeSession = useRemoveSession();
-  const index = Number(params.id);
-  const session = plan?.sessions[index] ?? null;
+  const session = findPlanSession(plan, params.id);
+  // Sessions are addressed by id; an old numeric link resolves once and moves to it.
+  const sessionId = session?.id ?? params.id;
+  useEffect(() => {
+    if (session?.id && session.id !== params.id) router.replace(`/session/${session.id}`);
+  }, [session?.id, params.id, router]);
   const stravaStatus = useStravaStatus();
   const matchQuery = useStravaActivityMatch(session, !!stravaStatus.data?.connected);
   const hasStravaMatch = !!stravaStatus.data?.connected && !!matchQuery.data?.matched;
@@ -74,7 +79,7 @@ export default function SessionDetailPage() {
   // leave for the week screen -- mirrors WorkoutEditor's save-then-navigate effect.
   useEffect(() => {
     if (moveJobId && moveSucceeded && movedDate) {
-      updateSession(index, (s) => ({ ...s, date: movedDate }));
+      updateSession(sessionId, (s) => ({ ...s, date: movedDate }));
       router.push("/week");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -115,7 +120,7 @@ export default function SessionDetailPage() {
 
     // No Garmin-side copy to move yet -- just update the local plan and go.
     if (!originalWorkout) {
-      updateSession(index, () => movedSession);
+      updateSession(sessionId, () => movedSession);
       router.push("/week");
       return;
     }
@@ -155,7 +160,7 @@ export default function SessionDetailPage() {
       if (originalWorkout) {
         await applyDeletion.mutateAsync([originalWorkout]);
       }
-      removeSession(index);
+      removeSession(sessionId);
       router.push("/week");
     } catch (err) {
       setDeleteError(err instanceof ApiError ? err.message : "Non sono riuscito a cancellare l'allenamento.");
@@ -171,7 +176,7 @@ export default function SessionDetailPage() {
       error={deleteError}
       actions={
         <>
-          <Link href={`/session/${index}/edit`} className="tap-target" aria-label="Modifica allenamento" style={{ color: "var(--crema)", fontSize: 18, textDecoration: "none" }}>
+          <Link href={`/session/${sessionId}/edit`} className="tap-target" aria-label="Modifica allenamento" style={{ color: "var(--crema)", fontSize: 18, textDecoration: "none" }}>
             ✎
           </Link>
           <DeleteIconButton onClick={handleDelete} disabled={isDeleting} />
@@ -214,7 +219,7 @@ export default function SessionDetailPage() {
         animate={animate}
         hasStravaMatch={hasStravaMatch}
         matchData={matchQuery.data}
-        stravaHref={`/session/${index}/strava`}
+        stravaHref={`/session/${sessionId}/strava`}
       />
     </DetailScaffold>
   );

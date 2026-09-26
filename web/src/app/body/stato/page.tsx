@@ -96,8 +96,9 @@ export default function DayStatePage() {
     [access.plan, workoutsQuery.data]
   );
 
-  const todayIndex = sessions.findIndex((s) => s.date === todayKey);
-  const todaySession = todayIndex >= 0 ? sessions[todayIndex] : null;
+  const todaySession = sessions.find((s) => s.date === todayKey) ?? null;
+  // Only a plan session can be rewritten; a live Garmin entry has no id here.
+  const todayId = access.plan ? todaySession?.id ?? null : null;
   const { goal } = useRaceGoal(access.plan, access.ready);
 
   const ready = access.ready && (!liveMode || !workoutsQuery.isPending);
@@ -111,17 +112,17 @@ export default function DayStatePage() {
    * -- a live Garmin calendar entry has no steps here to soften, so that case offers
    * the advice without the button. */
   function applyAlternative(v: DayVerdict) {
-    if (!v.alternative || todayIndex < 0) return;
+    if (!v.alternative || !todayId) return;
     if (v.alternative.kind === "reschedule") {
-      updateSession(todayIndex, (s) => ({ ...s, date: shiftDateKey(s.date, 1) }));
+      updateSession(todayId, (s) => ({ ...s, date: shiftDateKey(s.date, 1) }));
     } else if (v.alternative.kind === "soften") {
-      updateSession(todayIndex, softenSession);
+      updateSession(todayId, softenSession);
     } else if (v.alternative.kind === "easy") {
-      updateSession(todayIndex, easySession);
+      updateSession(todayId, easySession);
     } else if (v.alternative.kind === "rest") {
       // A rest day is the absence of a session, so the session moves out of today
       // rather than being deleted: nothing is lost, it is just not today's problem.
-      updateSession(todayIndex, (s) => ({ ...s, date: shiftDateKey(s.date, 1) }));
+      updateSession(todayId, (s) => ({ ...s, date: shiftDateKey(s.date, 1) }));
     }
     setApplied(v.alternative.kind);
   }
@@ -203,7 +204,7 @@ export default function DayStatePage() {
                 <p style={{ background: "var(--verde)", color: "var(--verde-testo)", borderRadius: "var(--radius-card)", padding: "12px 14px", fontSize: 13.5, fontWeight: 600, margin: "14px 0 0" }}>
                   Fatto, il piano è aggiornato.
                 </p>
-              ) : todayIndex >= 0 && access.plan ? (
+              ) : todayId ? (
                 <button
                   type="button"
                   onClick={() => applyAlternative(verdict)}

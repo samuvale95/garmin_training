@@ -162,8 +162,8 @@ function WeekPageContent() {
     const targetKey = dayKeyAtPageY(pageY);
     if (!targetKey || targetKey === card.session.date) return;
     haptic([10, 40, 14]);
-    if (card.planIndex != null) {
-      updateSession(card.planIndex, (s) => ({ ...s, date: targetKey }));
+    if (card.planId != null) {
+      updateSession(card.planId, (s) => ({ ...s, date: targetKey }));
     } else if (card.workout) {
       rescheduleWorkout.mutate({ workout: card.workout, newDate: targetKey });
     }
@@ -291,9 +291,8 @@ function WeekPageContent() {
     const key = toDateKey(date);
     const cards: DayCardData[] = access.plan
       ? access.plan.sessions
-          .map((session, index) => ({ session, index }))
-          .filter((x) => x.session.date === key)
-          .map(({ session, index }) => ({ id: `plan:${index}`, session, planIndex: index }))
+          .filter((session) => session.date === key && session.id)
+          .map((session) => ({ id: `plan:${session.id}`, session, planId: session.id }))
       : liveMode
         ? (workoutsQuery.data?.workouts ?? [])
             .filter((w) => w.date === key)

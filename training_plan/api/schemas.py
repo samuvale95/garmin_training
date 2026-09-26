@@ -11,6 +11,7 @@ import base64
 from datetime import date as date_type
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -116,6 +117,9 @@ class TrainingSessionIn(BaseModel):
     title: str
     description: str | None = None
     steps: list[SessionStepIn] = Field(default_factory=list)
+    # Optional on create: the client may choose the id so it can navigate to the new
+    # session before the request returns. Ignored everywhere else.
+    id: UUID | None = None
 
     def to_model(self) -> models.TrainingSession:
         return models.TrainingSession(
@@ -133,6 +137,11 @@ class TrainingSessionOut(BaseModel):
     title: str
     description: str | None = None
     steps: list[SessionStepOut] = Field(default_factory=list)
+    # Set only on sessions stored in the plan (see plan_store.py); a session parsed from
+    # a file or proposed by `/coach/plan` has none of the three yet.
+    id: str | None = None
+    origin: Literal["import", "manual", "ai"] | None = None
+    locked: bool | None = None
 
     @classmethod
     def from_model(cls, session: models.TrainingSession) -> "TrainingSessionOut":
@@ -213,11 +222,21 @@ class ParsePlanResponse(BaseModel):
 
 
 class PlanIn(BaseModel):
+    """An import: the plan-level facts and the sessions of a file, replacing the plan.
+
+    `import` must be true for the sessions to be taken. A web client from before the
+    server owned the plan still sends its whole session list here on every edit; without
+    the marker that list is ignored, so an old tab cannot wipe ids and locks.
+    """
+
+    model_config = {"populate_by_name": True}
+
     yaml_text: str
     sessions: list[TrainingSessionIn]
     filename: str | None = None
     imported_at: str
     goal: RaceGoalIn | None = None
+    is_import: bool = Field(False, alias="import")
 
 
 class PlanOut(BaseModel):
@@ -228,13 +247,13 @@ class PlanOut(BaseModel):
     goal: RaceGoalOut | None = None
 
     @classmethod
-    def from_model(cls, plan: db.UserPlan) -> "PlanOut":
+    def from_model(cls, plan: db.UserPlan, sessions: list[dict]) -> "PlanOut":
         # The stored goal is the three stated facts; `phase` and `days_to_race` are
         # recomputed on every read, because both change with nothing but the date.
         goal = RaceGoalIn.model_validate(plan.goal).to_model() if plan.goal else None
         return cls(
             yaml_text=plan.yaml_text,
-            sessions=[TrainingSessionOut.model_validate(s) for s in plan.sessions],
+            sessions=[TrainingSessionOut.model_validate(s) for s in sessions],
             filename=plan.filename,
             imported_at=plan.imported_at,
             goal=RaceGoalOut.from_model(goal) if goal else None,
@@ -243,6 +262,22 @@ class PlanOut(BaseModel):
 
 class PlanResponse(BaseModel):
     plan: PlanOut | None
+
+
+class SessionPatch(BaseModel):
+    """Only the fields sent change. A user edit locks the session; `locked: false` on its
+    own is the user unlocking it."""
+
+    date: date_type | None = None
+    sport: str | None = None
+    title: str | None = None
+    description: str | None = None
+    steps: list[SessionStepIn] | None = None
+    locked: bool | None = None
+
+    def changes(self) -> dict:
+        sent = self.model_dump(mode="json", exclude_unset=True)
+        return sent
 
 
 # ---- the race goal, before any plan exists to hold it -------------------------------------

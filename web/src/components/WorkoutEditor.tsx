@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Reorder } from "framer-motion";
 import { PrimaryButton, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { useAddSession, useApplyDeletion, useInvalidateCalendarData, usePlanQuery, useRemoveSession, useStartSync, useSyncJobStatus, useUpdateSession, useWorkoutsForDate } from "@/lib/queries";
+import { findPlanSession, useAddSession, useApplyDeletion, useInvalidateCalendarData, usePlanQuery, useRemoveSession, useStartSync, useSyncJobStatus, useUpdateSession, useWorkoutsForDate } from "@/lib/queries";
 import { ApiError } from "@/lib/apiClient";
 import { normalizeTitle, parseDateKey, shiftDateKey, toDateKey } from "@/lib/sessionVisuals";
 import { capitalize, formatFullDate, formatPaceMinSec, formatPaceRange, parsePaceMinSec, stepTypeHint, stepTypeLabel } from "@/lib/format";
@@ -94,19 +94,19 @@ function blankStep(type: StepType): EditableStep {
  * local plan is left untouched in that mode: this workout is not part of it. */
 type WorkoutEditorProps =
   | { mode: "create" }
-  | { mode: "edit"; sessionIndex: number }
+  | { mode: "edit"; sessionId: string }
   | { mode: "garmin"; workout: ScheduledWorkout; session: TrainingSession };
 
 export function WorkoutEditor(props: WorkoutEditorProps) {
   const { mode } = props;
-  const sessionIndex = props.mode === "edit" ? props.sessionIndex : null;
+  const sessionParam = props.mode === "edit" ? props.sessionId : null;
   const garminWorkout = props.mode === "garmin" ? props.workout : null;
   const garminSession = props.mode === "garmin" ? props.session : null;
 
   const router = useRouter();
   const animate = useMountOnce(
     mode === "edit"
-      ? `session-edit-${sessionIndex}`
+      ? `session-edit-${sessionParam}`
       : mode === "garmin"
         ? `workout-edit-${garminWorkout!.scheduled_workout_id}`
         : "session-new"
@@ -121,7 +121,9 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   const invalidateCalendar = useInvalidateCalendarData();
 
   const existing =
-    mode === "edit" ? (plan && sessionIndex != null ? plan.sessions[sessionIndex] : null) : garminSession;
+    mode === "edit" ? (sessionParam != null ? findPlanSession(plan, sessionParam) : null) : garminSession;
+  // The id to write to; an old numeric URL resolves to the session's real id here.
+  const sessionId = existing?.id ?? sessionParam;
   // Captured once, at mount: the (date, title) Garmin actually knows this session by,
   // so editing the title/date in this form doesn't break the calendar lookup below.
   // Only needed in `edit` mode -- in `garmin` mode the calendar entry is handed in.
@@ -151,7 +153,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   /** Where "×"/"Annulla" go back to: the screen this editor was opened from. */
   const originHref =
     mode === "edit"
-      ? `/session/${sessionIndex}`
+      ? `/session/${sessionId}`
       : mode === "garmin"
         ? `/workout/${garminWorkout!.scheduled_workout_id}?date=${garminWorkout!.date}`
         : "/week";
@@ -256,7 +258,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
     if (mode === "create") {
       addSession(session);
     } else if (mode === "edit") {
-      updateSession(sessionIndex!, () => session);
+      updateSession(sessionId!, () => session);
     }
 
     try {
@@ -292,7 +294,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       if (originalWorkout) {
         await applyDeletion.mutateAsync([originalWorkout]);
       }
-      if (mode === "edit") removeSession(sessionIndex!);
+      if (mode === "edit") removeSession(sessionId!);
       router.push("/week");
     } catch (err) {
       setSaveError(err instanceof ApiError ? err.message : "Non sono riuscito a cancellare l'allenamento.");

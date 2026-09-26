@@ -16,5 +16,5 @@ export default function EditSessionPage() {
   // then keep it: today's date, no title, no steps -- and saving wrote *that* to Garmin
   // as a new workout. Same rule the Garmin-side twin of this route already follows.
   if (!isHydrated) return <SkeletonEditorForm />;
-  return <WorkoutEditor mode="edit" sessionIndex={Number(params.id)} />;
+  return <WorkoutEditor mode="edit" sessionId={params.id} />;
 }

@@ -4,21 +4,20 @@ import { useParams } from "next/navigation";
 import { StravaComparisonScreen } from "@/components/StravaComparisonScreen";
 import { useMountOnce } from "@/lib/motion";
 import { useRequirePlan } from "@/lib/guards";
-import { useStravaActivityMatch, useStravaStatus } from "@/lib/queries";
+import { findPlanSession, useStravaActivityMatch, useStravaStatus } from "@/lib/queries";
 
 export default function SessionStravaPage() {
   const params = useParams<{ id: string }>();
   const { plan } = useRequirePlan();
   const animate = useMountOnce(`session-strava-${params.id}`);
-  const index = Number(params.id);
-  const session = plan?.sessions[index] ?? null;
+  const session = findPlanSession(plan, params.id);
 
   const stravaStatus = useStravaStatus();
   const matchQuery = useStravaActivityMatch(session, !!stravaStatus.data?.connected);
 
   return (
     <StravaComparisonScreen
-      backHref={`/session/${index}`}
+      backHref={`/session/${session?.id ?? params.id}`}
       date={session?.date ?? null}
       title={session?.title ?? null}
       match={matchQuery.data}
@@ -26,7 +25,7 @@ export default function SessionStravaPage() {
       // rather than nothing (it used to `return null` until both were available).
       isLoading={!session || matchQuery.isPending}
       stravaConnected={!!stravaStatus.data?.connected}
-      shoesFrom={`/session/${index}/strava`}
+      shoesFrom={`/session/${session?.id ?? params.id}/strava`}
       backLabel="Torna alla sessione"
       animate={animate}
     />

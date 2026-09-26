@@ -66,6 +66,13 @@ export interface TrainingSession {
   title: string;
   description?: string | null;
   steps: SessionStep[];
+  /** Set on sessions stored in the plan; absent on a session parsed from a file or
+   * proposed by `/coach/plan` before it is added. */
+  id?: string;
+  /** `import` from a YAML file, `manual` made in the app, `ai` written by the plan. */
+  origin?: "import" | "manual" | "ai";
+  /** The user created, edited or moved it: the AI leaves it alone. */
+  locked?: boolean;
 }
 
 export interface ScheduledWorkout {

@@ -220,7 +220,7 @@ function applyPlanLocally(queryClient: ReturnType<typeof useQueryClient>, next: 
  * gets pushed by `restorePersistedPlanOnce`'s own migration path on the next load. */
 function persistPlanToServer(queryClient: ReturnType<typeof useQueryClient>, plan: PlanState | null): void {
   const request = plan
-    ? apiPut<{ goal: RaceGoal | null }>("/plan", {
+    ? apiPut<{ goal: RaceGoal | null; sessions?: TrainingSession[] }>("/plan", {
         goal: plan.goal
           ? {
               // Only the stated facts travel: `phase` and `days_to_race` are derived
@@ -235,11 +235,22 @@ function persistPlanToServer(queryClient: ReturnType<typeof useQueryClient>, pla
         sessions: plan.sessions,
         filename: plan.filename,
         imported_at: plan.importedAt ?? new Date().toISOString(),
+        // The whole-plan write is an import now (see `schemas.PlanIn`): without this
+        // marker the server ignores the sessions.
+        import: true,
       })
     : apiDelete<{ ok: boolean }>("/plan");
 
   request
     .then((saved) => {
+      // The imported sessions come back with the ids the server gave them; without
+      // adopting those, the next edit would have nothing to address.
+      if (plan && "sessions" in saved && saved.sessions) {
+        const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
+        if (current && current.sessions.length === saved.sessions.length) {
+          applyPlanLocally(queryClient, { ...current, sessions: saved.sessions });
+        }
+      }
       // The goal comes back carrying its derived `phase` and `days_to_race`, computed
       // in the one place that owns that rule (`models.race_phase`) -- worth adopting
       // whenever it's an answer to what's still on screen. Two shapes of that: the goal
@@ -380,38 +391,105 @@ export function useSetRaceGoal() {
   };
 }
 
-export function useUpdateSession() {
-  const queryClient = useQueryClient();
-  return (index: number, updater: (session: TrainingSession) => TrainingSession) => {
-    const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
-    if (!current || !current.sessions[index]) return;
-    const sessions = [...current.sessions];
-    sessions[index] = updater(sessions[index]);
-    writePlan(queryClient, { ...current, sessions });
+// ---- one session at a time (see training_plan/plan_store.py) ------------------------------
+//
+// The server owns the plan: each session has an id and its own endpoint, so an edit here
+// never rewrites sessions this tab did not touch -- the AI writing next week while this
+// tab edits today can no longer undo each other. Every write is optimistic: the cache and
+// the localStorage mirror change at once, the request follows, and a failed request puts
+// back exactly the session it was about.
+
+type SessionPatchBody = Pick<TrainingSession, "date" | "sport" | "title" | "description" | "steps">;
+
+function contentOf(session: TrainingSession): SessionPatchBody {
+  return {
+    date: session.date,
+    sport: session.sport,
+    title: session.title,
+    description: session.description ?? null,
+    steps: session.steps,
   };
 }
 
-/** Appends a new session (screen 10b, create mode) and returns its index, lazily
- * creating an empty plan if none exists yet. */
+function replaceSessionLocally(
+  queryClient: ReturnType<typeof useQueryClient>,
+  id: string,
+  replace: (session: TrainingSession | undefined) => TrainingSession | null
+): void {
+  const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
+  if (!current) return;
+  const exists = current.sessions.some((s) => s.id === id);
+  const sessions = exists
+    ? current.sessions.flatMap((s) => {
+        if (s.id !== id) return [s];
+        const next = replace(s);
+        return next ? [next] : [];
+      })
+    : (() => {
+        const next = replace(undefined);
+        return next ? [...current.sessions, next] : current.sessions;
+      })();
+  applyPlanLocally(queryClient, { ...current, sessions });
+}
+
+/** Edit or move one session by id. The server locks it: a session the user touched is
+ * one the AI will leave alone. */
+export function useUpdateSession() {
+  const queryClient = useQueryClient();
+  return (id: string, updater: (session: TrainingSession) => TrainingSession) => {
+    const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
+    const before = current?.sessions.find((s) => s.id === id);
+    if (!before) return;
+    const after: TrainingSession = { ...updater(before), id, origin: before.origin, locked: true };
+    replaceSessionLocally(queryClient, id, () => after);
+
+    apiPatch<TrainingSession>(`/plan/sessions/${id}`, contentOf(after))
+      .then((saved) => replaceSessionLocally(queryClient, id, () => saved))
+      .catch(() => replaceSessionLocally(queryClient, id, () => before));
+  };
+}
+
+/** Adds a session (screen 10b create mode, `/coach/plan` prescriptions) and returns its
+ * id at once -- chosen here, so the caller can navigate before the request returns. */
 export function useAddSession() {
   const queryClient = useQueryClient();
-  return (session: TrainingSession): number => {
+  return (session: TrainingSession): string => {
+    const id = crypto.randomUUID();
     const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
-    const base = current ?? { yamlText: "", sessions: [], filename: null, importedAt: new Date().toISOString() };
-    const sessions = [...base.sessions, session];
-    writePlan(queryClient, { ...base, sessions });
-    return sessions.length - 1;
+    if (!current) {
+      applyPlanLocally(queryClient, { yamlText: "", sessions: [], filename: null, importedAt: new Date().toISOString() });
+    }
+    const created: TrainingSession = { ...session, id, origin: "manual", locked: true };
+    replaceSessionLocally(queryClient, id, () => created);
+
+    apiPost<TrainingSession>("/plan/sessions", { ...contentOf(created), id })
+      .then((saved) => replaceSessionLocally(queryClient, id, () => saved))
+      .catch(() => replaceSessionLocally(queryClient, id, () => null));
+    return id;
   };
 }
 
 export function useRemoveSession() {
   const queryClient = useQueryClient();
-  return (index: number) => {
+  return (id: string) => {
     const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
-    if (!current) return;
-    const sessions = current.sessions.filter((_, i) => i !== index);
-    writePlan(queryClient, { ...current, sessions });
+    const before = current?.sessions.find((s) => s.id === id);
+    if (!before) return;
+    replaceSessionLocally(queryClient, id, () => null);
+
+    apiDelete<{ ok: boolean }>(`/plan/sessions/${id}`).catch(() =>
+      replaceSessionLocally(queryClient, id, () => before)
+    );
   };
+}
+
+/** A session by id, with a fallback for the numeric URLs of before sessions had ids:
+ * `/session/3` still finds the fourth session, and the caller redirects to its id. */
+export function findPlanSession(plan: PlanState | null | undefined, param: string): TrainingSession | null {
+  if (!plan) return null;
+  const byId = plan.sessions.find((s) => s.id === param);
+  if (byId) return byId;
+  return /^\d+$/.test(param) ? plan.sessions[Number(param)] ?? null : null;
 }
 
 // ---- garmin connection -----------------------------------------------------------------

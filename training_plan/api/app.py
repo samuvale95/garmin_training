@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .. import db, history
+from .. import db, history, plan_store
 from ..garmin_sync import GarminRateLimitError, GarminSyncError
 from ..parser import TrainingPlanValidationError
 from ..strava_sync import StravaAuthError
@@ -58,6 +58,8 @@ def _ensure_schema() -> None:
     # The stored history too: readers filter on columns its migration adds, so it has to
     # have run before the first request, not whenever a backfill next happens.
     history.ensure_schema()
+    # After db's: it adds a column to `user_plan` and moves each plan's sessions out of it.
+    plan_store.ensure_schema()
 
 
 @app.exception_handler(AuthError)

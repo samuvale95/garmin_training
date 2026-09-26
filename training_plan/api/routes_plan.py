@@ -10,13 +10,14 @@ from __future__ import annotations
 import hashlib
 import tempfile
 from pathlib import Path
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
-from .. import db, service
+from .. import db, plan_store, service
 from .. import goal_fit, llm
-from ..parser import parse_plan_document
+from ..parser import parse_plan_document, serialize_plan
 from . import garmin_session, schemas
 from .auth import current_user_id
 from .cache import TTL_GOAL_FIT_NARRATIVE, TTL_PLAN_DIFF, cache
@@ -27,29 +28,105 @@ router = APIRouter()
 
 @router.get("/plan", response_model=schemas.PlanResponse)
 async def get_plan(user_id: str = Depends(current_user_id)) -> schemas.PlanResponse:
-    plan = await run_in_threadpool(db.get_plan, user_id)
-    return schemas.PlanResponse(plan=schemas.PlanOut.from_model(plan) if plan else None)
+    def read() -> schemas.PlanResponse:
+        plan = db.get_plan(user_id)
+        if plan is None:
+            return schemas.PlanResponse(plan=None)
+        return schemas.PlanResponse(plan=schemas.PlanOut.from_model(plan, plan_store.list_sessions(user_id)))
+
+    return await run_in_threadpool(read)
 
 
 @router.put("/plan", response_model=schemas.PlanOut)
 async def save_plan(payload: schemas.PlanIn, user_id: str = Depends(current_user_id)) -> schemas.PlanOut:
-    plan = await run_in_threadpool(
-        lambda: db.save_plan(
+    """Import a plan. Sessions are only taken with `import: true` (see `schemas.PlanIn`)."""
+
+    def write() -> schemas.PlanOut:
+        plan = db.save_plan(
             user_id=user_id,
             yaml_text=payload.yaml_text,
-            sessions=[s.model_dump(mode="json") for s in payload.sessions],
             filename=payload.filename,
             imported_at=payload.imported_at,
             goal=payload.goal.model_dump(mode="json") if payload.goal else None,
         )
-    )
-    return schemas.PlanOut.from_model(plan)
+        if payload.is_import:
+            plan_store.import_sessions(user_id, [s.model_dump(mode="json") for s in payload.sessions])
+        return schemas.PlanOut.from_model(plan, plan_store.list_sessions(user_id))
+
+    return await run_in_threadpool(write)
 
 
 @router.delete("/plan", response_model=schemas.DeletePlanResponse)
 async def delete_plan(user_id: str = Depends(current_user_id)) -> schemas.DeletePlanResponse:
     await run_in_threadpool(db.delete_plan, user_id)
     return schemas.DeletePlanResponse(ok=True)
+
+
+# ---- one session at a time ---------------------------------------------------------------------
+#
+# Every write here is the user's, so every write locks the session (see plan_store.py):
+# whatever the AI does to the plan afterwards leaves it alone.
+
+
+def _not_found(session_id: str) -> HTTPException:
+    return HTTPException(status_code=404, detail=f"Seduta {session_id} non trovata")
+
+
+@router.post("/plan/sessions", response_model=schemas.TrainingSessionOut)
+async def create_session(
+    payload: schemas.TrainingSessionIn, user_id: str = Depends(current_user_id)
+) -> schemas.TrainingSessionOut:
+    def write() -> schemas.TrainingSessionOut:
+        db.ensure_plan(user_id)
+        created = plan_store.create_session(user_id, payload.model_dump(mode="json"), origin="manual")
+        return schemas.TrainingSessionOut.model_validate(created)
+
+    return await run_in_threadpool(write)
+
+
+@router.patch("/plan/sessions/{session_id}", response_model=schemas.TrainingSessionOut)
+async def update_session(
+    session_id: UUID, payload: schemas.SessionPatch, user_id: str = Depends(current_user_id)
+) -> schemas.TrainingSessionOut:
+    def write() -> schemas.TrainingSessionOut:
+        try:
+            updated = plan_store.update_session(user_id, str(session_id), payload.changes(), by_user=True)
+        except plan_store.SessionNotFound:
+            raise _not_found(str(session_id))
+        return schemas.TrainingSessionOut.model_validate(updated)
+
+    return await run_in_threadpool(write)
+
+
+@router.delete("/plan/sessions/{session_id}", response_model=schemas.DeletePlanResponse)
+async def delete_session(session_id: UUID, user_id: str = Depends(current_user_id)) -> schemas.DeletePlanResponse:
+    def write() -> None:
+        try:
+            plan_store.delete_session(user_id, str(session_id), by_user=True)
+        except plan_store.SessionNotFound:
+            raise _not_found(str(session_id))
+
+    await run_in_threadpool(write)
+    return schemas.DeletePlanResponse(ok=True)
+
+
+@router.get("/plan/export")
+async def export_plan(user_id: str = Depends(current_user_id)) -> Response:
+    """The plan as the same YAML the importer reads -- including everything added or
+    edited in the app, so the file stays a real way out."""
+
+    def build() -> str:
+        plan = db.get_plan(user_id)
+        sessions = [schemas.TrainingSessionIn.model_validate(s).to_model() for s in plan_store.list_sessions(user_id)]
+        goal = schemas.RaceGoalIn.model_validate(plan.goal).to_model() if plan and plan.goal else None
+        return serialize_plan(sessions, goal)
+
+    text = await run_in_threadpool(build)
+    return Response(
+        content=text,
+        media_type="text/yaml; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="piano-passo.yaml"'},
+    )
 
 
 @router.get("/goal", response_model=schemas.GoalResponse)
