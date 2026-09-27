@@ -96,3 +96,37 @@ async def test_the_export_is_yaml_the_importer_reads(store, monkeypatch, tmp_pat
     path.write_bytes(response.body)
     assert [s.title for s in parse_plan_document(path).sessions] == ["Corsa"]
     assert "attachment" in response.headers["content-disposition"]
+
+
+@pytest.mark.anyio
+async def test_validate_checks_the_stored_plans_next_weeks(store, monkeypatch):
+    from datetime import date, timedelta
+
+    from training_plan import plan_rules
+
+    today = date.today()
+    hard = {
+        "sport": "running",
+        "title": "Ripetute",
+        "description": None,
+        "steps": [{"reps": 6, "steps": [{"type": "interval", "duration_type": "time", "duration_value": 3}]}],
+        "origin": "ai",
+        "locked": False,
+    }
+    stored = [
+        {**hard, "id": str(uuid4()), "date": (today + timedelta(days=1)).isoformat()},
+        {**hard, "id": str(uuid4()), "date": (today + timedelta(days=2)).isoformat()},
+        {**hard, "id": str(uuid4()), "date": (today + timedelta(days=60)).isoformat()},  # outside the window
+    ]
+    monkeypatch.setattr(plan_store, "list_sessions", lambda user_id: stored)
+    monkeypatch.setattr(routes_plan, "_zones", lambda user_id: None)
+    monkeypatch.setattr(
+        plan_rules,
+        "build_context",
+        lambda user_id, today, threshold_available: plan_rules.RuleContext(1, None, None, today),
+    )
+
+    out = await routes_plan.validate_plan(None, user_id="u")
+    in_a_row = next(v for v in out.violations if v.key == "hard_in_a_row")
+    assert in_a_row.sessions == [stored[0]["id"], stored[1]["id"]]
+    assert out.context.effective_level == 1

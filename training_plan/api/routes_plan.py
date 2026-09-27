@@ -9,18 +9,20 @@ from __future__ import annotations
 
 import hashlib
 import tempfile
+from datetime import date, timedelta
 from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
-from .. import db, plan_store, service
+from .. import db, plan_rules, plan_store, service
 from .. import goal_fit, llm
 from ..parser import parse_plan_document, serialize_plan
 from . import garmin_session, schemas
 from .auth import current_user_id
 from .cache import TTL_GOAL_FIT_NARRATIVE, TTL_PLAN_DIFF, cache
+from .routes_coach import _zones
 from .jobs import job_store
 
 router = APIRouter()
@@ -108,6 +110,53 @@ async def delete_session(session_id: UUID, user_id: str = Depends(current_user_i
 
     await run_in_threadpool(write)
     return schemas.DeletePlanResponse(ok=True)
+
+
+# ---- limits -------------------------------------------------------------------------------------
+
+# How far ahead "the stored plan" reaches when no sessions are sent: the AI plan's detailed
+# window (2-3 weeks, see the brainstorming §0.4).
+VALIDATE_DAYS_AHEAD = 21
+
+
+@router.post("/plan/validate", response_model=schemas.ValidatePlanResponse)
+async def validate_plan(
+    payload: schemas.ValidatePlanRequest | None = None, user_id: str = Depends(current_user_id)
+) -> schemas.ValidatePlanResponse:
+    """The limits the given sessions -- or the stored plan's next three weeks -- break.
+
+    For the generator to call before writing, and for looking at the rules against a real
+    plan. Every violation carries the user's own numbers and the evidence behind it.
+    """
+    payload = payload or schemas.ValidatePlanRequest()
+
+    def check() -> schemas.ValidatePlanResponse:
+        today = date.today()
+        end = today + timedelta(days=VALIDATE_DAYS_AHEAD)
+        if payload.sessions:
+            sessions = [s.to_model() for s in payload.sessions]
+            ids = [str(s.id) if s.id else None for s in payload.sessions]
+            window = (min(s.date for s in sessions), max(s.date for s in sessions))
+        else:
+            stored = [s for s in plan_store.list_sessions(user_id) if today.isoformat() <= s["date"] <= end.isoformat()]
+            sessions = [schemas.TrainingSessionIn.model_validate(s).to_model() for s in stored]
+            ids = [s["id"] for s in stored]
+            window = (today, end)
+
+        context = plan_rules.build_context(user_id, today, threshold_available=_zones(user_id) is not None)
+        violations = plan_rules.validate(
+            sessions, context, ids=ids, start=window[0], end=window[1], only_move_warnings=payload.only_move_warnings
+        )
+        return schemas.ValidatePlanResponse(
+            context=schemas.RuleContextOut(
+                effective_level=context.effective_level,
+                recent_weekly_minutes=context.recent_weekly_minutes,
+                recent_longest_run=context.recent_longest_run,
+            ),
+            violations=[schemas.ViolationOut(**vars(v)) for v in violations],
+        )
+
+    return await run_in_threadpool(check)
 
 
 @router.get("/plan/export")

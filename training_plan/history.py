@@ -884,3 +884,15 @@ def set_adaptation_mode(user_id: str, mode: str | None) -> None:
                    adaptation_mode = EXCLUDED.adaptation_mode, updated_at = now()""",
             [user_id, mode],
         )
+
+
+def longest_run(user_id: str, start: date_type, end: date_type, *, running_sports: Sequence[str]) -> float | None:
+    """The longest canonical run in the range, in minutes; None when there was none."""
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT max(duration_min) FROM activity "
+            "WHERE user_id = %s AND day BETWEEN %s AND %s AND duplicate_of IS NULL AND sport = ANY(%s)",
+            [user_id, start, end, list(running_sports)],
+        )
+        value = cur.fetchone()[0]
+    return float(value) if value is not None else None

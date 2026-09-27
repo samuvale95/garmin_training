@@ -1606,6 +1606,39 @@ class AdaptationModeRequest(BaseModel):
     mode: Literal["automatico", "proposta"] | None = None
 
 
+# ---- plan limits ------------------------------------------------------------------------------
+
+
+class RuleContextOut(BaseModel):
+    effective_level: int
+    recent_weekly_minutes: float | None
+    recent_longest_run: float | None
+
+
+class ViolationOut(BaseModel):
+    key: str
+    message: str
+    measured: float
+    limit: float
+    level: int
+    evidence: Literal["ricerca", "consenso", "prudenza"]
+    warn_on_move: bool
+    sessions: list[str]
+    dates: list[date_type]
+
+
+class ValidatePlanRequest(BaseModel):
+    """Sessions to check; empty or absent means the stored plan's next three weeks."""
+
+    sessions: list[TrainingSessionIn] = Field(default_factory=list)
+    only_move_warnings: bool = False
+
+
+class ValidatePlanResponse(BaseModel):
+    context: RuleContextOut
+    violations: list[ViolationOut]
+
+
 # ---- history sync ----------------------------------------------------------------------------
 
 
