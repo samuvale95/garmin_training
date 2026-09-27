@@ -148,6 +148,19 @@ def test_the_fourth_week_after_three_building_ones_is_lighter():
     assert round(deload.limit) == round(190 * 0.85)
 
 
+def test_the_week_after_a_lighter_one_can_return_to_the_volume_before_it():
+    # Spec: 300 minutes average, weeks of 320, 340, 270 and 345. Against the lighter week
+    # alone the last would break the limit (330); against the highest of the three before
+    # it (340) the limit is 374.
+    weeks = []
+    for w, minutes in enumerate((320, 340, 270, 345)):
+        weeks += [run(w * 7 + d, minutes / 5) for d in (0, 1, 2, 4, 5)]
+    violations = [v for v in plan_rules.validate(weeks, ctx(level=1, weekly=300, longest=120)) if v.key == "volume_growth"]
+    assert violations == []
+    limit, _ = plan_rules.volume_limit(340, ctx(level=1, weekly=300))
+    assert round(limit) == 374
+
+
 # ---- honesty --------------------------------------------------------------------------------
 
 

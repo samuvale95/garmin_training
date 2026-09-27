@@ -14,15 +14,16 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from fastapi.responses import JSONResponse
 from fastapi.concurrency import run_in_threadpool
 
-from .. import db, plan_rules, plan_store, service
+from .. import db, plan_generator, plan_rules, plan_store, service
 from .. import goal_fit, llm
 from ..parser import parse_plan_document, serialize_plan
 from . import garmin_session, schemas
 from .auth import current_user_id
 from .cache import TTL_GOAL_FIT_NARRATIVE, TTL_PLAN_DIFF, cache
-from .routes_coach import _zones
+from .routes_coach import _zones, coach_state
 from .jobs import job_store
 
 router = APIRouter()
@@ -157,6 +158,54 @@ async def validate_plan(
         )
 
     return await run_in_threadpool(check)
+
+
+# ---- generation ---------------------------------------------------------------------------------
+
+
+def _error(status: int, category: str, message: str, details: list[str] | None = None) -> JSONResponse:
+    """The app's error shape (`schemas.ErrorResponse`), which the web client reads."""
+    return JSONResponse(
+        status_code=status,
+        content=schemas.ErrorResponse(category=category, message=message, details=details or []).model_dump(),
+    )
+
+
+@router.post("/plan/generate", response_model=schemas.GeneratePlanResponse)
+async def generate_plan(
+    payload: schemas.GeneratePlanRequest | None = None, user_id: str = Depends(current_user_id)
+) -> schemas.GeneratePlanResponse | JSONResponse:
+    """Write the next weeks: the model composes inside the code's limits, the code checks,
+    and sessions edited by hand stay (see `plan_generator.py`). Blocks until done --
+    usually one model call, bounded at a few."""
+    payload = payload or schemas.GeneratePlanRequest()
+
+    def run() -> schemas.GeneratePlanResponse | JSONResponse:
+        state = coach_state(user_id)
+        profile = state[1].profile if state and state[1] else None
+        try:
+            result = plan_generator.generate(
+                user_id,
+                date.today(),
+                profile=profile,
+                threshold_available=state is not None,
+                regenerate_skeleton=payload.regenerate_skeleton,
+            )
+        except plan_generator.GenerationInProgress:
+            return _error(409, "validation_failed", "Sto già scrivendo il piano: aspetta che finisca.")
+        except plan_generator.GenerationFailed as exc:
+            return _error(422, "validation_failed", "Non riesco a scrivere un piano dentro i limiti.", exc.errors)
+        return schemas.GeneratePlanResponse.from_model(result)
+
+    return await run_in_threadpool(run)
+
+
+@router.get("/plan/skeleton", response_model=schemas.SkeletonResponse)
+async def get_skeleton(user_id: str = Depends(current_user_id)) -> schemas.SkeletonResponse:
+    stored = await run_in_threadpool(db.get_skeleton, user_id)
+    if not stored:
+        return schemas.SkeletonResponse(weeks=None)
+    return schemas.SkeletonResponse(weeks=[schemas.SkeletonWeekOut(**week) for week in stored["weeks"]])
 
 
 @router.get("/plan/export")

@@ -690,3 +690,39 @@ export interface AthleteLevel {
   adaptation_mode: "automatico" | "proposta";
   adaptation_mode_is_default: boolean;
 }
+
+// ---- the generated plan -------------------------------------------------------------------
+
+/** One week of the skeleton to the goal: computed by the server from the history, the
+ * level and the goal, never by the model. */
+export interface SkeletonWeek {
+  monday: string;
+  phase: string;
+  target_minutes: number;
+  long_run_minutes: number;
+  quality_sessions: number;
+  running_days: number;
+  lighter: boolean;
+  reason: string;
+}
+
+export interface GeneratedWeek {
+  skeleton: SkeletonWeek;
+  first_day: string;
+  last_day: string;
+  target_minutes: number;
+  reason: string;
+}
+
+export interface GeneratePlanResult {
+  /** "ai" when the model's plan passed every check, "regole" when the fallback wrote it. */
+  source: "ai" | "regole";
+  attempts: number;
+  start: string;
+  end: string;
+  weeks: GeneratedWeek[];
+  written: TrainingSession[];
+  conflicts: { date: string; sport: string; title: string }[];
+  fallback_reason: string | null;
+  skeleton_regenerated: boolean;
+}

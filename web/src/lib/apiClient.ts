@@ -45,10 +45,10 @@ const REQUEST_TIMEOUT_MS = 25_000;
  * `AbortSignal.timeout` is only used when present: losing the timeout on an old browser
  * is a degradation, but a `TypeError` would fail every single request.
  */
-function requestSignal(signal?: AbortSignal): AbortSignal | undefined {
+function requestSignal(signal?: AbortSignal, timeoutMs: number = REQUEST_TIMEOUT_MS): AbortSignal | undefined {
   const timeout =
     typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
-      ? AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+      ? AbortSignal.timeout(timeoutMs)
       : undefined;
   if (!signal) return timeout;
   if (!timeout) return signal;
@@ -95,13 +95,15 @@ export async function apiGet<T>(
   return handle<T>(response);
 }
 
-export async function apiPost<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+/** `timeoutMs` for the few calls that are slow by design (plan generation waits on a
+ * model); everything else keeps the default above. */
+export async function apiPost<T>(path: string, body?: unknown, signal?: AbortSignal, timeoutMs?: number): Promise<T> {
   const response = await fetch(new URL(path, API_BASE_URL), {
     method: "POST",
     headers: { ...(await authHeaders()), ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
     body: body !== undefined ? JSON.stringify(body) : undefined,
     cache: "no-store",
-    signal: requestSignal(signal),
+    signal: requestSignal(signal, timeoutMs),
   });
   return handle<T>(response);
 }

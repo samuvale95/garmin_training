@@ -11,7 +11,7 @@ import { useMotionEnabled } from "@/lib/motion";
  * needed:
  *   cwebp -q 82 -resize 640 640 -alpha_q 100 <src>.png -o public/illustrazioni/<name>.webp
  */
-const SOURCES = {
+export const ILLUSTRATION_SOURCES = {
   corsa: "/illustrazioni/corsa.webp",
   attesa: "/illustrazioni/attesa.webp",
   esultanza: "/illustrazioni/esultanza.webp",
@@ -22,7 +22,7 @@ const SOURCES = {
   sync: "/illustrazioni/sync.webp",
 } as const;
 
-export type IllustrationName = keyof typeof SOURCES;
+export type IllustrationName = keyof typeof ILLUSTRATION_SOURCES;
 
 interface IllustrationProps {
   name: IllustrationName;
@@ -75,7 +75,7 @@ export function Illustration({
         style={{ width: "100%", height: "100%", position: "relative" }}
       >
         <Image
-          src={SOURCES[name]}
+          src={ILLUSTRATION_SOURCES[name]}
           alt=""
           fill
           sizes={`${width}px`}

@@ -130,3 +130,72 @@ async def test_validate_checks_the_stored_plans_next_weeks(store, monkeypatch):
     in_a_row = next(v for v in out.violations if v.key == "hard_in_a_row")
     assert in_a_row.sessions == [stored[0]["id"], stored[1]["id"]]
     assert out.context.effective_level == 1
+
+
+@pytest.mark.anyio
+async def test_generate_returns_the_window_and_what_was_written(monkeypatch):
+    from datetime import date
+
+    from training_plan import plan_generator
+    from training_plan.plan_rules import RuleContext
+    from training_plan.plan_skeleton import SkeletonInputs, build_skeleton
+
+    today = date(2026, 9, 27)
+    window = plan_generator.build_window(
+        today=today,
+        skeleton=build_skeleton(SkeletonInputs(date(2026, 9, 28), 2, 150.0, 3)),
+        context=RuleContext(2, 150.0, 90.0, today),
+        stored=[],
+        days=[],
+        bands=None,
+        goal=None,
+    )
+    sessions = plan_generator.compose_fallback(window)
+    written = [{**plan_generator.session_to_dict(s), "id": str(uuid4()), "origin": "ai", "locked": False} for s in sessions]
+    seen = {}
+
+    def fake_generate(user_id, today, *, profile, threshold_available, regenerate_skeleton):
+        seen.update(profile=profile, threshold=threshold_available, regenerate=regenerate_skeleton)
+        return plan_generator.GenerationResult(
+            source="regole",
+            attempts=0,
+            window=window,
+            written=written,
+            conflicts=[{"date": "2026-10-01", "sport": "running", "title": "Soglia"}],
+            fallback_reason="modello non configurato",
+            skeleton_regenerated=True,
+        )
+
+    monkeypatch.setattr(routes_plan, "coach_state", lambda user_id: None)
+    monkeypatch.setattr(plan_generator, "generate", fake_generate)
+    out = await routes_plan.generate_plan(None, user_id="u")
+    assert out.source == "regole" and out.fallback_reason == "modello non configurato"
+    assert (out.start, out.end) == (date(2026, 9, 28), date(2026, 10, 18))
+    assert len(out.weeks) == 3 and out.weeks[0].reason
+    assert len(out.written) == len(sessions)
+    assert out.conflicts[0].title == "Soglia"
+    assert seen == {"profile": None, "threshold": False, "regenerate": False}
+
+    def busy(*args, **kwargs):
+        raise plan_generator.GenerationInProgress("u")
+
+    monkeypatch.setattr(plan_generator, "generate", busy)
+    refused = await routes_plan.generate_plan(None, user_id="u")
+    assert refused.status_code == 409
+    assert b"aspetta" in refused.body
+
+
+@pytest.mark.anyio
+async def test_skeleton_is_none_until_one_is_stored(monkeypatch):
+    from datetime import date
+
+    from training_plan import db
+    from training_plan.plan_skeleton import SkeletonInputs, build_skeleton
+
+    monkeypatch.setattr(db, "get_skeleton", lambda user_id: None)
+    assert (await routes_plan.get_skeleton(user_id="u")).weeks is None
+
+    weeks = build_skeleton(SkeletonInputs(date(2026, 9, 28), 3, 181.0, 4))
+    monkeypatch.setattr(db, "get_skeleton", lambda user_id: {"inputs": {}, "weeks": [w.to_dict() for w in weeks]})
+    out = await routes_plan.get_skeleton(user_id="u")
+    assert [w.target_minutes for w in out.weeks] == [200, 220, 240]

@@ -76,6 +76,10 @@ def _timeout() -> float:
         return DEFAULT_TIMEOUT_S
 
 
+def configured() -> bool:
+    return _api_key() is not None
+
+
 def photo_upload_enabled() -> bool:
     """Whether a plate photo may be sent to a hosted model.
 
@@ -100,7 +104,9 @@ def config_state() -> dict:
     }
 
 
-def _post_chat(model: str, messages: list[dict], *, max_tokens: int, json_object: bool) -> str | None:
+def _post_chat(
+    model: str, messages: list[dict], *, max_tokens: int, json_object: bool, timeout: float | None = None
+) -> str | None:
     """One chat completion, or `None` for every possible failure.
 
     Deliberately built on `httpx` (already a dependency) rather than the `openai`
@@ -128,7 +134,7 @@ def _post_chat(model: str, messages: list[dict], *, max_tokens: int, json_object
                 "X-Title": "Passo",
             },
             json=payload,
-            timeout=_timeout(),
+            timeout=timeout if timeout is not None else _timeout(),
         )
         response.raise_for_status()
         data = response.json()
@@ -418,3 +424,35 @@ def estimate_macros_from_photo(image_bytes: bytes, mime_type: str = "image/jpeg"
         }
     ]
     return _estimate_with_retry(os.getenv("LLM_VISION_MODEL", DEFAULT_VISION_MODEL), messages)
+
+
+# ---- the plan role ------------------------------------------------------------------
+
+# Writing three weeks of structured sessions is a longer answer than a sentence, and it
+# is asked for once per generation, not per screen: a slower call is fine, a truncated
+# one is not.
+DEFAULT_PLAN_TIMEOUT_S = 90.0
+PLAN_MAX_TOKENS = 6000
+
+
+def plan_model() -> str:
+    return os.getenv("LLM_PLAN_MODEL") or os.getenv("LLM_TEXT_MODEL", DEFAULT_TEXT_MODEL)
+
+
+def _plan_timeout() -> float:
+    try:
+        return float(os.getenv("LLM_PLAN_TIMEOUT_S", DEFAULT_PLAN_TIMEOUT_S))
+    except ValueError:
+        return DEFAULT_PLAN_TIMEOUT_S
+
+
+def compose_plan(messages: list[dict]) -> str | None:
+    """One turn of the plan conversation: the raw answer, or `None` when the model is
+    unavailable. The brief, the checks and the retries live in `plan_generator` -- this
+    stays a transport, like every other role here, and the numbers that bound the plan
+    are never the model's (see `plan_skeleton.py`)."""
+    return _post_chat(plan_model(), messages, max_tokens=PLAN_MAX_TOKENS, json_object=True, timeout=_plan_timeout())
+
+
+def parse_json_object(raw: str) -> dict | None:
+    return _parse_json_object(raw)

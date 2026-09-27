@@ -1639,6 +1639,81 @@ class ValidatePlanResponse(BaseModel):
     violations: list[ViolationOut]
 
 
+# ---- plan generation ------------------------------------------------------------------------
+
+
+class SkeletonWeekOut(BaseModel):
+    monday: date_type
+    phase: str
+    target_minutes: int
+    long_run_minutes: int
+    quality_sessions: int
+    running_days: int
+    lighter: bool
+    reason: str
+
+
+class GeneratedWeekOut(BaseModel):
+    """A window week: the skeleton's entry and what it became once today's limits and
+    the sessions already fixed in it were applied."""
+
+    skeleton: SkeletonWeekOut
+    first_day: date_type
+    last_day: date_type
+    target_minutes: int
+    reason: str
+
+
+class PlanConflictOut(BaseModel):
+    date: date_type
+    sport: str
+    title: str
+
+
+class GeneratePlanRequest(BaseModel):
+    regenerate_skeleton: bool = False
+
+
+class GeneratePlanResponse(BaseModel):
+    source: Literal["ai", "regole"]
+    attempts: int
+    start: date_type
+    end: date_type
+    weeks: list[GeneratedWeekOut]
+    written: list[TrainingSessionOut]
+    conflicts: list[PlanConflictOut]
+    fallback_reason: str | None = None
+    skeleton_regenerated: bool
+
+    @classmethod
+    def from_model(cls, result) -> "GeneratePlanResponse":
+        window = result.window
+        return cls(
+            source=result.source,
+            attempts=result.attempts,
+            start=window.start,
+            end=window.end,
+            weeks=[
+                GeneratedWeekOut(
+                    skeleton=SkeletonWeekOut(**week.skeleton.to_dict()),
+                    first_day=week.first_day,
+                    last_day=week.last_day,
+                    target_minutes=week.target,
+                    reason=week.target_reason,
+                )
+                for week in window.weeks
+            ],
+            written=[TrainingSessionOut.model_validate(s) for s in result.written],
+            conflicts=[PlanConflictOut(**{k: s[k] for k in ("date", "sport", "title")}) for s in result.conflicts],
+            fallback_reason=result.fallback_reason,
+            skeleton_regenerated=result.skeleton_regenerated,
+        )
+
+
+class SkeletonResponse(BaseModel):
+    weeks: list[SkeletonWeekOut] | None = None
+
+
 # ---- history sync ----------------------------------------------------------------------------
 
 

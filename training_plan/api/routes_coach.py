@@ -215,23 +215,17 @@ class _NoZones(Exception):
     """No threshold to anchor on -- raised out of the cached computation so it is not stored."""
 
 
-@router.get("/coach/plan", response_model=schemas.CoachPlanResponse)
-async def coach_plan(
-    # Bounded: every distinct value is its own cache entry and its own full read of the
-    # history, and nothing on the screen asks for more than two years.
-    days: int = Query(PLAN_LOOKBACK_DAYS, ge=28, le=730),
-    refresh: bool = False,
-    user_id: str = Depends(current_user_id),
-) -> schemas.CoachPlanResponse:
-    """How this athlete actually trains, and the sessions that would change it.
+def coach_state(
+    user_id: str, days: int = PLAN_LOOKBACK_DAYS, refresh: bool = False
+) -> tuple[intensity.Zones, prescription.CoachPlan | None] | None:
+    """How this athlete actually trains, as models: zones, and the plan read off the
+    stored history (None when there is no block to read). None without zones.
 
-    Reads the stored history and nothing else -- no imported plan required, which is the
-    point: the diagnosis is about what was *done*, and the plan file only ever says what
-    was intended. It was the missing piece that made the execution screen unusable for
-    an account training off the Garmin calendar.
+    Shared by `/coach/plan` and the plan generator, which needs the same pace profile:
+    one pass over the streams, cached, whoever asks first.
     """
 
-    def compute() -> schemas.CoachPlanResponse:
+    def compute() -> tuple[intensity.Zones, prescription.CoachPlan | None]:
         zones = _zones(user_id)
         if zones is None:
             raise _NoZones
@@ -275,27 +269,47 @@ async def coach_plan(
 
         block = intensity.read_block(executions)
         if block is None:
-            return schemas.CoachPlanResponse(zones=schemas.ZonesOut.from_model(zones))
+            return zones, None
 
         profile = paces.build_profile(samples, aerobic_hr=zones.aerobic_hr, threshold_hr=zones.threshold_hr)
-        plan = prescription.CoachPlan(
+        return zones, prescription.CoachPlan(
             zones=zones,
             block=block,
             profile=profile,
             prescriptions=prescription.prescribe(block, zones, profile, today=today),
             sensitivity=intensity.threshold_sensitivity(histogram, zones.threshold_hr),
         )
-        return schemas.CoachPlanResponse.from_model(plan)
 
-    def cached() -> schemas.CoachPlanResponse:
-        # Keyed on the stored streams as well as the range, so a run that syncs shows up
-        # on the next view rather than whenever the TTL happens to lapse.
-        key = (days, history.streams_version(user_id))
-        return cache.get_or_call("coach:plan", user_id, key, TTL_COACH_PLAN, compute, refresh=refresh)
-
+    # Keyed on the stored streams as well as the range, so a run that syncs shows up on
+    # the next view rather than whenever the TTL happens to lapse.
+    key = (days, history.streams_version(user_id))
     try:
-        return await run_in_threadpool(cached)
+        return cache.get_or_call("coach:plan", user_id, key, TTL_COACH_PLAN, compute, refresh=refresh)
     except _NoZones:
         # Not cached: `lactate_threshold` degrades a timeout or a rate limit to "no
         # estimate", and caching that would hide real zones for the whole TTL.
+        return None
+
+
+@router.get("/coach/plan", response_model=schemas.CoachPlanResponse)
+async def coach_plan(
+    # Bounded: every distinct value is its own cache entry and its own full read of the
+    # history, and nothing on the screen asks for more than two years.
+    days: int = Query(PLAN_LOOKBACK_DAYS, ge=28, le=730),
+    refresh: bool = False,
+    user_id: str = Depends(current_user_id),
+) -> schemas.CoachPlanResponse:
+    """How this athlete actually trains, and the sessions that would change it.
+
+    Reads the stored history and nothing else -- no imported plan required, which is the
+    point: the diagnosis is about what was *done*, and the plan file only ever says what
+    was intended. It was the missing piece that made the execution screen unusable for
+    an account training off the Garmin calendar.
+    """
+    state = await run_in_threadpool(coach_state, user_id, days, refresh)
+    if state is None:
         return schemas.CoachPlanResponse(zones=None)
+    zones, plan = state
+    if plan is None:
+        return schemas.CoachPlanResponse(zones=schemas.ZonesOut.from_model(zones))
+    return schemas.CoachPlanResponse.from_model(plan)

@@ -627,3 +627,75 @@ button {
   align-items: center;
   justify-content: center;
 }
+
+/* ---- plan generation: the wait (PlanWaiting.tsx). Each sport moves its own way; the
+   ground scrolls under the two that travel. Applied from JS only when motion is on, so
+   "Meno movimento" and the system preference both leave a still picture. */
+@keyframes genRunBob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-7px) rotate(1deg);
+  }
+}
+@keyframes genRideGlide {
+  0%,
+  100% {
+    transform: translateX(-4px) translateY(0);
+  }
+  25% {
+    transform: translateX(0) translateY(-1.5px);
+  }
+  50% {
+    transform: translateX(4px) translateY(0);
+  }
+  75% {
+    transform: translateX(0) translateY(-1.5px);
+  }
+}
+@keyframes genLift {
+  0%,
+  100% {
+    transform: translateY(6px) scaleY(0.97);
+  }
+  45%,
+  60% {
+    transform: translateY(-6px) scaleY(1.01);
+  }
+}
+@keyframes genGround {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -48px 0;
+  }
+}
+@keyframes genSwap {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.gen-run {
+  animation: genRunBob 0.42s ease-in-out infinite;
+}
+.gen-ride {
+  animation: genRideGlide 1.6s ease-in-out infinite;
+}
+.gen-lift {
+  animation: genLift 1.8s cubic-bezier(0.45, 0, 0.3, 1) infinite;
+  transform-origin: bottom center;
+}
+.gen-ground {
+  animation: genGround 0.5s linear infinite;
+}
+.gen-swap {
+  animation: genSwap 420ms var(--ease) both;
+}

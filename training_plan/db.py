@@ -69,6 +69,10 @@ ALTER TABLE user_plan ADD COLUMN IF NOT EXISTS goal JSONB;
 -- its own table so a goal can exist before -- or after -- a plan does. `save_plan`
 -- carries a row from here into the new plan and clears it (see routes_plan.py); nothing
 -- else reads this table once a plan exists.
+-- The generated plan's skeleton, `{inputs, weeks}` (see `plan_skeleton.py`): stored so the
+-- progression builds from one generation to the next instead of re-basing each time.
+ALTER TABLE user_plan ADD COLUMN IF NOT EXISTS skeleton JSONB;
+
 CREATE TABLE IF NOT EXISTS user_goal (
   user_id      TEXT PRIMARY KEY,
   goal         JSONB NOT NULL,
@@ -500,3 +504,38 @@ def set_standalone_goal(user_id: str, goal: dict[str, Any] | None) -> dict[str, 
             )
             row = cur.fetchone()
     return row["goal"]
+
+
+def current_goal(user_id: str) -> dict[str, Any] | None:
+    """The race the user is training for: the plan's goal, or the one set before a plan."""
+    with connect() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT goal FROM user_plan WHERE user_id = %s", (user_id,))
+            row = cur.fetchone()
+            # A plan row can exist without a goal (`ensure_plan` for a hand-built plan),
+            # and then the standalone one is still the one the user set.
+            if row is not None and row["goal"]:
+                return row["goal"]
+            cur.execute("SELECT goal FROM user_goal WHERE user_id = %s", (user_id,))
+            row = cur.fetchone()
+    return row["goal"] if row else None
+
+
+# ---- the generated plan's skeleton -------------------------------------------------------------
+
+
+def get_skeleton(user_id: str) -> dict[str, Any] | None:
+    with connect() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT skeleton FROM user_plan WHERE user_id = %s", (user_id,))
+            row = cur.fetchone()
+    return row["skeleton"] if row else None
+
+
+def save_skeleton(user_id: str, skeleton: dict[str, Any]) -> None:
+    ensure_plan(user_id)
+    with connect() as conn:
+        conn.execute(
+            "UPDATE user_plan SET skeleton = %s, updated_at = now() WHERE user_id = %s",
+            (Jsonb(skeleton), user_id),
+        )

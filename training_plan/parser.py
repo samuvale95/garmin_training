@@ -300,15 +300,10 @@ class ParsedPlan:
     goal: RaceGoal | None = None
 
 
-def parse_plan_document(path: str | Path) -> ParsedPlan:
-    """Parse and validate a training-plan YAML file: its sessions and its optional goal.
-
-    Raises TrainingPlanValidationError, with every entry's problems collected,
-    if anything is invalid. Nothing is returned when validation fails.
-    """
-    raw = yaml.safe_load(Path(path).read_text()) or {}
-    raw_sessions = raw.get("sessions") or []
-
+def parse_sessions(raw_sessions: list[Any]) -> tuple[list[TrainingSession], list[str]]:
+    """The plan file's `sessions` list, validated: the sessions that passed, and every
+    entry's problems. Shared by the file import and the plan generator, which asks the
+    model for exactly this shape so its answer is checked by the same code."""
     errors: list[str] = []
     sessions: list[TrainingSession] = []
 
@@ -336,6 +331,17 @@ def parse_plan_document(path: str | Path) -> ParsedPlan:
                 steps=steps,
             )
         )
+    return sessions, errors
+
+
+def parse_plan_document(path: str | Path) -> ParsedPlan:
+    """Parse and validate a training-plan YAML file: its sessions and its optional goal.
+
+    Raises TrainingPlanValidationError, with every entry's problems collected,
+    if anything is invalid. Nothing is returned when validation fails.
+    """
+    raw = yaml.safe_load(Path(path).read_text()) or {}
+    sessions, errors = parse_sessions(raw.get("sessions") or [])
 
     goal = _validate_goal(raw, errors)
 

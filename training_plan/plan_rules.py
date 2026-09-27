@@ -225,22 +225,47 @@ def _fmt_day(day: date_type) -> str:
 # ---- the rules ---------------------------------------------------------------------------
 
 
-def _volume_growth(weeks, ctx: RuleContext) -> list[Violation]:
+def volume_limit(base: float | None, ctx: RuleContext) -> tuple[float, str]:
+    """The most running minutes a week may hold over `base`, and where the limit comes from.
+
+    Public because the generator sizes its week targets with the same function the
+    validator checks them with: two copies of this arithmetic would drift apart.
+    """
     level = ctx.effective_level
     growth = RULES["volume_growth"].limit(level)
     allowance = VOLUME_ALLOWANCE[level - 1]
+    if base is None:
+        return allowance, f"il massimo per iniziare al livello {level}"
+    limit = max(base * (1 + growth), base + MIN_VOLUME_STEP)
+    if ctx.recent_weekly_minutes is None:
+        limit = max(limit, allowance)
+    return limit, f"+{round(growth * 100)}% su {round(base)} minuti, livello {level}"
+
+
+def volume_base(ctx: RuleContext, earlier: dict[date_type, float], monday: date_type) -> float | None:
+    """What a week's volume is compared against: the recent average, or the highest of
+    the planned weeks in the three before it when that is higher.
+
+    The highest, not the last: after a lighter week the plan has to be able to return to
+    where it was, and comparing to the lighter week alone made that return a violation.
+    It does not compound: each week still grows only by the limit over a week already
+    planned.
+    """
+    recent = [
+        minutes
+        for week, minutes in earlier.items()
+        if monday - timedelta(weeks=BUILD_WEEKS) <= week < monday and minutes > 0
+    ]
+    return max(filter(None, (*recent, ctx.recent_weekly_minutes)), default=None)
+
+
+def _volume_growth(weeks, ctx: RuleContext) -> list[Violation]:
+    level = ctx.effective_level
     out = []
-    previous: float | None = None
+    earlier: dict[date_type, float] = {}
     for monday, items in weeks.items():
         minutes = _week_minutes(items)
-        base = max(filter(None, (previous, ctx.recent_weekly_minutes)), default=None)
-        if base is None:
-            limit, origin = allowance, f"il massimo per iniziare al livello {level}"
-        else:
-            limit = max(base * (1 + growth), base + MIN_VOLUME_STEP)
-            origin = f"+{round(growth * 100)}% su {round(base)} minuti, livello {level}"
-            if ctx.recent_weekly_minutes is None:
-                limit = max(limit, allowance)
+        limit, origin = volume_limit(volume_base(ctx, earlier, monday), ctx)
         if minutes > limit:
             out.append(
                 _v(
@@ -253,7 +278,7 @@ def _volume_growth(weeks, ctx: RuleContext) -> list[Violation]:
                     items,
                 )
             )
-        previous = minutes if minutes > 0 else previous
+        earlier[monday] = minutes
     return out
 
 
@@ -326,25 +351,30 @@ def _easy_share(planned, ctx: RuleContext) -> list[Violation]:
     ]
 
 
-def _long_run_growth(planned, ctx: RuleContext) -> list[Violation]:
+def long_run_limit(ctx: RuleContext) -> tuple[float, str]:
+    """The longest run allowed, and where the limit comes from. Public for the generator."""
     level = ctx.effective_level
+    if ctx.recent_longest_run is None:
+        return LONG_RUN_ALLOWANCE[level - 1], f"il massimo per iniziare al livello {level}"
+    growth = RULES["long_run_growth"].limit(level)
+    limit = max(ctx.recent_longest_run * (1 + growth), ctx.recent_longest_run + MIN_LONG_RUN_STEP)
+    return limit, (
+        f"+{round(growth * 100)}% sul tuo lungo più lungo delle ultime 8 settimane, {round(ctx.recent_longest_run)} minuti"
+    )
+
+
+def _long_run_growth(planned, ctx: RuleContext) -> list[Violation]:
     running = [item for item in planned if item.minutes > 0]
     if not running:
         return []
     longest = max(running, key=lambda item: item.minutes)
-    if ctx.recent_longest_run is None:
-        limit = LONG_RUN_ALLOWANCE[level - 1]
-        origin = f"il massimo per iniziare al livello {level}"
-    else:
-        growth = RULES["long_run_growth"].limit(level)
-        limit = max(ctx.recent_longest_run * (1 + growth), ctx.recent_longest_run + MIN_LONG_RUN_STEP)
-        origin = f"+{round(growth * 100)}% sul tuo lungo più lungo delle ultime 8 settimane, {round(ctx.recent_longest_run)} minuti"
+    limit, origin = long_run_limit(ctx)
     if longest.minutes <= limit:
         return []
     return [
         _v(
             "long_run_growth",
-            level,
+            ctx.effective_level,
             f"La corsa di {_fmt_day(longest.session.date)} dura {round(longest.minutes)} minuti: il limite è "
             f"{round(limit)} ({origin}).",
             longest.minutes,
@@ -508,7 +538,11 @@ def context_from_days(
     )
 
 
-def build_context(user_id: str, today: date_type, *, threshold_available: bool) -> RuleContext:
+def gather_context(
+    user_id: str, today: date_type, *, threshold_available: bool
+) -> tuple[RuleContext, list["DayTraining"]]:
+    """The rules' context, and the per-day totals it was read from (the generator needs
+    both: the days also say how often, and what was already run this week)."""
     from . import history, intensity, levels  # local: history imports nothing from here
 
     level_days = [
@@ -536,4 +570,9 @@ def build_context(user_id: str, today: date_type, *, threshold_available: bool) 
         last_monday - timedelta(days=1),
         running_sports=intensity.RUNNING_SPORTS,
     )
-    return context_from_days(level_days, today=today, effective_level=assessment.effective_level, longest=longest)
+    context = context_from_days(level_days, today=today, effective_level=assessment.effective_level, longest=longest)
+    return context, level_days
+
+
+def build_context(user_id: str, today: date_type, *, threshold_available: bool) -> RuleContext:
+    return gather_context(user_id, today, threshold_available=threshold_available)[0]

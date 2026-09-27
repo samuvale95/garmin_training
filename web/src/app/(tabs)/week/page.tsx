@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
 import { DraggableWeekCard, RestCard, type DayCardData } from "@/components/WeekCards";
+import { PlanGenerateCard, generationWindow } from "@/components/PlanGenerateCard";
 import { useMotionEnabled, useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import {
@@ -15,12 +16,14 @@ import {
   useRescheduleWorkout,
   useStravaActivityMatches,
   useStravaStatus,
+  useGenerationState,
   useUpdateSession,
   useWeekWorkouts,
 } from "@/lib/queries";
 import { SkeletonDayCards } from "@/components/skeletons";
 import { sessionDistanceKm, toDateKey, weekBounds, weekOffsetFromToday } from "@/lib/sessionVisuals";
 import type { TrainingSession } from "@/lib/types";
+import { formatShortDate } from "@/lib/format";
 
 function formatWeekRange(start: Date, end: Date): string {
   const startMonth = start.toLocaleDateString("it-IT", { month: "short" });
@@ -105,6 +108,11 @@ function WeekPageContent() {
   const prefetchWorkoutSession = usePrefetchWorkoutSession();
   const updateSession = useUpdateSession();
   const rescheduleWorkout = useRescheduleWorkout();
+  // While the server rewrites the next weeks, their days hold still: a move made now
+  // would race the generation, and the plan adopted when it finishes could hide it.
+  const rewriting = useGenerationState().status === "pending";
+  const rewriteWindow = generationWindow();
+  const isRewritten = (key: string) => rewriting && key >= rewriteWindow.start && key <= rewriteWindow.end;
 
   // Drag target detection for the day cards below: each day row registers itself here
   // by key, and the carried card's position is tested against every row's rect to find
@@ -161,6 +169,10 @@ function WeekPageContent() {
   function handleCardDrop(card: DayCardData, pageY: number) {
     const targetKey = dayKeyAtPageY(pageY);
     if (!targetKey || targetKey === card.session.date) return;
+    if (isRewritten(targetKey) || isRewritten(card.session.date)) {
+      haptic([30, 30, 30]);
+      return;
+    }
     haptic([10, 40, 14]);
     if (card.planId != null) {
       updateSession(card.planId, (s) => ({ ...s, date: targetKey }));
@@ -361,9 +373,17 @@ function WeekPageContent() {
           </Link>
         )}
 
+        {/* Only on this week: generation always starts tomorrow, so offering it while
+            paging through past or later weeks would promise a window it won't write. */}
+        {offset === 0 && <PlanGenerateCard animate={animate} delayMs={160} />}
+
         {weekSessions.length > 0 && (
           <p style={{ fontSize: 11.5, color: carried ? "var(--rosso-avviso)" : "var(--inchiostro-35)", margin: "10px 0 0", transition: "color 160ms var(--ease)" }}>
-            {carried ? "Rilascia sul giorno in cui spostarla." : "Tieni premuta una seduta per spostarla di giorno."}
+            {rewriting
+              ? `Sto riscrivendo i giorni fino a ${formatShortDate(rewriteWindow.end)}: potrai spostarli appena ho finito.`
+              : carried
+                ? "Rilascia sul giorno in cui spostarla."
+                : "Tieni premuta una seduta per spostarla di giorno."}
           </p>
         )}
 

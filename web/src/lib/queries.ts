@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useMutationState, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm, apiPut } from "./apiClient";
 import { shiftDateKey, toDateKey, weekBounds } from "./sessionVisuals";
 import type {
@@ -24,6 +24,7 @@ import type {
   FoodHistory,
   FuelTargets,
   GarminStatus,
+  GeneratePlanResult,
   GoalFit,
   LoadSnapshot,
   Narrative,
@@ -1062,6 +1063,52 @@ export function useAthleteLevel() {
     queryFn: ({ signal }) => apiGet<AthleteLevel>("/profile/level", undefined, signal),
     staleTime: 10 * 60_000,
   });
+}
+
+// ---- plan generation ------------------------------------------------------------------------
+
+const GENERATE_PLAN_KEY = ["plan-generate"] as const;
+
+/** Generation waits on a model and may retry it: well past the default request timeout. */
+const GENERATE_TIMEOUT_MS = 4 * 60_000;
+
+/** Write the next weeks of the plan server-side (see `training_plan/plan_generator.py`),
+ * then adopt the server's plan, so the new sessions show without a reload. Sessions the
+ * user edited by hand are untouched by the server, so nothing local is lost. */
+export function useGeneratePlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: GENERATE_PLAN_KEY,
+    mutationFn: (regenerateSkeleton: boolean = false) =>
+      apiPost<GeneratePlanResult>("/plan/generate", { regenerate_skeleton: regenerateSkeleton }, undefined, GENERATE_TIMEOUT_MS),
+    onSuccess: async () => {
+      const { plan } = await apiGet<{ plan: PlanState | null }>("/plan");
+      if (plan) applyPlanLocally(queryClient, plan);
+      queryClient.invalidateQueries({ queryKey: ["plan-diff"] });
+    },
+  });
+}
+
+/** The latest generation, read from the mutation cache rather than a component's state:
+ * the wait and the summary survive paging to another week or another tab and back, and
+ * every screen can tell a generation is running. `dismiss` drops a finished one. */
+export function useGenerationState() {
+  const queryClient = useQueryClient();
+  const mutations = useMutationState({
+    filters: { mutationKey: GENERATE_PLAN_KEY },
+    select: (mutation) => mutation,
+  });
+  const latest = mutations.at(-1) ?? null;
+  const state = latest?.state;
+  return {
+    status: state?.status ?? "idle",
+    startedAt: state?.submittedAt ?? 0,
+    result: (state?.status === "success" ? state.data : null) as GeneratePlanResult | null,
+    error: state?.status === "error" ? state.error : null,
+    dismiss: () => {
+      if (latest) queryClient.getMutationCache().remove(latest);
+    },
+  };
 }
 
 // ---- strava (read-only) --------------------------------------------------------------------
