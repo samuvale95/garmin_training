@@ -6,6 +6,7 @@ import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm, apiPut } from "./api
 import { shiftDateKey, toDateKey, weekBounds } from "./sessionVisuals";
 import type {
   ActivityForm,
+  Adaptation,
   CoachTrend,
   AthleteLevel,
   AthleteProfile,
@@ -1099,6 +1100,93 @@ export function useSaveCheckIn() {
       queryClient.invalidateQueries({ queryKey: ["summary"] });
       queryClient.invalidateQueries({ queryKey: ["progress"] });
     },
+  });
+}
+
+// ---- plan adaptation --------------------------------------------------------------------------
+
+const ADAPTATION_KEY = ["plan", "adaptation"] as const;
+const ADAPTATION_CHECK_KEY = ["plan-adaptation-check"] as const;
+/** A replan waits on the model, like a generation. */
+const ADAPTATION_TIMEOUT_MS = 4 * 60_000;
+const ADAPTATION_CHECKED_KEY = "passo-adaptation-checked";
+
+/** The server changed some sessions: adopt its plan. */
+async function adoptServerPlan(queryClient: ReturnType<typeof useQueryClient>) {
+  const { plan } = await apiGet<{ plan: PlanState | null }>("/plan");
+  if (plan) applyPlanLocally(queryClient, plan);
+  queryClient.invalidateQueries({ queryKey: ["plan-diff"] });
+  queryClient.invalidateQueries({ queryKey: ["progress"] });
+}
+
+/** The pending proposal, or the adaptation applied today (see `plan_adaptation.py`). */
+export function useAdaptation(enabled = true) {
+  return useQuery({
+    queryKey: ADAPTATION_KEY,
+    queryFn: ({ signal }) => apiGet<{ adaptation: Adaptation | null }>("/plan/adaptation", undefined, signal),
+    enabled,
+    staleTime: LIVE_STALE_TIME,
+  });
+}
+
+/** Look at what happened and adapt. `force` skips the once-a-day guard (after a check-in,
+ * which is the most common reason to adapt). */
+export function useCheckAdaptation() {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationKey: ADAPTATION_CHECK_KEY,
+    mutationFn: () =>
+      apiPost<{ adaptation: Adaptation | null }>("/plan/adaptation/check", undefined, undefined, ADAPTATION_TIMEOUT_MS),
+    onSuccess: async (result) => {
+      if (result.adaptation) {
+        queryClient.setQueryData(ADAPTATION_KEY, result);
+        if (result.adaptation.status === "applied") await adoptServerPlan(queryClient);
+      }
+    },
+  });
+  return useCallback(
+    (force = false) => {
+      const today = toDateKey(new Date());
+      try {
+        if (!force && localStorage.getItem(ADAPTATION_CHECKED_KEY) === today) return;
+        localStorage.setItem(ADAPTATION_CHECKED_KEY, today);
+      } catch {
+        // storage unavailable: check anyway, the server remembers what it handled
+      }
+      if (queryClient.isMutating({ mutationKey: ADAPTATION_CHECK_KEY }) > 0) return;
+      mutation.mutate();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [queryClient]
+  );
+}
+
+/** When the running check started, or null: the Oggi card shows the wait from it. */
+export function useAdaptationCheckStartedAt(): number | null {
+  const pending = useMutationState({
+    filters: { mutationKey: ADAPTATION_CHECK_KEY, status: "pending" },
+    select: (mutation) => mutation.state.submittedAt,
+  });
+  return pending.at(-1) ?? null;
+}
+
+export function useAnswerAdaptation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action }: { id: string; action: "accept" | "reject" | "undo" }) =>
+      apiPost<{ adaptation: Adaptation | null }>(`/plan/adaptation/${id}/${action}`),
+    onSuccess: async (result, { action }) => {
+      queryClient.setQueryData(ADAPTATION_KEY, result);
+      if (action !== "reject") await adoptServerPlan(queryClient);
+    },
+  });
+}
+
+export function useSetAdaptationMode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (mode: "automatico" | "proposta" | null) => apiPut<AthleteLevel>("/profile/adaptation-mode", { mode }),
+    onSuccess: (level) => queryClient.setQueryData(["profile", "level"], level),
   });
 }
 

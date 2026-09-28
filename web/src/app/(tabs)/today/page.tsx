@@ -8,6 +8,7 @@ import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { DayStateCard } from "@/components/DayStateCard";
 import { CheckInCard } from "@/components/CheckInCard";
+import { AdaptationCard } from "@/components/AdaptationCard";
 import { Mascot, Tokens } from "@/components/ProgressBits";
 import { RaceGoalCard } from "@/components/RaceGoalCard";
 import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/motion/primitives";
@@ -17,6 +18,7 @@ import {
   GOAL_LOOKAHEAD_DAYS,
   useActivities,
   useBodyToday,
+  useCheckAdaptation,
   useCheckIns,
   useProgress,
   useWeekSummary,
@@ -111,6 +113,14 @@ export default function TodayPage() {
   const lastWeek = useWeekSummary(null, access.ready && earlyInWeek);
   const progress = useProgress(access.ready);
 
+  // Adaptation: once a day from here (and after every check-in, see CheckInCard). Only
+  // with a plan -- there is nothing to adapt on a Garmin-calendar-only account.
+  const checkAdaptation = useCheckAdaptation();
+  const hasPlan = !!access.plan;
+  useEffect(() => {
+    if (access.ready && hasPlan) checkAdaptation();
+  }, [access.ready, hasPlan, checkAdaptation]);
+
   // Until we know whether there's a plan or a live Garmin connection there is nothing
   // real to show -- but "nothing real" used to mean `return null`, i.e. an empty screen
   // for as long as the Garmin status check took. Render the header and the shapes.
@@ -193,6 +203,8 @@ export default function TodayPage() {
       </SlideUp>
 
       <DayStateCard verdict={verdictQuery.data} narrative={verdictNarrative.data?.text} animate={animate} delayMs={260} />
+
+      {hasPlan && <AdaptationCard animate={animate} delayMs={280} />}
 
       {checkInDay && (
         <CheckInCard

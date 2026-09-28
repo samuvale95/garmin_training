@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, Upl
 from fastapi.responses import JSONResponse
 from fastapi.concurrency import run_in_threadpool
 
-from .. import checkin, db, move_check, plan_generator, plan_rules, plan_store, service
+from .. import checkin, db, history, levels, move_check, plan_adaptation, plan_generator, plan_rules, plan_store, readiness, service
 from .. import goal_fit, llm
 from ..parser import parse_plan_document, serialize_plan
 from . import garmin_session, schemas
@@ -212,6 +212,104 @@ async def record_move_decision(
     return schemas.DeletePlanResponse(ok=True)
 
 
+# ---- adaptation ---------------------------------------------------------------------------------
+
+
+def _readiness_state(user_id: str, today: date) -> str | None:
+    """Today's verdict state, from the cached body snapshot; None when unavailable."""
+    from .routes_body import _body_snapshot, _reported_signals
+
+    try:
+        session = next((s for s in plan_store.list_sessions(user_id) if s["date"] == today.isoformat()), None)
+        verdict = readiness.assess_day(
+            _body_snapshot(user_id),
+            plan_generator.session_from_dict(session) if session else None,
+            today=today,
+            reported=_reported_signals(user_id, today),
+        )
+        return verdict.state
+    except Exception:  # noqa: BLE001 - no readiness is one event fewer, not an error
+        return None
+
+
+def _adaptation_response(row: dict | None) -> schemas.AdaptationResponse:
+    return schemas.AdaptationResponse(adaptation=schemas.AdaptationOut.from_row(row) if row else None)
+
+
+@router.post("/plan/adaptation/check", response_model=schemas.AdaptationResponse)
+async def check_adaptation(user_id: str = Depends(current_user_id)) -> schemas.AdaptationResponse | JSONResponse:
+    """Look at what happened and adapt the plan (see `plan_adaptation.py`): applied in
+    `automatico`, stored as a proposal in `proposta`. Nothing new, nothing returned. A
+    replan waits on the model like a generation does, and shares its lock."""
+
+    def run() -> schemas.AdaptationResponse | JSONResponse:
+        today = date.today()
+        zones = _zones(user_id)
+        context, days = plan_rules.gather_context(user_id, today, threshold_available=zones is not None)
+        stored_mode = history.load_profile(user_id)["adaptation_mode"]
+        mode = stored_mode or levels.default_adaptation_mode(context.effective_level)
+
+        def replan():
+            state = coach_state(user_id)
+            return plan_generator.generate(
+                user_id,
+                today,
+                profile=state[1].profile if state and state[1] else None,
+                threshold_available=zones is not None,
+                write=False,
+                hold_lock=False,
+            )
+
+        try:
+            with plan_generator.one_at_a_time(user_id):
+                row = plan_adaptation.run_check(
+                    user_id,
+                    today,
+                    days=days,
+                    checkins=checkin.get_range(user_id, today - timedelta(days=1), today),
+                    readiness_state=_readiness_state(user_id, today),
+                    threshold_now=zones.threshold_hr if zones else None,
+                    mode=mode,
+                    replan=replan,
+                )
+        except plan_generator.GenerationInProgress:
+            return _error(409, "validation_failed", "Sto già lavorando sul piano: riprova fra poco.")
+        except plan_generator.GenerationFailed as exc:
+            return _error(422, "validation_failed", "Non riesco ad adattare il piano dentro i limiti.", exc.errors)
+        return _adaptation_response(row)
+
+    return await run_in_threadpool(run)
+
+
+@router.get("/plan/adaptation", response_model=schemas.AdaptationResponse)
+async def get_adaptation(user_id: str = Depends(current_user_id)) -> schemas.AdaptationResponse:
+    row = await run_in_threadpool(plan_adaptation.current, user_id, date.today())
+    return _adaptation_response(row)
+
+
+@router.post("/plan/adaptation/{adaptation_id}/{action}", response_model=schemas.AdaptationResponse)
+async def answer_adaptation(
+    adaptation_id: UUID, action: str, user_id: str = Depends(current_user_id)
+) -> schemas.AdaptationResponse | JSONResponse:
+    def run() -> schemas.AdaptationResponse | JSONResponse:
+        try:
+            if action == "accept":
+                row = plan_adaptation.accept(user_id, str(adaptation_id))
+            elif action == "reject":
+                row = plan_adaptation.reject(user_id, str(adaptation_id))
+            elif action == "undo":
+                row = plan_adaptation.undo(user_id, str(adaptation_id), date.today())
+            else:
+                return _error(404, "validation_failed", f"Azione {action} sconosciuta.")
+        except plan_adaptation.AdaptationNotFound:
+            return _error(404, "validation_failed", "Adattamento non trovato.")
+        except plan_adaptation.AdaptationNotPending:
+            return _error(409, "validation_failed", "Questo adattamento è già stato gestito.")
+        return _adaptation_response(row)
+
+    return await run_in_threadpool(run)
+
+
 # ---- generation ---------------------------------------------------------------------------------
 
 
@@ -242,6 +340,7 @@ async def generate_plan(
                 profile=profile,
                 threshold_available=state is not None,
                 regenerate_skeleton=payload.regenerate_skeleton,
+                threshold_hr=state[0].threshold_hr if state else None,
             )
         except plan_generator.GenerationInProgress:
             return _error(409, "validation_failed", "Sto già scrivendo il piano: aspetta che finisca.")

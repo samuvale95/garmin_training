@@ -251,11 +251,11 @@ def test_recent_running_days_is_the_median_week():
 
 
 def test_one_generation_at_a_time():
-    with gen._one_at_a_time("u1"):
+    with gen.one_at_a_time("u1"):
         with pytest.raises(gen.GenerationInProgress):
-            with gen._one_at_a_time("u1"):
+            with gen.one_at_a_time("u1"):
                 pass
-    with gen._one_at_a_time("u1"):
+    with gen.one_at_a_time("u1"):
         pass
 
 

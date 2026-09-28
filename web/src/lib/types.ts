@@ -813,3 +813,15 @@ export interface Progress {
   level: number;
   level_name: string;
 }
+
+// ---- plan adaptation ----------------------------------------------------------------------
+
+export interface Adaptation {
+  id: string;
+  status: "pending" | "applied" | "undone" | "rejected" | "none" | "stale";
+  day: string;
+  events: { kind: string; day: string; message: string }[];
+  changes: { date: string; before: string[]; after: string[]; reason: string }[];
+  conflicts: string[];
+  source: string | null;
+}

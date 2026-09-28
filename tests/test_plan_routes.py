@@ -154,7 +154,7 @@ async def test_generate_returns_the_window_and_what_was_written(monkeypatch):
     written = [{**plan_generator.session_to_dict(s), "id": str(uuid4()), "origin": "ai", "locked": False} for s in sessions]
     seen = {}
 
-    def fake_generate(user_id, today, *, profile, threshold_available, regenerate_skeleton):
+    def fake_generate(user_id, today, *, profile, threshold_available, regenerate_skeleton, threshold_hr=None):
         seen.update(profile=profile, threshold=threshold_available, regenerate=regenerate_skeleton)
         return plan_generator.GenerationResult(
             source="regole",

@@ -3,7 +3,7 @@
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { useAthleteLevel } from "@/lib/queries";
+import { useAthleteLevel, useSetAdaptationMode } from "@/lib/queries";
 import type { AthleteLevel, LevelCriterion } from "@/lib/types";
 
 /** Screen "Livello": where you are from a first run to athlete level, and what the next
@@ -57,6 +57,8 @@ export default function LevelSettingsPage() {
             title={data.next.length ? `Per il livello ${data.level + 1}` : "Cosa ti tiene qui"}
             criteria={data.next.length ? data.next : data.current}
           />
+
+          <AdaptationModeSwitch level={data} />
 
           <p style={{ fontSize: 12.5, color: "var(--inchiostro-35)", marginTop: 16, lineHeight: 1.4 }}>
             Il livello si calcola dai tuoi allenamenti e non scende: dopo una pausa resti dove sei arrivato.
@@ -114,3 +116,56 @@ function formatCriterion(criterion: LevelCriterion): string {
   if (!criterion.unit) return criterion.met ? "sì" : "no";
   return `${Math.round(criterion.measured)} / ${Math.round(criterion.required)}`;
 }
+
+/** How the plan adapts to the real week: applied with an undo, or proposed. The default
+ * follows the level (automatic while learning, a proposal at athlete level). */
+function AdaptationModeSwitch({ level }: { level: AthleteLevel }) {
+  const setMode = useSetAdaptationMode();
+  const current = level.adaptation_mode_is_default ? null : level.adaptation_mode;
+  const options: [("automatico" | "proposta" | null), string, string][] = [
+    [null, "Come il livello", level.adaptation_mode === "automatico" ? "ora: automatico" : "ora: proposta"],
+    ["automatico", "Automatico", "cambio io, con un annulla"],
+    ["proposta", "Proposta", "decidi tu ogni volta"],
+  ];
+  return (
+    <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 16 }}>
+      <p style={{ fontWeight: 600, fontSize: 14.5, margin: 0 }}>Quando il piano si adatta</p>
+      <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "4px 0 10px", lineHeight: 1.4 }}>
+        Dopo un dolore, una seduta saltata o una notte storta. Le sedute che hai modificato tu non le tocco mai.
+      </p>
+      <div role="radiogroup" aria-label="Modalità di adattamento" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {options.map(([value, label, hint]) => {
+          const selected = current === value;
+          return (
+            <button
+              key={label}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              className="press-soft"
+              disabled={setMode.isPending}
+              onClick={() => setMode.mutate(value)}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: selected ? "var(--inchiostro)" : "var(--sabbia-chip)",
+                color: selected ? "var(--crema)" : "var(--inchiostro)",
+                border: "none",
+                borderRadius: 12,
+                padding: "10px 12px",
+                fontSize: 13.5,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              <span>{label}</span>
+              <span style={{ fontSize: 12, fontWeight: 400, opacity: 0.75 }}>{hint}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+

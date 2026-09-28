@@ -1670,6 +1670,48 @@ class MoveDecisionRequest(BaseModel):
     warnings: list[MoveWarningOut]
 
 
+# ---- plan adaptation --------------------------------------------------------------------------
+
+
+class AdaptationEventOut(BaseModel):
+    kind: str
+    day: date_type
+    message: str
+
+
+class AdaptationChangeOut(BaseModel):
+    date: date_type
+    before: list[str]
+    after: list[str]
+    reason: str
+
+
+class AdaptationOut(BaseModel):
+    id: UUID
+    status: Literal["pending", "applied", "undone", "rejected", "none", "stale"]
+    day: date_type
+    events: list[AdaptationEventOut]
+    changes: list[AdaptationChangeOut]
+    conflicts: list[str]
+    source: str | None = None
+
+    @classmethod
+    def from_row(cls, row: dict) -> "AdaptationOut":
+        return cls(
+            id=row["id"],
+            status=row["status"],
+            day=row["day"],
+            events=[AdaptationEventOut(kind=e["kind"], day=e["day"], message=e["message"]) for e in row["events"]],
+            changes=[AdaptationChangeOut(**c) for c in row["changes"]],
+            conflicts=row["conflicts"],
+            source=row["source"],
+        )
+
+
+class AdaptationResponse(BaseModel):
+    adaptation: AdaptationOut | None = None
+
+
 # ---- progress ---------------------------------------------------------------------------------
 
 

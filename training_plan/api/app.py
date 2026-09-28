@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .. import checkin, db, history, move_check, plan_store
+from .. import checkin, db, history, move_check, plan_adaptation, plan_store
 from ..garmin_sync import GarminRateLimitError, GarminSyncError
 from ..parser import TrainingPlanValidationError
 from ..strava_sync import StravaAuthError
@@ -65,6 +65,7 @@ def _ensure_schema() -> None:
     plan_store.ensure_schema()
     checkin.ensure_schema()
     move_check.ensure_schema()
+    plan_adaptation.ensure_schema()
 
 
 @app.exception_handler(AuthError)

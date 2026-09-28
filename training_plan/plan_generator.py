@@ -24,7 +24,7 @@ import math
 import threading
 import time
 from collections.abc import Callable, Iterator, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import asdict, dataclass, field
 from datetime import date as date_type
 from datetime import timedelta
@@ -812,7 +812,7 @@ _running_lock = threading.Lock()
 
 
 @contextmanager
-def _one_at_a_time(user_id: str) -> Iterator[None]:
+def one_at_a_time(user_id: str) -> Iterator[None]:
     """One generation per user: a second click would race the first to the same rows.
     In-process, which is enough for the single API process (design.md decision #10)."""
     with _running_lock:
@@ -835,6 +835,10 @@ class GenerationResult:
     conflicts: list[dict]
     fallback_reason: str | None = None
     skeleton_regenerated: bool = False
+    # A dry run (`write=False`): what would be written, and the snapshot it was checked
+    # against, for `plan_store.replace_unlocked(expected=...)` when it is accepted.
+    proposed: list[TrainingSession] = field(default_factory=list)
+    expected: tuple[date_type, date_type, dict[str, str]] | None = None
 
 
 def goal_from_dict(raw: dict | None) -> RaceGoal | None:
@@ -895,10 +899,17 @@ def generate(
     threshold_available: bool,
     regenerate_skeleton: bool = False,
     compose: Callable[[list[dict]], str | None] = llm.compose_plan,
+    write: bool = True,
+    threshold_hr: int | None = None,
+    hold_lock: bool = True,
 ) -> GenerationResult:
+    """Write the next weeks -- or, with `write=False`, only propose them (plan adaptation
+    in proposal mode). `threshold_hr` is stored with the skeleton so a later change of
+    the Garmin threshold can be noticed. `hold_lock=False` is for a caller that already
+    holds `one_at_a_time` for this user."""
     from . import db, plan_store  # local: keeps the pure parts importable without a DB
 
-    with _one_at_a_time(user_id):
+    with one_at_a_time(user_id) if hold_lock else nullcontext():
         context, days = plan_rules.gather_context(user_id, today, threshold_available=threshold_available)
         raw_goal = db.current_goal(user_id)
         goal = goal_from_dict(raw_goal)
@@ -959,6 +970,19 @@ def generate(
         if sessions is None:
             source, sessions = SOURCE_RULES, _fallback_or_fail(user_id, window)
 
+        if not write:
+            return GenerationResult(
+                source=source,
+                attempts=attempts.count,
+                window=window,
+                written=[],
+                conflicts=[],
+                fallback_reason=reason if source == SOURCE_RULES else None,
+                skeleton_regenerated=regenerated,
+                proposed=[*sessions, *window.fixed],
+                expected=(*span, seen),
+            )
+
         for _ in range(MAX_REWRITES + 1):
             try:
                 written = plan_store.replace_unlocked(
@@ -982,6 +1006,9 @@ def generate(
         else:
             raise GenerationFailed(["Il piano continua a cambiare mentre lo scrivo: riprova tra poco."])
 
+        if threshold_hr is not None:
+            stored = db.get_skeleton(user_id) or {}
+            db.save_skeleton(user_id, {**stored, "threshold_hr": threshold_hr})
         return GenerationResult(
             source=source,
             attempts=attempts.count,

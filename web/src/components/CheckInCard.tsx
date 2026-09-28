@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { SlideUp } from "@/components/motion/primitives";
-import { useSaveCheckIn } from "@/lib/queries";
+import { useCheckAdaptation, useSaveCheckIn } from "@/lib/queries";
 import type { CheckIn, CheckInBody, CheckInEffort, PainArea } from "@/lib/types";
 
 const EFFORTS: [CheckInEffort, string][] = [
@@ -50,6 +50,8 @@ export function CheckInCard({
   delayMs?: number;
 }) {
   const save = useSaveCheckIn();
+  // What was just said may be a reason to adapt the plan (pain, a session too hard).
+  const checkAdaptation = useCheckAdaptation();
   const [editing, setEditing] = useState(false);
   const [effort, setEffort] = useState<CheckInEffort | null>(existing?.effort ?? null);
   const [body, setBody] = useState<CheckInBody | null>(existing?.body ?? null);
@@ -61,7 +63,12 @@ export function CheckInCard({
     if (next.body === "dolore" && !next.area) return;
     save.mutate(
       { date, effort: trained ? next.effort : null, body: next.body, pain_area: next.body === "dolore" ? next.area : null },
-      { onSuccess: () => setEditing(false) }
+      {
+        onSuccess: () => {
+          setEditing(false);
+          checkAdaptation(true);
+        },
+      }
     );
   }
 
