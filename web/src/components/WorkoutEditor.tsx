@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { Reorder } from "framer-motion";
 import { PrimaryButton, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { findPlanSession, useAddSession, useApplyDeletion, useInvalidateCalendarData, usePlanQuery, useRemoveSession, useStartSync, useSyncJobStatus, useUpdateSession, useWorkoutsForDate } from "@/lib/queries";
+import { findPlanSession, useAddSession, useIsRewritten, useApplyDeletion, useInvalidateCalendarData, usePlanQuery, useRemoveSession, useStartSync, useSyncJobStatus, useUpdateSession, useWorkoutsForDate } from "@/lib/queries";
 import { ApiError } from "@/lib/apiClient";
 import { normalizeTitle, parseDateKey, shiftDateKey, toDateKey } from "@/lib/sessionVisuals";
-import { capitalize, formatFullDate, formatPaceMinSec, formatPaceRange, parsePaceMinSec, stepTypeHint, stepTypeLabel } from "@/lib/format";
+import { capitalize, formatFullDate, formatPaceMinSec, formatShortDate, formatPaceRange, parsePaceMinSec, stepTypeHint, stepTypeLabel } from "@/lib/format";
 import { isRepeatBlock } from "@/lib/types";
 import type { ScheduledWorkout, SessionStep, Sport, Step, StepType, TrainingSession } from "@/lib/types";
 
@@ -119,6 +119,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   const addSession = useAddSession();
   const removeSession = useRemoveSession();
   const invalidateCalendar = useInvalidateCalendarData();
+  const { isRewritten, until: rewriteUntil } = useIsRewritten();
 
   const existing =
     mode === "edit" ? (sessionParam != null ? findPlanSession(plan, sessionParam) : null) : garminSession;
@@ -242,9 +243,17 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
     });
   }
 
+  /** A plan write that would race the generation running now (see `useIsRewritten`). */
+  function blockedByGeneration(day: string): boolean {
+    if (mode === "garmin" || !(isRewritten(day) || (existing?.date != null && isRewritten(existing.date)))) return false;
+    setSaveError(`Sto riscrivendo il piano fino a ${formatShortDate(rewriteUntil)}: salva appena ho finito.`);
+    return true;
+  }
+
   async function handleSave() {
     if (!dayIsValid) return;
     setSaveError(null);
+    if (blockedByGeneration(date)) return;
     const session: TrainingSession = {
       date,
       sport,
@@ -290,6 +299,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       return;
     }
     setSaveError(null);
+    if (existing?.date != null && blockedByGeneration(existing.date)) return;
     try {
       if (originalWorkout) {
         await applyDeletion.mutateAsync([originalWorkout]);

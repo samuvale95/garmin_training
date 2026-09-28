@@ -874,6 +874,19 @@ def skeleton_is_current(
     return all(monday.isoformat() in covered for monday in mondays)
 
 
+# Times a write refused because the plan changed underneath is re-checked and retried.
+MAX_REWRITES = 2
+
+
+def _fallback_or_fail(user_id: str, window: Window) -> list[TrainingSession]:
+    sessions = compose_fallback(window)
+    errors = check(sessions, window)
+    if errors:
+        logger.warning("fallback plan rejected for %s: %s", user_id, errors)
+        raise GenerationFailed(errors)
+    return sessions
+
+
 def generate(
     user_id: str,
     today: date_type,
@@ -919,38 +932,62 @@ def generate(
         else:
             weeks = [SkeletonWeek.from_dict(week) for week in stored_skeleton["weeks"]]
 
-        window = build_window(
-            today=today,
-            skeleton=weeks,
-            context=context,
-            stored=plan_store.list_sessions(user_id),
-            days=days,
-            bands=pace_bands(profile),
-            goal=goal,
-        )
+        # Everything `build_window` reads from the plan: this week before the window, and
+        # the window. Snapshotted before reading, checked again at write time.
+        span = (_monday(start), end)
 
+        def fresh_window() -> tuple[Window, dict[str, str]]:
+            seen = plan_store.snapshot(user_id, *span)
+            window = build_window(
+                today=today,
+                skeleton=weeks,
+                context=context,
+                stored=plan_store.list_sessions(user_id),
+                days=days,
+                bands=pace_bands(profile),
+                goal=goal,
+            )
+            return window, seen
+
+        window, seen = fresh_window()
         if llm.configured():
             attempts = ask_model(window, compose)
         else:
             attempts = Attempts(None, 0, "modello non configurato")
 
-        source, sessions = SOURCE_AI, attempts.sessions
+        source, sessions, reason = SOURCE_AI, attempts.sessions, attempts.reason
         if sessions is None:
-            source, sessions = SOURCE_RULES, compose_fallback(window)
-            errors = check(sessions, window)
-            if errors:
-                logger.warning("fallback plan rejected for %s: %s", user_id, errors)
-                raise GenerationFailed(errors)
+            source, sessions = SOURCE_RULES, _fallback_or_fail(user_id, window)
 
-        written = plan_store.replace_unlocked(
-            user_id, window.start, window.end, [session_to_dict(s) for s in (*sessions, *window.fixed)], origin="ai"
-        )
+        for _ in range(MAX_REWRITES + 1):
+            try:
+                written = plan_store.replace_unlocked(
+                    user_id,
+                    window.start,
+                    window.end,
+                    [session_to_dict(s) for s in (*sessions, *window.fixed)],
+                    origin="ai",
+                    expected=(*span, seen),
+                )
+                break
+            except plan_store.PlanChanged:
+                # The user changed the plan while the model was writing: what was checked
+                # is no longer what would be written around. Check the same proposal
+                # against the plan as it is now; if it no longer fits, the rules write a
+                # window that does -- quickly, so the user is not made to wait again.
+                window, seen = fresh_window()
+                if check(sessions, window):
+                    source, sessions = SOURCE_RULES, _fallback_or_fail(user_id, window)
+                    reason = "hai modificato il piano mentre lo scrivevo"
+        else:
+            raise GenerationFailed(["Il piano continua a cambiare mentre lo scrivo: riprova tra poco."])
+
         return GenerationResult(
             source=source,
             attempts=attempts.count,
             window=window,
             written=written.written,
             conflicts=written.conflicts,
-            fallback_reason=attempts.reason if source == SOURCE_RULES else None,
+            fallback_reason=reason if source == SOURCE_RULES else None,
             skeleton_regenerated=regenerated,
         )

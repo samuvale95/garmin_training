@@ -5,19 +5,8 @@ import { SlideUp } from "@/components/motion/primitives";
 import { PlanWaiting } from "@/components/PlanWaiting";
 import { ApiError } from "@/lib/apiClient";
 import { formatFullDate } from "@/lib/format";
-import { useGeneratePlan, useGenerationState } from "@/lib/queries";
-import { shiftDateKey, toDateKey } from "@/lib/sessionVisuals";
+import { generationWindow, useGeneratePlan, useGenerationState } from "@/lib/queries";
 import type { GeneratePlanResult } from "@/lib/types";
-
-/** The window the server will write: tomorrow to the Sunday of the week two weeks after
- * tomorrow's (`plan_generator.window_dates`). Shown before asking, so "sostituisce" has
- * dates attached, and used to hold still the days being rewritten; the result then
- * states the real window, cut at the race if there is one. */
-export function generationWindow(): { start: string; end: string } {
-  const start = shiftDateKey(toDateKey(new Date()), 1);
-  const weekday = (new Date(`${start}T00:00:00`).getDay() + 6) % 7; // Monday 0
-  return { start, end: shiftDateKey(start, 20 - weekday) };
-}
 
 const card: React.CSSProperties = {
   background: "var(--crema-card)",

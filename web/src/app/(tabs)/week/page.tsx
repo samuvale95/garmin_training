@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
 import { DraggableWeekCard, RestCard, type DayCardData } from "@/components/WeekCards";
-import { PlanGenerateCard, generationWindow } from "@/components/PlanGenerateCard";
+import { PlanGenerateCard } from "@/components/PlanGenerateCard";
 import { useMotionEnabled, useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import {
@@ -16,7 +16,7 @@ import {
   useRescheduleWorkout,
   useStravaActivityMatches,
   useStravaStatus,
-  useGenerationState,
+  useIsRewritten,
   useUpdateSession,
   useWeekWorkouts,
 } from "@/lib/queries";
@@ -110,9 +110,7 @@ function WeekPageContent() {
   const rescheduleWorkout = useRescheduleWorkout();
   // While the server rewrites the next weeks, their days hold still: a move made now
   // would race the generation, and the plan adopted when it finishes could hide it.
-  const rewriting = useGenerationState().status === "pending";
-  const rewriteWindow = generationWindow();
-  const isRewritten = (key: string) => rewriting && key >= rewriteWindow.start && key <= rewriteWindow.end;
+  const { rewriting, until: rewriteUntil, isRewritten } = useIsRewritten();
 
   // Drag target detection for the day cards below: each day row registers itself here
   // by key, and the carried card's position is tested against every row's rect to find
@@ -380,7 +378,7 @@ function WeekPageContent() {
         {weekSessions.length > 0 && (
           <p style={{ fontSize: 11.5, color: carried ? "var(--rosso-avviso)" : "var(--inchiostro-35)", margin: "10px 0 0", transition: "color 160ms var(--ease)" }}>
             {rewriting
-              ? `Sto riscrivendo i giorni fino a ${formatShortDate(rewriteWindow.end)}: potrai spostarli appena ho finito.`
+              ? `Sto riscrivendo i giorni fino a ${formatShortDate(rewriteUntil)}: potrai spostarli appena ho finito.`
               : carried
                 ? "Rilascia sul giorno in cui spostarla."
                 : "Tieni premuta una seduta per spostarla di giorno."}

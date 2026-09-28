@@ -84,6 +84,10 @@ class SessionLocked(Exception):
     """A non-user writer tried to change a session the user has claimed."""
 
 
+class PlanChanged(Exception):
+    """The sessions a writer planned around changed before it wrote (see `snapshot`)."""
+
+
 @dataclass
 class ReplaceResult:
     written: list[dict] = field(default_factory=list)
@@ -218,17 +222,55 @@ def delete_session(user_id: str, session_id: str, *, by_user: bool) -> None:
         cur.execute("DELETE FROM plan_session WHERE user_id = %s AND id = %s", [user_id, session_id])
 
 
+def _snapshot(cur, user_id: str, start: date_type, end: date_type) -> dict[str, str]:
+    # A hash of the content, not `updated_at`: two writes in one transaction share a
+    # `now()`, and what matters is whether the session is different, not when it changed.
+    cur.execute(
+        "SELECT id, md5(row(date, position, sport, title, description, steps, locked)::text) AS content "
+        "FROM plan_session WHERE user_id = %s AND date BETWEEN %s AND %s FOR UPDATE",
+        [user_id, start, end],
+    )
+    return {str(row["id"]): row["content"] for row in cur.fetchall()}
+
+
+def snapshot(user_id: str, start: date_type, end: date_type) -> dict[str, str]:
+    """Every session in `[start, end]` by id, with a fingerprint of its content.
+
+    Taken by a slow writer (the plan generator waits on a model for up to minutes) before
+    it reads the plan, and handed back to `replace_unlocked`: if the user edited, moved,
+    added or deleted a session in the range meanwhile, the write is refused instead of
+    landing on a plan it was not checked against.
+    """
+    with db.connect() as conn, conn.cursor(row_factory=dict_row) as cur:
+        return _snapshot(cur, user_id, start, end)
+
+
 def replace_unlocked(
-    user_id: str, start: date_type, end: date_type, sessions: Iterable[dict], *, origin: Origin = "ai"
+    user_id: str,
+    start: date_type,
+    end: date_type,
+    sessions: Iterable[dict],
+    *,
+    origin: Origin = "ai",
+    expected: tuple[date_type, date_type, dict[str, str]] | None = None,
 ) -> ReplaceResult:
     """The one path for non-user writers: swap the unlocked sessions of `[start, end]`.
 
     One transaction. Locked sessions in the range stay exactly as they are; a proposed
     session on the same day and sport as a locked one is not written and is returned as
     a conflict, so the caller can say what it wanted and why it did not happen.
+
+    With `expected` (`(from, to, snapshot(user_id, from, to))`), raises `PlanChanged`
+    and writes nothing when the sessions of that range are no longer what the snapshot
+    saw. The rows are locked while comparing, so no user write can slip in between the
+    check and the replace.
     """
     result = ReplaceResult()
     with db.connect() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+        if expected is not None:
+            since, until, seen = expected
+            if _snapshot(cur, user_id, since, until) != seen:
+                raise PlanChanged(user_id)
         cur.execute(
             "SELECT date, sport FROM plan_session "
             "WHERE user_id = %s AND date BETWEEN %s AND %s AND locked FOR UPDATE",

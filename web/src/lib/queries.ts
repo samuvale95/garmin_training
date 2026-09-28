@@ -1081,12 +1081,47 @@ export function useGeneratePlan() {
     mutationKey: GENERATE_PLAN_KEY,
     mutationFn: (regenerateSkeleton: boolean = false) =>
       apiPost<GeneratePlanResult>("/plan/generate", { regenerate_skeleton: regenerateSkeleton }, undefined, GENERATE_TIMEOUT_MS),
-    onSuccess: async () => {
+    onSuccess: async (result) => {
+      // Only the generated window is taken from the server: an edit elsewhere in the plan
+      // may still be on its way there, and adopting the whole plan would hide it.
       const { plan } = await apiGet<{ plan: PlanState | null }>("/plan");
-      if (plan) applyPlanLocally(queryClient, plan);
+      if (!plan) return;
+      const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
+      const inWindow = (s: TrainingSession) => s.date >= result.start && s.date <= result.end;
+      applyPlanLocally(
+        queryClient,
+        current
+          ? {
+              ...current,
+              sessions: [...current.sessions.filter((s) => !inWindow(s)), ...plan.sessions.filter(inWindow)].sort((a, b) =>
+                a.date.localeCompare(b.date)
+              ),
+            }
+          : plan
+      );
       queryClient.invalidateQueries({ queryKey: ["plan-diff"] });
     },
   });
+}
+
+/** The window the server will write: tomorrow to the Sunday of the week two weeks after
+ * tomorrow's (`plan_generator.window_dates`). Shown before asking, so "sostituisce" has
+ * dates attached, and used to hold those days still while they are rewritten; the result
+ * then states the real window, cut at the race if there is one. */
+export function generationWindow(): { start: string; end: string } {
+  const start = shiftDateKey(toDateKey(new Date()), 1);
+  const weekday = (new Date(`${start}T00:00:00`).getDay() + 6) % 7; // Monday 0
+  return { start, end: shiftDateKey(start, 20 - weekday) };
+}
+
+/** Whether a day is being rewritten right now. A plan write to one of those days would
+ * race the generation: the server would refuse the generation's write and recheck, but
+ * an edit to a session the generation just replaced would 404 and be rolled back here --
+ * so the screens that write hold still instead. */
+export function useIsRewritten(): { rewriting: boolean; until: string; isRewritten: (day: string) => boolean } {
+  const rewriting = useGenerationState().status === "pending";
+  const { start, end } = generationWindow();
+  return { rewriting, until: end, isRewritten: (day: string) => rewriting && day >= start && day <= end };
 }
 
 /** The latest generation, read from the mutation cache rather than a component's state:

@@ -276,9 +276,20 @@ def storage(monkeypatch):
     monkeypatch.setattr(plan_store, "list_sessions", lambda user_id: state["stored"])
     monkeypatch.setattr(llm, "configured", lambda: state["configured"])
 
-    def replace(user_id, start, end, sessions, origin):
+    state["snapshots"] = [{}]  # one per call; the last repeats
+    state["changed"] = 0  # how many writes to refuse as "plan changed"
+
+    def snapshot(user_id, start, end):
+        return state["snapshots"][0] if len(state["snapshots"]) == 1 else state["snapshots"].pop(0)
+
+    def replace(user_id, start, end, sessions, origin, expected=None):
+        if state["changed"]:
+            state["changed"] -= 1
+            raise plan_store.PlanChanged(user_id)
         state["replaced"] = (start, end, list(sessions), origin)
         return plan_store.ReplaceResult(written=list(sessions), conflicts=[])
+
+    monkeypatch.setattr(plan_store, "snapshot", snapshot)
 
     monkeypatch.setattr(plan_store, "replace_unlocked", replace)
     return state
@@ -314,3 +325,38 @@ def test_a_hand_edited_session_is_planned_around(storage):
     gen.generate("u1", SUNDAY, profile=profile(), threshold_available=True)
     written_days = {s["date"] for s in storage["replaced"][2]}
     assert locked_day.isoformat() not in written_days
+
+
+LOCKED_THURSDAY = {
+    "id": "x", "date": "2026-10-01", "sport": "running", "title": "Mia", "description": None,
+    "steps": [{"type": "interval", "duration_type": "time", "duration_value": 30, "target_pace": None}],
+    "origin": "manual", "locked": True,
+}
+
+
+def test_a_plan_edited_during_generation_is_rechecked_before_writing(storage):
+    # The model plans an empty window; while it writes, the user locks Thursday. The
+    # write is refused, the proposal no longer fits (it has a run on Thursday), so the
+    # rules write a window around the user's session instead.
+    storage["configured"] = True
+    w = window()
+    proposal = gen.compose_fallback(w)
+    assert date(2026, 10, 1) in {s.date for s in proposal}
+    answer = as_json(proposal)
+    storage["changed"] = 1
+
+    def compose(messages):
+        storage["stored"] = [LOCKED_THURSDAY]
+        return answer
+
+    result = gen.generate("u1", SUNDAY, profile=profile(), threshold_available=True, compose=compose)
+    assert result.source == gen.SOURCE_RULES
+    assert result.fallback_reason == "hai modificato il piano mentre lo scrivevo"
+    assert "2026-10-01" not in {s["date"] for s in storage["replaced"][2]}
+
+
+def test_a_plan_that_keeps_changing_gives_up_without_writing(storage):
+    storage["changed"] = 99
+    with pytest.raises(gen.GenerationFailed):
+        gen.generate("u1", SUNDAY, profile=profile(), threshold_available=True)
+    assert storage["replaced"] is None
