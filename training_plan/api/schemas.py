@@ -1670,6 +1670,43 @@ class MoveDecisionRequest(BaseModel):
     warnings: list[MoveWarningOut]
 
 
+# ---- progress ---------------------------------------------------------------------------------
+
+
+class PointLineOut(BaseModel):
+    date: date_type
+    points: int
+    reason: str
+
+
+class BadgeOut(BaseModel):
+    key: str
+    title: str
+    description: str
+    earned: bool
+    earned_on: date_type | None
+    progress: int
+    target: int
+
+
+class MascotOut(BaseModel):
+    state: Literal["esultanza", "corsa", "riposo", "attesa"]
+    sentence: str
+
+
+class ProgressResponse(BaseModel):
+    streak: int
+    tokens: int
+    max_tokens: int
+    week_points: int
+    week_lines: list[PointLineOut]
+    total_points: int
+    badges: list[BadgeOut]
+    mascot: MascotOut
+    level: int
+    level_name: str
+
+
 # ---- weekly summary ---------------------------------------------------------------------------
 
 
@@ -1704,6 +1741,9 @@ class WeekSummaryResponse(BaseModel):
     next_week: NextWeekOut | None = None
     headline: str
     highlights: list[str]
+    week_points: int = 0
+    point_lines: list[str] = Field(default_factory=list)
+    badges: list[str] = Field(default_factory=list)
 
     @classmethod
     def from_model(cls, summary) -> "WeekSummaryResponse":

@@ -24,20 +24,23 @@ def _summary(user_id: str, monday: date | None) -> weekly_summary.WeekSummary:
         levels.DayTraining(**row)
         for row in history.daily_training(
             user_id,
-            monday - timedelta(weeks=weekly_summary.STREAK_WEEKS),
-            sunday,
+            today - timedelta(weeks=weekly_summary.STREAK_WEEKS + 1),
+            today,
             running_sports=intensity.RUNNING_SPORTS,
             min_minutes=levels.MIN_SESSION_MINUTES,
         )
     ]
     stored_skeleton = db.get_skeleton(user_id)
+    all_checkins = checkin.get_range(user_id, monday - timedelta(weeks=weekly_summary.STREAK_WEEKS), today)
     return weekly_summary.build_summary(
         monday=monday,
         today=today,
         planned=plan_store.list_sessions(user_id),
         days=days,
-        checkins=checkin.get_range(user_id, monday, sunday),
+        checkins=[c for c in all_checkins if monday <= c.date <= sunday],
         skeleton=[SkeletonWeek.from_dict(w) for w in (stored_skeleton or {}).get("weeks", [])],
+        reached_level=history.load_profile(user_id)["reached_level"],
+        all_checkins=all_checkins,
     )
 
 

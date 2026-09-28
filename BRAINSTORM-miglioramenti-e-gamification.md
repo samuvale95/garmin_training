@@ -242,6 +242,29 @@ disponibile + allarmi di salute.
 
 ---
 
+## 5bis. Le idee di §6–9 passate dal filtro (deciso il 28/9/2026)
+
+La gamification serve **C (costanza)**. Ogni punto si spiega con i numeri ("+10 perché…") e
+non spinge mai verso il sovraccarico (vincolo salute). L'equità (§8: sforzo relativo a sé
+stessi, tetto, niente classifiche per km) è un principio che vale per tutto, non una funzione.
+
+| Idea | Serve | Verdetto |
+|---|---|---|
+| Serie di settimane attive con gettone salva-serie | C | **prima fetta** |
+| Punti Disciplina (seduta del piano fatta, riposo rispettato, check-in, scelta intelligente) | C, V1 | **prima fetta**; correre oltre il previsto non dà punti |
+| Livelli come progressione | C | **prima fetta** (esistono già, si mostrano come percorso) |
+| Badge semplici verificabili dai dati | C, V2 | **prima fetta**; rimandati quelli su dati non ancora affidabili (PB, VO₂max, disaccoppiamento) |
+| Mascotte con stati (illustrazioni esistenti) | C | **prima fetta** |
+| Sfida della settimana | C, D2 | dopo |
+| Territori, creature, villaggio, multiplayer | C | rimandati a dopo la fase 2 |
+| Fantasma di te stesso | D3 | rimandato (serve la qualità d'esecuzione) |
+| Card condivisibili, Wrapped | C | più avanti |
+
+Ordine: gamification prima dell'adattamento (fase 2). Finché il piano non si adatta da solo,
+"seduta come da piano" conta in modo morbido: il giorno allenato, non la seduta identica.
+
+---
+
 ## 6. Gamification "classica" (orientata alla salute)
 
 Principio: **premiare il comportamento giusto, non il volume.** Anche il riposo fatto

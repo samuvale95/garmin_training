@@ -144,6 +144,27 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
         )}
       </SlideUp>
 
+      {(data.week_points !== 0 || data.badges.length > 0) && (
+        <SlideUp active={animate} delayMs={250} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+            <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: 0 }}>Punti Disciplina</p>
+            <p style={{ font: "600 20px/1 var(--font-outfit)", margin: 0 }}>{data.week_points}</p>
+          </div>
+          <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", display: "flex", flexDirection: "column", gap: 4 }}>
+            {data.point_lines.map((line) => (
+              <li key={line} style={{ fontSize: 12.5, color: "var(--inchiostro-70)" }}>
+                {line}
+              </li>
+            ))}
+          </ul>
+          {data.badges.length > 0 && (
+            <p style={{ fontSize: 13, fontWeight: 600, margin: "10px 0 0", color: "var(--corallo)" }}>
+              Traguardi: {data.badges.join(", ")}
+            </p>
+          )}
+        </SlideUp>
+      )}
+
       {data.next_week && (
         <SlideUp active={animate} delayMs={280} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12 }}>
           <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: 0 }}>La prossima settimana</p>

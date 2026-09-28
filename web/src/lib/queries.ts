@@ -30,6 +30,7 @@ import type {
   LoadSnapshot,
   Narrative,
   PlanDiff,
+  Progress,
   RaceGoal,
   RescheduleResult,
   ScheduledWorkout,
@@ -1096,7 +1097,21 @@ export function useSaveCheckIn() {
       queryClient.invalidateQueries({ queryKey: ["body", "readiness"] });
       queryClient.invalidateQueries({ queryKey: ["body", "readiness-narrative"] });
       queryClient.invalidateQueries({ queryKey: ["summary"] });
+      queryClient.invalidateQueries({ queryKey: ["progress"] });
     },
+  });
+}
+
+// ---- progress -------------------------------------------------------------------------------
+
+/** Streak, Disciplina points, badges, mascot (see `training_plan/progress.py`). All
+ * recomputed server-side from the history, the plan and the check-ins. */
+export function useProgress(enabled = true) {
+  return useQuery({
+    queryKey: ["progress"],
+    queryFn: ({ signal }) => apiGet<Progress>("/progress", undefined, signal),
+    enabled,
+    staleTime: LIVE_STALE_TIME,
   });
 }
 

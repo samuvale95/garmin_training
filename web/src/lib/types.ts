@@ -778,4 +778,38 @@ export interface WeekSummary {
   next_week: { monday: string; planned_sessions: number; planned_minutes: number; reason: string | null } | null;
   headline: string;
   highlights: string[];
+  week_points: number;
+  point_lines: string[];
+  badges: string[];
+}
+
+// ---- progress ---------------------------------------------------------------------------
+
+export interface PointLine {
+  date: string;
+  points: number;
+  reason: string;
+}
+
+export interface Badge {
+  key: string;
+  title: string;
+  description: string;
+  earned: boolean;
+  earned_on: string | null;
+  progress: number;
+  target: number;
+}
+
+export interface Progress {
+  streak: number;
+  tokens: number;
+  max_tokens: number;
+  week_points: number;
+  week_lines: PointLine[];
+  total_points: number;
+  badges: Badge[];
+  mascot: { state: "esultanza" | "corsa" | "riposo" | "attesa"; sentence: string };
+  level: number;
+  level_name: string;
 }

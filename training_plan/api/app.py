@@ -31,6 +31,7 @@ from .routes_nutrition import router as nutrition_router
 from .routes_plan import router as plan_router
 from .routes_strava import router as strava_router
 from .routes_summary import router as summary_router
+from .routes_progress import router as progress_router
 
 # The CLI (cli.py) calls this too, but `uvicorn training_plan.api:app` never goes
 # through cli.py -- without this, GARMIN_EMAIL/GARMIN_PASSWORD/STRAVA_* in a local
@@ -136,6 +137,7 @@ app.include_router(history_router, tags=["history"], dependencies=_auth_gate)
 app.include_router(profile_router, tags=["profile"], dependencies=_auth_gate)
 app.include_router(checkin_router, tags=["checkin"], dependencies=_auth_gate)
 app.include_router(summary_router, tags=["summary"], dependencies=_auth_gate)
+app.include_router(progress_router, tags=["progress"], dependencies=_auth_gate)
 
 
 @app.get("/health")

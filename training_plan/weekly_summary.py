@@ -10,9 +10,9 @@ Two choices worth knowing:
 - **Planned days trained, not sessions matched.** A session moved or swapped still counts
   if the day was trained -- matching titles would punish the flexibility the app promises
   (§0.5).
-- **The streak is on the history, not the plan.** A user with no plan builds the habit
-  too, and the week in progress only joins the streak once it is active, so a Monday
-  never "breaks" anything.
+- **The streak is `progress`'s**: on the history, not the plan (a user with no plan
+  builds the habit too), protected by salva-serie tokens and by reported pain, and the
+  week in progress only joins it once it is active.
 """
 
 from __future__ import annotations
@@ -82,27 +82,14 @@ class WeekSummary:
     next_week: NextWeek | None = None
     headline: str = ""
     highlights: list[str] = field(default_factory=list)
+    # From `progress`: the week's Disciplina points, their lines, and badges earned in it.
+    week_points: int = 0
+    point_lines: list[str] = field(default_factory=list)
+    badges: list[str] = field(default_factory=list)
 
 
 def _week_days(days: Sequence["DayTraining"], monday: date_type) -> list["DayTraining"]:
     return [d for d in days if monday <= d.day <= monday + timedelta(days=6)]
-
-
-def _active(days: Sequence["DayTraining"], monday: date_type) -> bool:
-    return sum(d.sessions for d in _week_days(days, monday)) >= ACTIVE_WEEK_SESSIONS
-
-
-def streak(days: Sequence["DayTraining"], monday: date_type, today: date_type) -> int:
-    """Consecutive active weeks ending with `monday`'s week -- or the one before, while
-    `monday`'s week is still running and not active yet."""
-    week = monday
-    if not _active(days, week) and week + timedelta(days=6) >= today:
-        week -= timedelta(weeks=1)
-    count = 0
-    while count < STREAK_WEEKS and _active(days, week):
-        count += 1
-        week -= timedelta(weeks=1)
-    return count
 
 
 def _planned_minutes(session: dict) -> float:
@@ -124,7 +111,20 @@ def build_summary(
     days: Sequence["DayTraining"],
     checkins: Sequence[CheckIn],
     skeleton: Sequence[SkeletonWeek] = (),
+    reached_level: int = 1,
+    all_checkins: Sequence[CheckIn] | None = None,
 ) -> WeekSummary:
+    """`all_checkins` spans the streak's weeks (pain protects a week), `checkins` this one."""
+    from . import progress
+
+    streak_weeks, lines, badges, points = progress.summary_of_week(
+        monday=monday,
+        today=today,
+        days=days,
+        planned=planned,
+        checkins=all_checkins if all_checkins is not None else checkins,
+        reached_level=reached_level,
+    )
     sunday = monday + timedelta(days=6)
     in_week = [s for s in planned if monday.isoformat() <= s["date"] <= sunday.isoformat()]
     week_days = _week_days(days, monday)
@@ -147,7 +147,10 @@ def build_summary(
         done_sessions=sum(d.sessions for d in week_days),
         done_minutes=round(sum(d.run_minutes for d in week_days)),
         days_trained=len(trained),
-        streak_weeks=streak(days, monday, today),
+        streak_weeks=streak_weeks,
+        week_points=points,
+        point_lines=[f"{'+' if line.points > 0 else ''}{line.points} {line.reason}" for line in lines],
+        badges=[badge.title for badge in badges],
         checkin_days=len(week_checkins),
         efforts=dict(Counter(c.effort for c in week_checkins if c.effort)),
         tired_days=[c.date for c in week_checkins if c.body == "stanco"],

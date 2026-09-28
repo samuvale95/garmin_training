@@ -8,6 +8,7 @@ import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { DayStateCard } from "@/components/DayStateCard";
 import { CheckInCard } from "@/components/CheckInCard";
+import { Mascot, Tokens } from "@/components/ProgressBits";
 import { RaceGoalCard } from "@/components/RaceGoalCard";
 import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
@@ -17,6 +18,7 @@ import {
   useActivities,
   useBodyToday,
   useCheckIns,
+  useProgress,
   useWeekSummary,
   useDayVerdict,
   useDayVerdictNarrative,
@@ -107,6 +109,7 @@ export default function TodayPage() {
   // that, so no date is sent.
   const earlyInWeek = (today.getDay() + 6) % 7 <= 2;
   const lastWeek = useWeekSummary(null, access.ready && earlyInWeek);
+  const progress = useProgress(access.ready);
 
   // Until we know whether there's a plan or a live Garmin connection there is nothing
   // real to show -- but "nothing real" used to mean `return null`, i.e. an empty screen
@@ -201,6 +204,26 @@ export default function TodayPage() {
           animate={animate}
           delayMs={290}
         />
+      )}
+
+      {progress.data && (
+        <Link href="/progress" style={{ textDecoration: "none", color: "inherit" }}>
+          <SlideUp active={animate} delayMs={295} className="press-soft" style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: "10px 14px", marginTop: 12, display: "flex", alignItems: "center", gap: 12 }}>
+            <Mascot state={progress.data.mascot.state} size={52} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontWeight: 600, fontSize: 15, margin: 0 }}>
+                {progress.data.streak} {progress.data.streak === 1 ? "settimana" : "settimane"} di fila
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                <Tokens tokens={progress.data.tokens} max={progress.data.max_tokens} />
+                <span className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)" }}>
+                  {progress.data.week_points} punti questa settimana
+                </span>
+              </div>
+            </div>
+            <span className="anim-chev" aria-hidden="true">→</span>
+          </SlideUp>
+        </Link>
       )}
 
       {earlyInWeek && lastWeek.data && lastWeek.data.done_sessions + lastWeek.data.planned_sessions > 0 && (
