@@ -563,6 +563,10 @@ def gather_context(
         reached_level=profile["reached_level"],
         adaptation_mode=profile["adaptation_mode"],
     )
+    # The level only goes up: store it when the history shows more than what was stored,
+    # as `/profile/level` does, so every reader that trusts the stored level sees it.
+    if assessment.computed_level > profile["reached_level"]:
+        history.raise_reached_level(user_id, assessment.computed_level)
     last_monday = _monday(today)
     longest = history.longest_run(
         user_id,

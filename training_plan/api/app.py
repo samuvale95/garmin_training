@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .. import db, history, plan_store
+from .. import checkin, db, history, move_check, plan_store
 from ..garmin_sync import GarminRateLimitError, GarminSyncError
 from ..parser import TrainingPlanValidationError
 from ..strava_sync import StravaAuthError
@@ -22,6 +22,7 @@ from . import schemas, user_tokenstore
 from .auth import AuthError, current_user_id
 from .cache import cache
 from .routes_body import router as body_router
+from .routes_checkin import router as checkin_router
 from .routes_coach import router as coach_router
 from .routes_garmin import router as garmin_router
 from .routes_history import router as history_router
@@ -29,6 +30,7 @@ from .routes_profile import router as profile_router
 from .routes_nutrition import router as nutrition_router
 from .routes_plan import router as plan_router
 from .routes_strava import router as strava_router
+from .routes_summary import router as summary_router
 
 # The CLI (cli.py) calls this too, but `uvicorn training_plan.api:app` never goes
 # through cli.py -- without this, GARMIN_EMAIL/GARMIN_PASSWORD/STRAVA_* in a local
@@ -60,6 +62,8 @@ def _ensure_schema() -> None:
     history.ensure_schema()
     # After db's: it adds a column to `user_plan` and moves each plan's sessions out of it.
     plan_store.ensure_schema()
+    checkin.ensure_schema()
+    move_check.ensure_schema()
 
 
 @app.exception_handler(AuthError)
@@ -130,6 +134,8 @@ app.include_router(nutrition_router, tags=["nutrition"], dependencies=_auth_gate
 app.include_router(coach_router, tags=["coach"], dependencies=_auth_gate)
 app.include_router(history_router, tags=["history"], dependencies=_auth_gate)
 app.include_router(profile_router, tags=["profile"], dependencies=_auth_gate)
+app.include_router(checkin_router, tags=["checkin"], dependencies=_auth_gate)
+app.include_router(summary_router, tags=["summary"], dependencies=_auth_gate)
 
 
 @app.get("/health")

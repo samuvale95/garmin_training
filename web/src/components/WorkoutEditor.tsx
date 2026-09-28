@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Reorder } from "framer-motion";
 import { PrimaryButton, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
+import { checkMoveAfterwards } from "@/lib/moveWarnings";
 import { findPlanSession, useAddSession, useIsRewritten, useApplyDeletion, useInvalidateCalendarData, usePlanQuery, useRemoveSession, useStartSync, useSyncJobStatus, useUpdateSession, useWorkoutsForDate } from "@/lib/queries";
 import { ApiError } from "@/lib/apiClient";
 import { normalizeTitle, parseDateKey, shiftDateKey, toDateKey } from "@/lib/sessionVisuals";
@@ -268,6 +269,8 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       addSession(session);
     } else if (mode === "edit") {
       updateSession(sessionId!, () => session);
+      // A new day is a move: check it like one (the sheet shows wherever the user is).
+      if (existing?.date && existing.date !== session.date) checkMoveAfterwards(sessionId!, existing.date, session.date);
     }
 
     try {

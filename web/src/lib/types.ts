@@ -726,3 +726,56 @@ export interface GeneratePlanResult {
   fallback_reason: string | null;
   skeleton_regenerated: boolean;
 }
+
+// ---- check-in ---------------------------------------------------------------------------
+
+export type CheckInEffort = "facile" | "giusta" | "dura" | "troppo";
+export type CheckInBody = "bene" | "stanco" | "dolore";
+export type PainArea = "piede" | "caviglia" | "polpaccio" | "stinco" | "ginocchio" | "coscia" | "anca" | "schiena" | "altro";
+
+export interface CheckIn {
+  date: string;
+  effort: CheckInEffort | null;
+  body: CheckInBody;
+  pain_area: PainArea | null;
+}
+
+// ---- move warnings ------------------------------------------------------------------------
+
+export interface MoveWarning {
+  key: string;
+  message: string;
+  evidence: "ricerca" | "consenso" | "prudenza";
+  dates: string[];
+  fingerprint: string;
+}
+
+export interface MoveCheck {
+  warnings: MoveWarning[];
+  /** The same session made easier on the new day, when that clears every warning. */
+  adapted: TrainingSession | null;
+}
+
+// ---- weekly summary -----------------------------------------------------------------------
+
+export interface WeekSummary {
+  monday: string;
+  sunday: string;
+  complete: boolean;
+  planned_sessions: number;
+  planned_minutes: number;
+  /** null without a plan for the week: "no plan" is not "zero of zero". */
+  planned_days_trained: number | null;
+  planned_days: number;
+  done_sessions: number;
+  done_minutes: number;
+  days_trained: number;
+  streak_weeks: number;
+  checkin_days: number;
+  efforts: Partial<Record<CheckInEffort, number>>;
+  tired_days: string[];
+  pain_days: { date: string; area: string | null }[];
+  next_week: { monday: string; planned_sessions: number; planned_minutes: number; reason: string | null } | null;
+  headline: string;
+  highlights: string[];
+}

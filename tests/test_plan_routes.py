@@ -199,3 +199,29 @@ async def test_skeleton_is_none_until_one_is_stored(monkeypatch):
     monkeypatch.setattr(db, "get_skeleton", lambda user_id: {"inputs": {}, "weeks": [w.to_dict() for w in weeks]})
     out = await routes_plan.get_skeleton(user_id="u")
     assert [w.target_minutes for w in out.weeks] == [200, 220, 240]
+
+
+@pytest.mark.anyio
+async def test_move_check_returns_warnings_and_the_adapted_session(monkeypatch):
+    from datetime import date, timedelta
+
+    from training_plan import checkin, move_check, plan_rules
+    from tests.test_move_check import intervals
+
+    today = date.today()
+    a, b = str(uuid4()), str(uuid4())
+    stored = [intervals(a, today + timedelta(days=1)), intervals(b, today + timedelta(days=3))]
+    monkeypatch.setattr(plan_store, "list_sessions", lambda user_id: stored)
+    monkeypatch.setattr(
+        plan_rules, "gather_context", lambda user_id, today, threshold_available: (plan_rules.RuleContext(1, 150.0, 90.0, today), [])
+    )
+    monkeypatch.setattr(checkin, "get_range", lambda user_id, start, end: [])
+    monkeypatch.setattr(move_check, "confirmed_fingerprints", lambda user_id: set())
+    monkeypatch.setattr(routes_plan, "_zones", lambda user_id: None)
+
+    out = await routes_plan.check_move(
+        schemas.MoveCheckRequest(session_id=b, date=today + timedelta(days=2)), user_id="u"
+    )
+    assert [w.key for w in out.warnings] == ["hard_in_a_row"]
+    assert out.warnings[0].fingerprint
+    assert out.adapted is not None and out.adapted.date == today + timedelta(days=2)

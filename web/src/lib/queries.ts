@@ -9,6 +9,7 @@ import type {
   CoachTrend,
   AthleteLevel,
   AthleteProfile,
+  CheckIn,
   BodyMetrics,
   BodySnapshot,
   CoachPlan,
@@ -37,6 +38,7 @@ import type {
   StravaStatus,
   SyncJobStatus,
   TrainingSession,
+  WeekSummary,
 } from "./types";
 
 // ---- how long an answer stays good --------------------------------------------------------
@@ -1062,6 +1064,60 @@ export function useAthleteLevel() {
     queryKey: ["profile", "level"],
     queryFn: ({ signal }) => apiGet<AthleteLevel>("/profile/level", undefined, signal),
     staleTime: 10 * 60_000,
+  });
+}
+
+// ---- check-in -------------------------------------------------------------------------------
+
+const checkInsKey = (start: string, end: string) => ["checkins", start, end] as const;
+
+export function useCheckIns(start: string, end: string, enabled = true) {
+  return useQuery({
+    queryKey: checkInsKey(start, end),
+    queryFn: ({ signal }) => apiGet<{ checkins: CheckIn[] }>("/checkins", { start, end }, signal),
+    enabled,
+    staleTime: LIVE_STALE_TIME,
+  });
+}
+
+/** Save a day's answers. Every check-in range and the day's verdict (which reads them)
+ * are refreshed: the verdict may change because of what was just said. */
+export function useSaveCheckIn() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (checkin: CheckIn) =>
+      apiPut<CheckIn>(`/checkins/${checkin.date}`, {
+        effort: checkin.effort,
+        body: checkin.body,
+        pain_area: checkin.pain_area,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["checkins"] });
+      queryClient.invalidateQueries({ queryKey: ["body", "readiness"] });
+      queryClient.invalidateQueries({ queryKey: ["body", "readiness-narrative"] });
+      queryClient.invalidateQueries({ queryKey: ["summary"] });
+    },
+  });
+}
+
+// ---- weekly summary -------------------------------------------------------------------------
+
+/** `monday` null: the server's default week (the finished one Monday to Wednesday). */
+export function useWeekSummary(monday: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["summary", "week", monday],
+    queryFn: ({ signal }) => apiGet<WeekSummary>("/summary/week", monday ? { monday } : undefined, signal),
+    enabled,
+    staleTime: LIVE_STALE_TIME,
+  });
+}
+
+export function useWeekSummaryNarrative(monday: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["summary", "narrative", monday],
+    queryFn: ({ signal }) => apiGet<Narrative>("/summary/week/narrative", monday ? { monday } : undefined, signal),
+    enabled,
+    staleTime: 60 * 60_000,
   });
 }
 

@@ -257,6 +257,21 @@ Regole assolute:
 - Rispondi solo con le frasi, senza virgolette e senza preamboli."""
 
 
+SUMMARY_SYSTEM_PROMPT = """Sei l'allenatore di chi usa Passo, un'app di allenamento.
+
+Hai davanti il resoconto di una settimana. Scrivi UNA frase, al massimo DUE, in italiano,
+che dica come è andata e una cosa su cui puntare la settimana dopo.
+
+Regole assolute:
+- Usa solo i numeri che ti do. Non inventarne altri.
+- La costanza conta più dei chilometri: se la persona si è allenata con regolarità dillo,
+  anche se il volume è basso.
+- Se c'è un dolore, la prima cosa è quella, detta come la direbbe un allenatore: niente
+  diagnosi, niente allarmi.
+- Niente complimenti di circostanza, niente esclamativi, niente emoji, niente elenchi.
+- Rispondi solo con le frasi, senza virgolette e senza preamboli."""
+
+
 def _write_sentence(system_prompt: str, facts: dict) -> str | None:
     content = _post_chat(
         os.getenv("LLM_TEXT_MODEL", DEFAULT_TEXT_MODEL),
@@ -298,6 +313,12 @@ def write_coach_narrative(facts: dict) -> str | None:
     the screen keeps `ActivityForm.headline` and `focus`, both deterministic, and loses
     only the prose around them."""
     return _write_sentence(COACH_SYSTEM_PROMPT, facts)
+
+
+def write_summary_narrative(facts: dict) -> str | None:
+    """The week, phrased. `None` when the model is unavailable -- the screen keeps the
+    summary's headline, which is deterministic."""
+    return _write_sentence(SUMMARY_SYSTEM_PROMPT, facts)
 
 
 def write_goal_narrative(facts: dict) -> str | None:

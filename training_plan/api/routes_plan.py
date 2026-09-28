@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, Upl
 from fastapi.responses import JSONResponse
 from fastapi.concurrency import run_in_threadpool
 
-from .. import db, plan_generator, plan_rules, plan_store, service
+from .. import checkin, db, move_check, plan_generator, plan_rules, plan_store, service
 from .. import goal_fit, llm
 from ..parser import parse_plan_document, serialize_plan
 from . import garmin_session, schemas
@@ -158,6 +158,58 @@ async def validate_plan(
         )
 
     return await run_in_threadpool(check)
+
+
+# ---- move warnings ------------------------------------------------------------------------------
+
+
+@router.post("/plan/move-check", response_model=schemas.MoveCheckResponse)
+async def check_move(payload: schemas.MoveCheckRequest, user_id: str = Depends(current_user_id)) -> schemas.MoveCheckResponse:
+    """What moving a session to a day would make risky (see `move_check.py`). Called after
+    the move is shown, so it never delays it; a few database reads, no Garmin call."""
+
+    def run() -> schemas.MoveCheckResponse:
+        today = date.today()
+        # The threshold read is cached (see `_zones`): a drag and drop costs a few
+        # database reads, not a Garmin round-trip.
+        context, days = plan_rules.gather_context(user_id, today, threshold_available=_zones(user_id) is not None)
+        result = move_check.check_move(
+            session_id=str(payload.session_id),
+            new_date=payload.date,
+            stored=plan_store.list_sessions(user_id),
+            days=days,
+            checkins=checkin.get_range(user_id, payload.date - timedelta(days=move_check.PAIN_DAYS), payload.date),
+            context=context,
+            today=today,
+            confirmed=move_check.confirmed_fingerprints(user_id),
+            from_date=payload.from_date,
+        )
+        return schemas.MoveCheckResponse(
+            warnings=[
+                schemas.MoveWarningOut(
+                    key=w.key, message=w.message, evidence=w.evidence, dates=w.dates, fingerprint=w.fingerprint
+                )
+                for w in result.warnings
+            ],
+            adapted=schemas.TrainingSessionOut.from_model(result.adapted) if result.adapted else None,
+        )
+
+    return await run_in_threadpool(run)
+
+
+@router.post("/plan/move-decisions", response_model=schemas.DeletePlanResponse)
+async def record_move_decision(
+    payload: schemas.MoveDecisionRequest, user_id: str = Depends(current_user_id)
+) -> schemas.DeletePlanResponse:
+    await run_in_threadpool(
+        move_check.record_decision,
+        user_id,
+        str(payload.session_id),
+        payload.date,
+        payload.choice,
+        [w.model_dump(mode="json") for w in payload.warnings],
+    )
+    return schemas.DeletePlanResponse(ok=True)
 
 
 # ---- generation ---------------------------------------------------------------------------------

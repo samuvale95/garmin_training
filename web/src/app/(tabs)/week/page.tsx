@@ -8,6 +8,7 @@ import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
 import { DraggableWeekCard, RestCard, type DayCardData } from "@/components/WeekCards";
 import { PlanGenerateCard } from "@/components/PlanGenerateCard";
 import { useMotionEnabled, useMountOnce } from "@/lib/motion";
+import { useMoveSession } from "@/lib/moveWarnings";
 import { useCalendarAccess } from "@/lib/guards";
 import {
   useActivities,
@@ -17,7 +18,6 @@ import {
   useStravaActivityMatches,
   useStravaStatus,
   useIsRewritten,
-  useUpdateSession,
   useWeekWorkouts,
 } from "@/lib/queries";
 import { SkeletonDayCards } from "@/components/skeletons";
@@ -106,7 +106,7 @@ function WeekPageContent() {
   const stravaEnabled = !!stravaStatus.data?.connected && planSessions.length > 0;
   const stravaMatches = useStravaActivityMatches(planSessions, stravaEnabled);
   const prefetchWorkoutSession = usePrefetchWorkoutSession();
-  const updateSession = useUpdateSession();
+  const moveSession = useMoveSession();
   const rescheduleWorkout = useRescheduleWorkout();
   // While the server rewrites the next weeks, their days hold still: a move made now
   // would race the generation, and the plan adopted when it finishes could hide it.
@@ -173,7 +173,7 @@ function WeekPageContent() {
     }
     haptic([10, 40, 14]);
     if (card.planId != null) {
-      updateSession(card.planId, (s) => ({ ...s, date: targetKey }));
+      moveSession(card.planId, card.session.date, targetKey);
     } else if (card.workout) {
       rescheduleWorkout.mutate({ workout: card.workout, newDate: targetKey });
     }
@@ -374,6 +374,12 @@ function WeekPageContent() {
         {/* Only on this week: generation always starts tomorrow, so offering it while
             paging through past or later weeks would promise a window it won't write. */}
         {offset === 0 && <PlanGenerateCard animate={animate} delayMs={160} />}
+
+        {offset <= 0 && (
+          <Link href={`/summary?monday=${startKey}`} style={{ display: "inline-block", fontSize: 12.5, fontWeight: 600, color: "var(--inchiostro-70)", marginTop: 10 }}>
+            Resoconto della settimana →
+          </Link>
+        )}
 
         {weekSessions.length > 0 && (
           <p style={{ fontSize: 11.5, color: carried ? "var(--rosso-avviso)" : "var(--inchiostro-35)", margin: "10px 0 0", transition: "color 160ms var(--ease)" }}>

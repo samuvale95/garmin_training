@@ -1639,6 +1639,96 @@ class ValidatePlanResponse(BaseModel):
     violations: list[ViolationOut]
 
 
+# ---- move warnings ----------------------------------------------------------------------------
+
+
+class MoveCheckRequest(BaseModel):
+    session_id: UUID
+    date: date_type
+    # The day it was moved from, when the move has already been saved.
+    from_date: date_type | None = None
+
+
+class MoveWarningOut(BaseModel):
+    key: str
+    message: str
+    evidence: Literal["ricerca", "consenso", "prudenza"]
+    dates: list[date_type]
+    fingerprint: str
+
+
+class MoveCheckResponse(BaseModel):
+    warnings: list[MoveWarningOut]
+    # The same session, easier, on the new day -- only when it clears every warning.
+    adapted: TrainingSessionOut | None = None
+
+
+class MoveDecisionRequest(BaseModel):
+    session_id: UUID
+    date: date_type
+    choice: Literal["confermo", "adatta", "annulla"]
+    warnings: list[MoveWarningOut]
+
+
+# ---- weekly summary ---------------------------------------------------------------------------
+
+
+class PainDayOut(BaseModel):
+    date: date_type
+    area: str | None
+
+
+class NextWeekOut(BaseModel):
+    monday: date_type
+    planned_sessions: int
+    planned_minutes: int
+    reason: str | None = None
+
+
+class WeekSummaryResponse(BaseModel):
+    monday: date_type
+    sunday: date_type
+    complete: bool
+    planned_sessions: int
+    planned_minutes: int
+    planned_days_trained: int | None
+    planned_days: int
+    done_sessions: int
+    done_minutes: int
+    days_trained: int
+    streak_weeks: int
+    checkin_days: int
+    efforts: dict[str, int]
+    tired_days: list[date_type]
+    pain_days: list[PainDayOut]
+    next_week: NextWeekOut | None = None
+    headline: str
+    highlights: list[str]
+
+    @classmethod
+    def from_model(cls, summary) -> "WeekSummaryResponse":
+        from dataclasses import asdict
+
+        return cls.model_validate(asdict(summary))
+
+
+# ---- check-in ---------------------------------------------------------------------------------
+
+
+class CheckInIn(BaseModel):
+    effort: Literal["facile", "giusta", "dura", "troppo"] | None = None
+    body: Literal["bene", "stanco", "dolore"]
+    pain_area: Literal["piede", "caviglia", "polpaccio", "stinco", "ginocchio", "coscia", "anca", "schiena", "altro"] | None = None
+
+
+class CheckInOut(CheckInIn):
+    date: date_type
+
+
+class CheckInsResponse(BaseModel):
+    checkins: list[CheckInOut]
+
+
 # ---- plan generation ------------------------------------------------------------------------
 
 

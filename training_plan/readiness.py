@@ -26,6 +26,7 @@ and no verdict at all, because a guess dressed as a readout is worse than a blan
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date as date_type
 
@@ -238,9 +239,13 @@ def _load_signal(acute_chronic_ratio: float | None) -> Signal | None:
     )
 
 
-def read_signals(snapshot, acute_chronic_ratio: float | None = None) -> list[Signal]:
-    """Every threshold that today's numbers cross, strongest first."""
+def read_signals(
+    snapshot, acute_chronic_ratio: float | None = None, reported: Sequence[Signal] = ()
+) -> list[Signal]:
+    """Every threshold that today's numbers cross, strongest first -- plus what the user
+    reported in the check-in (`checkin.signals`), counted like any other signal."""
     candidates = [
+        *reported,
         _hrv_signal(snapshot),
         _rhr_signal(snapshot),
         _sleep_signal(snapshot),
@@ -370,6 +375,7 @@ def assess_day(
     acute_chronic_ratio: float | None = None,
     goal: RaceGoal | None = None,
     today: date_type | None = None,
+    reported: Sequence[Signal] = (),
 ) -> DayVerdict:
     """Today's state, and what it means for today's session.
 
@@ -381,7 +387,9 @@ def assess_day(
     demand = session_demand(session)
     title = session.title if session else None
 
-    if not snapshot.has_overnight_data:
+    # Without overnight data there is nothing to read -- unless the user told us
+    # something: reported pain on a night the watch was off is still pain.
+    if not snapshot.has_overnight_data and not reported:
         return DayVerdict(
             date=day,
             state=STATE_UNKNOWN,
@@ -392,7 +400,9 @@ def assess_day(
             has_data=False,
         )
 
-    signals = read_signals(snapshot, acute_chronic_ratio)
+    signals = (
+        read_signals(snapshot, acute_chronic_ratio, reported) if snapshot.has_overnight_data else list(reported)
+    )
     state = state_from_signals(signals)
 
     # The alternative decides the action, not the other way round: two separate ladders

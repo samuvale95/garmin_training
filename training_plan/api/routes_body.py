@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
-from .. import body_insights, llm, readiness
+from .. import body_insights, checkin, llm, readiness
 from . import garmin_session, schemas
 from .auth import current_user_id
 from .cache import (
@@ -112,6 +113,16 @@ def _load_ratio_or_none(user_id: str) -> float | None:
         return None
 
 
+def _reported_signals(user_id: str, day: date | None) -> list[readiness.Signal]:
+    """What the user said in the check-ins of the day and the day before."""
+    today = day or date.today()
+    try:
+        return checkin.signals(checkin.get_range(user_id, today - timedelta(days=1), today), today)
+    except Exception:  # noqa: BLE001 - a missing check-in narrows the verdict, never breaks it
+        logger.warning("check-ins unavailable for the day verdict, degrading", exc_info=True)
+        return []
+
+
 @router.post("/body/readiness", response_model=schemas.DayVerdictResponse)
 async def body_readiness(
     payload: schemas.DayVerdictRequest, user_id: str = Depends(current_user_id)
@@ -126,12 +137,14 @@ async def body_readiness(
     """
     snapshot = await run_in_threadpool(_body_snapshot, user_id)
     ratio = await run_in_threadpool(_load_ratio_or_none, user_id)
+    reported = await run_in_threadpool(_reported_signals, user_id, payload.date)
     verdict = readiness.assess_day(
         snapshot,
         payload.session.to_model() if payload.session else None,
         acute_chronic_ratio=ratio,
         goal=payload.goal.to_model() if payload.goal else None,
         today=payload.date,
+        reported=reported,
     )
     return schemas.DayVerdictResponse.from_model(verdict)
 
@@ -149,12 +162,14 @@ async def body_readiness_narrative(
     snapshot = await run_in_threadpool(_body_snapshot, user_id)
     ratio = await run_in_threadpool(_load_ratio_or_none, user_id)
     goal = payload.goal.to_model() if payload.goal else None
+    reported = await run_in_threadpool(_reported_signals, user_id, payload.date)
     verdict = readiness.assess_day(
         snapshot,
         payload.session.to_model() if payload.session else None,
         acute_chronic_ratio=ratio,
         goal=goal,
         today=payload.date,
+        reported=reported,
     )
 
     def compute() -> schemas.NarrativeResponse:

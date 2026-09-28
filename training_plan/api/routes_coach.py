@@ -26,6 +26,7 @@ from .cache import (
     TTL_COACH_PLAN,
     TTL_COACH_TECHNIQUE,
     TTL_COACH_TREND,
+    TTL_COACH_ZONES,
     cache,
 )
 
@@ -116,11 +117,23 @@ def _zones(user_id: str) -> intensity.Zones | None:
     formula would carry an error wider than the bands they define, so this module would
     rather show no analysis than a confident wrong one.
     """
-    threshold = garmin_session.run(user_id, lambda sync: sync.lactate_threshold())
-    heart_rate = threshold.get("threshold_hr")
-    if not heart_rate:
+
+
+    def read() -> intensity.Zones:
+        threshold = garmin_session.run(user_id, lambda sync: sync.lactate_threshold())
+        heart_rate = threshold.get("threshold_hr")
+        if not heart_rate:
+            raise _NoZones
+        return intensity.Zones.from_threshold(heart_rate, source="garmin")
+
+    # Cached when there is an answer only: `lactate_threshold` degrades a timeout to "no
+    # estimate", and caching that would hide real zones for the whole TTL. Cached at all
+    # because the level (and so every limit and move warning) reads it, and a drag and
+    # drop is no reason for a Garmin round-trip.
+    try:
+        return cache.get_or_call("coach:zones", user_id, "threshold", TTL_COACH_ZONES, read)
+    except _NoZones:
         return None
-    return intensity.Zones.from_threshold(heart_rate, source="garmin")
 
 
 @router.post("/coach/execution", response_model=schemas.ExecutionBlockResponse)

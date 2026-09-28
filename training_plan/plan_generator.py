@@ -280,7 +280,7 @@ def race_session(goal: RaceGoal) -> TrainingSession:
     )
 
 
-def _done_sessions(days: Sequence["DayTraining"], start: date_type, end: date_type) -> list[TrainingSession]:
+def done_sessions(days: Sequence["DayTraining"], start: date_type, end: date_type) -> list[TrainingSession]:
     """What was run in `[start, end]`, as easy sessions of the right length.
 
     The history knows minutes, not the shape of the session, so a hard day already done
@@ -314,7 +314,7 @@ def build_window(
     first_monday = _monday(start)
 
     locked = [session_from_dict(s) for s in stored if s["locked"] and start.isoformat() <= s["date"] <= end.isoformat()]
-    before = _done_sessions(days, first_monday, today)
+    before = done_sessions(days, first_monday, today)
     if not any(s.date == today for s in before):
         before += [session_from_dict(s) for s in stored if s["date"] == today.isoformat()]
     before = [s for s in before if s.date >= first_monday]

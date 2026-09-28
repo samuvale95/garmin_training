@@ -7,13 +7,17 @@ import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { DayStateCard } from "@/components/DayStateCard";
+import { CheckInCard } from "@/components/CheckInCard";
 import { RaceGoalCard } from "@/components/RaceGoalCard";
 import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import {
   GOAL_LOOKAHEAD_DAYS,
+  useActivities,
   useBodyToday,
+  useCheckIns,
+  useWeekSummary,
   useDayVerdict,
   useDayVerdictNarrative,
   usePlanDiff,
@@ -78,6 +82,31 @@ export default function TodayPage() {
   const wantsVerdict = avvisamiSeIlCorpoNonRegge && !watchSync.blocking && access.ready;
   const verdictQuery = useDayVerdict(verdictSession, goal, wantsVerdict);
   const verdictNarrative = useDayVerdictNarrative(verdictSession, goal, wantsVerdict && !!verdictQuery.data);
+
+  // The check-in: asked after training today, or the next morning for yesterday's
+  // session if it went unanswered (see `CheckInCard`). "Trained" is a completed activity
+  // when the watch is connected, a planned session otherwise.
+  const yesterdayKey = shiftDateKey(todayKey, -1);
+  const recentActivities = useActivities(yesterdayKey, todayKey, access.ready && access.garminConnected);
+  const recentCheckIns = useCheckIns(yesterdayKey, todayKey, access.ready);
+  const trainedOn = (day: string) =>
+    access.garminConnected
+      ? (recentActivities.data?.activities ?? []).some((a) => a.date === day)
+      : !!access.plan?.sessions.some((s) => s.date === day);
+  const checkInOn = (day: string) => recentCheckIns.data?.checkins.find((c) => c.date === day) ?? null;
+  const checkInReady = recentCheckIns.isSuccess && (!access.garminConnected || recentActivities.isSuccess);
+  const checkInDay: "oggi" | "ieri" | null = !checkInReady
+    ? null
+    : trainedOn(todayKey) || checkInOn(todayKey)
+      ? "oggi"
+      : trainedOn(yesterdayKey) && !checkInOn(yesterdayKey)
+        ? "ieri"
+        : null;
+
+  // Monday to Wednesday, the week just finished: the server's default week is exactly
+  // that, so no date is sent.
+  const earlyInWeek = (today.getDay() + 6) % 7 <= 2;
+  const lastWeek = useWeekSummary(null, access.ready && earlyInWeek);
 
   // Until we know whether there's a plan or a live Garmin connection there is nothing
   // real to show -- but "nothing real" used to mean `return null`, i.e. an empty screen
@@ -161,6 +190,30 @@ export default function TodayPage() {
       </SlideUp>
 
       <DayStateCard verdict={verdictQuery.data} narrative={verdictNarrative.data?.text} animate={animate} delayMs={260} />
+
+      {checkInDay && (
+        <CheckInCard
+          key={checkInDay === "oggi" ? todayKey : yesterdayKey}
+          date={checkInDay === "oggi" ? todayKey : yesterdayKey}
+          dayLabel={checkInDay}
+          trained={trainedOn(checkInDay === "oggi" ? todayKey : yesterdayKey)}
+          existing={checkInOn(checkInDay === "oggi" ? todayKey : yesterdayKey)}
+          animate={animate}
+          delayMs={290}
+        />
+      )}
+
+      {earlyInWeek && lastWeek.data && lastWeek.data.done_sessions + lastWeek.data.planned_sessions > 0 && (
+        <Link href="/summary" style={{ textDecoration: "none", color: "inherit" }}>
+          <SlideUp active={animate} delayMs={300} className="press-soft" style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: 0 }}>La settimana scorsa</p>
+              <p style={{ fontSize: 14, margin: "3px 0 0" }}>{lastWeek.data.headline}</p>
+            </div>
+            <span className="anim-chev" aria-hidden="true">→</span>
+          </SlideUp>
+        </Link>
+      )}
 
       {/* Without a race this asks for one -- counted from today forward, plan or live
           calendar alike, so a finished block or a bare Garmin connection doesn't ask. */}

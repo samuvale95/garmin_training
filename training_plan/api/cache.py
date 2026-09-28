@@ -75,6 +75,8 @@ TTL_READINESS_NARRATIVE = 30 * 60
 # How the plan lines up with the race: arithmetic, so not cached -- but the sentence
 # written about it is a model call, keyed on the conclusion it describes.
 TTL_GOAL_FIT_NARRATIVE = 30 * 60
+# The week summary's sentence: keyed on the facts it phrases, so it changes when they do.
+TTL_SUMMARY_NARRATIVE = 24 * 60 * 60
 
 # A finished activity is a fact and its form metrics never change again, so the only
 # thing bounding this TTL is how long the process should hold the answer at all. The
@@ -91,6 +93,8 @@ TTL_COACH_EXECUTION = 24 * 60 * 60
 # The diagnosis reads a year of stored streams, so it is the heaviest computation here --
 # but it is all local, and what it describes only changes when a new session syncs.
 TTL_COACH_PLAN = 6 * 60 * 60
+# Garmin's threshold estimate moves after a hard session at most: hours are fine.
+TTL_COACH_ZONES = 6 * 60 * 60
 # The level is keyed on the stored activities, so a new session recomputes it on the next
 # read; the TTL only bounds how stale the Garmin threshold part can get. The day matters
 # too -- weeks complete and pauses begin without any new activity -- so it is in the key.
