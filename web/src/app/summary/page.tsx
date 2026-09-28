@@ -165,6 +165,20 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
         </SlideUp>
       )}
 
+      {data.food_days > 0 && (
+        <SlideUp active={animate} delayMs={265} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12 }}>
+          <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: 0 }}>Carburante</p>
+          <p style={{ fontSize: 14, margin: "6px 0 0" }}>
+            Cibo registrato {data.food_days} {data.food_days === 1 ? "giorno" : "giorni"} su 7.
+          </p>
+          {data.carb_short_days.length > 0 && (
+            <p style={{ fontSize: 13, margin: "6px 0 0", color: "var(--inchiostro-70)" }}>
+              Carboidrati sotto il range prima di una seduta dura: {data.carb_short_days.map((d) => formatWeekday(d)).join(", ")}.
+            </p>
+          )}
+        </SlideUp>
+      )}
+
       {data.next_week && (
         <SlideUp active={animate} delayMs={280} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12 }}>
           <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: 0 }}>La prossima settimana</p>

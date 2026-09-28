@@ -7,6 +7,7 @@ import { BrandMark } from "@/components/motion/BrandMark";
 import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
 import { DraggableWeekCard, RestCard, type DayCardData } from "@/components/WeekCards";
 import { PlanGenerateCard } from "@/components/PlanGenerateCard";
+import { OffPlanCard, offPlanActivities } from "@/components/OffPlanCard";
 import { useMotionEnabled, useMountOnce } from "@/lib/motion";
 import { useMoveSession } from "@/lib/moveWarnings";
 import { useCalendarAccess } from "@/lib/guards";
@@ -18,6 +19,7 @@ import {
   useStravaActivityMatches,
   useStravaStatus,
   useIsRewritten,
+  useStoredActivities,
   useWeekWorkouts,
 } from "@/lib/queries";
 import { SkeletonDayCards } from "@/components/skeletons";
@@ -77,6 +79,9 @@ function WeekPageContent() {
   // against and a live Garmin connection to pull completed activities from.
   const showProgress = !liveMode && access.garminConnected;
   const activitiesQuery = useActivities(startKey, endKey, showProgress);
+  // Everything done this week, from the stored history (all sports, Strava-only too):
+  // what falls outside the plan is shown in its day.
+  const storedActivities = useStoredActivities(startKey, endKey, access.ready);
 
   // "Svolto" indicators on day cards: plan sessions already have the shape the batch
   // endpoint expects; a liveMode ScheduledWorkout (date/sport/title, no steps) is
@@ -308,7 +313,11 @@ function WeekPageContent() {
             .filter((w) => w.date === key)
             .map((w) => ({ id: `garmin:${w.scheduled_workout_id}`, session: w, workout: w }))
         : [];
-    return { date, key, cards };
+    const offPlan = offPlanActivities(
+      (storedActivities.data?.activities ?? []).filter((a) => a.day === key),
+      cards.map((card) => card.session.sport)
+    );
+    return { date, key, cards, offPlan };
   });
 
   const weekSessions = days.flatMap((d) => d.cards.map((c) => c.session));
@@ -322,7 +331,7 @@ function WeekPageContent() {
       ? `${doneKm.toFixed(0)} / ${weekKm.toFixed(0)} km · ${weekSessions.length} sedute`
       : `${weekKm.toFixed(0)} km · ${weekSessions.length} sedute`;
 
-  const firstRestIndex = days.findIndex((d) => d.cards.length === 0);
+  const firstRestIndex = days.findIndex((d) => d.cards.length === 0 && d.offPlan.length === 0);
   const weekInClass = reduced || direction === 0 ? undefined : "anim-week-in";
 
   return (
@@ -461,7 +470,7 @@ function WeekPageContent() {
                       </span>
                     </div>
                     <div className={isDropTarget ? "day-drop-target" : undefined} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-                      {day.cards.length === 0 ? (
+                      {day.cards.length === 0 && day.offPlan.length === 0 ? (
                         <RestCard animate={animate} delayMs={i * 70} withIllustration={i === firstRestIndex} />
                       ) : (
                         day.cards.map((card, j) => (
@@ -478,6 +487,9 @@ function WeekPageContent() {
                           />
                         ))
                       )}
+                      {day.offPlan.map((activity, j) => (
+                        <OffPlanCard key={activity.activity_id} activity={activity} animate={animate} delayMs={i * 70 + (day.cards.length + j) * 40} />
+                      ))}
                     </div>
                   </div>
                 );

@@ -6,12 +6,11 @@ import { FoodThumb } from "@/components/FuelCorrectionSheet";
 import { capitalize, formatClockTime, formatFullDate } from "@/lib/format";
 import type {
   DayTarget,
+  ComplianceLine,
   DayTotals,
   DuringSession,
   FoodEntry,
   FuelTargets,
-  MealSlot,
-  Portion,
   RecoveryWindow,
   SessionLoad,
 } from "@/lib/types";
@@ -255,7 +254,20 @@ function MacroBar({ label, value, range, color, animate, delayMs }: { label: str
   );
 }
 
-export function TodayFuelBlock({ animate, fuel, totals, hasPlan }: { animate: boolean; fuel: FuelTargets; totals: DayTotals | undefined; hasPlan: boolean }) {
+export function TodayFuelBlock({
+  animate,
+  fuel,
+  totals,
+  hasPlan,
+  lines = [],
+}: {
+  animate: boolean;
+  fuel: FuelTargets;
+  totals: DayTotals | undefined;
+  hasPlan: boolean;
+  /** In, or what is missing, per macro (`/nutrition/status`). */
+  lines?: ComplianceLine[];
+}) {
   const t: DayTarget = fuel.today;
   const hasEntries = !!totals && totals.entries > 0;
   const subtitle = !hasPlan ? "nessun piano" : t.session_title ? t.session_title.toLowerCase() : LOAD_LABELS[t.load];
@@ -309,6 +321,25 @@ export function TodayFuelBlock({ animate, fuel, totals, hasPlan }: { animate: bo
               <MacroBar label="grassi" value={totals.fat_g} range={t.fat_g} color={MACRO_COLORS.fat} animate={animate} delayMs={400} />
             </div>
           </div>
+          {lines.length > 0 && (
+            <ul style={{ listStyle: "none", padding: 0, margin: "14px 0 0", display: "flex", flexDirection: "column", gap: 6 }}>
+              {lines.map((line) => (
+                <li
+                  key={line.macro}
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 1.4,
+                    color: line.flagged ? "var(--inchiostro)" : "var(--inchiostro-70)",
+                    fontWeight: line.flagged ? 600 : 400,
+                    paddingLeft: 12,
+                    borderLeft: `3px solid ${line.status === "sotto" ? (line.flagged ? "var(--corallo)" : "var(--sabbia-bordo)") : "var(--verde-tratto-scuro)"}`,
+                  }}
+                >
+                  {line.message}
+                </li>
+              ))}
+            </ul>
+          )}
         </>
       ) : (
         <>
@@ -494,76 +525,20 @@ export function EnergyBlock({ animate, target }: { animate: boolean; target: Day
   );
 }
 
-function PortionLine({ portions }: { portions: Portion[] }) {
-  if (portions.length === 0) return null;
-  return (
-    <p className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-70)", margin: "8px 0 0", lineHeight: 1.5 }}>
-      {portions
-        .map((p) => (p.grams == null ? p.food : `${p.food} ${p.grams} g${p.note ? ` (${p.note})` : ""}`))
-        .join("  +  ")}
-    </p>
-  );
-}
 
 /** The day's targets, spent across the meals a person actually eats.
  *
  * One worked example, not a prescription -- the copy says so, and the ranges stay on
  * screen above it. The portions are sized on the midpoint of each range, which is why
  * they can be added up and checked against the targets. */
-export function MealPlanBlock({
-  animate,
-  meals,
-  during,
-  recovery,
-}: {
-  animate: boolean;
-  meals: MealSlot[];
-  during: DuringSession | null;
-  recovery: RecoveryWindow | null;
-}) {
-  if (meals.length === 0) return null;
-
+/** What to eat during and after today's session: values, not a menu. The meal plan that
+ * used to sit around these was dropped (§0.4 of the brainstorming: "solo i valori"). */
+export function SessionFuelBlock({ animate, during, recovery }: { animate: boolean; during: DuringSession | null; recovery: RecoveryWindow | null }) {
+  if (!during && !recovery) return null;
   return (
-    <div style={{ marginTop: 22 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
-          Come spenderli oggi
-        </span>
-        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
-          {meals.length} pasti
-        </span>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-        {meals.map((meal, i) => (
-          <SlideUp
-            key={meal.key}
-            active={animate}
-            delayMs={300 + i * 50}
-            row
-            style={{ background: "var(--crema-card)", borderRadius: "var(--radius-row)", padding: "14px 16px" }}
-          >
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-              <p style={{ fontWeight: 600, fontSize: 15, margin: 0 }}>{meal.name}</p>
-              <span className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", flex: "none" }}>
-                {meal.timing}
-              </span>
-            </div>
-            <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "5px 0 0" }}>
-              {meal.carb_g} g carboidrati · {meal.protein_g} g proteine
-            </p>
-            <PortionLine portions={meal.portions} />
-            {meal.note && (
-              <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-70)", margin: "8px 0 0", lineHeight: 1.35 }}>
-                {meal.note}
-              </p>
-            )}
-          </SlideUp>
-        ))}
-      </div>
-
+    <div style={{ marginTop: 16 }}>
       {during && (
-        <SlideUp active={animate} delayMs={520} style={{ background: "var(--corallo)", color: "var(--inchiostro)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 10 }}>
+        <SlideUp active={animate} delayMs={300} style={{ background: "var(--corallo)", color: "var(--inchiostro)", borderRadius: "var(--radius-card)", padding: 16 }}>
           <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", opacity: 0.7, margin: 0 }}>
             durante la seduta
           </p>
@@ -573,30 +548,18 @@ export function MealPlanBlock({
           <p style={{ fontSize: 12.5, margin: "3px 0 0", opacity: 0.8 }}>
             in tutto {during.total_carb_g[0]}–{during.total_carb_g[1]} g
           </p>
-          <p className="font-serif-italic" style={{ fontSize: 14, margin: "9px 0 0", lineHeight: 1.35 }}>{during.note}</p>
         </SlideUp>
       )}
-
       {recovery && (
-        <SlideUp active={animate} delayMs={560} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 10 }}>
+        <SlideUp active={animate} delayMs={340} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 16, marginTop: during ? 10 : 0 }}>
           <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
             dopo la seduta
           </p>
           <p className="font-mono" style={{ fontSize: 15, margin: "7px 0 0" }}>
             {recovery.carb_g} g carboidrati · {recovery.protein_g} g proteine
           </p>
-          <PortionLine portions={recovery.portions} />
-          <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-70)", margin: "9px 0 0", lineHeight: 1.35 }}>
-            {recovery.note}
-          </p>
         </SlideUp>
       )}
-
-      <p style={{ fontSize: 11.5, color: "var(--inchiostro-35)", margin: "12px 0 0", lineHeight: 1.45 }}>
-        Un esempio di giornata, non una prescrizione: le quantità stanno al centro degli
-        intervalli qui sopra, e gli alimenti sono intercambiabili con altri che portano gli
-        stessi grammi. Orientamento sportivo generale, non un piano alimentare.
-      </p>
     </div>
   );
 }

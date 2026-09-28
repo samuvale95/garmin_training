@@ -86,6 +86,10 @@ class WeekSummary:
     week_points: int = 0
     point_lines: list[str] = field(default_factory=list)
     badges: list[str] = field(default_factory=list)
+    # Food: days with something logged, and days under the carbohydrate range the day
+    # before a hard or long session.
+    food_days: int = 0
+    carb_short_days: list[date_type] = field(default_factory=list)
 
 
 def _week_days(days: Sequence["DayTraining"], monday: date_type) -> list["DayTraining"]:
@@ -113,6 +117,8 @@ def build_summary(
     skeleton: Sequence[SkeletonWeek] = (),
     reached_level: int = 1,
     all_checkins: Sequence[CheckIn] | None = None,
+    food_days: int = 0,
+    carb_short_days: Sequence[date_type] = (),
 ) -> WeekSummary:
     """`all_checkins` spans the streak's weeks (pain protects a week), `checkins` this one."""
     from . import progress
@@ -151,6 +157,8 @@ def build_summary(
         week_points=points,
         point_lines=[f"{'+' if line.points > 0 else ''}{line.points} {line.reason}" for line in lines],
         badges=[badge.title for badge in badges],
+        food_days=food_days,
+        carb_short_days=sorted(carb_short_days),
         checkin_days=len(week_checkins),
         efforts=dict(Counter(c.effort for c in week_checkins if c.effort)),
         tired_days=[c.date for c in week_checkins if c.body == "stanco"],
@@ -202,6 +210,9 @@ def _highlights(s: WeekSummary) -> list[str]:
         out.append(f"{s.efforts['troppo']} {'seduta' if s.efforts['troppo'] == 1 else 'sedute'} troppo dure secondo te.")
     elif hard or easy:
         out.append(f"Sensazioni: {easy} sedute facili o giuste, {hard} dure.")
+    if s.carb_short_days:
+        named = ", ".join(_day(d) for d in s.carb_short_days)
+        out.append(f"Carboidrati sotto il range {named}, il giorno prima di una seduta dura.")
     if len(s.tired_days) >= 2:
         out.append(f"Stanchezza segnalata {len(s.tired_days)} giorni.")
     return out[:MAX_HIGHLIGHTS]
@@ -221,4 +232,6 @@ def facts(s: WeekSummary) -> dict:
         "giorni_con_dolore": [{"giorno": _day(p.date), "zona": p.area} for p in s.pain_days],
         "punti": s.highlights,
         "prossima_settimana": s.next_week.reason if s.next_week else None,
+        "giorni_con_cibo_registrato": s.food_days,
+        "carboidrati_bassi_prima_di_seduta_dura": [_day(d) for d in s.carb_short_days],
     }

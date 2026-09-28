@@ -17,6 +17,7 @@ import type {
   CompletedActivity,
   ExecutionBlock,
   ConflictAssessment,
+  DayEnergy,
   DayVerdict,
   DeleteResult,
   DeviceInfo,
@@ -24,6 +25,7 @@ import type {
   FoodEntries,
   FoodEntry,
   FoodHistory,
+  FuelStatus,
   FuelTargets,
   GarminStatus,
   GeneratePlanResult,
@@ -37,6 +39,7 @@ import type {
   ScheduledWorkout,
   Shoe,
   StravaActivityMatch,
+  StoredActivity,
   StravaStatus,
   SyncJobStatus,
   TrainingSession,
@@ -1190,6 +1193,29 @@ export function useSetAdaptationMode() {
   });
 }
 
+// ---- stored activities and the day's energy ------------------------------------------------
+
+/** Every workout in the range from the stored history: all sports, Garmin and
+ * Strava-only, copies counted once, with calories and their source. */
+export function useStoredActivities(start: string, end: string, enabled = true) {
+  return useQuery({
+    queryKey: ["activities", start, end],
+    queryFn: ({ signal }) => apiGet<{ activities: StoredActivity[] }>("/activities", { start, end }, signal),
+    enabled,
+    staleTime: rangeStaleTime(end),
+  });
+}
+
+/** The day's energy at 360° (see `training_plan/energy.py`). */
+export function useDayEnergy(date: string, enabled = true) {
+  return useQuery({
+    queryKey: ["energy", "day", date],
+    queryFn: ({ signal }) => apiGet<DayEnergy>("/energy/day", { day: date }, signal),
+    enabled,
+    staleTime: LIVE_STALE_TIME,
+  });
+}
+
 // ---- progress -------------------------------------------------------------------------------
 
 /** Streak, Disciplina points, badges, mascot (see `training_plan/progress.py`). All
@@ -1472,6 +1498,18 @@ export function useFuelTargets(date: string, sessions: TrainingSession[], weight
   });
 }
 
+/** The day's totals against its targets: in, or what is missing (see
+ * `nutrition.compliance`). Refreshed with every meal logged (`invalidateNutrition`). */
+export function useFuelStatus(date: string, weightKg: number | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ["nutrition", "status", date, weightKg ?? null],
+    queryFn: ({ signal }) =>
+      apiGet<FuelStatus>("/nutrition/status", { date, weight_kg: weightKg != null ? String(weightKg) : undefined }, signal),
+    enabled,
+    staleTime: LIVE_STALE_TIME,
+  });
+}
+
 /** One `today` target per date -- what the weekly history chart (screen E2) needs to
  * tell "in target" from "sotto" for each of the last seven days, since `/nutrition/
  * history` only returns what was actually eaten, never what was asked for. A fixed-
@@ -1568,6 +1606,9 @@ function invalidateNutrition(queryClient: ReturnType<typeof useQueryClient>, dat
   queryClient.invalidateQueries({ queryKey: ["nutrition", "history"] });
   queryClient.invalidateQueries({ queryKey: ["nutrition", "entries"] });
   queryClient.invalidateQueries({ queryKey: ["nutrition", "narrative"] });
+  queryClient.invalidateQueries({ queryKey: ["nutrition", "status"] });
+  queryClient.invalidateQueries({ queryKey: ["summary"] });
+  queryClient.invalidateQueries({ queryKey: ["energy"] });
 }
 
 /** Estimate + store one plate. The entry is written server-side even when the model

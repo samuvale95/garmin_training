@@ -781,6 +781,8 @@ export interface WeekSummary {
   week_points: number;
   point_lines: string[];
   badges: string[];
+  food_days: number;
+  carb_short_days: string[];
 }
 
 // ---- progress ---------------------------------------------------------------------------
@@ -824,4 +826,61 @@ export interface Adaptation {
   changes: { date: string; before: string[]; after: string[]; reason: string }[];
   conflicts: string[];
   source: string | null;
+}
+
+// ---- nutrition compliance -----------------------------------------------------------------
+
+export interface ComplianceLine {
+  macro: "carb" | "protein" | "fat";
+  status: "sotto" | "dentro" | "sopra";
+  logged_g: number;
+  target_g: [number, number];
+  missing_g: number;
+  message: string;
+  /** Carbohydrate short before a hard or long day: the one line worth emphasising. */
+  flagged: boolean;
+}
+
+export interface FuelStatus {
+  date: string;
+  totals: DayTotals;
+  lines: ComplianceLine[];
+}
+
+// ---- stored activities and the day's energy ---------------------------------------------
+
+export interface StoredActivity {
+  activity_id: number;
+  day: string;
+  title: string;
+  sport: string | null;
+  family: string;
+  label: string;
+  start_time: string | null;
+  minutes: number;
+  distance_km: number | null;
+  kcal: number;
+  source: "garmin" | "strava" | "stima";
+}
+
+export interface DayEnergy {
+  date: string;
+  activities: Omit<StoredActivity, "activity_id" | "day">[];
+  activities_kcal: number;
+  garmin_total_kcal: number | null;
+  garmin_active_kcal: number | null;
+  garmin_bmr_kcal: number | null;
+  steps: number | null;
+  estimate_kcal: number;
+  estimate_bmr_kcal: number;
+  estimate_steps_kcal: number;
+  spent_kcal: number;
+  spent_source: "garmin" | "stima";
+  intake_kcal: number;
+  entries: number;
+  training_day: boolean;
+  missing_kcal: number | null;
+  message: string;
+  /** The same without numbers, for level 1. */
+  words: string;
 }

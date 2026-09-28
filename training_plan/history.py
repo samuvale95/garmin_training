@@ -164,6 +164,10 @@ MIGRATIONS = """
 ALTER TABLE activity ADD COLUMN IF NOT EXISTS start_time TIMESTAMPTZ;
 ALTER TABLE activity ADD COLUMN IF NOT EXISTS external_id TEXT;
 ALTER TABLE activity ADD COLUMN IF NOT EXISTS duplicate_of BIGINT;
+-- The calories the source reported, and which source: `garmin` (the watch's figure) or
+-- `strava` (a ride's kilojoules standing in for kilocalories). NULL is estimated when read.
+ALTER TABLE activity ADD COLUMN IF NOT EXISTS calories REAL;
+ALTER TABLE activity ADD COLUMN IF NOT EXISTS calories_source TEXT;
 ALTER TABLE activity_stream ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'strava';
 
 DO $$
@@ -369,8 +373,8 @@ def save_activity(user_id: str, source: str, activity_id: int, day: date_type, v
         conn.execute(
             """INSERT INTO activity (user_id, source, activity_id, day, sport, title, distance_km,
                                      duration_min, avg_hr, max_hr, avg_cadence, avg_power,
-                                     elevation_gain, summary, start_time, external_id)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                     elevation_gain, summary, start_time, external_id, calories, calories_source)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                ON CONFLICT (user_id, source, activity_id) DO UPDATE SET
                    day = EXCLUDED.day, sport = EXCLUDED.sport, title = EXCLUDED.title,
                    distance_km = EXCLUDED.distance_km, duration_min = EXCLUDED.duration_min,
@@ -378,6 +382,7 @@ def save_activity(user_id: str, source: str, activity_id: int, day: date_type, v
                    avg_cadence = EXCLUDED.avg_cadence, avg_power = EXCLUDED.avg_power,
                    elevation_gain = EXCLUDED.elevation_gain, summary = EXCLUDED.summary,
                    start_time = EXCLUDED.start_time, external_id = EXCLUDED.external_id,
+                   calories = EXCLUDED.calories, calories_source = EXCLUDED.calories_source,
                    fetched_at = now()""",
             [
                 user_id,
@@ -396,6 +401,8 @@ def save_activity(user_id: str, source: str, activity_id: int, day: date_type, v
                 json.dumps(values.get("summary") or {}),
                 values.get("start_time"),
                 values.get("external_id"),
+                values.get("calories"),
+                values.get("calories_source") if values.get("calories") is not None else None,
             ],
         )
 
@@ -505,7 +512,8 @@ def activities_between(
     """Stored activities in the range. By default one row per real workout: a Strava row
     that duplicates a Garmin one is left out (see `resolve_duplicates`)."""
     columns = ("source", "activity_id", "day", "sport", "title", "distance_km", "duration_min",
-               "avg_hr", "max_hr", "avg_cadence", "avg_power", "elevation_gain", "start_time")
+               "avg_hr", "max_hr", "avg_cadence", "avg_power", "elevation_gain", "start_time",
+               "calories", "calories_source")
     canonical = "AND duplicate_of IS NULL " if canonical_only else ""
     with db.connect() as conn, conn.cursor() as cur:
         cur.execute(
@@ -538,8 +546,12 @@ def load_workout_streams(user_id: str, source: str, activity_id: int) -> dict[st
 # watch and the phone disagreeing on when "start" was pressed; ten percent absorbs Strava
 # counting moving time where Garmin counts timer time. Neither is loose enough to merge
 # the morning run with the evening one.
-DUPLICATE_START_TOLERANCE_S = 120
-DUPLICATE_DURATION_TOLERANCE = 0.10
+# Two devices recording one workout: starts this close, and overlapping in time for at
+# least this share of the shorter recording. Overlap, not equal durations: devices count
+# moving time, pool pauses and the timer differently (a real swim was 54' on one and 45'
+# on the other, 2'45" apart), but the same workout occupies the same stretch of the day.
+DUPLICATE_START_TOLERANCE_S = 5 * 60
+DUPLICATE_MIN_OVERLAP = 0.80
 
 # Strava's `external_id` for an activity Garmin pushed to it. The number is *not* the
 # Garmin activity id (checked against a real two-year history: none of 368 matched), so
@@ -590,9 +602,9 @@ def match_duplicates(garmin: Sequence[dict], strava: Sequence[dict]) -> dict[int
        within fifteen minutes, preferring the same sport family, and with no duration
        check -- Strava counts moving time where Garmin counts the timer, and on a ride
        with stops the two differ by a quarter.
-    2. Otherwise the same sport family, starts within two minutes, durations within ten
-       percent. With several candidates, the closest start wins. This is the case of two
-       devices recording the same workout.
+    2. Otherwise the same sport family, starts within five minutes, and overlapping for at
+       least 80% of the shorter recording. With several candidates, the closest start wins.
+       This is the case of two devices recording the same workout.
     3. Otherwise it is its own workout -- for instance one recorded on another watch.
     """
     out: dict[int, int | None] = {}
@@ -607,7 +619,7 @@ def match_duplicates(garmin: Sequence[dict], strava: Sequence[dict]) -> dict[int
                     row,
                     tolerance_s=DUPLICATE_START_TOLERANCE_S,
                     accept=lambda candidate: sport_family(candidate.get("sport")) == sport_family(row.get("sport"))
-                    and _durations_agree(candidate.get("duration_min"), row.get("duration_min")),
+                    and _overlap_share(candidate, row) >= DUPLICATE_MIN_OVERLAP,
                 )
         out[row["activity_id"]] = match
     return out
@@ -638,10 +650,15 @@ def _closest(garmin: Sequence[dict], row: dict, *, tolerance_s: float, accept) -
     return best[1] if best else None
 
 
-def _durations_agree(a: float | None, b: float | None) -> bool:
-    if not a or not b:
-        return False
-    return abs(a - b) <= DUPLICATE_DURATION_TOLERANCE * max(a, b)
+def _overlap_share(a: dict, b: dict) -> float:
+    """How much of the shorter of two recordings the other one covers, 0 to 1."""
+    if not a.get("duration_min") or not b.get("duration_min"):
+        return 0.0
+    a_start, b_start = a["start_time"], b["start_time"]
+    a_end = a_start + timedelta(minutes=a["duration_min"])
+    b_end = b_start + timedelta(minutes=b["duration_min"])
+    overlap = (min(a_end, b_end) - max(a_start, b_start)).total_seconds() / 60
+    return max(0.0, overlap) / min(a["duration_min"], b["duration_min"])
 
 
 def resolve_duplicates(user_id: str, start: date_type, end: date_type) -> int:

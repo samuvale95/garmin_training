@@ -74,8 +74,28 @@ def test_a_run_and_a_ride_at_the_same_time_are_never_merged():
     assert out == {9: None}
 
 
-def test_durations_that_disagree_are_different_workouts():
+def test_a_shorter_recording_inside_a_longer_one_is_the_same_workout():
+    # One person cannot run twice at once: a device that stopped early recorded part of it.
     out = match_duplicates([_garmin(111, minutes=60)], [_strava(9, minutes=30)])
+    assert out == {9: 111}
+
+
+def test_the_same_swim_on_two_devices_is_one_workout():
+    # Real account, 6 January 2026: 11:13 for 54' on one device, 11:15:51 for 45' on Garmin.
+    start = datetime(2026, 1, 6, 11, 13, 6, tzinfo=timezone.utc)
+    garmin = [_garmin(111, start=start + timedelta(minutes=2, seconds=45), minutes=45, sport="lap_swimming")]
+    strava = [_strava(9, start=start, minutes=54, sport="Swim", external_id="6B6A6480-0A1B.fit")]
+    assert match_duplicates(garmin, strava) == {9: 111}
+
+
+def test_back_to_back_workouts_are_different():
+    # A run right after another one: starts more than five minutes apart.
+    out = match_duplicates([_garmin(111, minutes=41)], [_strava(9, start=T0 + timedelta(minutes=45), minutes=20)])
+    assert out == {9: None}
+
+
+def test_a_small_overlap_is_not_enough():
+    out = match_duplicates([_garmin(111, minutes=10)], [_strava(9, start=T0 + timedelta(minutes=4), minutes=60)])
     assert out == {9: None}
 
 

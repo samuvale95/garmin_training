@@ -422,11 +422,13 @@ def _session_on(sessions: list[TrainingSession], day: date_type) -> TrainingSess
     A rest day is the *absence* of an entry -- the file format has no "rest" session
     type -- so a missing plan and a planned rest day are indistinguishable here. The
     caller knows which it has; see `DailyFuelling.weight_source`'s equivalent problem.
+
+    With more than one session on the day, the longest one: the fuel is sized for the
+    hardest thing the day asks, and taking the first one listed let an easy 40 minutes
+    hide a long run planned the same day.
     """
-    for session in sessions:
-        if session.date == day:
-            return session
-    return None
+    on_day = [session for session in sessions if session.date == day]
+    return max(on_day, key=session_duration_minutes, default=None)
 
 
 def daily_fuelling(
@@ -819,3 +821,90 @@ def fuelling_facts(fuelling: DailyFuelling, consumed: dict[str, float] | None = 
             "proteine_g": round(consumed.get("protein_g", 0.0)),
         }
     return facts
+
+
+# ---- what was actually run ------------------------------------------------------------------
+
+# A day run this much longer than planned is fuelled for what was run.
+REAL_LOAD_RATIO = 1.2
+
+
+def with_real_load(
+    sessions: list[TrainingSession], day: date_type, run_minutes: float | None
+) -> list[TrainingSession]:
+    """`sessions`, with `day`'s session replaced by what the history says was run when that
+    was clearly more: a rest day that became a long run needs the long run's fuel.
+
+    Only upward. A day run shorter than planned keeps the planned target: the food was
+    probably eaten already, and under-fuelling is the risk this module exists to avoid.
+    """
+    from .models import Step
+
+    if not run_minutes:
+        return sessions
+    planned = _session_on(sessions, day)
+    planned_minutes = session_duration_minutes(planned) if planned else 0.0
+    if planned is not None and run_minutes <= planned_minutes * REAL_LOAD_RATIO:
+        return sessions
+    done = TrainingSession(
+        date=day,
+        sport="running",
+        title=f"Corsa di {round(run_minutes)} minuti",
+        steps=[Step("interval", "time", run_minutes)],
+    )
+    return [s for s in sessions if s.date != day] + [done]
+
+
+# ---- in, or what is missing -----------------------------------------------------------------
+
+# Estimates from a photo are rough: a few grams under the range is not "missing".
+COMPLIANCE_TOLERANCE = 0.05
+
+MACRO_LABELS = {"carb": "Carboidrati", "protein": "Proteine", "fat": "Grassi"}
+
+
+@dataclass
+class ComplianceLine:
+    macro: Literal["carb", "protein", "fat"]
+    status: Literal["sotto", "dentro", "sopra"]
+    logged_g: int
+    target_g: tuple[int, int]
+    missing_g: int
+    message: str
+    # The one case worth emphasising: carbohydrate short before a hard or long day.
+    flagged: bool = False
+
+
+def compliance(
+    today: DayTarget, totals: dict[str, float], tomorrow: DayTarget, *, in_progress: bool
+) -> list[ComplianceLine]:
+    """Each macro against its range: under (with the grams missing), in, or above.
+
+    Above is information, never a fault: the frame is fuelling, not restriction. Empty
+    when nothing was logged -- zero grams is not a finding about a day nobody recorded.
+    """
+    if not totals or not totals.get("entries"):
+        return []
+    when = "finora " if in_progress else ""
+    hard_tomorrow = tomorrow.load in ("duro", "molto_lungo")
+    out: list[ComplianceLine] = []
+    for macro, target in (("carb", today.carb_g), ("protein", today.protein_g), ("fat", today.fat_g)):
+        if target is None:
+            continue
+        logged = round(totals.get(f"{macro}_g", 0.0))
+        low, high = target
+        label = MACRO_LABELS[macro]
+        if logged < low * (1 - COMPLIANCE_TOLERANCE):
+            missing = low - logged
+            flagged = macro == "carb" and hard_tomorrow
+            message = f"{label}: {when}{logged} g, ne mancano {missing} per arrivare a {low}"
+            if flagged:
+                message += f": domani c'è {tomorrow.session_title or 'una seduta dura'}, e il serbatoio si riempie oggi"
+            out.append(ComplianceLine(macro, "sotto", logged, target, missing, message + ".", flagged))
+        elif logged > high:
+            out.append(
+                ComplianceLine(macro, "sopra", logged, target, 0, f"{label}: {when}{logged} g, sopra il range {low}–{high}: nessun problema.")
+            )
+        else:
+            out.append(ComplianceLine(macro, "dentro", logged, target, 0, f"{label}: {when}{logged} g, dentro il range {low}–{high}."))
+    return out

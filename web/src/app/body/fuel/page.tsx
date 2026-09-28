@@ -5,7 +5,8 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { PulseRing, Skeleton, SlideUp } from "@/components/motion/primitives";
 import { FuelCorrectionSheet } from "@/components/FuelCorrectionSheet";
-import { EnergyBlock, FuelComment, FuelHero, MealList, MealPlanBlock, TodayFuelBlock } from "@/components/FuelBlocks";
+import { DayEnergyCard } from "@/components/DayEnergyCard";
+import { EnergyBlock, FuelComment, FuelHero, MealList, SessionFuelBlock, TodayFuelBlock } from "@/components/FuelBlocks";
 import { useMountOnce } from "@/lib/motion";
 import { formatWeekday } from "@/lib/format";
 import { useCalendarAccess } from "@/lib/guards";
@@ -14,7 +15,10 @@ import {
   useDeleteEntry,
   useDescribeMeal,
   useFoodDay,
+  useAthleteLevel,
+  useDayEnergy,
   useFuelNarrative,
+  useFuelStatus,
   useFuelTargets,
   useLogPhoto,
   useUpdateEntry,
@@ -101,6 +105,11 @@ export default function FuelPage() {
   // the model calls this screen pays for.
   const sessionsReady = access.ready && (!liveMode || !workoutsQuery.isPending);
   const fuelQuery = useFuelTargets(today, sessions, manualWeight?.weightKg, sessionsReady);
+  const statusQuery = useFuelStatus(today, manualWeight?.weightKg, sessionsReady);
+  // Level 1 builds the habit: no calorie figures while it does.
+  const level = useAthleteLevel();
+  const showEnergy = (level.data?.level ?? 2) > 1;
+  const dayEnergy = useDayEnergy(today, access.ready);
   const narrativeQuery = useFuelNarrative(today, sessions, manualWeight?.weightKg, sessionsReady && !!fuelQuery.data);
   const dayQuery = useFoodDay(today);
   const logPhoto = useLogPhoto();
@@ -274,14 +283,16 @@ export default function FuelPage() {
             </SlideUp>
           )}
 
-          <TodayFuelBlock animate={animate} fuel={fuel} totals={day?.totals} hasPlan={hasPlan} />
+          <TodayFuelBlock animate={animate} fuel={fuel} totals={day?.totals} hasPlan={hasPlan} lines={statusQuery.data?.lines} />
 
           {/* The cross-check, then the plan. In that order on purpose: the grams above
               have to stop looking arbitrary before a list of plates built on them is
               worth reading. */}
-          <EnergyBlock animate={animate} target={fuel.today} />
+          {dayEnergy.data && <DayEnergyCard energy={dayEnergy.data} numbers={showEnergy} animate={animate} delayMs={280} />}
 
-          <MealPlanBlock animate={animate} meals={fuel.meals} during={fuel.during} recovery={fuel.recovery} />
+          {showEnergy && <EnergyBlock animate={animate} target={fuel.today} />}
+
+          <SessionFuelBlock animate={animate} during={fuel.during} recovery={fuel.recovery} />
 
           <MealList entries={entries} animate={animate} onSelect={setCorrecting} />
 

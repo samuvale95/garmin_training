@@ -82,9 +82,38 @@ guardata girare:
   durante la generazione). Il server non sovrascrive: le sedute modificate diventano
   bloccate e la scrittura controlla che il piano non sia cambiato.
 
+## Cibo
+
+- **Mai provato con pasti veri**: sul tuo account non c'è cibo registrato; le righe
+  "dentro / mancano" sono state provate solo con pasti finti.
+- **Tolleranza del 5%** sotto il range prima di dire "mancano": le stime da foto sono
+  grossolane. Da tarare.
+- **Il carico reale corregge solo verso l'alto** (hai corso più del piano). Se hai corso
+  meno, restano gli obiettivi del piano.
+- **Livello 1 senza kcal**: niente blocco energia. Da vedere se manca a qualcuno.
+- **Il piano pasti è sparito dalla schermata** (restano i valori per durante e dopo la
+  seduta); il codice che lo calcola è ancora nel backend, inutilizzato.
+
+## Attività ed energia
+
+- **Stima contro Garmin**: sul lungo del 26/9 la stima dà 4.097 kcal contro 4.306 di
+  Garmin (-5%). Da vedere su giorni di bici, nuoto, palestra: i coefficienti per sport in
+  `energy.py` sono di letteratura, non tarati su di te.
+- **Calorie solo per le attività recenti**: le ultime 2 settimane le hanno già; le più
+  vecchie le prendono al prossimo passaggio completo dello storico.
+- **Attività solo-Strava senza calorie** (quasi tutte, tranne le bici con potenza): stimate.
+- **"Fuori piano" per famiglia di sport**: una corsa pianificata "consuma" una corsa fatta
+  quel giorno; due corse con una sola pianificata → la seconda è fuori piano. Da vedere se
+  torna nei casi reali (doppia seduta, corsa + riscaldamento separato).
+- **La nuova regola dei doppioni** (sovrapposizione ≥ 80%, partenza entro 5 minuti) ha
+  trovato 2 doppioni in più su tutto lo storico. Se una corsa sparisce dal calendario,
+  potrebbe essere stata presa per doppione.
+- **Soglia "mancano kcal"**: sotto il 70% di quanto speso, dopo le 18 o per i giorni
+  passati. Da tarare.
+
 ## Dati e ambiente
 
-- **Scritture sul database di produzione durante le prove**: livello salvato portato a 3
+- **Scritture sul database di produzione durante le prove**: colonne `calories` aggiunte ad `activity`, doppioni ricalcolati su tutto lo storico (373), calorie di 9 attività recenti; livello salvato portato a 3
   (corretto: era 1 perché la schermata livello non era mai stata aperta); create le tabelle
   `checkin` e `move_decision` (vuote). `plan_adaptation` verrà creata all'avvio.
 - **22 test falliscono da prima** (`test_db`, `test_api`, `test_api_caching`,
@@ -92,7 +121,7 @@ guardata girare:
 - **Build locale**: Turbopack non ha i binding nativi su questa macchina; si compila con
   `npx next build --webpack`.
 - **Change OpenSpec da archiviare**: `daily-check-in`, `move-warnings`, `weekly-summary`,
-  `gamification-core`, `plan-adaptation`, `ai-plan-generation`. `weekly-summary` va
+  `gamification-core`, `plan-adaptation`, `ai-plan-generation`, `nutrition-compliance`, `activity-overview-and-energy`. `weekly-summary` va
   archiviata prima di `gamification-core`, che ne modifica una spec.
 
 ## Chiusi

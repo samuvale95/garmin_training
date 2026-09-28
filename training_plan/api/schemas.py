@@ -1670,6 +1670,85 @@ class MoveDecisionRequest(BaseModel):
     warnings: list[MoveWarningOut]
 
 
+# ---- activities and day energy ----------------------------------------------------------------
+
+
+class StoredActivityOut(BaseModel):
+    activity_id: int
+    day: date_type
+    title: str
+    sport: str | None
+    family: str
+    label: str
+    start_time: datetime | None
+    minutes: float
+    distance_km: float | None
+    kcal: int
+    source: Literal["garmin", "strava", "stima"]
+
+
+class ActivitiesListResponse(BaseModel):
+    activities: list[StoredActivityOut]
+
+
+class ActivityEnergyOut(BaseModel):
+    title: str
+    sport: str | None
+    family: str
+    label: str
+    start_time: datetime | None
+    minutes: float
+    distance_km: float | None
+    kcal: int
+    source: Literal["garmin", "strava", "stima"]
+
+
+class DayEnergyResponse(BaseModel):
+    date: date_type
+    activities: list[ActivityEnergyOut]
+    activities_kcal: int
+    garmin_total_kcal: int | None
+    garmin_active_kcal: int | None
+    garmin_bmr_kcal: int | None
+    steps: int | None
+    estimate_kcal: int
+    estimate_bmr_kcal: int
+    estimate_steps_kcal: int
+    spent_kcal: int
+    spent_source: Literal["garmin", "stima"]
+    intake_kcal: int
+    entries: int
+    training_day: bool
+    missing_kcal: int | None
+    message: str
+    words: str
+
+    @classmethod
+    def from_model(cls, value) -> "DayEnergyResponse":
+        from dataclasses import asdict
+
+        return cls.model_validate(asdict(value))
+
+
+# ---- nutrition compliance ---------------------------------------------------------------------
+
+
+class ComplianceLineOut(BaseModel):
+    macro: Literal["carb", "protein", "fat"]
+    status: Literal["sotto", "dentro", "sopra"]
+    logged_g: int
+    target_g: tuple[int, int]
+    missing_g: int
+    message: str
+    flagged: bool = False
+
+
+class FuelStatusResponse(BaseModel):
+    date: date_type
+    totals: DayTotals
+    lines: list[ComplianceLineOut]
+
+
 # ---- plan adaptation --------------------------------------------------------------------------
 
 
@@ -1786,6 +1865,8 @@ class WeekSummaryResponse(BaseModel):
     week_points: int = 0
     point_lines: list[str] = Field(default_factory=list)
     badges: list[str] = Field(default_factory=list)
+    food_days: int = 0
+    carb_short_days: list[date_type] = Field(default_factory=list)
 
     @classmethod
     def from_model(cls, summary) -> "WeekSummaryResponse":

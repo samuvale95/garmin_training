@@ -340,6 +340,8 @@ def backfill_garmin_activities(
                     "avg_power": activity.avg_power,
                     "elevation_gain": activity.elevation_gain,
                     "start_time": activity.start_time,
+                    "calories": activity.calories,
+                    "calories_source": "garmin",
                 },
             )
         )
@@ -396,6 +398,11 @@ def backfill_activities(
                 # Set by Strava when the activity was uploaded from elsewhere -- for a
                 # Garmin upload it names the Garmin activity, the strongest duplicate signal.
                 "external_id": activity.get("external_id"),
+                # Strava's list has calories only for some uploads; a ride with power has
+                # kilojoules of work, which at the usual ~24% efficiency equal the
+                # kilocalories burned closely enough to stand in for them.
+                "calories": _float(activity.get("calories")) or _float(activity.get("kilojoules")),
+                "calories_source": "strava",
                 "summary": {
                     "has_heartrate": activity.get("has_heartrate"),
                     "elapsed_time": activity.get("elapsed_time"),

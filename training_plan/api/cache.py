@@ -41,6 +41,8 @@ TTL_GARMIN_ACTIVITIES = 5 * 60
 TTL_GARMIN_WORKOUT_SESSION = 60 * 60
 TTL_GARMIN_DEVICE = 5 * 60
 TTL_BODY_TODAY = 10 * 60
+# Garmin's calories and steps for today: they grow through the day.
+TTL_GARMIN_DAY_ENERGY = 10 * 60
 TTL_BODY_LOAD = 30 * 60
 TTL_STRAVA_MATCH = 5 * 60
 TTL_STRAVA_SHOES = 5 * 60

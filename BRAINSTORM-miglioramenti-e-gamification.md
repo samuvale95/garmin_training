@@ -144,6 +144,25 @@ Oggi esiste un controllo simile ma diverso: `body_insights.assess_conflict` conf
 stato del corpo con la seduta del giorno, e ha già le opzioni "sposta"/"ammorbidisci".
 Il controllo sugli spostamenti può riusare lo stesso formato.
 
+### 0.7 Redesign completo dell'app (deciso il 28/9/2026, da pianificare)
+
+Rifare tutto il design dell'app prendendo spunto dall'app di **Airbnb**: fluidissima,
+super facile, animazioni bellissime. Serve direttamente il **mezzo — semplicità** di §0.2:
+chi non capisce smette.
+
+Cosa prendere da Airbnb, da definire insieme prima di scrivere codice:
+
+- navigazione e gerarchia chiare, una cosa per schermata;
+- transizioni fluide fra schermate (elementi condivisi che si trasformano, non pagine
+  che si sostituiscono), gesti naturali, niente attese visibili;
+- tipografia e spazi generosi, card grandi, immagini/illustrazioni protagoniste;
+- micro-animazioni che confermano ogni azione.
+
+È un lavoro trasversale su tutte le schermate: va fatto con una change OpenSpec dedicata
+(design system, poi schermata per schermata), misurando la fluidità sulla build di
+produzione. Da fare quando lo decide l'utente; le schermate nuove fino ad allora seguono lo
+stile attuale.
+
 ### 0.6 Le idee di §1–5 passate dal filtro
 
 | Idea | Scopo (la domanda a cui risponde) | Serve | Livello | Stato | Verdetto |

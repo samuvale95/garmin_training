@@ -104,13 +104,30 @@ async def nutrition_config() -> schemas.NutritionConfigResponse:
     return schemas.NutritionConfigResponse(**llm.config_state())
 
 
-def _plan_key(payload: schemas.FuelTargetsRequest) -> str:
-    """What the answer actually depends on, as a hashable cache key: the sessions this
-    request carried, in order. Hashed rather than kept whole -- a plan is kilobytes, and
-    the cache holds this key for half an hour."""
-    return sha1(
-        json.dumps([s.model_dump(mode="json") for s in payload.sessions], sort_keys=True).encode()
-    ).hexdigest()
+def _sessions_for(user_id: str, sent: list, day: date_type) -> tuple[list, str]:
+    """The sessions the targets are computed from, and a cache key for them.
+
+    The ones the request carried when it carried any (the Garmin-calendar-only account
+    sends its calendar); the server's stored plan otherwise. Then the day itself is
+    corrected upward with what the history says was run (`nutrition.with_real_load`).
+    Hashed for the key -- a plan is kilobytes, and the cache holds it for half an hour.
+    """
+    from .. import energy, history, plan_generator, plan_store
+
+    if sent:
+        raw = [s.model_dump(mode="json") for s in sent]
+        sessions = [s.to_model() for s in sent]
+    else:
+        raw = plan_store.list_sessions(user_id)
+        sessions = [plan_generator.session_from_dict(s) for s in raw]
+    run_minutes = None
+    if day <= date_type.today():
+        # The whole day's endurance, not only the run: a ride or a swim recorded the same
+        # day, on Garmin or Strava, needs fuel too.
+        run_minutes = energy.endurance_minutes(history.activities_between(user_id, day, day)) or None
+    sessions = nutrition.with_real_load(sessions, day, run_minutes)
+    key = sha1(json.dumps([raw, run_minutes], sort_keys=True, default=str).encode()).hexdigest()
+    return sessions, key
 
 
 @router.post("/nutrition/targets", response_model=schemas.FuelTargetsResponse)
@@ -118,12 +135,13 @@ async def nutrition_targets(
     payload: schemas.FuelTargetsRequest, refresh: bool = False, user_id: str = Depends(current_user_id)
 ) -> schemas.FuelTargetsResponse:
     day = payload.date or date_type.today()
+    sessions, plan_key = await run_in_threadpool(_sessions_for, user_id, payload.sessions, day)
 
     def compute() -> schemas.FuelTargetsResponse:
         weight, source = _resolve_weight(user_id, payload.weight_kg)
         fuelling = nutrition.daily_fuelling(
             day,
-            [s.to_model() for s in payload.sessions],
+            sessions,
             weight_kg=weight,
             weight_source=source,
             profile=_resolve_profile(user_id),
@@ -134,7 +152,7 @@ async def nutrition_targets(
         lambda: cache.get_or_call(
             "nutrition:targets",
             user_id,
-            (day, _plan_key(payload), payload.weight_kg),
+            (day, plan_key, payload.weight_kg),
             TTL_NUTRITION_TARGETS,
             compute,
             refresh=refresh,
@@ -156,12 +174,13 @@ async def nutrition_narrative(
     the namespace outright anyway (`invalidate_nutrition`).
     """
     day = payload.date or date_type.today()
+    sessions, plan_key = await run_in_threadpool(_sessions_for, user_id, payload.sessions, day)
 
     def compute(consumed: dict) -> schemas.NarrativeResponse:
         weight, source = _resolve_weight(user_id, payload.weight_kg)
         fuelling = nutrition.daily_fuelling(
             day,
-            [s.to_model() for s in payload.sessions],
+            sessions,
             weight_kg=weight,
             weight_source=source,
             profile=_resolve_profile(user_id),
@@ -177,12 +196,36 @@ async def nutrition_narrative(
         lambda: cache.get_or_call(
             "nutrition:narrative",
             user_id,
-            (day, _plan_key(payload), payload.weight_kg, consumed["entries"], round(consumed["carb_g"])),
+            (day, plan_key, payload.weight_kg, consumed["entries"], round(consumed["carb_g"])),
             TTL_NUTRITION_NARRATIVE,
             lambda: compute(consumed),
             refresh=refresh,
         )
     )
+
+
+@router.get("/nutrition/status", response_model=schemas.FuelStatusResponse)
+async def nutrition_status(
+    date: date_type | None = None, weight_kg: float | None = None, user_id: str = Depends(current_user_id)
+) -> schemas.FuelStatusResponse:
+    """Today's targets against what was logged: in, or what is missing (see
+    `nutrition.compliance`). Not cached: it changes with every meal, and it is arithmetic
+    over already-cached reads."""
+    day = date or date_type.today()
+
+    def compute() -> schemas.FuelStatusResponse:
+        sessions, _ = _sessions_for(user_id, [], day)
+        weight, source = _resolve_weight(user_id, weight_kg)
+        fuelling = nutrition.daily_fuelling(day, sessions, weight_kg=weight, weight_source=source)
+        totals = db.totals_for_date(user_id, day.isoformat())
+        lines = nutrition.compliance(fuelling.today, totals, fuelling.tomorrow, in_progress=day == date_type.today())
+        return schemas.FuelStatusResponse(
+            date=day,
+            totals=schemas.DayTotals(**totals),
+            lines=[schemas.ComplianceLineOut(**vars(line)) for line in lines],
+        )
+
+    return await run_in_threadpool(compute)
 
 
 @router.get("/nutrition/day", response_model=schemas.FoodDayResponse)

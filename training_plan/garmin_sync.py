@@ -146,6 +146,8 @@ class CompletedActivity:
     avg_cadence: float | None = None
     avg_power: float | None = None
     elevation_gain: float | None = None
+    # What the watch measured for the activity, from heart rate; None when not reported.
+    calories: float | None = None
 
 
 @dataclass
@@ -1202,6 +1204,7 @@ def _parse_activity_item(item: dict) -> CompletedActivity | None:
         avg_cadence=_number(item.get("averageRunningCadenceInStepsPerMinute")),
         avg_power=_number(item.get("avgPower")),
         elevation_gain=_number(item.get("elevationGain")),
+        calories=_number(item.get("calories")),
     )
 
 

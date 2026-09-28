@@ -7,13 +7,37 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
-from .. import checkin, db, history, intensity, levels, llm, plan_store, weekly_summary
+from .. import checkin, db, history, intensity, levels, llm, nutrition, plan_store, weekly_summary
 from ..plan_skeleton import SkeletonWeek
 from . import schemas
 from .auth import current_user_id
 from .cache import TTL_SUMMARY_NARRATIVE, cache
 
 router = APIRouter()
+
+
+def _food(user_id: str, monday: date, sunday: date, planned: list[dict]) -> tuple[int, list[date]]:
+    """Days with food logged, and days under the carbohydrate range before a hard day."""
+    from ..plan_generator import session_from_dict
+    from .routes_nutrition import _resolve_weight
+
+    totals = {row["date"]: row for row in db.totals_between(user_id, monday, sunday) if row["entries"]}
+    if not totals:
+        return 0, []
+    sessions = [session_from_dict(s) for s in planned]
+    weight, source = _resolve_weight(user_id, None)
+    short = []
+    for day, row in totals.items():
+        day = day if isinstance(day, date) else date.fromisoformat(str(day))
+        fuelling = nutrition.daily_fuelling(day, sessions, weight_kg=weight, weight_source=source)
+        target = fuelling.today.carb_g
+        if (
+            target
+            and fuelling.tomorrow.load in ("duro", "molto_lungo")
+            and row["carb_g"] < target[0] * (1 - nutrition.COMPLIANCE_TOLERANCE)
+        ):
+            short.append(day)
+    return len(totals), short
 
 
 def _summary(user_id: str, monday: date | None) -> weekly_summary.WeekSummary:
@@ -31,16 +55,20 @@ def _summary(user_id: str, monday: date | None) -> weekly_summary.WeekSummary:
         )
     ]
     stored_skeleton = db.get_skeleton(user_id)
+    planned = plan_store.list_sessions(user_id)
+    food_days, carb_short = _food(user_id, monday, sunday, planned)
     all_checkins = checkin.get_range(user_id, monday - timedelta(weeks=weekly_summary.STREAK_WEEKS), today)
     return weekly_summary.build_summary(
         monday=monday,
         today=today,
-        planned=plan_store.list_sessions(user_id),
+        planned=planned,
         days=days,
         checkins=[c for c in all_checkins if monday <= c.date <= sunday],
         skeleton=[SkeletonWeek.from_dict(w) for w in (stored_skeleton or {}).get("weeks", [])],
         reached_level=history.load_profile(user_id)["reached_level"],
         all_checkins=all_checkins,
+        food_days=food_days,
+        carb_short_days=carb_short,
     )
 
 
