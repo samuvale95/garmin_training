@@ -38,6 +38,8 @@ export function DayStateCard({ verdict, narrative, animate, delayMs = 0 }: { ver
           display: "block",
           background: style.background,
           color: style.color,
+          border: "var(--border-airbnb)",
+          boxShadow: "var(--shadow-airbnb-subtle)",
           borderRadius: "var(--radius-card)",
           padding: "15px 18px",
           textDecoration: "none",

@@ -20,9 +20,27 @@ export const ILLUSTRATION_SOURCES = {
   bici: "/illustrazioni/bici.webp",
   crollo: "/illustrazioni/crollo.webp",
   sync: "/illustrazioni/sync.webp",
+  fondo_lento: "/illustrazioni/fondo_lento.webp",
+  fuel: "/illustrazioni/fuel.webp",
+  prontezza: "/illustrazioni/prontezza.webp",
+  sonno: "/illustrazioni/sonno.webp",
+  fiamma: "/illustrazioni/fiamma.webp",
+  scarpe: "/illustrazioni/scarpe.webp",
+  loading: "/illustrazioni/loading.webp",
 } as const;
 
 export type IllustrationName = keyof typeof ILLUSTRATION_SOURCES;
+
+// Fallbacks for newly registered illustrations until the user generates and places the WebP assets
+const FALLBACKS: Partial<Record<IllustrationName, string>> = {
+  fondo_lento: "/illustrazioni/corsa.webp",
+  fuel: "/illustrazioni/attesa.webp",
+  prontezza: "/illustrazioni/sync.webp",
+  sonno: "/illustrazioni/riposo.webp",
+  fiamma: "/illustrazioni/esultanza.webp",
+  scarpe: "/illustrazioni/corsa.webp",
+  loading: "/illustrazioni/attesa.webp",
+};
 
 interface IllustrationProps {
   name: IllustrationName;
@@ -30,6 +48,8 @@ interface IllustrationProps {
   height: number;
   /** Only the protagonist illustration of a screen should breathe (MOTION.md §4: one per screen, counts toward the 3-concurrent-animation ceiling). */
   breathe?: boolean;
+  /** Enable 3D organic clay levitation with soft reactive contact shadow */
+  float?: boolean;
   active?: boolean;
   delayMs?: number;
   right?: number;
@@ -47,6 +67,7 @@ export function Illustration({
   width,
   height,
   breathe = true,
+  float = false,
   active = true,
   delayMs = 900,
   right = 0,
@@ -55,6 +76,7 @@ export function Illustration({
 }: IllustrationProps) {
   const { reduced } = useMotionEnabled();
   const animate = active && !reduced;
+  const src = ILLUSTRATION_SOURCES[name] ?? FALLBACKS[name] ?? "/illustrazioni/corsa.webp";
 
   return (
     <div
@@ -68,14 +90,21 @@ export function Illustration({
         height,
         transformOrigin: "bottom center",
         animationDelay: animate ? `${delayMs}ms` : undefined,
+        transformStyle: "preserve-3d",
       }}
     >
       <div
-        className={animate && breathe ? "anim-breath" : undefined}
-        style={{ width: "100%", height: "100%", position: "relative" }}
+        className={animate && breathe && !float ? "anim-breath" : undefined}
+        style={{
+          width: "100%",
+          height: "100%",
+          position: "relative",
+          transform: float ? "translateZ(24px)" : undefined,
+          transformStyle: "preserve-3d",
+        }}
       >
         <Image
-          src={ILLUSTRATION_SOURCES[name]}
+          src={src}
           alt=""
           fill
           sizes={`${width}px`}

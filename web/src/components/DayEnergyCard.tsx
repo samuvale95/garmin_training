@@ -1,6 +1,7 @@
 "use client";
 
 import { SlideUp } from "@/components/motion/primitives";
+import { TiltCard } from "@/components/motion/TiltCard";
 import type { DayEnergy } from "@/lib/types";
 
 const SOURCE_LABELS: Record<string, string> = { garmin: "Garmin", strava: "Strava", stima: "stima" };
@@ -11,8 +12,17 @@ const SOURCE_LABELS: Record<string, string> = { garmin: "Garmin", strava: "Strav
  * At level 1, words only: no kilocalories while the habit is being built. */
 export function DayEnergyCard({ energy, numbers, animate, delayMs = 0 }: { energy: DayEnergy; numbers: boolean; animate: boolean; delayMs?: number }) {
   return (
-    <SlideUp active={animate} delayMs={delayMs} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 18, marginTop: 12 }}>
-      <p style={{ font: "600 18px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0 }}>La tua giornata</p>
+    <SlideUp active={animate} delayMs={delayMs} style={{ marginTop: 12 }}>
+      <TiltCard
+        maxTilt={4.5}
+        style={{
+          background: "var(--crema)",
+          border: "var(--border-airbnb)",
+          borderRadius: "var(--radius-card-lg)",
+          padding: 18,
+        }}
+      >
+        <p style={{ font: "600 18px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0 }}>La tua giornata</p>
 
       {energy.activities.length > 0 && (
         <ul style={{ listStyle: "none", padding: 0, margin: "12px 0 0", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -49,6 +59,7 @@ export function DayEnergyCard({ energy, numbers, animate, delayMs = 0 }: { energ
       >
         {numbers ? energy.message : energy.words}
       </p>
+      </TiltCard>
     </SlideUp>
   );
 }

@@ -183,9 +183,11 @@ function ChipRow<T extends string>({
 }
 
 const cardStyle: React.CSSProperties = {
-  background: "var(--crema-card)",
+  background: "var(--crema)",
+  border: "var(--border-airbnb)",
+  boxShadow: "var(--shadow-airbnb-subtle)",
   borderRadius: "var(--radius-card)",
-  padding: 14,
+  padding: 16,
   marginTop: 12,
 };
 

@@ -196,12 +196,13 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
       row
       style={{
         background: "var(--crema)",
-        border: "1px solid var(--sabbia-bordo)",
-        boxShadow: "0 3px 12px rgb(0 0 0 / 3%)",
+        border: "var(--border-airbnb)",
+        boxShadow: "var(--shadow-airbnb-subtle)",
         color: "var(--inchiostro)",
         borderRadius: "var(--radius-card)",
-        padding: "14px 16px",
+        padding: "15px 18px",
         minHeight: height,
+        transition: "box-shadow 0.25s var(--ease), border-color 0.2s ease, transform 0.2s var(--ease)",
         position: "relative",
         overflow: "hidden",
         display: "flex",

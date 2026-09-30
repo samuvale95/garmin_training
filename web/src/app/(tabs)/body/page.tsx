@@ -7,6 +7,7 @@ import { Avatar } from "@/components/Avatar";
 import { HrvCard, ReadinessMeaning, SleepCard } from "@/components/BodyCards";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { ProgressRing, SlideUp, Skeleton } from "@/components/motion/primitives";
+import { TiltCard } from "@/components/motion/TiltCard";
 import { useMountOnce } from "@/lib/motion";
 import { useBodyToday, useFuelTargets, usePlanQuery, usePrefetchFuelNarrative } from "@/lib/queries";
 import { useWatchSyncStatus } from "@/lib/watchSync";
@@ -77,22 +78,36 @@ export default function RecoveryPage() {
         </SlideUp>
       ) : (
         <>
-          <SlideUp active={animate} delayMs={150} style={{ background: "var(--verde)", color: "var(--verde-testo)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 16, display: "flex", alignItems: "center", gap: 16 }}>
-            <ProgressRing value={(data.readiness_score ?? 0) / 100} size={104} strokeWidth={10} trackColor="rgba(31,51,16,.15)" color="var(--verde-testo)">
-              <p className="font-mono" style={{ fontSize: 26, fontWeight: 500, margin: 0 }}>{data.readiness_score ?? "—"}</p>
-            </ProgressRing>
-            <div style={{ minWidth: 0 }}>
-              <p style={{ fontWeight: 700, fontSize: 16, margin: "0 0 4px" }}>
-                {(data.readiness_score ?? 0) >= 65 ? "Pronto a lavorare" : "Vacci piano oggi"}
-              </p>
-              {/* The score used to sit here as a bare ring with a Garmin lookup key
-                  under it. The key is decoded server-side now, and when it cannot be,
-                  this says what the number is instead of printing an identifier. */}
-              {data.readiness_score != null && <ReadinessMeaning score={data.readiness_score} href="/body/prontezza" />}
-              <p className="font-serif-italic" style={{ fontSize: 14, margin: "6px 0 0" }}>
-                {data.readiness_message ?? "Tocca il punteggio per vedere da cosa nasce."}
-              </p>
-            </div>
+          <SlideUp active={animate} delayMs={150} style={{ marginTop: 16 }}>
+            <TiltCard
+              maxTilt={4.5}
+              style={{
+                background: "var(--verde)",
+                color: "var(--verde-testo)",
+                border: "var(--border-airbnb)",
+                borderRadius: "var(--radius-card-lg)",
+                padding: 20,
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+              }}
+            >
+              <ProgressRing value={(data.readiness_score ?? 0) / 100} size={104} strokeWidth={10} trackColor="rgba(31,51,16,.15)" color="var(--verde-testo)">
+                <p className="font-mono" style={{ fontSize: 26, fontWeight: 500, margin: 0 }}>{data.readiness_score ?? "—"}</p>
+              </ProgressRing>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontWeight: 700, fontSize: 16, margin: "0 0 4px" }}>
+                  {(data.readiness_score ?? 0) >= 65 ? "Pronto a lavorare" : "Vacci piano oggi"}
+                </p>
+                {/* The score used to sit here as a bare ring with a Garmin lookup key
+                    under it. The key is decoded server-side now, and when it cannot be,
+                    this says what the number is instead of printing an identifier. */}
+                {data.readiness_score != null && <ReadinessMeaning score={data.readiness_score} href="/body/prontezza" />}
+                <p className="font-serif-italic" style={{ fontSize: 14, margin: "6px 0 0" }}>
+                  {data.readiness_message ?? "Tocca il punteggio per vedere da cosa nasce."}
+                </p>
+              </div>
+            </TiltCard>
           </SlideUp>
 
           {/* Two cards that used to show one number each with nothing to read it

@@ -11,6 +11,7 @@ import { CheckInCard } from "@/components/CheckInCard";
 import { AdaptationCard } from "@/components/AdaptationCard";
 import { Mascot, Tokens } from "@/components/ProgressBits";
 import { RaceGoalCard } from "@/components/RaceGoalCard";
+import { TiltCard } from "@/components/motion/TiltCard";
 import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
@@ -179,38 +180,59 @@ export default function TodayPage() {
         <p>{capitalize(formatFullDate(todayKey))} · Un passo alla volta.</p>
       </header>
 
-      <SlideUp
-        active={animate}
-        delayMs={100}
-        className="today-hero"
-        style={{ background: "var(--corallo)", color: "var(--corallo-testo)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 16, minHeight: 210, position: "relative", overflow: "hidden", boxSizing: "border-box" }}
-      >
-        <div className="today-hero-copy">
-          {heroSession ? (
-            <>
-              <p className="font-mono" style={{ fontSize: 12, opacity: 0.7, margin: "0 0 6px" }}>
-                {relativeDayLabel(heroSession.date, today)} · {formatFullDate(heroSession.date)}
-              </p>
-              <p style={{ font: "600 22px/1.15 var(--font-outfit)", margin: "0 0 8px", maxWidth: 200 }}>{heroSession.title}</p>
-              {heroMainGroup && (
-                <p className="font-mono" style={{ fontSize: 13, opacity: 0.85, margin: 0, maxWidth: 200 }}>{stepGroupLine(heroMainGroup)}</p>
-              )}
-              {heroMatch?.matched && heroMatch.distance_km != null && (
-                <p className="font-mono" style={{ fontSize: 12, opacity: 0.75, margin: "6px 0 0", maxWidth: 200 }}>
-                  svolto {heroMatch.distance_km.toFixed(1)} km
+      <SlideUp active={animate} delayMs={100}>
+        <TiltCard
+          maxTilt={5}
+          className="today-hero"
+          style={{
+            background: heroSession ? "var(--corallo)" : "var(--sabbia)",
+            color: heroSession ? "var(--corallo-testo)" : "var(--inchiostro)",
+            borderRadius: "var(--radius-card-lg)",
+            padding: 20,
+            marginTop: 16,
+            minHeight: 210,
+            position: "relative",
+            overflow: "hidden",
+            boxSizing: "border-box",
+          }}
+        >
+          <div className="today-hero-copy">
+            {heroSession ? (
+              <>
+                <p className="font-mono" style={{ fontSize: 12, opacity: 0.7, margin: "0 0 6px" }}>
+                  {relativeDayLabel(heroSession.date, today)} · {formatFullDate(heroSession.date)}
                 </p>
-              )}
-            </>
-          ) : (
-            <p className="font-serif-italic" style={{ fontSize: 17, maxWidth: 200 }}>Oggi è un giorno di riposo. E va bene così.</p>
-          )}
-        </div>
-        <div className="today-hero-art">
-          <Illustration name={heroSession ? classifySession(heroSession).illustration ?? "corsa" : "riposo"} width={110} height={120} right={0} bottom={0} active={animate} delayMs={160} breathe={false} />
-        </div>
-        <Link href={heroHref} className="tap-target today-hero-action">
-          {heroSession ? "Vedi allenamento" : "Esplora la settimana"}<span aria-hidden="true">↗</span>
-        </Link>
+                <p style={{ font: "600 22px/1.15 var(--font-outfit)", margin: "0 0 8px", maxWidth: 200 }}>{heroSession.title}</p>
+                {heroMainGroup && (
+                  <p className="font-mono" style={{ fontSize: 13, opacity: 0.85, margin: 0, maxWidth: 200 }}>{stepGroupLine(heroMainGroup)}</p>
+                )}
+                {heroMatch?.matched && heroMatch.distance_km != null && (
+                  <p className="font-mono" style={{ fontSize: 12, opacity: 0.75, margin: "6px 0 0", maxWidth: 200 }}>
+                    svolto {heroMatch.distance_km.toFixed(1)} km
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="font-serif-italic" style={{ fontSize: 17, maxWidth: 200 }}>Oggi è un giorno di riposo. E va bene così.</p>
+            )}
+          </div>
+          <div className="today-hero-art" style={{ transform: "translateZ(26px)" }}>
+            <Illustration
+              name={heroSession ? classifySession(heroSession).illustration ?? "corsa" : "riposo"}
+              width={110}
+              height={120}
+              right={0}
+              bottom={0}
+              active={animate}
+              delayMs={160}
+              breathe
+              float
+            />
+          </div>
+          <Link href={heroHref} className="tap-target today-hero-action">
+            {heroSession ? "Vedi allenamento" : "Esplora la settimana"}<span aria-hidden="true">↗</span>
+          </Link>
+        </TiltCard>
       </SlideUp>
 
       <DayStateCard verdict={verdictQuery.data} narrative={verdictNarrative.data?.text} animate={animate} delayMs={260} />

@@ -50,7 +50,14 @@ export function SleepCard({ sleep, animate, delayMs }: { sleep: SleepPhases; ani
     <SlideUp
       active={animate}
       delayMs={delayMs}
-      style={{ background: "var(--azzurro)", color: "var(--azzurro-testo)", borderRadius: "var(--radius-card)", padding: 16 }}
+      style={{
+        background: "var(--azzurro)",
+        color: "var(--azzurro-testo)",
+        border: "var(--border-airbnb)",
+        boxShadow: "var(--shadow-airbnb-subtle)",
+        borderRadius: "var(--radius-card)",
+        padding: 16,
+      }}
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
         <p className="font-mono" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", margin: 0 }}>
@@ -168,7 +175,13 @@ export function HrvCard({
     <SlideUp
       active={animate}
       delayMs={delayMs}
-      style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16 }}
+      style={{
+        background: "var(--crema)",
+        border: "var(--border-airbnb)",
+        boxShadow: "var(--shadow-airbnb-subtle)",
+        borderRadius: "var(--radius-card)",
+        padding: 16,
+      }}
     >
       <p className="font-mono" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", margin: 0, color: "var(--inchiostro-50)" }}>
         Variabilità cardiaca

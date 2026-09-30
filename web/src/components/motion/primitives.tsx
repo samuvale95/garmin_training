@@ -298,29 +298,19 @@ export function PrimaryButton({
 
 // ---- skeleton loading (MOTION.md §7.1 -- no spinners) ----------------------------------------
 
-export function Skeleton({ width = "100%", height = 16, radius = 8 }: { width?: number | string; height?: number | string; radius?: number }) {
+export function Skeleton({ width = "100%", height = 16, radius = 12 }: { width?: number | string; height?: number | string; radius?: number }) {
   return (
     <div
+      className="anim-clay-shimmer"
       style={{
         width,
         height,
         borderRadius: radius,
-        background: "var(--sabbia-chip)",
+        background: "var(--sabbia)",
         position: "relative",
-        overflow: "hidden",
+        boxShadow: "inset 0 1px 2px rgba(0,0,0,0.03)",
+        border: "1px solid rgba(0,0,0,0.03)",
       }}
-    >
-      <span
-        aria-hidden="true"
-        className="anim-sheen"
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "50%",
-          background: "linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.6), rgba(255,255,255,0))",
-          animationDuration: "1.8s",
-        }}
-      />
-    </div>
+    />
   );
 }
