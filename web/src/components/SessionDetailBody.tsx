@@ -34,6 +34,9 @@ export function SessionDetailBody({
 
   return (
     <>
+      <WordIn as="h1" active={animate} delayMs={200} style={{ font: "600 26px/1.06 var(--font-outfit)", textAlign: "center", margin: "28px 0 24px" }}>
+        {session.title}
+      </WordIn>
       <ProgressRing value={Math.min(1, distanceKm / 20)} size={180} strokeWidth={12} trackColor="rgba(246,238,218,.13)">
         <div style={{ textAlign: "center" }}>
           <p className="font-mono" style={{ fontSize: 28, fontWeight: 500, margin: 0 }}>{distanceKm.toFixed(1)}</p>
@@ -41,16 +44,15 @@ export function SessionDetailBody({
         </div>
       </ProgressRing>
 
-      <WordIn active={animate} delayMs={200} style={{ font: "600 26px/1.06 var(--font-outfit)", textAlign: "center", marginTop: 20 }}>
-        {session.title}
-      </WordIn>
+
       {session.description && (
         <p className="font-serif-italic" style={{ fontSize: 15.5, textAlign: "center", color: "var(--inchiostro-su-scuro)", maxWidth: 280 }}>
           {session.description}
         </p>
       )}
 
-      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+      <h2 className="detail-section-title">Il tuo allenamento</h2>
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
         {groups.length === 0 && (
           <p style={{ textAlign: "center", color: "var(--inchiostro-su-scuro)", fontSize: 13 }}>Sessione libera, senza step strutturati.</p>
         )}
@@ -71,7 +73,6 @@ export function SessionDetailBody({
                 alignItems: "center",
                 gap: 10,
               }}
-              className={isKey ? "anim-breath" : undefined}
             >
               <span>
                 <span style={{ display: "block", fontSize: 13, fontWeight: 600 }}>{label}</span>

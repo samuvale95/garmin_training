@@ -3,63 +3,29 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
+import { useMotionEnabled } from "@/lib/motion";
 
 const TABS = [
-  { href: "/today", label: "Oggi" },
-  { href: "/week", label: "Settimana" },
-  { href: "/body", label: "Corpo" },
+  { href: "/today", label: "Oggi", path: "M3 11 12 3l9 8M5 10v11h5v-7h4v7h5V10" },
+  { href: "/week", label: "Settimana", path: "M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2M7 14h2m6 0h2M7 18h2" },
+  { href: "/body", label: "Corpo", path: "M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" },
 ] as const;
 
 export function TabBar() {
   const pathname = usePathname();
-
+  const { reduced } = useMotionEnabled();
   return (
-    <nav
-      style={{
-        position: "sticky",
-        bottom: 0,
-        display: "flex",
-        gap: 4,
-        background: "var(--inchiostro)",
-        borderRadius: "var(--radius-pill)",
-        padding: 6,
-        margin: "0 20px 18px",
-      }}
-      aria-label="Navigazione principale"
-    >
+    <nav className="tab-bar" aria-label="Navigazione principale">
       {TABS.map((tab) => {
         const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
         return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            className="tap-target"
-            style={{
-              position: "relative",
-              flex: 1,
-              textDecoration: "none",
-              textAlign: "center",
-              padding: "10px 0",
-              borderRadius: "var(--radius-pill)",
-              fontSize: 14,
-              fontWeight: 600,
-              color: active ? "var(--inchiostro)" : "var(--inchiostro-su-scuro)",
-            }}
-          >
-            {active && (
-              <motion.span
-                layoutId="tab-pill"
-                transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: "var(--crema)",
-                  borderRadius: "var(--radius-pill)",
-                  zIndex: 0,
-                }}
-              />
-            )}
-            <span style={{ position: "relative", zIndex: 1 }}>{tab.label}</span>
+          <Link key={tab.href} href={tab.href} className="tap-target tab-link" aria-current={active ? "page" : undefined}>
+            {active && (reduced ? <span className="tab-indicator" /> :
+              <motion.span className="tab-indicator" layoutId="tab-pill" transition={{ type: "spring", stiffness: 420, damping: 36 }} />)}
+            <span className="tab-link-content">
+              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={tab.path} /></svg>
+              <span>{tab.label}</span>
+            </span>
           </Link>
         );
       })}

@@ -195,8 +195,10 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
       delayMs={delayMs}
       row
       style={{
-        background: visual.background,
-        color: visual.foreground,
+        background: "var(--crema)",
+        border: "1px solid var(--sabbia-bordo)",
+        boxShadow: "0 3px 12px rgb(0 0 0 / 3%)",
+        color: "var(--inchiostro)",
         borderRadius: "var(--radius-card)",
         padding: "14px 16px",
         minHeight: height,
@@ -207,8 +209,9 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
         justifyContent: "center",
       }}
     >
-      <p style={{ fontSize: 14.5, fontWeight: 600, margin: 0, paddingRight: 54, letterSpacing: "-.01em" }}>{card.session.title}</p>
-      <p className="font-serif-italic" style={{ fontSize: 13.5, margin: "4px 0 0", opacity: 0.85, paddingRight: 54 }}>
+      <span className="session-kind" style={{ background: visual.background, color: visual.foreground }}>{visual.label}</span>
+      <p style={{ fontSize: 15.5, fontWeight: 600, margin: 0, paddingRight: 54, letterSpacing: "-.01em" }}>{card.session.title}</p>
+      <p className="font-serif-italic" style={{ fontSize: 13.5, margin: "4px 0 0", color: "var(--inchiostro-70)", paddingRight: 54 }}>
         {detail}
       </p>
       {matchKm != null && (

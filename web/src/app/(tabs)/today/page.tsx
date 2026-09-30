@@ -34,7 +34,7 @@ import {
 import { useWatchSyncStatus } from "@/lib/watchSync";
 import { SkeletonTodayHero } from "@/components/skeletons";
 import { usePassoStore } from "@/lib/store";
-import { classifySession, isoWeekNumber, sessionDistanceKm, shiftDateKey, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
+import { classifySession, sessionDistanceKm, shiftDateKey, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
 import { capitalize, formatFullDate, groupSteps, numberToItalianWords, relativeDayLabel, stepGroupLine } from "@/lib/format";
 
 export default function TodayPage() {
@@ -129,7 +129,7 @@ export default function TodayPage() {
       <div style={{ padding: "22px 20px 12px" }}>
         <TodayHeader />
         <div style={{ marginTop: 18 }}>
-          <WordIn active={animate} style={{ font: "600 34px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>Settimana</WordIn>
+          <WordIn active={animate} style={{ font: "600 34px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>Il tuo oggi</WordIn>
         </div>
         <div style={{ marginTop: 16 }}>
           <SkeletonTodayHero />
@@ -157,6 +157,14 @@ export default function TodayPage() {
   const heroMainGroup = heroGroups.find((g) => g.kind === "interval") ?? heroGroups[0] ?? null;
 
   const heroMatch = heroSession ? stravaMatches.data?.matches[heroSession.date] : undefined;
+  const heroPlanSession = access.plan?.sessions.find((session) => session === heroSession);
+  const heroWorkout = workoutsQuery.data?.workouts.find((session) => session === heroSession);
+  const heroHref = heroPlanSession?.id
+    ? `/session/${encodeURIComponent(heroPlanSession.id)}`
+    : heroWorkout
+      ? `/workout/${heroWorkout.scheduled_workout_id}?date=${heroWorkout.date}`
+      : "/week";
+
 
   const pendingChanges = (diffQuery.data?.to_create.length ?? 0) + (diffQuery.data?.changed.length ?? 0);
   const readiness = bodyQuery.data?.readiness_score;
@@ -166,20 +174,18 @@ export default function TodayPage() {
     <div style={{ padding: "22px 20px 12px" }}>
       <TodayHeader />
 
-      <div style={{ marginTop: 18 }}>
-        <WordIn active={animate} style={{ font: "600 34px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>Settimana</WordIn>
-        <WordIn active={animate} delayMs={100} style={{ font: "600 34px/1.04 var(--font-outfit)", letterSpacing: "-.035em", color: "var(--corallo)" }}>
-          {numberToItalianWords(isoWeekNumber(today))}
-        </WordIn>
-      </div>
+      <header className="today-intro">
+        <h1>Il tuo oggi</h1>
+        <p>{capitalize(formatFullDate(todayKey))} · Un passo alla volta.</p>
+      </header>
 
       <SlideUp
         active={animate}
-        delayMs={200}
-        style={{ background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 16, height: 210, position: "relative", overflow: "hidden", boxSizing: "border-box" }}
+        delayMs={100}
+        className="today-hero"
+        style={{ background: "var(--corallo)", color: "var(--corallo-testo)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 16, minHeight: 210, position: "relative", overflow: "hidden", boxSizing: "border-box" }}
       >
-        <span aria-hidden="true" className="anim-sweep-once" style={{ position: "absolute", inset: 0, background: "var(--corallo)" }} />
-        <div style={{ position: "relative", color: "var(--corallo-testo)" }}>
+        <div className="today-hero-copy">
           {heroSession ? (
             <>
               <p className="font-mono" style={{ fontSize: 12, opacity: 0.7, margin: "0 0 6px" }}>
@@ -199,7 +205,12 @@ export default function TodayPage() {
             <p className="font-serif-italic" style={{ fontSize: 17, maxWidth: 200 }}>Oggi è un giorno di riposo. E va bene così.</p>
           )}
         </div>
-        <Illustration name="corsa" width={150} height={160} right={0} bottom={0} active={animate} delayMs={900} />
+        <div className="today-hero-art">
+          <Illustration name={heroSession ? classifySession(heroSession).illustration ?? "corsa" : "riposo"} width={110} height={120} right={0} bottom={0} active={animate} delayMs={160} breathe={false} />
+        </div>
+        <Link href={heroHref} className="tap-target today-hero-action">
+          {heroSession ? "Vedi allenamento" : "Esplora la settimana"}<span aria-hidden="true">↗</span>
+        </Link>
       </SlideUp>
 
       <DayStateCard verdict={verdictQuery.data} narrative={verdictNarrative.data?.text} animate={animate} delayMs={260} />

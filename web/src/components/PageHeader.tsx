@@ -19,7 +19,7 @@ export function PageHeader({ backHref, color = "var(--inchiostro)" }: PageHeader
   return (
     <Link
       href={href}
-      className="tap-target"
+      className="tap-target page-back"
       aria-label={label}
       style={{
         color,

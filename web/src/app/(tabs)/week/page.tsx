@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
-import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
+import { BarGrow, SlideUp } from "@/components/motion/primitives";
 import { DraggableWeekCard, RestCard, type DayCardData } from "@/components/WeekCards";
 import { PlanGenerateCard } from "@/components/PlanGenerateCard";
 import { OffPlanCard, offPlanActivities } from "@/components/OffPlanCard";
@@ -537,49 +537,30 @@ interface WeekHeaderProps {
 
 /** Brand mark, week paging, "add workout", the week range -- rendered the same whether
  * or not the week's data has arrived. */
-function WeekHeaderRow({ start, end, animate, offset, onPrev, onNext, onToday }: WeekHeaderProps) {
+function WeekHeaderRow({ start, end, offset, onPrev, onNext, onToday }: WeekHeaderProps) {
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div className="screen-brand-row">
         <BrandMark height={22} />
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <NavButton label="Settimana precedente" onClick={onPrev}>
-            ‹
-          </NavButton>
-          <NavButton label="Settimana successiva" onClick={onNext}>
-            ›
-          </NavButton>
-          <Link href="/week/new" aria-label="Aggiungi allenamento" className="tap-target press-soft" style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--inchiostro)", color: "var(--crema)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", textDecoration: "none", fontSize: 16 }}>
-            +
-          </Link>
+        <Link href="/week/new" className="tap-target add-workout-link">
+          <span aria-hidden="true">+</span> Allenamento
+        </Link>
+      </div>
+      <header className="screen-intro">
+        <h1>La tua settimana</h1>
+        <p>Trova il ritmo, un giorno alla volta.</p>
+      </header>
+      <div className="week-picker">
+        <NavButton label="Settimana precedente" onClick={onPrev}>‹</NavButton>
+        <div className="week-picker-label" aria-live="polite" aria-atomic="true">
+          <span>{formatWeekRange(start, end)}</span>
+          <span className="week-picker-caption">{start.getFullYear()}{start.getFullYear() !== end.getFullYear() ? ` – ${end.getFullYear()}` : ""}</span>
         </div>
+        <NavButton label="Settimana successiva" onClick={onNext}>›</NavButton>
       </div>
-
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 14 }}>
-        <WordIn active={animate} style={{ font: "600 30px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>
-          {formatWeekRange(start, end)}
-        </WordIn>
-        {offset !== 0 && (
-          <button
-            type="button"
-            onClick={onToday}
-            className="press-soft"
-            style={{
-              flex: "none",
-              background: "var(--sabbia-chip)",
-              color: "var(--inchiostro-70)",
-              border: "none",
-              borderRadius: "var(--radius-pill)",
-              padding: "7px 14px",
-              fontSize: 12.5,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            questa settimana
-          </button>
-        )}
-      </div>
+      {offset !== 0 && (
+        <button type="button" onClick={onToday} className="tap-target week-reset">Torna a questa settimana</button>
+      )}
     </>
   );
 }

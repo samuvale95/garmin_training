@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { HrvCard, ReadinessMeaning, SleepCard } from "@/components/BodyCards";
 import { BrandMark } from "@/components/motion/BrandMark";
-import { ProgressRing, SlideUp, WordIn } from "@/components/motion/primitives";
+import { ProgressRing, SlideUp, Skeleton } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useBodyToday, useFuelTargets, usePlanQuery, usePrefetchFuelNarrative } from "@/lib/queries";
 import { useWatchSyncStatus } from "@/lib/watchSync";
@@ -55,18 +55,20 @@ export default function RecoveryPage() {
     <div style={{ padding: "22px 20px 12px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <BrandMark height={22} />
-        <Avatar size={32} />
+        <Link href="/settings" className="tap-target" aria-label="Impostazioni"><Avatar size={32} /></Link>
       </div>
 
-      <div style={{ marginTop: 14, display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-        <WordIn active={animate} style={{ font: "600 30px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>Come stai</WordIn>
-        {data && (
-          <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{formatFullDate(data.date)}</span>
-        )}
-      </div>
+      <header className="screen-intro">
+        <h1>Come stai oggi?</h1>
+        <p>{data ? formatFullDate(data.date) : "Recupero, energia e allenamento."}</p>
+      </header>
 
       {isLoading ? (
-        <p style={{ marginTop: 20 }}>Carico i dati…</p>
+        <div role="status" aria-label="Caricamento dati del corpo" className="body-loading">
+          <Skeleton height={144} radius={28} />
+          <Skeleton height={180} radius={24} />
+          <Skeleton height={150} radius={24} />
+        </div>
       ) : !data?.has_overnight_data ? (
         <SlideUp active={animate} delayMs={150} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 16 }}>
           <p className="font-serif-italic" style={{ fontSize: 16, margin: 0 }}>
@@ -215,13 +217,13 @@ function SmallMetric({
   children?: ReactNode;
 }) {
   return (
-    <div style={{ flex: 1, background, borderRadius: "var(--radius-chip)", padding: 12 }}>
+    <div style={{ flex: 1, minWidth: 0, background, borderRadius: "var(--radius-row)", padding: 12 }}>
       <p className="font-mono" style={{ fontSize: 16, margin: "0 0 2px" }}>
         {value}
-        {unit && <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}> {unit}</span>}
+        {unit && <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}> {unit}</span>}
       </p>
-      <p style={{ fontSize: 10, color: "var(--inchiostro-50)", margin: 0 }}>{label}</p>
-      {caption && <p style={{ fontSize: 10, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>{caption}</p>}
+      <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>{label}</p>
+      {caption && <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>{caption}</p>}
       {children}
     </div>
   );
@@ -229,7 +231,7 @@ function SmallMetric({
 
 function NavRow({ href, label }: { href: string; label: string }) {
   return (
-    <Link href={href} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 4px", textDecoration: "none", color: "inherit" }}>
+    <Link href={href} className="body-nav-row tap-target press-soft">
       <span style={{ fontSize: 14, fontWeight: 600 }}>{label}</span>
       <span className="anim-chev" aria-hidden="true">→</span>
     </Link>

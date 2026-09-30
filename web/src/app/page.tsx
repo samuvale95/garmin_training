@@ -61,7 +61,7 @@ export default function EntryPage() {
         <WordIn active={animate} delayMs={100} style={{ font: "600 40px/1.06 var(--font-outfit)", letterSpacing: "-.04em" }}>
           scritto una
         </WordIn>
-        <WordIn active={animate} delayMs={200} style={{ font: "600 40px/1.06 var(--font-outfit)", letterSpacing: "-.04em", color: "var(--corallo)" }}>
+        <WordIn active={animate} delayMs={200} style={{ font: "600 40px/1.06 var(--font-outfit)", letterSpacing: "-.04em", color: "var(--accent)" }}>
           volta sola
         </WordIn>
       </div>

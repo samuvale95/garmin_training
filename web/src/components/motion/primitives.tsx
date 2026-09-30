@@ -23,7 +23,7 @@ export function WordIn({ children, active = true, delayMs = 0, as: Tag = "div", 
   const animate = active && !reduced;
   return (
     <Tag className={`word-in-clip ${className ?? ""}`} style={style}>
-      <div className={animate ? "anim-word-in" : undefined} style={animate ? { animationDelay: `${delayMs}ms` } : undefined}>
+      <div className={animate ? "anim-word-in" : undefined} style={animate ? { animationDelay: `${Math.min(delayMs, 160)}ms` } : undefined}>
         {children}
       </div>
     </Tag>
@@ -47,7 +47,7 @@ export function SlideUp({ children, active = true, delayMs = 0, row = false, as:
   return (
     <Tag
       className={`${animate ? animClass : ""} ${className ?? ""}`}
-      style={animate ? { animationDelay: `${delayMs}ms`, ...style } : style}
+      style={animate ? { animationDelay: `${Math.min(delayMs, 160)}ms`, ...style } : style}
     >
       {children}
     </Tag>
@@ -82,7 +82,7 @@ export function BarGrow({ value, active = true, delayMs = 0, vertical = false, c
             background: color,
             borderRadius: 100,
             transformOrigin: "bottom",
-            animationDelay: animate ? `${delayMs}ms` : undefined,
+            animationDelay: animate ? `${Math.min(delayMs, 160)}ms` : undefined,
           }}
         />
       </div>
@@ -99,7 +99,7 @@ export function BarGrow({ value, active = true, delayMs = 0, vertical = false, c
           background: color,
           borderRadius: 100,
           transformOrigin: "left",
-          animationDelay: animate ? `${delayMs}ms` : undefined,
+          animationDelay: animate ? `${Math.min(delayMs, 160)}ms` : undefined,
         }}
       />
     </div>
@@ -226,9 +226,9 @@ export function PrimaryButton({
   onClick,
   state = "idle",
   sheen = false,
-  fillColor = "var(--corallo)",
+  fillColor = "var(--accent)",
   successColor = "var(--verde)",
-  background = "var(--inchiostro)",
+  background = "var(--accent)",
   textColor = "var(--crema)",
   type = "button",
 }: PrimaryButtonProps) {
@@ -253,8 +253,8 @@ export function PrimaryButton({
         fontSize: 16,
         fontWeight: 600,
         cursor: disabled ? "default" : "pointer",
-        background: state === "disabled" ? "var(--sabbia-chip)" : background,
-        color: state === "disabled" ? "var(--inchiostro-35)" : textColor,
+        background: state === "disabled" ? "var(--sabbia-chip)" : isSuccess ? successColor : background,
+        color: state === "disabled" ? "var(--inchiostro-35)" : isSuccess ? "var(--verde-testo)" : textColor,
         transition: reduced ? undefined : `transform ${120}ms var(--ease)`,
       }}
       onPointerDown={(e) => {
