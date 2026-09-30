@@ -36,6 +36,6 @@ if (ip) {
 }
 
 const nextBin = process.platform === "win32" ? "next.cmd" : "next";
-const args = ["dev", ...process.argv.slice(2)];
+const args = ["dev", "--webpack", ...process.argv.slice(2)];
 const child = spawn(nextBin, args, { stdio: "inherit" });
 child.on("exit", (code) => process.exit(code ?? 0));
