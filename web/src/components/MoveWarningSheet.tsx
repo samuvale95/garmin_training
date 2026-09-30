@@ -56,7 +56,7 @@ export function MoveWarningSheet() {
             </p>
           </div>
           <div style={{ flexShrink: 0 }}>
-            <Illustration name="scarico" size={48} float />
+            <Illustration name="scarico" size={48} />
           </div>
         </div>
 

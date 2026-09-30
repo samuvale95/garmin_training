@@ -1,21 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Outfit, Instrument_Serif, DM_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate } from "@/components/AuthGate";
 
-const outfit = Outfit({
-  variable: "--font-outfit",
+const plusJakarta = Plus_Jakarta_Sans({
+  variable: "--font-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
-
-const instrumentSerif = Instrument_Serif({
-  variable: "--font-instrument-serif",
-  subsets: ["latin"],
-  weight: "400",
-  style: "italic",
+  weight: ["400", "500", "600", "700"],
 });
 
 const dmMono = DM_Mono({
@@ -49,7 +42,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="it" className={`${outfit.variable} ${instrumentSerif.variable} ${dmMono.variable}`}>
+    <html lang="it" className={`${plusJakarta.variable} ${dmMono.variable}`}>
       <body>
         <Providers>
           <AppShell>

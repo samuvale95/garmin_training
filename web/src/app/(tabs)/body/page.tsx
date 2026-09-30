@@ -222,7 +222,7 @@ export default function RecoveryPage() {
                   {fuel.advice}
                 </p>
               </Link>
-              <Illustration name="fuel" width={84} height={84} right={10} bottom={10} active={animate} delayMs={560} breathe float />
+              <Illustration name="fuel" width={84} height={84} right={10} bottom={10} active={animate} delayMs={560} />
             </TiltCard>
           </SlideUp>
         )

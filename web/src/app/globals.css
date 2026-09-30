@@ -56,6 +56,7 @@
   --border-airbnb: 1px solid rgba(0, 0, 0, 0.06);
   --border-airbnb-hover: 1px solid rgba(0, 0, 0, 0.12);
   --clay-highlight: inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 2px 0 rgba(0, 0, 0, 0.03);
+  --font-outfit: var(--font-sans);
 }
 
 /* Lenis Smooth Scroll */
@@ -88,8 +89,9 @@ body {
 body {
   background: var(--crema);
   color: var(--inchiostro);
-  font-family: var(--font-outfit), Helvetica, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.012em;
 }
 
 a {
@@ -124,9 +126,10 @@ button {
 }
 
 .font-serif-italic {
-  font-family: var(--font-outfit), Helvetica, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, sans-serif;
   font-style: normal;
   font-weight: 400;
+  color: var(--inchiostro-70);
 }
 
 .font-mono {
@@ -405,10 +408,14 @@ button {
   animation: mkSheen 5.6s var(--ease) infinite;
 }
 .anim-nudge {
-  animation: mkNudge 3.6s var(--ease) infinite;
+  animation: none;
 }
 .anim-chev {
-  animation: mkChev 3.6s var(--ease) infinite;
+  display: inline-block;
+  transition: transform 0.25s var(--ease);
+}
+.press-soft:hover .anim-chev, a:hover .anim-chev, div:hover > .anim-chev {
+  transform: translateX(3px);
 }
 .anim-pulse-ring {
   animation: mkPulseRing 2.2s var(--ease) infinite;
@@ -433,13 +440,13 @@ button {
   animation: mkSpinSlow 1s linear infinite;
 }
 .anim-arrow-up {
-  animation: mkArrowUp 3.6s var(--ease) infinite;
+  animation: none;
 }
 .anim-creep {
-  animation: mkCreep 9s linear infinite;
+  animation: none;
 }
 .anim-tip-grow {
-  animation: mkTipGrow 3.2s ease-in-out infinite;
+  animation: none;
 }
 .anim-bar-settle {
   animation: mkBarSettle 5.4s ease-in-out infinite;

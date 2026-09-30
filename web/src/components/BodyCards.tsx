@@ -95,7 +95,7 @@ export function SleepCard({ sleep, animate, delayMs }: { sleep: SleepPhases; ani
         </div>
       </div>
 
-      <Illustration name="sonno" width={56} height={56} right={12} bottom={62} active={animate} delayMs={delayMs + 80} breathe float />
+      <Illustration name="sonno" width={56} height={56} right={12} bottom={62} active={animate} delayMs={delayMs + 80} />
 
       <div style={{ display: "flex", height: 7, borderRadius: 100, overflow: "hidden", marginTop: 12 }}>
         {SLEEP_PHASES.map((phase) => {

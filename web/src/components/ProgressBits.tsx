@@ -8,7 +8,7 @@ import type { Progress } from "@/lib/types";
  * used -- the app does not show the user collapsing for missing a day. */
 export function Mascot({ state, size }: { state: Progress["mascot"]["state"]; size: number }) {
   return (
-    <div aria-hidden="true" className="anim-breath" style={{ position: "relative", width: size, height: size, flex: "none" }}>
+    <div aria-hidden="true" style={{ position: "relative", width: size, height: size, flex: "none" }}>
       <Image src={ILLUSTRATION_SOURCES[state]} alt="" fill sizes={`${size}px`} style={{ objectFit: "contain" }} />
     </div>
   );

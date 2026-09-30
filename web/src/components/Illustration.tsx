@@ -74,7 +74,7 @@ export function Illustration({
   width: rawWidth,
   height: rawHeight,
   size,
-  breathe = true,
+  breathe = false,
   float = false,
   active = true,
   delayMs = 900,

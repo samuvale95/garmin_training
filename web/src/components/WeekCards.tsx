@@ -69,7 +69,7 @@ export function RestCard({ animate, delayMs, withIllustration }: { animate: bool
           e va bene così
         </p>
         {withIllustration && visual.illustration && (
-          <Illustration name={visual.illustration} width={56} height={62} breathe={false} active={animate} delayMs={200 + delayMs} float={true} />
+          <Illustration name={visual.illustration} width={56} height={62} breathe={false} active={animate} delayMs={200 + delayMs} />
         )}
       </motion.div>
     </SlideUp>
@@ -227,7 +227,7 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
           svolto {matchKm.toFixed(1)} km
         </p>
       )}
-      {visual.illustration && <Illustration name={visual.illustration} width={58} height={64} breathe={false} active={animate} delayMs={200 + delayMs} float={true} />}
+      {visual.illustration && <Illustration name={visual.illustration} width={58} height={64} breathe={false} active={animate} delayMs={200 + delayMs} />}
     </SlideUp>
   );
 
