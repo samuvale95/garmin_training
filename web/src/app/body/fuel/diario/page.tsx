@@ -44,7 +44,7 @@ export default function FuelDiaryPage() {
     <div style={{ padding: "22px 20px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/body/fuel" />
-        <h1 style={{ font: "600 20px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Diario</h1>
+        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Diario</h1>
         <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "6px 12px" }}>
           {DIARY_DAYS} giorni
         </span>
@@ -125,7 +125,7 @@ function DaySection({
 function EmptyDiary({ animate }: { animate: boolean }) {
   return (
     <SlideUp active={animate} delayMs={100} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 18 }}>
-      <p style={{ font: "600 17px/1.2 var(--font-outfit)", margin: 0 }}>Ancora niente qui</p>
+      <p style={{ font: "600 17px/1.2 var(--font-sans)", margin: 0 }}>Ancora niente qui</p>
       <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-70)", margin: "10px 0 0", lineHeight: 1.35 }}>
         Fotografa un piatto o scrivi cosa hai mangiato: da lì in poi lo ritrovi qui, e
         puoi correggerlo quando vuoi.

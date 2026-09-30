@@ -6,6 +6,7 @@ import { PlanWaiting } from "@/components/PlanWaiting";
 import { Illustration } from "@/components/Illustration";
 import { SlideUp } from "@/components/motion/primitives";
 import { formatFullDate } from "@/lib/format";
+import { ArrowRight } from "@/components/Icons";
 import { useAdaptation, useAdaptationCheckStartedAt, useAnswerAdaptation } from "@/lib/queries";
 
 /** How long a check has to run before the wait is shown: most checks find nothing and
@@ -30,7 +31,7 @@ export function AdaptationCard({ animate, delayMs = 0 }: { animate: boolean; del
     <SlideUp active={animate} delayMs={delayMs} style={card}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
         <div>
-          <p style={{ font: "600 16px/1.2 var(--font-outfit)", margin: 0 }}>
+          <p style={{ font: "600 16px/1.2 var(--font-sans)", margin: 0 }}>
             {pending ? "Ti propongo di adattare il piano" : "Ho adattato il piano"}
           </p>
           <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", display: "flex", flexDirection: "column", gap: 4 }}>
@@ -57,7 +58,7 @@ export function AdaptationCard({ animate, delayMs = 0 }: { animate: boolean; del
               <span style={{ textDecoration: change.after.length ? "line-through" : undefined, color: "var(--inchiostro-50)" }}>
                 {change.before.join(", ") || "riposo"}
               </span>
-              {" → "}
+              <ArrowRight size={12} style={{ display: "inline-block", verticalAlign: "middle", margin: "0 6px", color: "var(--inchiostro-50)" }} />
               <span style={{ fontWeight: 600 }}>{change.after.join(", ") || "riposo"}</span>
             </li>
           ))}

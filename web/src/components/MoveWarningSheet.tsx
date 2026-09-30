@@ -48,7 +48,7 @@ export function MoveWarningSheet() {
         <div style={{ width: 40, height: 4.5, borderRadius: 100, background: "var(--sabbia-bordo)", margin: "0 auto" }} />
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
           <div>
-            <p id="move-warning-title" style={{ font: "600 20px/1.2 var(--font-outfit)", margin: 0 }}>
+            <p id="move-warning-title" style={{ font: "600 20px/1.2 var(--font-sans)", margin: 0 }}>
               Attenzione a questo spostamento
             </p>
             <p style={{ fontSize: 13, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>

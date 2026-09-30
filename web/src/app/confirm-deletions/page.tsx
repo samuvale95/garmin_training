@@ -40,7 +40,7 @@ export default function ConfirmDeletionsPage() {
         <span style={{ fontSize: 11, color: "var(--rosa-testo-50)", fontWeight: 500 }}>fermo · azione irreversibile</span>
       </div>
 
-      <h1 style={{ font: "600 28px/1.1 var(--font-outfit)", color: "var(--rosso-testo)", letterSpacing: "-.03em", margin: "20px 0 8px" }}>
+      <h1 style={{ font: "600 28px/1.1 var(--font-sans)", color: "var(--rosso-testo)", letterSpacing: "-.03em", margin: "20px 0 8px" }}>
         {changed.length > 0
           ? `${capitalize(numberToItalianWords(changed.length))} ${changed.length === 1 ? "sessione va" : "sessioni vanno"} cancellate`
           : "Nessuna sessione da cancellare"}

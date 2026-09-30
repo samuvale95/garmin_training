@@ -48,7 +48,7 @@ export function PrescriptionCard({
       style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 12 }}
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-        <p style={{ font: "600 19px/1.2 var(--font-outfit)", letterSpacing: "-.02em", margin: 0 }}>
+        <p style={{ font: "600 19px/1.2 var(--font-sans)", letterSpacing: "-.02em", margin: 0 }}>
           {prescription.title}
         </p>
         <span

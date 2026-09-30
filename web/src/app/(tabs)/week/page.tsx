@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { BarGrow, SlideUp } from "@/components/motion/primitives";
+import { ChevronLeft, ChevronRight, PlusIcon, ArrowRight } from "@/components/Icons";
 import { DraggableWeekCard, RestCard, type DayCardData } from "@/components/WeekCards";
 import { PlanGenerateCard } from "@/components/PlanGenerateCard";
 import { OffPlanCard, offPlanActivities } from "@/components/OffPlanCard";
@@ -376,7 +377,7 @@ function WeekPageContent() {
               <p className="font-serif-italic" style={{ fontSize: 14, margin: 0, flex: 1 }}>
                 Importa un piano per vedere step e passi di ogni seduta.
               </p>
-              <span className="anim-chev" aria-hidden="true">→</span>
+              <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
             </SlideUp>
           </Link>
         )}
@@ -386,8 +387,9 @@ function WeekPageContent() {
         {offset === 0 && <PlanGenerateCard animate={animate} delayMs={160} />}
 
         {offset <= 0 && (
-          <Link href={`/summary?monday=${startKey}`} style={{ display: "inline-block", fontSize: 12.5, fontWeight: 600, color: "var(--inchiostro-70)", marginTop: 10 }}>
-            Resoconto della settimana →
+          <Link href={`/summary?monday=${startKey}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12.5, fontWeight: 600, color: "var(--inchiostro-70)", marginTop: 10 }}>
+            <span>Resoconto della settimana</span>
+            <ArrowRight size={13} />
           </Link>
         )}
 
@@ -544,8 +546,9 @@ function WeekHeaderRow({ start, end, offset, onPrev, onNext, onToday }: WeekHead
       <div className="screen-brand-row">
         <BrandMark height={22} />
         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.94 }}>
-          <Link href="/week/new" className="tap-target add-workout-link">
-            <span aria-hidden="true">+</span> Allenamento
+          <Link href="/week/new" className="tap-target add-workout-link" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <PlusIcon size={13} strokeWidth={2.5} />
+            <span>Allenamento</span>
           </Link>
         </motion.div>
       </div>
@@ -554,12 +557,16 @@ function WeekHeaderRow({ start, end, offset, onPrev, onNext, onToday }: WeekHead
         <p>Trova il ritmo, un giorno alla volta.</p>
       </header>
       <div className="week-picker">
-        <NavButton label="Settimana precedente" onClick={onPrev}>‹</NavButton>
+        <NavButton label="Settimana precedente" onClick={onPrev}>
+          <ChevronLeft size={16} strokeWidth={2.4} />
+        </NavButton>
         <div className="week-picker-label" aria-live="polite" aria-atomic="true">
           <span>{formatWeekRange(start, end)}</span>
           <span className="week-picker-caption">{start.getFullYear()}{start.getFullYear() !== end.getFullYear() ? ` – ${end.getFullYear()}` : ""}</span>
         </div>
-        <NavButton label="Settimana successiva" onClick={onNext}>›</NavButton>
+        <NavButton label="Settimana successiva" onClick={onNext}>
+          <ChevronRight size={16} strokeWidth={2.4} />
+        </NavButton>
       </div>
       {offset !== 0 && (
         <motion.button
@@ -586,7 +593,7 @@ function WeekHeader(props: WeekHeaderProps) {
   );
 }
 
-function NavButton({ label, onClick, children }: { label: string; onClick: () => void; children: string }) {
+function NavButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
   return (
     <motion.button
       className="tap-target"

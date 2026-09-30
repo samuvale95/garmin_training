@@ -22,7 +22,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
         textAlign: "center",
       }}
     >
-      <p style={{ font: "600 20px/1.2 var(--font-outfit)", margin: 0 }}>Qualcosa è andato storto.</p>
+      <p style={{ font: "600 20px/1.2 var(--font-sans)", margin: 0 }}>Qualcosa è andato storto.</p>
       <p className="font-serif-italic" style={{ fontSize: 14, opacity: 0.75, margin: 0, maxWidth: 320 }}>
         {error.message || "Errore imprevisto."}
       </p>

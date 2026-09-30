@@ -24,7 +24,7 @@ export default function LevelSettingsPage() {
         <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}>impostazioni</span>
       </div>
 
-      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-outfit)", letterSpacing: "-.03em", margin: "16px 0 16px" }}>
+      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 16px" }}>
         Il tuo livello
       </WordIn>
 
@@ -44,7 +44,7 @@ export default function LevelSettingsPage() {
             <p className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-su-scuro)", margin: 0 }}>
               livello {data.level} di 3
             </p>
-            <p style={{ font: "600 34px/1 var(--font-outfit)", letterSpacing: "-.03em", margin: "12px 0 0" }}>{data.level_name}</p>
+            <p style={{ font: "600 34px/1 var(--font-sans)", letterSpacing: "-.03em", margin: "12px 0 0" }}>{data.level_name}</p>
             <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.35, margin: "12px 0 0" }}>
               {data.level_meaning}
             </p>

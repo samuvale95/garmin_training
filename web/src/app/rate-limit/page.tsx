@@ -63,7 +63,7 @@ export default function RateLimitPage() {
         <span style={{ fontSize: 11, color: "var(--rosa-testo-50)" }}>fermo · non insisto</span>
       </div>
 
-      <h1 style={{ font: "600 26px/1.1 var(--font-outfit)", color: "var(--rosso-testo)", letterSpacing: "-.03em", margin: "20px 0 16px" }}>
+      <h1 style={{ font: "600 26px/1.1 var(--font-sans)", color: "var(--rosso-testo)", letterSpacing: "-.03em", margin: "20px 0 16px" }}>
         Aspetto io, così non peggiora
       </h1>
 

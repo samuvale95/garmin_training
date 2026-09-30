@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton, SlideUp } from "@/components/motion/primitives";
+import { ChevronRight } from "@/components/Icons";
 import { DistributionBar, FindingCard } from "@/components/ExecutionBlocks";
 import { PaceProfileCard, PrescriptionCard, SensitivityTable } from "@/components/PrescriptionCard";
 import { useMountOnce } from "@/lib/motion";
@@ -27,7 +28,7 @@ export default function CoachTrainingPage() {
     <div style={{ padding: "22px 20px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/coach" />
-        <h1 style={{ font: "600 20px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>
+        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>
           Come ti alleni
         </h1>
       </div>
@@ -64,7 +65,7 @@ export default function CoachTrainingPage() {
               {formatShortDate(data.block.from_date)} – {formatShortDate(data.block.to_date)} ·{" "}
               {data.block.sessions} corse
             </p>
-            <p style={{ font: "600 34px/1 var(--font-outfit)", letterSpacing: "-.03em", margin: "12px 0 0" }}>
+            <p style={{ font: "600 34px/1 var(--font-sans)", letterSpacing: "-.03em", margin: "12px 0 0" }}>
               {Math.round(data.block.easy_share * 100)}%
             </p>
             <p style={{ fontSize: 13.5, color: "var(--inchiostro-su-scuro)", margin: "4px 0 0" }}>
@@ -148,7 +149,7 @@ function Empty({ title, body, href, cta }: { title: string; body: string; href: 
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: "15px 18px", marginTop: 10, textDecoration: "none", color: "inherit" }}
       >
         <span style={{ fontSize: 14.5, fontWeight: 600 }}>{cta}</span>
-        <span aria-hidden="true" className="anim-chev">→</span>
+        <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
       </Link>
     </div>
   );
@@ -173,7 +174,7 @@ function Failed({ onRetry, retrying }: { onRetry: () => void; retrying: boolean 
         style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: "15px 18px", marginTop: 10, border: "none", color: "inherit", font: "inherit", cursor: "pointer" }}
       >
         <span style={{ fontSize: 14.5, fontWeight: 600 }}>{retrying ? "Riprovo…" : "Riprova"}</span>
-        <span aria-hidden="true" className="anim-chev">→</span>
+        <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
       </button>
     </div>
   );

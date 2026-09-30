@@ -32,7 +32,7 @@ export default function ConnectStravaPage() {
         <Avatar size={30} />
       </div>
 
-      <WordIn active={animate} style={{ font: "600 32px/1.05 var(--font-outfit)", letterSpacing: "-.035em", marginTop: 20 }}>
+      <WordIn active={animate} style={{ font: "600 32px/1.05 var(--font-sans)", letterSpacing: "-.035em", marginTop: 20 }}>
         Collega Strava
       </WordIn>
 

@@ -5,6 +5,8 @@ import { DetailScaffold } from "@/components/DetailScaffold";
 import { SkeletonStravaPanel } from "@/components/skeletons";
 import { StravaMatchPanel } from "@/components/StravaMatchPanel";
 import { formatFullDate } from "@/lib/format";
+import { ArrowRight } from "@/components/Icons";
+import { SlideUp } from "@/components/motion/primitives";
 import type { StravaActivityMatch } from "@/lib/types";
 
 /** The planned-vs-done comparison screen.
@@ -37,7 +39,7 @@ export function StravaComparisonScreen({
 }) {
   return (
     <DetailScaffold backHref={backHref} caption={date ? `${formatFullDate(date)} · da Strava` : undefined}>
-      <div style={{ width: "100%", marginTop: 12 }}>
+      <SlideUp active={animate} delayMs={0} style={{ width: "100%", marginTop: 12 }}>
         {title && (
           <h1
             style={{
@@ -71,7 +73,8 @@ export function StravaComparisonScreen({
                 textDecoration: "none",
               }}
             >
-              Collega Strava →
+              <span>Collega Strava</span>
+              <ArrowRight size={14} />
             </Link>
           </div>
         ) : isLoading && !match ? (
@@ -103,7 +106,7 @@ export function StravaComparisonScreen({
             {backLabel}
           </Link>
         </div>
-      </div>
+      </SlideUp>
     </DetailScaffold>
   );
 }

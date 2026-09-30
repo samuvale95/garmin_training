@@ -59,7 +59,7 @@ export function DayStateCard({ verdict, narrative, animate, delayMs = 0 }: { ver
           )}
         </div>
 
-        <p style={{ font: "600 17px/1.25 var(--font-outfit)", letterSpacing: "-.01em", margin: "8px 0 0" }}>{verdict.headline}</p>
+        <p style={{ font: "600 17px/1.25 var(--font-sans)", letterSpacing: "-.01em", margin: "8px 0 0" }}>{verdict.headline}</p>
         {line !== verdict.headline && (
           <p className="font-serif-italic" style={{ fontSize: 14.5, lineHeight: 1.35, margin: "6px 0 0", opacity: 0.9 }}>
             {line}

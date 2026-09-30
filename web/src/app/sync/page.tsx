@@ -64,7 +64,7 @@ function SyncScreenInner() {
       </div>
 
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 24 }}>
-        <WordIn style={{ font: "600 72px/1 var(--font-outfit)", letterSpacing: "-.05em" }}>{completed}</WordIn>
+        <WordIn style={{ font: "600 72px/1 var(--font-sans)", letterSpacing: "-.05em" }}>{completed}</WordIn>
         <span style={{ fontSize: 16, color: "var(--inchiostro-su-scuro)" }}>di {total} sessioni</span>
       </div>
 
@@ -115,7 +115,7 @@ function SyncScreenInner() {
 function Count({ value, label, color }: { value: number; label: string; color: string }) {
   return (
     <div>
-      <p style={{ font: "600 20px/1 var(--font-outfit)", color, margin: "0 0 2px" }}>{value}</p>
+      <p style={{ font: "600 20px/1 var(--font-sans)", color, margin: "0 0 2px" }}>{value}</p>
       <p style={{ fontSize: 11, color: "var(--inchiostro-su-scuro)", margin: 0 }}>{label}</p>
     </div>
   );

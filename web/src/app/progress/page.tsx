@@ -22,7 +22,7 @@ export default function ProgressPage() {
         <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}>progressi</span>
       </div>
 
-      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-outfit)", letterSpacing: "-.03em", margin: "16px 0 16px" }}>
+      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 16px" }}>
         I tuoi progressi
       </WordIn>
 
@@ -39,7 +39,7 @@ export default function ProgressPage() {
               <p className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-su-scuro)", margin: 0 }}>
                 serie
               </p>
-              <p style={{ font: "600 40px/1 var(--font-outfit)", letterSpacing: "-.03em", margin: "8px 0 0" }}>
+              <p style={{ font: "600 40px/1 var(--font-sans)", letterSpacing: "-.03em", margin: "8px 0 0" }}>
                 {data.streak}
                 <span style={{ fontSize: 15, fontWeight: 500 }}> {data.streak === 1 ? "settimana" : "settimane"} di fila</span>
               </p>
@@ -59,10 +59,10 @@ export default function ProgressPage() {
             {data.max_tokens}); una settimana con dolore segnalato non rompe la serie.
           </p>
 
-          <SlideUp active={animate} delayMs={160} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 16 }}>
+          <SlideUp active={animate} delayMs={160} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 16 }}>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-              <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: 0 }}>Punti Disciplina, questa settimana</p>
-              <p style={{ font: "600 22px/1 var(--font-outfit)", margin: 0 }}>{data.week_points}</p>
+              <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>Punti Disciplina, questa settimana</p>
+              <p style={{ font: "600 22px/1 var(--font-sans)", margin: 0 }}>{data.week_points}</p>
             </div>
             {data.week_lines.length === 0 ? (
               <p style={{ fontSize: 13, color: "var(--inchiostro-70)", margin: "8px 0 0" }}>
@@ -85,7 +85,7 @@ export default function ProgressPage() {
             </p>
           </SlideUp>
 
-          <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: "20px 2px 8px" }}>Traguardi</p>
+          <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: "20px 2px 8px" }}>Traguardi</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 9 }}>
             {data.badges.map((badge, i) => (
               <BadgeCard key={badge.key} badge={badge} animate={animate} delayMs={220 + i * 40} />
@@ -105,6 +105,8 @@ function BadgeCard({ badge, animate, delayMs }: { badge: Badge; animate: boolean
       style={{
         background: badge.earned ? "var(--corallo)" : "var(--crema-card)",
         color: badge.earned ? "var(--corallo-testo)" : undefined,
+        border: "1px solid var(--border-airbnb)",
+        boxShadow: "var(--shadow-airbnb-subtle)",
         borderRadius: "var(--radius-card)",
         padding: 12,
         opacity: badge.earned ? 1 : 0.85,

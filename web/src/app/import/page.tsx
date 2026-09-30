@@ -76,7 +76,7 @@ export default function ImportPlanPage() {
       </div>
 
       <div style={{ marginTop: 20 }}>
-        <WordIn active={animate} style={{ font: "600 34px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>
+        <WordIn active={animate} style={{ font: "600 34px/1.04 var(--font-sans)", letterSpacing: "-.035em" }}>
           Portami il file
         </WordIn>
       </div>

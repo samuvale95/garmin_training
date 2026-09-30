@@ -46,7 +46,7 @@ export default function DiffPage() {
           </div>
           <span style={{ fontSize: 11, color: "var(--inchiostro-35)", fontWeight: 500 }}>fermo · stai decidendo</span>
         </div>
-        <h1 style={{ font: "600 30px/1.04 var(--font-outfit)", letterSpacing: "-.035em", margin: "16px 0 6px" }}>
+        <h1 style={{ font: "600 30px/1.04 var(--font-sans)", letterSpacing: "-.035em", margin: "16px 0 6px" }}>
           {diff ? `${capitalize(numberToItalianWords(diff.to_create.length + diff.changed.length))} differenze` : "Differenze"}
         </h1>
         <p className="font-serif-italic" style={{ fontSize: 15.5, color: "var(--inchiostro-70)", margin: "0 0 14px" }}>

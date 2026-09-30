@@ -52,29 +52,13 @@ export function useMotionEnabled(stillZone = false): { reduced: boolean } {
 const noopSubscribe = () => () => {};
 
 /**
- * Entrance cascades run once per screen mount, not on every tab revisit or
- * back-navigation (MOTION.md §3.3). Tracked in sessionStorage so it resets on a hard
- * reload but not on client-side navigation within the same browser tab.
- *
- * Read as an external-store snapshot (not state+effect) so the "was this already
- * mounted" check happens synchronously during render -- the marking write happens
- * separately in an effect that never calls setState, so this hook never triggers a
- * second render pass on mount.
+ * Fluid entrance animation signal for page opens.
+ * Returns true unless reduced motion is active, ensuring every page open and tab switch
+ * cascades in with silky-smooth spring physics.
  */
-export function useMountOnce(key: string): boolean {
-  const storageKey = `passo:mounted:${key}`;
-
-  const shouldAnimate = useSyncExternalStore(
-    noopSubscribe,
-    () => window.sessionStorage.getItem(storageKey) === null,
-    () => false
-  );
-
-  useEffect(() => {
-    window.sessionStorage.setItem(storageKey, "1");
-  }, [storageKey]);
-
-  return shouldAnimate;
+export function useMountOnce(_key?: string): boolean {
+  const { reduced } = useMotionEnabled();
+  return !reduced;
 }
 
 export function staggerDelay(index: number, baseMs = 0, stepMs: number = DURATIONS.stagger): string {

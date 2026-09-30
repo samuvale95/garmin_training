@@ -60,7 +60,7 @@ export function RaceGoalCard({
               </div>
 
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 7 }}>
-                <p style={{ font: "600 17px/1.2 var(--font-outfit)", letterSpacing: "-.01em", margin: 0, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <p style={{ font: "600 17px/1.2 var(--font-sans)", letterSpacing: "-.01em", margin: 0, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {goalTitle(goal)}
                 </p>
                 <span className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-70)", flex: "none" }}>
@@ -113,7 +113,7 @@ function MissingGoalCard({ sessions, animate, delayMs }: { sessions: number; ani
 
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 7 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ font: "600 17px/1.2 var(--font-outfit)", letterSpacing: "-.01em", margin: 0 }}>Per che gara ti alleni?</p>
+                  <p style={{ font: "600 17px/1.2 var(--font-sans)", letterSpacing: "-.01em", margin: 0 }}>Per che gara ti alleni?</p>
                   <p className="font-serif-italic" style={{ fontSize: 14.5, color: "var(--inchiostro-70)", margin: "6px 0 0", lineHeight: 1.35 }}>
                     Hai <span className="font-mono" style={{ fontSize: 13.5, fontStyle: "normal" }}>{sessions}</span>{" "}
                     {sessions === 1 ? "seduta" : "sedute"} davanti. Dimmi la gara e rileggo quelle che hai già, per capire se ti ci portano.

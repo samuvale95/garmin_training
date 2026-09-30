@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton, SlideUp } from "@/components/motion/primitives";
+import { ChevronRight } from "@/components/Icons";
 import { FocusBlock, MetricRow, PacingBlock, TrendSection } from "@/components/TechniqueBlocks";
 import { useMountOnce } from "@/lib/motion";
 import { useActivities, useActivityForm, useCoachNarrative, useSportTrend } from "@/lib/queries";
@@ -72,7 +73,7 @@ export default function CoachPage() {
     <div style={{ padding: "22px 20px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/body" />
-        <h1 style={{ font: "600 20px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Tecnica</h1>
+        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Tecnica</h1>
       </div>
 
       {activitiesQuery.isPending ? (
@@ -97,13 +98,13 @@ export default function CoachPage() {
               style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card)", padding: "16px 18px", textDecoration: "none" }}
             >
               <div style={{ flex: 1 }}>
-                <p style={{ font: "600 15.5px/1.2 var(--font-outfit)", margin: 0 }}>Come ti alleni</p>
+                <p style={{ font: "600 15.5px/1.2 var(--font-sans)", margin: 0 }}>Come ti alleni</p>
                 <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-su-scuro)", margin: "6px 0 0", lineHeight: 1.35 }}>
                   Un anno di corse contro il riferimento della ricerca, e le sedute che
                   cambierebbero il quadro.
                 </p>
               </div>
-              <span aria-hidden="true" className="anim-chev" style={{ flex: "none", fontSize: 18 }}>→</span>
+              <ChevronRight size={18} style={{ color: "var(--crema)", flex: "none" }} />
             </Link>
           </SlideUp>
 
@@ -114,13 +115,13 @@ export default function CoachPage() {
               style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "15px 18px", textDecoration: "none", color: "inherit" }}
             >
               <div style={{ flex: 1 }}>
-                <p style={{ font: "600 15.5px/1.2 var(--font-outfit)", margin: 0 }}>Come ti alleni davvero</p>
+                <p style={{ font: "600 15.5px/1.2 var(--font-sans)", margin: 0 }}>Come ti alleni davvero</p>
                 <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-70)", margin: "6px 0 0", lineHeight: 1.35 }}>
                   Otto settimane di sedute lette secondo per secondo, contro quello che il piano
                   chiedeva e contro il riferimento della ricerca.
                 </p>
               </div>
-              <span aria-hidden="true" className="anim-chev" style={{ flex: "none", fontSize: 18 }}>→</span>
+              <ChevronRight size={18} style={{ color: "var(--inchiostro-50)", flex: "none" }} />
             </Link>
           </SlideUp>
 
@@ -269,7 +270,7 @@ function EmptyState() {
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: "15px 18px", marginTop: 10, textDecoration: "none", color: "inherit" }}
       >
         <span style={{ fontSize: 14.5, fontWeight: 600 }}>Controlla la connessione a Garmin</span>
-        <span aria-hidden="true" className="anim-chev">→</span>
+        <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
       </Link>
     </div>
   );

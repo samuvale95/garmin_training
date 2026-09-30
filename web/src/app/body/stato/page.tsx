@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton, SlideUp } from "@/components/motion/primitives";
+import { ChevronRight } from "@/components/Icons";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import { useBodyToday, useDayVerdict, useDayVerdictNarrative, useRaceGoal, useUpdateSession, useWeekWorkouts } from "@/lib/queries";
@@ -133,7 +134,7 @@ export default function DayStatePage() {
     <div style={{ padding: "22px 20px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/today" />
-        <h1 style={{ font: "600 20px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Stato del giorno</h1>
+        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Stato del giorno</h1>
         {goal && (
           <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "6px 12px" }}>
             {countdownLabel(goal)}
@@ -156,7 +157,7 @@ export default function DayStatePage() {
             <p className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", opacity: 0.7, margin: 0 }}>
               {header.overline}
             </p>
-            <p style={{ font: "600 26px/1.15 var(--font-outfit)", letterSpacing: "-.02em", margin: "10px 0 0" }}>{verdict.headline}</p>
+            <p style={{ font: "600 26px/1.15 var(--font-sans)", letterSpacing: "-.02em", margin: "10px 0 0" }}>{verdict.headline}</p>
             <p className="font-serif-italic" style={{ fontSize: 16, lineHeight: 1.35, margin: "12px 0 0", opacity: 0.92 }}>
               {narrativeQuery.data?.text ?? "Guarda i segnali qui sotto: sono le misure di stanotte, confrontate con le tue."}
             </p>
@@ -190,7 +191,7 @@ export default function DayStatePage() {
               <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
                 in alternativa
               </p>
-              <p style={{ font: "600 17px/1.25 var(--font-outfit)", margin: "8px 0 0" }}>{verdict.alternative.label}</p>
+              <p style={{ font: "600 17px/1.25 var(--font-sans)", margin: "8px 0 0" }}>{verdict.alternative.label}</p>
               <p className="font-serif-italic" style={{ fontSize: 14.5, color: "var(--inchiostro-70)", margin: "6px 0 0", lineHeight: 1.35 }}>
                 {verdict.alternative.detail}
               </p>
@@ -233,13 +234,13 @@ export default function DayStatePage() {
                 style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--sabbia)", border: "1px dashed var(--inchiostro-35)", borderRadius: "var(--radius-card)", padding: "15px 18px", textDecoration: "none", color: "inherit" }}
               >
                 <div style={{ flex: 1 }}>
-                  <p style={{ font: "600 15.5px/1.2 var(--font-outfit)", margin: 0 }}>Non so per che gara ti alleni</p>
+                  <p style={{ font: "600 15.5px/1.2 var(--font-sans)", margin: 0 }}>Non so per che gara ti alleni</p>
                   <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-70)", margin: "6px 0 0", lineHeight: 1.35 }}>
                     Con una data e una distanza so a che punto della preparazione sei, e l&apos;alternativa
                     che ti propongo cambia di conseguenza.
                   </p>
                 </div>
-                <span aria-hidden="true" className="anim-chev" style={{ flex: "none", fontSize: 18 }}>→</span>
+                <ChevronRight size={18} style={{ color: "var(--inchiostro-50)", flex: "none" }} />
               </Link>
             </SlideUp>
           )}
@@ -311,7 +312,7 @@ function SessionBlock({ verdict, animate }: { verdict: DayVerdict; animate: bool
         oggi in programma
       </p>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 7 }}>
-        <p style={{ font: "600 16px/1.25 var(--font-outfit)", margin: 0 }}>
+        <p style={{ font: "600 16px/1.25 var(--font-sans)", margin: 0 }}>
           {verdict.session_title ?? "Niente, è un giorno di riposo"}
         </p>
         {verdict.session_demand && (

@@ -126,7 +126,7 @@ export function FuelHero({ animate, fuel, narrativeText }: { animate: boolean; f
           </span>
         </div>
 
-        <p style={{ font: "600 26px/1.1 var(--font-outfit)", letterSpacing: "-.02em", margin: "8px 0 2px" }}>{title}</p>
+        <p style={{ font: "600 26px/1.1 var(--font-sans)", letterSpacing: "-.02em", margin: "8px 0 2px" }}>{title}</p>
         <p style={{ fontSize: 12.5, color: muted, margin: 0 }}>{formatFullDate(t.date)}</p>
 
         {t.carb_g ? (
@@ -275,7 +275,7 @@ export function TodayFuelBlock({
   return (
     <SlideUp active={animate} delayMs={240} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 18, marginTop: 12 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <p style={{ font: "600 18px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0 }}>Oggi</p>
+        <p style={{ font: "600 18px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0 }}>Oggi</p>
         <span
           className="font-mono"
           style={{
@@ -474,7 +474,7 @@ export function EnergyBlock({ animate, target }: { animate: boolean; target: Day
   return (
     <SlideUp active={animate} delayMs={280} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 18, marginTop: 12 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-        <p style={{ font: "600 18px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0 }}>I conti tornano?</p>
+        <p style={{ font: "600 18px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0 }}>I conti tornano?</p>
         <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>stima</span>
       </div>
 

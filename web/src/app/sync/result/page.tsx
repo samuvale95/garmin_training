@@ -74,7 +74,7 @@ function ResultScreenInner() {
         }}
       >
         <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", margin: 0 }}>scritte sul calendario</p>
-        <WordIn active={animate} delayMs={300} style={{ font: "600 52px/1 var(--font-outfit)", letterSpacing: "-.045em", marginTop: 8 }}>
+        <WordIn active={animate} delayMs={300} style={{ font: "600 52px/1 var(--font-sans)", letterSpacing: "-.045em", marginTop: 8 }}>
           {succeeded}
           <span style={{ fontSize: 24, opacity: 0.5 }}>/{total}</span>
         </WordIn>

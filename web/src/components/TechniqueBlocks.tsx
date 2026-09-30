@@ -86,7 +86,7 @@ export function PacingBlock({ pacing, animate, delayMs }: { pacing: PacingRead; 
         <VerdictChip verdict={pacing.verdict} />
       </div>
 
-      <p style={{ font: "600 17px/1.25 var(--font-outfit)", margin: "8px 0 0" }}>Split {pacing.kind}</p>
+      <p style={{ font: "600 17px/1.25 var(--font-sans)", margin: "8px 0 0" }}>Split {pacing.kind}</p>
 
       <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
         <Half label="prima metà" pace={pacing.first_half_pace_sec_per_km} />
@@ -124,7 +124,7 @@ export function FocusBlock({ form, animate, narrativeText }: { form: ActivityFor
       <p className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-su-scuro)", margin: 0 }}>
         il tuo allenatore
       </p>
-      <p style={{ font: "600 24px/1.15 var(--font-outfit)", letterSpacing: "-.02em", margin: "10px 0 0" }}>{form.headline}</p>
+      <p style={{ font: "600 24px/1.15 var(--font-sans)", letterSpacing: "-.02em", margin: "10px 0 0" }}>{form.headline}</p>
       <p className="font-serif-italic" style={{ fontSize: 16, lineHeight: 1.35, margin: "12px 0 0" }}>
         {narrativeText ?? form.focus ?? "Le misure qui sotto sono tutte dentro le loro fasce di riferimento."}
       </p>

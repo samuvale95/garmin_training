@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { SlideUp, WordIn } from "@/components/motion/primitives";
+import { PencilIcon } from "@/components/Icons";
 import { useMountOnce } from "@/lib/motion";
 import { useBodyMetrics } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
@@ -83,7 +84,7 @@ export default function BodySettingsPage() {
         <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}>impostazioni</span>
       </div>
 
-      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-outfit)", letterSpacing: "-.03em", margin: "16px 0 16px" }}>
+      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 16px" }}>
         Il tuo corpo
       </WordIn>
 
@@ -100,7 +101,7 @@ export default function BodySettingsPage() {
                 className="tap-target"
                 style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--sabbia-chip)", border: "none", borderRadius: "var(--radius-pill)", padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
               >
-                <span aria-hidden="true">✏️</span> modifica
+                <PencilIcon size={13} style={{ color: "var(--inchiostro)" }} /> modifica
               </button>
             )}
           </div>

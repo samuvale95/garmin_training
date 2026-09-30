@@ -41,7 +41,7 @@ export function GoalFitBlock({ fit, narrative, animate, delayMs = 0 }: { fit: Go
         <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", opacity: 0.75, margin: 0 }}>
           {style.overline}
         </p>
-        <p style={{ font: "600 19px/1.25 var(--font-outfit)", letterSpacing: "-.01em", margin: "8px 0 0" }}>{fit.headline}</p>
+        <p style={{ font: "600 19px/1.25 var(--font-sans)", letterSpacing: "-.01em", margin: "8px 0 0" }}>{fit.headline}</p>
         <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.35, margin: "8px 0 0", opacity: 0.92 }}>
           {narrative ?? "Ho riletto le sedute che hai già, da oggi alla gara."}
         </p>

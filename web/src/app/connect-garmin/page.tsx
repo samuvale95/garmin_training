@@ -53,10 +53,10 @@ export default function ConnectGarminPage() {
       </div>
 
       <div style={{ marginTop: 24 }}>
-        <WordIn active={animate} delayMs={0} style={{ font: "600 34px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>
+        <WordIn active={animate} delayMs={0} style={{ font: "600 34px/1.04 var(--font-sans)", letterSpacing: "-.035em" }}>
           Un passo
         </WordIn>
-        <WordIn active={animate} delayMs={100} style={{ font: "600 34px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>
+        <WordIn active={animate} delayMs={100} style={{ font: "600 34px/1.04 var(--font-sans)", letterSpacing: "-.035em" }}>
           e non ci pensi più
         </WordIn>
       </div>

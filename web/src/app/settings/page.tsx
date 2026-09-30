@@ -7,7 +7,8 @@ import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
 import { RefreshButton } from "@/components/RefreshButton";
-import { StatusDot } from "@/components/motion/primitives";
+import { SlideUp, StatusDot } from "@/components/motion/primitives";
+import { ChevronRight } from "@/components/Icons";
 import { useAthleteLevel, useClearPlan, useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, usePlanQuery, useResetAllLocalData, useStravaStatus } from "@/lib/queries";
 import { useAthleteIdentity } from "@/lib/identity";
 import { signOut } from "@/lib/auth";
@@ -48,258 +49,286 @@ export default function SettingsPage() {
 
   return (
     <div style={{ padding: "24px 22px 40px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <PageHeader />
-        <BrandMark height={22} />
-      </div>
-      <h1 style={{ font: "600 28px/1.06 var(--font-outfit)", letterSpacing: "-.03em", margin: "18px 0 16px" }}>Il tuo profilo</h1>
-
-      <Card>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Avatar size={40} />
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-            {/* Name and photo come from the connected account (Strava first, Garmin
-                second): there's a real one to show, so typing a second one by hand
-                would only be a way to disagree with it. The hand-typed name stays for
-                anyone with neither account connected. */}
-            {identity.source === "strava" || identity.source === "garmin" ? (
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                <span style={{ fontSize: 15, fontWeight: 600 }}>{identity.name}</span>
-                <span style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
-                  da {identity.source === "strava" ? "Strava" : "Garmin"}
-                </span>
-              </div>
-            ) : (
-              <input
-                value={profile.name}
-                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                placeholder="Il tuo nome"
-                style={{ border: "none", background: "none", fontSize: 15, fontWeight: 600, padding: 0, outline: "none" }}
-              />
-            )}
-            <input
-              value={profile.email}
-              onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-              placeholder="la tua email"
-              style={{ border: "none", background: "none", fontSize: 12, color: "var(--inchiostro-50)", padding: 0, outline: "none" }}
-            />
-          </div>
-        </div>
-      </Card>
-
-      <Card>
-        <p style={{ fontWeight: 600, margin: "0 0 4px" }}>Connessioni</p>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
-          <StatusDot kind={garminStatus?.connected ? "active" : "error"} />
-          <span style={{ fontSize: 14, flex: 1 }}>Garmin Connect</span>
-          <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
-            {garminStatus?.connected
-              ? garminStatus.session_expires_in_days != null
-                ? `collegato · sessione valida per ${garminStatus.session_expires_in_days} giorni`
-                : "collegato"
-              : "non collegato"}
-          </span>
-        </div>
-        {garminStatus?.connected ? (
-          <button
-            type="button"
-            onClick={() => disconnect.mutate(undefined, { onSuccess: () => router.push("/connect-garmin") })}
-            disabled={disconnect.isPending}
-            className="tap-target"
-            style={{ marginTop: 10, background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}
-          >
-            scollega
-          </button>
-        ) : (
-          // A Link, not a router.push: Next prefetches the route so the tap lands on a
-          // ready screen instead of compiling/fetching it first.
-          <Link
-            href="/connect-garmin"
-            className="tap-target"
-            style={{ display: "inline-block", marginTop: 10, color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
-          >
-            Collega ora
-          </Link>
-        )}
-        {garminStatus?.connected && device?.device_name && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--sabbia-bordo)" }}>
-            <span style={{ fontSize: 14, flex: 1 }}>Orologio</span>
-            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
-              {device.device_name}
-              {device.last_synced_at && ` · sync ${minutesAgo(device.last_synced_at)} min fa`}
-            </span>
-          </div>
-        )}
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--sabbia-bordo)" }}>
-          <StatusDot kind={stravaStatus?.connected ? "active" : "error"} />
-          <span style={{ fontSize: 14, flex: 1 }}>Strava</span>
-          <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{stravaStatus?.connected ? "collegato" : "non collegato"}</span>
-        </div>
-        {stravaStatus?.connected ? (
-          <button
-            type="button"
-            onClick={() => disconnectStrava.mutate()}
-            disabled={disconnectStrava.isPending}
-            className="tap-target"
-            style={{ marginTop: 10, background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}
-          >
-            scollega Strava
-          </button>
-        ) : (
-          <Link
-            href="/connect-strava"
-            className="tap-target"
-            style={{ display: "inline-block", marginTop: 10, color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
-          >
-            collega
-          </Link>
-        )}
-      </Card>
-
-      <Card>
-        <Link href="/shoes?from=/settings" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ flex: 1 }}>
-            <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Scarpe</span>
-            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>usura, da Strava</span>
-          </span>
-          <span aria-hidden="true">›</span>
-        </Link>
-      </Card>
-
-      <Card>
-        <Link href="/settings/goal" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ flex: 1 }}>
-            <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Obiettivo</span>
-            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
-              {plan?.goal ? `${goalTitle(plan.goal)} · ${countdownLabel(plan.goal)}` : "la gara che stai preparando"}
-            </span>
-          </span>
-          <span aria-hidden="true">›</span>
-        </Link>
-      </Card>
-
-      <Card>
-        <Link href="/settings/level" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ flex: 1 }}>
-            <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Livello</span>
-            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
-              {athleteLevel ? `Livello ${athleteLevel.level} · ${athleteLevel.level_name}` : "da abitudine ad atleta"}
-            </span>
-          </span>
-          <span aria-hidden="true">›</span>
-        </Link>
-      </Card>
-
-      <Card>
-        <Link href="/settings/body" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ flex: 1 }}>
-            <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Il tuo corpo</span>
-            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>peso, altezza, età</span>
-          </span>
-          <span aria-hidden="true">›</span>
-        </Link>
-      </Card>
-
-      <Card>
-        <p style={{ fontWeight: 600, margin: "0 0 4px" }}>Preferenze</p>
-        <Toggle label="Avvisami se il corpo non regge" checked={prefs.avvisamiSeIlCorpoNonRegge} onChange={(v) => setPref("avvisamiSeIlCorpoNonRegge", v)} />
-        <Toggle label="Chiedi prima di cancellare" checked={prefs.chiediPrimaDiCancellare} onChange={(v) => setPref("chiediPrimaDiCancellare", v)} />
-        <Toggle label="Meno movimento" checked={prefs.menoMovimento} onChange={(v) => setPref("menoMovimento", v)} />
-      </Card>
-
-      <div style={{ background: "var(--azzurro)", color: "var(--azzurro-testo)", borderRadius: "var(--radius-card)", padding: 18, marginTop: 12 }}>
-        <p style={{ fontWeight: 600, margin: "0 0 8px" }}>Il file resta la verità</p>
-        <p className="font-serif-italic" style={{ fontSize: 13, margin: "0 0 12px" }}>
-          Ogni modifica fatta dall&apos;app te la riscrivo dentro, e puoi riscaricarlo quando vuoi.
-        </p>
-        <button
-          type="button"
-          disabled={!plan}
-          onClick={() => plan && downloadPlanYaml(plan.sessions, plan.filename ?? "piano.yaml", plan.goal)}
-          className="tap-target"
-          style={{
-            background: "none",
-            color: "var(--azzurro-testo)",
-            border: "none",
-            fontSize: 13,
-            fontWeight: 700,
-            padding: 0,
-            cursor: plan ? "pointer" : "default",
-            opacity: plan ? 1 : 0.5,
-          }}
-        >
-          Scarica {plan?.filename ?? "il YAML"}
-        </button>
-      </div>
-
-      <Card>
-        <p style={{ fontWeight: 600, margin: "0 0 4px" }}>Dati da Garmin e Strava</p>
-        <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-50)", margin: "0 0 10px" }}>
-          Li tengo in cache per qualche minuto, così l&apos;app resta immediata. Se sull&apos;orologio vedi qualcosa che
-          qui non c&apos;è ancora, chiedili di nuovo adesso.
-        </p>
-        <RefreshButton />
-      </Card>
-
-      <div style={{ background: "var(--rosa-avviso)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 20 }}>
-        <p style={{ fontWeight: 600, margin: "0 0 4px", color: "var(--rosso-testo)" }}>Qualcosa non torna?</p>
-        <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--rosso-testo)", margin: "0 0 10px" }}>
-          Cancella piano, preferenze e ogni dato salvato sul telefono. Non tocca Garmin o Strava: dopo il ripristino
-          l&apos;app riparte dal calendario Garmin, senza nulla di locale che possa essere disallineato.
-        </p>
+      <SlideUp delayMs={0}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button
-            type="button"
-            onClick={handleReset}
-            className="tap-target"
-            style={{
-              background: confirmReset ? "var(--rosso-forte)" : "none",
-              color: confirmReset ? "var(--crema)" : "var(--rosso-forte)",
-              border: confirmReset ? "none" : "1.5px solid var(--rosso-forte)",
-              borderRadius: "var(--radius-pill)",
-              padding: "9px 16px",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            {confirmReset ? "Conferma: cancella tutto" : "Ripristina tutto"}
-          </button>
-          {confirmReset && (
+          <PageHeader />
+          <BrandMark height={22} />
+        </div>
+        <h1 style={{ font: "600 28px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "18px 0 16px" }}>Il tuo profilo</h1>
+      </SlideUp>
+
+      <SlideUp delayMs={30}>
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Avatar size={40} />
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+              {identity.source === "strava" || identity.source === "garmin" ? (
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <span style={{ fontSize: 15, fontWeight: 600 }}>{identity.name}</span>
+                  <span style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
+                    da {identity.source === "strava" ? "Strava" : "Garmin"}
+                  </span>
+                </div>
+              ) : (
+                <input
+                  value={profile.name}
+                  onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                  placeholder="Il tuo nome"
+                  style={{ border: "none", background: "none", fontSize: 15, fontWeight: 600, padding: 0, outline: "none" }}
+                />
+              )}
+              <input
+                value={profile.email}
+                onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                placeholder="la tua email"
+                style={{ border: "none", background: "none", fontSize: 12, color: "var(--inchiostro-50)", padding: 0, outline: "none" }}
+              />
+            </div>
+          </div>
+        </Card>
+      </SlideUp>
+
+      <SlideUp delayMs={60}>
+        <Card>
+          <p style={{ fontWeight: 600, margin: "0 0 4px" }}>Connessioni</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+            <StatusDot kind={garminStatus?.connected ? "active" : "error"} />
+            <span style={{ fontSize: 14, flex: 1 }}>Garmin Connect</span>
+            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
+              {garminStatus?.connected
+                ? garminStatus.session_expires_in_days != null
+                  ? `collegato · sessione valida per ${garminStatus.session_expires_in_days} giorni`
+                  : "collegato"
+                : "non collegato"}
+            </span>
+          </div>
+          {garminStatus?.connected ? (
             <button
               type="button"
-              onClick={() => setConfirmReset(false)}
+              onClick={() => disconnect.mutate(undefined, { onSuccess: () => router.push("/connect-garmin") })}
+              disabled={disconnect.isPending}
               className="tap-target"
-              style={{ background: "none", border: "none", color: "var(--rosso-testo)", fontSize: 12, cursor: "pointer" }}
+              style={{ marginTop: 10, background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}
             >
-              Annulla
+              scollega
             </button>
+          ) : (
+            <Link
+              href="/connect-garmin"
+              className="tap-target"
+              style={{ display: "inline-block", marginTop: 10, color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
+            >
+              Collega ora
+            </Link>
           )}
-        </div>
-      </div>
+          {garminStatus?.connected && device?.device_name && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--sabbia-bordo)" }}>
+              <span style={{ fontSize: 14, flex: 1 }}>Orologio</span>
+              <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
+                {device.device_name}
+                {device.last_synced_at && ` · sync ${minutesAgo(device.last_synced_at)} min fa`}
+              </span>
+            </div>
+          )}
 
-      <button
-        type="button"
-        onClick={async () => {
-          clearPlan();
-          await signOut();
-          // Hard navigation, not router.push: AuthGate reads the Supabase session on
-          // mount, and a signed-out user has no reason to keep any client-side query
-          // cache (someone else's Garmin/Strava reads) around for the next sign-in.
-          window.location.href = "/login";
-        }}
-        className="tap-target"
-        style={{ display: "block", width: "100%", background: "none", border: "none", color: "var(--rosso-forte)", fontSize: 14, fontWeight: 600, marginTop: 24, cursor: "pointer" }}
-      >
-        Esci da Passo
-      </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--sabbia-bordo)" }}>
+            <StatusDot kind={stravaStatus?.connected ? "active" : "error"} />
+            <span style={{ fontSize: 14, flex: 1 }}>Strava</span>
+            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{stravaStatus?.connected ? "collegato" : "non collegato"}</span>
+          </div>
+          {stravaStatus?.connected ? (
+            <button
+              type="button"
+              onClick={() => disconnectStrava.mutate()}
+              disabled={disconnectStrava.isPending}
+              className="tap-target"
+              style={{ marginTop: 10, background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}
+            >
+              scollega Strava
+            </button>
+          ) : (
+            <Link
+              href="/connect-strava"
+              className="tap-target"
+              style={{ display: "inline-block", marginTop: 10, color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
+            >
+              collega
+            </Link>
+          )}
+        </Card>
+      </SlideUp>
+
+      <SlideUp delayMs={90}>
+        <Card>
+          <Link href="/shoes?from=/settings" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ flex: 1 }}>
+              <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Scarpe</span>
+              <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>usura, da Strava</span>
+            </span>
+            <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
+          </Link>
+        </Card>
+      </SlideUp>
+
+      <SlideUp delayMs={110}>
+        <Card>
+          <Link href="/settings/goal" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ flex: 1 }}>
+              <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Obiettivo</span>
+              <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
+                {plan?.goal ? `${goalTitle(plan.goal)} · ${countdownLabel(plan.goal)}` : "la gara che stai preparando"}
+              </span>
+            </span>
+            <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
+          </Link>
+        </Card>
+      </SlideUp>
+
+      <SlideUp delayMs={130}>
+        <Card>
+          <Link href="/settings/level" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ flex: 1 }}>
+              <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Livello</span>
+              <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
+                {athleteLevel ? `Livello ${athleteLevel.level} · ${athleteLevel.level_name}` : "da abitudine ad atleta"}
+              </span>
+            </span>
+            <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
+          </Link>
+        </Card>
+      </SlideUp>
+
+      <SlideUp delayMs={150}>
+        <Card>
+          <Link href="/settings/body" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ flex: 1 }}>
+              <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Il tuo corpo</span>
+              <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>peso, altezza, età</span>
+            </span>
+            <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
+          </Link>
+        </Card>
+      </SlideUp>
+
+      <SlideUp delayMs={170}>
+        <Card>
+          <p style={{ fontWeight: 600, margin: "0 0 4px" }}>Preferenze</p>
+          <Toggle label="Avvisami se il corpo non regge" checked={prefs.avvisamiSeIlCorpoNonRegge} onChange={(v) => setPref("avvisamiSeIlCorpoNonRegge", v)} />
+          <Toggle label="Chiedi prima di cancellare" checked={prefs.chiediPrimaDiCancellare} onChange={(v) => setPref("chiediPrimaDiCancellare", v)} />
+          <Toggle label="Meno movimento" checked={prefs.menoMovimento} onChange={(v) => setPref("menoMovimento", v)} />
+        </Card>
+      </SlideUp>
+
+      <SlideUp delayMs={190}>
+        <div style={{ background: "var(--azzurro)", color: "var(--azzurro-testo)", border: "1px solid var(--border-airbnb)", borderRadius: 20, padding: 18, marginTop: 12, boxShadow: "var(--shadow-airbnb-subtle)" }}>
+          <p style={{ fontWeight: 600, margin: "0 0 8px" }}>Il file resta la verità</p>
+          <p className="font-serif-italic" style={{ fontSize: 13, margin: "0 0 12px" }}>
+            Ogni modifica fatta dall&apos;app te la riscrivo dentro, e puoi riscaricarlo quando vuoi.
+          </p>
+          <button
+            type="button"
+            disabled={!plan}
+            onClick={() => plan && downloadPlanYaml(plan.sessions, plan.filename ?? "piano.yaml", plan.goal)}
+            className="tap-target"
+            style={{
+              background: "none",
+              color: "var(--azzurro-testo)",
+              border: "none",
+              fontSize: 13,
+              fontWeight: 700,
+              padding: 0,
+              cursor: plan ? "pointer" : "default",
+              opacity: plan ? 1 : 0.5,
+            }}
+          >
+            Scarica {plan?.filename ?? "il YAML"}
+          </button>
+        </div>
+      </SlideUp>
+
+      <SlideUp delayMs={210}>
+        <Card>
+          <p style={{ fontWeight: 600, margin: "0 0 4px" }}>Dati da Garmin e Strava</p>
+          <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-50)", margin: "0 0 10px" }}>
+            Li tengo in cache per qualche minuto, così l&apos;app resta immediata. Se sull&apos;orologio vedi qualcosa che
+            qui non c&apos;è ancora, chiedili di nuovo adesso.
+          </p>
+          <RefreshButton />
+        </Card>
+      </SlideUp>
+
+      <SlideUp delayMs={230}>
+        <div style={{ background: "var(--rosa-avviso)", border: "1px solid rgba(179,74,32,0.15)", borderRadius: 20, padding: 16, marginTop: 20, boxShadow: "var(--shadow-airbnb-subtle)" }}>
+          <p style={{ fontWeight: 600, margin: "0 0 4px", color: "var(--rosso-testo)" }}>Qualcosa non torna?</p>
+          <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--rosso-testo)", margin: "0 0 10px" }}>
+            Cancella piano, preferenze e ogni dato salvato sul telefono. Non tocca Garmin o Strava: dopo il ripristino
+            l&apos;app riparte dal calendario Garmin, senza nulla di locale che possa essere disallineato.
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="tap-target"
+              style={{
+                background: confirmReset ? "var(--rosso-forte)" : "none",
+                color: confirmReset ? "var(--crema)" : "var(--rosso-forte)",
+                border: confirmReset ? "none" : "1.5px solid var(--rosso-forte)",
+                borderRadius: "var(--radius-pill)",
+                padding: "9px 16px",
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {confirmReset ? "Conferma: cancella tutto" : "Ripristina tutto"}
+            </button>
+            {confirmReset && (
+              <button
+                type="button"
+                onClick={() => setConfirmReset(false)}
+                className="tap-target"
+                style={{ background: "none", border: "none", color: "var(--rosso-testo)", fontSize: 12, cursor: "pointer" }}
+              >
+                Annulla
+              </button>
+            )}
+          </div>
+        </div>
+      </SlideUp>
+
+      <SlideUp delayMs={250}>
+        <button
+          type="button"
+          onClick={async () => {
+            clearPlan();
+            await signOut();
+            window.location.href = "/login";
+          }}
+          className="tap-target"
+          style={{ display: "block", width: "100%", background: "none", border: "none", color: "var(--rosso-forte)", fontSize: 14, fontWeight: 600, marginTop: 24, cursor: "pointer" }}
+        >
+          Esci da Passo
+        </button>
+      </SlideUp>
     </div>
   );
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 12 }}>{children}</div>;
+  return (
+    <div
+      style={{
+        background: "var(--crema-card)",
+        border: "1px solid var(--border-airbnb)",
+        borderRadius: 20,
+        padding: 16,
+        marginTop: 12,
+        boxShadow: "var(--shadow-airbnb-subtle)",
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {

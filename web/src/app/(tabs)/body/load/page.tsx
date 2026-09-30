@@ -175,7 +175,7 @@ export default function LoadPage() {
       ) : (
         <>
           <div style={{ marginTop: 14 }}>
-            <WordIn active={animate} style={{ font: "600 30px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>{headline}</WordIn>
+            <WordIn active={animate} style={{ font: "600 30px/1.04 var(--font-sans)", letterSpacing: "-.035em" }}>{headline}</WordIn>
           </div>
           <p className="font-serif-italic" style={{ fontSize: 15.5, color: "var(--inchiostro-70)" }}>{caption}</p>
 
@@ -241,7 +241,7 @@ export default function LoadPage() {
           <div style={{ display: "flex", gap: 9, marginTop: 12 }}>
             <SlideUp active={animate} delayMs={250} style={{ flex: 1, background: "var(--verde)", color: "var(--verde-testo)", borderRadius: "var(--radius-card)", padding: 14 }}>
               <p style={{ fontSize: 11, textTransform: "uppercase", margin: "0 0 4px" }}>Stato</p>
-              <p style={{ font: "600 18px/1 var(--font-outfit)", margin: 0 }}>{loadState(data?.acute_chronic_ratio ?? null).label}</p>
+              <p style={{ font: "600 18px/1 var(--font-sans)", margin: 0 }}>{loadState(data?.acute_chronic_ratio ?? null).label}</p>
               <p style={{ fontSize: 11, margin: "6px 0 0" }}>{loadState(data?.acute_chronic_ratio ?? null).caption}</p>
             </SlideUp>
             <SlideUp active={animate} delayMs={280} style={{ flex: 1, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14 }}>

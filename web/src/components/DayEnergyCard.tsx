@@ -22,7 +22,7 @@ export function DayEnergyCard({ energy, numbers, animate, delayMs = 0 }: { energ
           padding: 18,
         }}
       >
-        <p style={{ font: "600 18px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0 }}>La tua giornata</p>
+        <p style={{ font: "600 18px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0 }}>La tua giornata</p>
 
       {energy.activities.length > 0 && (
         <ul style={{ listStyle: "none", padding: 0, margin: "12px 0 0", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -67,7 +67,7 @@ export function DayEnergyCard({ energy, numbers, animate, delayMs = 0 }: { energ
 function Figure({ label, value, muted = false }: { label: string; value: number; muted?: boolean }) {
   return (
     <div style={{ flex: 1, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 12, opacity: muted ? 0.6 : 1 }}>
-      <p style={{ font: "500 11px var(--font-outfit)", color: "var(--inchiostro-50)", margin: 0 }}>{label}</p>
+      <p style={{ font: "500 11px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>{label}</p>
       <p className="font-mono" style={{ fontSize: 20, fontWeight: 500, margin: "6px 0 0" }}>
         {value} <span style={{ fontSize: 11 }}>kcal</span>
       </p>

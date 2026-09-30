@@ -14,6 +14,7 @@ import { Mascot, Tokens } from "@/components/ProgressBits";
 import { RaceGoalCard } from "@/components/RaceGoalCard";
 import { TiltCard } from "@/components/motion/TiltCard";
 import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/motion/primitives";
+import { ChevronRight, ArrowRight, ArrowUpRight } from "@/components/Icons";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import {
@@ -131,7 +132,7 @@ export default function TodayPage() {
       <div style={{ padding: "22px 20px 12px" }}>
         <TodayHeader />
         <div style={{ marginTop: 18 }}>
-          <WordIn active={animate} style={{ font: "600 34px/1.04 var(--font-outfit)", letterSpacing: "-.035em" }}>Il tuo oggi</WordIn>
+          <WordIn active={animate} style={{ font: "600 34px/1.04 var(--font-sans)", letterSpacing: "-.035em" }}>Il tuo oggi</WordIn>
         </div>
         <div style={{ marginTop: 16 }}>
           <SkeletonTodayHero />
@@ -203,7 +204,7 @@ export default function TodayPage() {
                 <p className="font-mono" style={{ fontSize: 12, opacity: 0.7, margin: "0 0 6px" }}>
                   {relativeDayLabel(heroSession.date, today)} · {formatFullDate(heroSession.date)}
                 </p>
-                <p style={{ font: "600 22px/1.15 var(--font-outfit)", margin: "0 0 8px", maxWidth: 200 }}>{heroSession.title}</p>
+                <p style={{ font: "600 22px/1.15 var(--font-sans)", margin: "0 0 8px", maxWidth: 200 }}>{heroSession.title}</p>
                 {heroMainGroup && (
                   <p className="font-mono" style={{ fontSize: 13, opacity: 0.85, margin: 0, maxWidth: 200 }}>{stepGroupLine(heroMainGroup)}</p>
                 )}
@@ -230,15 +231,16 @@ export default function TodayPage() {
               float
             />
           </div>
-          <Link href={heroHref} className="tap-target today-hero-action">
-            {heroSession ? "Vedi allenamento" : "Esplora la settimana"}<span aria-hidden="true">↗</span>
+          <Link href={heroHref} className="tap-target today-hero-action" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span>{heroSession ? "Vedi allenamento" : "Esplora la settimana"}</span>
+            <ArrowUpRight size={15} />
           </Link>
         </TiltCard>
       </SlideUp>
 
-      <DayStateCard verdict={verdictQuery.data} narrative={verdictNarrative.data?.text} animate={animate} delayMs={260} />
+      <DayStateCard verdict={verdictQuery.data} narrative={verdictNarrative.data?.text} animate={animate} delayMs={120} />
 
-      {hasPlan && <AdaptationCard animate={animate} delayMs={280} />}
+      {hasPlan && <AdaptationCard animate={animate} delayMs={140} />}
 
       {checkInDay && (
         <CheckInCard
@@ -248,13 +250,13 @@ export default function TodayPage() {
           trained={trainedOn(checkInDay === "oggi" ? todayKey : yesterdayKey)}
           existing={checkInOn(checkInDay === "oggi" ? todayKey : yesterdayKey)}
           animate={animate}
-          delayMs={290}
+          delayMs={150}
         />
       )}
 
       {progress.data && (
         <Link href="/progress" style={{ textDecoration: "none", color: "inherit" }}>
-          <SlideUp active={animate} delayMs={295}>
+          <SlideUp active={animate} delayMs={160}>
             <motion.div
               whileHover={{ y: -2.5, scale: 1.012 }}
               whileTap={{ scale: 0.98 }}
@@ -283,7 +285,7 @@ export default function TodayPage() {
                   </span>
                 </div>
               </div>
-              <span className="anim-chev" aria-hidden="true">→</span>
+              <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
             </motion.div>
           </SlideUp>
         </Link>
@@ -291,7 +293,7 @@ export default function TodayPage() {
 
       {earlyInWeek && lastWeek.data && lastWeek.data.done_sessions + lastWeek.data.planned_sessions > 0 && (
         <Link href="/summary" style={{ textDecoration: "none", color: "inherit" }}>
-          <SlideUp active={animate} delayMs={300}>
+          <SlideUp active={animate} delayMs={170}>
             <motion.div
               whileHover={{ y: -2.5, scale: 1.012 }}
               whileTap={{ scale: 0.98 }}
@@ -309,10 +311,10 @@ export default function TodayPage() {
               }}
             >
               <div style={{ flex: 1 }}>
-                <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: 0 }}>La settimana scorsa</p>
+                <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>La settimana scorsa</p>
                 <p style={{ fontSize: 14, margin: "3px 0 0" }}>{lastWeek.data.headline}</p>
               </div>
-              <span className="anim-chev" aria-hidden="true">→</span>
+              <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
             </motion.div>
           </SlideUp>
         </Link>
@@ -326,7 +328,7 @@ export default function TodayPage() {
           access.plan ? access.plan.sessions.filter((s) => s.date >= todayKey).length : liveLookahead.data?.workouts.length ?? 0
         }
         animate={animate}
-        delayMs={320}
+        delayMs={180}
       />
 
       <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
@@ -374,16 +376,16 @@ export default function TodayPage() {
 
       {liveMode ? (
         <Link href="/import" style={{ textDecoration: "none", color: "inherit" }}>
-          <SlideUp active={animate} delayMs={580} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
+          <SlideUp active={animate} delayMs={200} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
             <p className="font-serif-italic" style={{ fontSize: 15, margin: 0, flex: 1 }}>
               Questo è il calendario Garmin. Importa un piano per i dettagli di ogni seduta.
             </p>
-            <span className="anim-chev" aria-hidden="true">→</span>
+            <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
           </SlideUp>
         </Link>
       ) : pendingChanges > 0 ? (
         <Link href="/diff" style={{ textDecoration: "none", color: "inherit" }}>
-          <SlideUp active={animate} delayMs={580} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
+          <SlideUp active={animate} delayMs={200} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
             <PulseRing size={8} />
             <div style={{ flex: 1 }}>
               <p style={{ fontWeight: 600, fontSize: 15, margin: "0 0 2px" }}>
@@ -395,12 +397,12 @@ export default function TodayPage() {
               aria-hidden="true"
               style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--inchiostro)", color: "var(--crema)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}
             >
-              →
+              <ArrowRight size={16} strokeWidth={2.4} />
             </span>
           </SlideUp>
         </Link>
       ) : (
-        <SlideUp active={animate} delayMs={580} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 4px", marginTop: 10 }}>
+        <SlideUp active={animate} delayMs={200} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 4px", marginTop: 10 }}>
           <StatusDot kind="active" size={7} />
           <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>in pari col calendario</span>
         </SlideUp>
@@ -412,7 +414,7 @@ export default function TodayPage() {
           one. */}
       {restOfWeek.length > 0 && (
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 20, padding: "0 2px 6px" }}>
-          <span style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)" }}>resto della settimana</span>
+          <span style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)" }}>resto della settimana</span>
           {remainingKm > 0 && (
             <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-35)" }}>{remainingKm.toFixed(1).replace(".0", "")} km</span>
           )}
@@ -427,7 +429,7 @@ export default function TodayPage() {
             <SlideUp
               key={`${session.date}-${i}`}
               active={animate}
-              delayMs={720 + i * 80}
+              delayMs={220 + i * 30}
               row
             >
               <motion.div
@@ -442,10 +444,10 @@ export default function TodayPage() {
                   borderTop: "1px solid var(--sabbia-bordo)",
                 }}
               >
-                <span style={{ font: "500 11px var(--font-outfit)", color: "var(--inchiostro-35)", width: 34, flex: "none" }}>
+                <span style={{ font: "500 11px var(--font-sans)", color: "var(--inchiostro-35)", width: 34, flex: "none" }}>
                   {new Date(session.date).toLocaleDateString("it-IT", { weekday: "short" })}
                 </span>
-                <span style={{ font: "500 13.5px var(--font-outfit)", flex: 1 }}>{session.title}</span>
+                <span style={{ font: "500 13.5px var(--font-sans)", flex: 1 }}>{session.title}</span>
                 {match?.matched && match.distance_km != null ? (
                   <span className="font-mono" style={{ fontSize: 11, color: "var(--verde-tratto-scuro)", width: 60, textAlign: "right", flex: "none" }}>
                     svolto {match.distance_km.toFixed(0)}
@@ -456,7 +458,7 @@ export default function TodayPage() {
                   </span>
                 )}
                 <div style={{ width: 70, height: 4, flex: "none" }}>
-                  <BarGrow value={Math.min(1, km / 20)} height={4} color={visual.background} trackColor="var(--sabbia-chip)" active={animate} delayMs={800 + i * 80} />
+                  <BarGrow value={Math.min(1, km / 20)} height={4} color={visual.background} trackColor="var(--sabbia-chip)" active={animate} delayMs={250 + i * 30} />
                 </div>
               </motion.div>
             </SlideUp>
@@ -518,15 +520,15 @@ function MetricCard({
           boxShadow: "var(--shadow-airbnb-subtle)",
         }}
       >
-        <p style={{ font: "500 11.5px var(--font-outfit)", color: color ? undefined : "var(--inchiostro-50)", opacity: color ? 0.7 : 1, margin: 0 }}>{label}</p>
+        <p style={{ font: "500 11.5px var(--font-sans)", color: color ? undefined : "var(--inchiostro-50)", opacity: color ? 0.7 : 1, margin: 0 }}>{label}</p>
         <div style={{ marginTop: 8, overflow: "hidden" }}>
-          <WordIn active={active} delayMs={delay + 160} style={{ font: "600 25px/1 var(--font-outfit)", letterSpacing: "-.03em" }}>
+          <WordIn active={active} delayMs={delay + 50} style={{ font: "600 25px/1 var(--font-sans)", letterSpacing: "-.03em" }}>
             {value}
             {unit && <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}> {unit}</span>}
           </WordIn>
         </div>
         <div style={{ marginTop: 11 }}>
-          <BarGrow value={fraction} height={4} color={barColor} trackColor="rgba(0,0,0,.08)" active={active} delayMs={delay + 260} />
+          <BarGrow value={fraction} height={4} color={barColor} trackColor="rgba(0,0,0,.08)" active={active} delayMs={delay + 100} />
         </div>
       </motion.div>
     </SlideUp>

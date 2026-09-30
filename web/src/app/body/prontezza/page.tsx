@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { ProgressRing, Skeleton, SlideUp } from "@/components/motion/primitives";
+import { ChevronRight } from "@/components/Icons";
 import { READINESS_BANDS, ReadinessFactorList, SleepPhaseLegend, readinessBand } from "@/components/BodyCards";
 import { useMountOnce } from "@/lib/motion";
 import { useBodyToday } from "@/lib/queries";
@@ -30,7 +31,7 @@ export default function ReadinessPage() {
     <div style={{ padding: "22px 20px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/body" />
-        <h1 style={{ font: "600 20px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>
+        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>
           Prontezza
         </h1>
       </div>
@@ -71,7 +72,7 @@ export default function ReadinessPage() {
               <p className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", opacity: 0.7, margin: 0 }}>
                 su 100
               </p>
-              <p style={{ font: "600 22px/1.15 var(--font-outfit)", letterSpacing: "-.02em", margin: "6px 0 0" }}>
+              <p style={{ font: "600 22px/1.15 var(--font-sans)", letterSpacing: "-.02em", margin: "6px 0 0" }}>
                 Prontezza {band?.label}
               </p>
               <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.35, margin: "8px 0 0", opacity: 0.92 }}>
@@ -163,13 +164,13 @@ export default function ReadinessPage() {
               }}
             >
               <div style={{ flex: 1 }}>
-                <p style={{ font: "600 15.5px/1.2 var(--font-outfit)", margin: 0 }}>E l&apos;allenamento di oggi?</p>
+                <p style={{ font: "600 15.5px/1.2 var(--font-sans)", margin: 0 }}>E l&apos;allenamento di oggi?</p>
                 <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-70)", margin: "6px 0 0", lineHeight: 1.35 }}>
                   Questo è il punteggio dell&apos;orologio. Il giudizio su cosa farne è in Stato del
                   giorno, e usa anche il carico e la seduta in programma.
                 </p>
               </div>
-              <span aria-hidden="true" className="anim-chev" style={{ flex: "none", fontSize: 18 }}>→</span>
+              <ChevronRight size={18} style={{ color: "var(--inchiostro-50)", flex: "none" }} />
             </Link>
           </SlideUp>
 

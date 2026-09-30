@@ -68,7 +68,7 @@ export default function FuelHistoryPage() {
         <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}>carburante · settimana {isoWeekNumber(new Date())}</span>
       </div>
 
-      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-outfit)", letterSpacing: "-.03em", margin: "16px 0 16px" }}>
+      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 16px" }}>
         Sette giorni
       </WordIn>
 

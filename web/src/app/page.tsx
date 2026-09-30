@@ -55,13 +55,13 @@ export default function EntryPage() {
       </div>
 
       <div style={{ marginTop: 32 }}>
-        <WordIn active={animate} delayMs={0} style={{ font: "600 40px/1 var(--font-outfit)", letterSpacing: "-.04em" }}>
+        <WordIn active={animate} delayMs={0} style={{ font: "600 40px/1 var(--font-sans)", letterSpacing: "-.04em" }}>
           Il piano
         </WordIn>
-        <WordIn active={animate} delayMs={100} style={{ font: "600 40px/1.06 var(--font-outfit)", letterSpacing: "-.04em" }}>
+        <WordIn active={animate} delayMs={100} style={{ font: "600 40px/1.06 var(--font-sans)", letterSpacing: "-.04em" }}>
           scritto una
         </WordIn>
-        <WordIn active={animate} delayMs={200} style={{ font: "600 40px/1.06 var(--font-outfit)", letterSpacing: "-.04em", color: "var(--accent)" }}>
+        <WordIn active={animate} delayMs={200} style={{ font: "600 40px/1.06 var(--font-sans)", letterSpacing: "-.04em", color: "var(--accent)" }}>
           volta sola
         </WordIn>
       </div>
@@ -80,9 +80,10 @@ export default function EntryPage() {
             overflow: "hidden",
             boxSizing: "border-box",
             padding: 18,
+            boxShadow: "var(--shadow-airbnb-subtle)",
           }}
         >
-          <p style={{ font: "600 15px/1.3 var(--font-outfit)", color: "var(--corallo-testo)", margin: 0, maxWidth: 140 }}>
+          <p style={{ font: "600 15px/1.3 var(--font-sans)", color: "var(--corallo-testo)", margin: 0, maxWidth: 140 }}>
             nessuna password Passo da ricordare
           </p>
           <Illustration name="corsa" width={196} height={212} right={12} bottom={0} active={animate} delayMs={900} priority />
@@ -93,7 +94,7 @@ export default function EntryPage() {
         <PrimaryButton sheen onClick={() => router.push("/connect-garmin")}>
           Continua
         </PrimaryButton>
-        <p style={{ font: "500 12px/1.6 var(--font-outfit)", color: "var(--inchiostro-35)", textAlign: "center", margin: 0 }}>
+        <p style={{ font: "500 12px/1.6 var(--font-sans)", color: "var(--inchiostro-35)", textAlign: "center", margin: 0 }}>
           L&apos;account Garmin lo colleghi dopo, quando importi il primo piano.
         </p>
       </SlideUp>

@@ -4,6 +4,7 @@ import { useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { PulseRing, Skeleton, SlideUp } from "@/components/motion/primitives";
+import { ChevronLeft, ChevronRight, ArrowRight, PencilIcon } from "@/components/Icons";
 import { FuelCorrectionSheet } from "@/components/FuelCorrectionSheet";
 import { DayEnergyCard } from "@/components/DayEnergyCard";
 import { EnergyBlock, FuelComment, FuelHero, MealList, SessionFuelBlock, TodayFuelBlock } from "@/components/FuelBlocks";
@@ -253,7 +254,7 @@ export default function FuelPage() {
     <div style={{ padding: "22px 20px 148px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/body" />
-        <h1 style={{ font: "600 20px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Carburante</h1>
+        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Carburante</h1>
         <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "6px 12px" }}>
           {formatWeekday(today)} {new Date(`${today}T00:00:00`).getDate()}
         </span>
@@ -270,14 +271,14 @@ export default function FuelPage() {
               <Link
                 href="/settings/body"
                 className="press-soft"
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: "16px 18px", textDecoration: "none", color: "inherit" }}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: "16px 18px", textDecoration: "none", color: "inherit" }}
               >
                 <span>
                   <span style={{ fontWeight: 600, fontSize: 15, display: "block" }}>Aggiungi il tuo peso</span>
                   <span style={{ fontSize: 12.5, color: "var(--inchiostro-50)" }}>dieci secondi, una volta sola</span>
                 </span>
                 <span aria-hidden="true" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--inchiostro)", color: "var(--crema)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
-                  →
+                  <ArrowRight size={16} strokeWidth={2.4} />
                 </span>
               </Link>
             </SlideUp>
@@ -305,7 +306,7 @@ export default function FuelPage() {
               style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "14px 16px", textDecoration: "none", color: "inherit" }}
             >
               <span style={{ fontSize: 14, fontWeight: 600 }}>Diario</span>
-              <span className="anim-chev" aria-hidden="true">→</span>
+              <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
             </Link>
             <Link
               href="/body/fuel/history"
@@ -313,7 +314,7 @@ export default function FuelPage() {
               style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "14px 16px", textDecoration: "none", color: "inherit" }}
             >
               <span style={{ fontSize: 14, fontWeight: 600 }}>Sette giorni</span>
-              <span className="anim-chev" aria-hidden="true">→</span>
+              <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
             </Link>
           </SlideUp>
 
@@ -385,7 +386,7 @@ export default function FuelPage() {
                 boxShadow: "0 10px 24px rgba(28,26,22,.16)",
               }}
             >
-              <span aria-hidden="true">✎</span> Scrivi
+              <PencilIcon size={14} style={{ display: "inline-block", verticalAlign: "middle", marginRight: 4 }} /> Scrivi
             </button>
           </div>
           <p style={{ textAlign: "center", fontSize: 11, color: "var(--inchiostro-35)", fontWeight: 500, margin: "9px 0 0" }}>
@@ -488,11 +489,11 @@ function ComposeScreen({
           onClick={onCancel}
           aria-label="Indietro"
           className="tap-target"
-          style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "var(--inchiostro)" }}
+          style={{ background: "none", border: "none", display: "inline-flex", alignItems: "center", cursor: "pointer", color: "var(--inchiostro)", padding: 4 }}
         >
-          ←
+          <ChevronLeft size={20} strokeWidth={2.4} />
         </button>
-        <h1 style={{ font: "600 20px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0 }}>Aggiungi un pasto</h1>
+        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0 }}>Aggiungi un pasto</h1>
       </div>
 
       <div style={{ display: "flex", gap: 4, background: "var(--sabbia)", borderRadius: "var(--radius-pill)", padding: 4, marginTop: 16 }}>
@@ -639,7 +640,7 @@ function EstimatingScreen({ preview, onCancel }: { preview: Preview; onCancel: (
         </div>
       )}
 
-      <p style={{ font: "700 26px/1.15 var(--font-outfit)", margin: "24px 0 0" }}>
+      <p style={{ font: "700 26px/1.15 var(--font-sans)", margin: "24px 0 0" }}>
         {preview.kind === "photo" ? (
           <>
             Sto guardando
@@ -844,7 +845,7 @@ function FailedScreen({ entryId, preview, onRetake, onSaved }: { entryId: number
   return (
     <div style={{ minHeight: "100dvh", background: "var(--rosa-avviso)", padding: "22px 20px 28px", display: "flex", flexDirection: "column" }}>
       <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--rosso-avviso)", margin: 0 }}>Stima non riuscita</p>
-      <p style={{ font: "700 30px/1.1 var(--font-outfit)", color: "var(--rosso-testo)", margin: "10px 0 0" }}>
+      <p style={{ font: "700 30px/1.1 var(--font-sans)", color: "var(--rosso-testo)", margin: "10px 0 0" }}>
         {preview.kind === "photo" ? (
           <>
             Da questa foto

@@ -97,7 +97,7 @@ export function CheckInCard({
 
   return (
     <SlideUp active={animate} delayMs={delayMs} style={cardStyle}>
-      <p style={{ font: "600 16px/1.2 var(--font-outfit)", margin: 0 }}>
+      <p style={{ font: "600 16px/1.2 var(--font-sans)", margin: 0 }}>
         {dayLabel === "oggi" ? "Com'è andata oggi?" : "Com'è andata ieri?"}
       </p>
       <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "3px 0 0" }}>
@@ -158,7 +158,7 @@ function ChipRow<T extends string>({
 }) {
   return (
     <div style={{ marginTop: 12 }}>
-      <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: "0 0 6px" }}>{label}</p>
+      <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: "0 0 6px" }}>{label}</p>
       <div role="radiogroup" aria-label={label} style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {options.map(([key, text]) => {
           const selected = value === key;

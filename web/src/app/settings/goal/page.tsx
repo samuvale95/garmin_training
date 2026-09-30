@@ -120,14 +120,14 @@ export default function RaceGoalSettingsPage() {
     <div style={{ padding: "22px 20px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/settings" />
-        <h1 style={{ font: "600 20px/1 var(--font-outfit)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Obiettivo</h1>
+        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Obiettivo</h1>
       </div>
 
       {stillDeciding ? (
         <p style={{ marginTop: 20, color: "var(--inchiostro-50)" }}>Carico…</p>
       ) : !hasTrainingContext ? (
         <SlideUp active={animate} delayMs={100} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 18 }}>
-          <p style={{ font: "600 17px/1.2 var(--font-outfit)", margin: 0 }}>Prima serve un allenamento</p>
+          <p style={{ font: "600 17px/1.2 var(--font-sans)", margin: 0 }}>Prima serve un allenamento</p>
           <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-70)", margin: "10px 0 0", lineHeight: 1.35 }}>
             La gara si legge contro sedute che esistono già: importa un piano, o collega Garmin
             e torna qui.
@@ -173,7 +173,7 @@ export default function RaceGoalSettingsPage() {
         </>
       ) : (
         <SlideUp active={animate} delayMs={100} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 18 }}>
-          <p style={{ font: "600 17px/1.2 var(--font-outfit)", margin: 0 }}>{plan ? "Nessuna gara nel piano" : "Nessuna gara impostata"}</p>
+          <p style={{ font: "600 17px/1.2 var(--font-sans)", margin: 0 }}>{plan ? "Nessuna gara nel piano" : "Nessuna gara impostata"}</p>
           <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-70)", margin: "10px 0 0", lineHeight: 1.35 }}>
             Si allena meglio sapendo per cosa. Dimmi che gara stai preparando e quando:
             serve a capire in che punto della preparazione sei, e cosa proporti quando una
@@ -223,7 +223,7 @@ function GoalSummary({ goal, animate, onEdit }: { goal: RaceGoal; animate: boole
           )}
         </div>
 
-        <p style={{ font: "600 26px/1.1 var(--font-outfit)", letterSpacing: "-.02em", margin: "10px 0 2px" }}>
+        <p style={{ font: "600 26px/1.1 var(--font-sans)", letterSpacing: "-.02em", margin: "10px 0 2px" }}>
           {goal.name?.trim() || distanceLabel(goal.distance_km)}
         </p>
         <p style={{ fontSize: 12.5, color: "var(--inchiostro-su-scuro)", margin: 0 }}>{formatFullDate(goal.race_date)}</p>

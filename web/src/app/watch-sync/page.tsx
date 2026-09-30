@@ -87,7 +87,7 @@ export default function WatchSyncPage() {
             style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--azzurro-tratto)", flex: "none" }}
           />
           <span
-            style={{ font: "500 11.5px var(--font-outfit)", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}
+            style={{ font: "500 11.5px var(--font-sans)", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}
             aria-live="polite"
           >
             {rechecking ? "controllo in corso" : "in attesa dell'orologio"}
@@ -96,10 +96,10 @@ export default function WatchSyncPage() {
 
         {/* Two forced lines, not a wrapped paragraph: the break is part of the setting. */}
         <h1 style={{ margin: 0 }}>
-          <WordIn active={animate} style={{ font: "600 32px/1.05 var(--font-outfit)", letterSpacing: "-.035em" }}>
+          <WordIn active={animate} style={{ font: "600 32px/1.05 var(--font-sans)", letterSpacing: "-.035em" }}>
             L&apos;orologio non
           </WordIn>
-          <WordIn active={animate} delayMs={80} style={{ font: "600 32px/1.05 var(--font-outfit)", letterSpacing: "-.035em" }}>
+          <WordIn active={animate} delayMs={80} style={{ font: "600 32px/1.05 var(--font-sans)", letterSpacing: "-.035em" }}>
             ha ancora parlato
           </WordIn>
         </h1>
@@ -122,14 +122,14 @@ export default function WatchSyncPage() {
           {/* Fixed 144: keeps the copy clear of the figure, which is anchored to the
               right edge and bleeds past it on wider screens rather than moving. */}
           <div style={{ position: "relative", zIndex: 1, width: 144 }}>
-            <p style={{ font: "500 11px var(--font-outfit)", letterSpacing: ".1em", textTransform: "uppercase", opacity: 0.6, margin: 0 }}>
+            <p style={{ font: "500 11px var(--font-sans)", letterSpacing: ".1em", textTransform: "uppercase", opacity: 0.6, margin: 0 }}>
               ultimo sync
             </p>
-            <p style={{ font: "600 22px/1.1 var(--font-outfit)", letterSpacing: "-.02em", margin: "4px 0 0" }}>
+            <p style={{ font: "600 22px/1.1 var(--font-sans)", letterSpacing: "-.02em", margin: "4px 0 0" }}>
               {watch.ready ? lastSyncLabel(watch.lastSyncedAt) : "—"}
             </p>
             {note && (
-              <p style={{ font: "500 12px/1.55 var(--font-outfit)", opacity: 0.8, margin: "10px 0 0" }}>{note}</p>
+              <p style={{ font: "500 12px/1.55 var(--font-sans)", opacity: 0.8, margin: "10px 0 0" }}>{note}</p>
             )}
           </div>
           <Illustration name="sync" width={346} height={346} right={-44} bottom={-28} active={animate} delayMs={600} />
@@ -160,7 +160,7 @@ export default function WatchSyncPage() {
             background: "none",
             border: "none",
             width: "100%",
-            font: "500 13px var(--font-outfit)",
+            font: "500 13px var(--font-sans)",
             color: "var(--inchiostro-50)",
             cursor: rechecking ? "default" : "pointer",
             opacity: rechecking ? 0.5 : 1,

@@ -923,7 +923,7 @@ function StepEditorModal({ step, onSave, onCancel }: { step: EditableStep; onSav
         onClick={(e) => e.stopPropagation()}
         style={{ width: "100%", background: "var(--crema)", borderRadius: "22px 22px 0 0", padding: "22px 20px 28px", display: "flex", flexDirection: "column", gap: 14 }}
       >
-        <p style={{ font: "600 18px var(--font-outfit)", margin: 0 }}>Modifica step</p>
+        <p style={{ font: "600 18px var(--font-sans)", margin: 0 }}>Modifica step</p>
 
         <Field label="Tipo">
           <select value={type} onChange={(e) => changeType(e.target.value as StepType)} style={selectStyle}>

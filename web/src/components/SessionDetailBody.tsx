@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { SlideUp } from "@/components/motion/primitives";
 import { sessionDistanceKm } from "@/lib/sessionVisuals";
 import { formatPaceValue, groupDistanceKm, groupSteps, sessionFallbackPaceSecPerKm, stepGroupParts } from "@/lib/format";
 import type { StravaActivityMatch, TrainingSession } from "@/lib/types";
@@ -68,159 +69,163 @@ export function SessionDetailBody({
   return (
     <div style={{ width: "100%", display: "flex", flexDirection: "column", marginTop: 12 }}>
       {/* Title */}
-      <h1
-        style={{
-          fontSize: 26,
-          fontWeight: 700,
-          color: "var(--inchiostro)",
-          textAlign: "center",
-          margin: "12px 0 6px",
-          letterSpacing: "-0.02em",
-          lineHeight: 1.15,
-        }}
-      >
-        {session.title}
-      </h1>
-
-      {/* Description */}
-      {session.description && (
-        <p
+      <SlideUp delayMs={0}>
+        <h1
           style={{
-            fontSize: 14,
+            fontSize: 26,
+            fontWeight: 700,
+            color: "var(--inchiostro)",
             textAlign: "center",
-            color: "var(--inchiostro-70)",
-            margin: "0 auto 20px",
-            maxWidth: 320,
-            lineHeight: 1.45,
+            margin: "12px 0 6px",
+            letterSpacing: "-0.02em",
+            lineHeight: 1.15,
           }}
         >
-          {session.description}
-        </p>
-      )}
+          {session.title}
+        </h1>
 
-      {/* Hero Stat Card (Airbnb Style) */}
-      <div
-        style={{
-          background: "var(--crema-card)",
-          border: "1px solid var(--border-airbnb)",
-          borderRadius: 24,
-          padding: "20px 22px",
-          boxShadow: "var(--shadow-airbnb)",
-          marginTop: session.description ? 0 : 12,
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <span
-                style={{
-                  background: "var(--sabbia-chip)",
-                  border: "1px solid var(--border-airbnb)",
-                  borderRadius: "var(--radius-pill)",
-                  padding: "4px 10px",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  color: "var(--inchiostro)",
-                }}
-              >
-                {session.sport === "cycling" ? "Bici" : session.sport === "strength_training" ? "Forza" : "Corsa"}
-              </span>
-              {groups.length > 0 && (
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: "var(--inchiostro-50)",
-                  }}
-                >
-                  {groups.length} {groups.length === 1 ? "fase" : "fasi"}
-                </span>
-              )}
-            </div>
-
-            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-              <span
-                className="font-mono"
-                style={{
-                  fontSize: 42,
-                  fontWeight: 700,
-                  color: "var(--inchiostro)",
-                  letterSpacing: "-0.03em",
-                  lineHeight: 1,
-                }}
-              >
-                {distanceKm > 0 ? distanceKm.toFixed(1) : "—"}
-              </span>
-              <span style={{ fontSize: 18, fontWeight: 600, color: "var(--inchiostro-50)" }}>km</span>
-            </div>
-
-            <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "4px 0 0", fontWeight: 500 }}>
-              Distanza programmata
-            </p>
-          </div>
-
-          {/* 3D Illustration - static, clean Airbnb look */}
-          <div
+        {/* Description */}
+        {session.description && (
+          <p
             style={{
-              width: 76,
-              height: 76,
-              position: "relative",
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              fontSize: 14,
+              textAlign: "center",
+              color: "var(--inchiostro-70)",
+              margin: "0 auto 20px",
+              maxWidth: 320,
+              lineHeight: 1.45,
             }}
           >
-            <Image
-              src={illustrationSrc}
-              alt="Illustrazione allenamento"
-              width={76}
-              height={76}
-              style={{ objectFit: "contain" }}
-              priority
-            />
-          </div>
-        </div>
+            {session.description}
+          </p>
+        )}
+      </SlideUp>
 
-        {/* Metric Badges Strip */}
+      {/* Hero Stat Card (Airbnb Style) */}
+      <SlideUp delayMs={50}>
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginTop: 18,
-            paddingTop: 16,
-            borderTop: "1px solid var(--border-airbnb)",
+            background: "var(--crema-card)",
+            border: "1px solid var(--border-airbnb)",
+            borderRadius: 24,
+            padding: "20px 22px",
+            boxShadow: "var(--shadow-airbnb)",
+            marginTop: session.description ? 0 : 12,
+            position: "relative",
+            overflow: "hidden",
           }}
         >
-          <div style={{ flex: 1 }}>
-            <span style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--inchiostro-50)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              Passo target
-            </span>
-            <span className="font-mono" style={{ display: "block", fontSize: 15, fontWeight: 600, color: "var(--inchiostro)", marginTop: 2 }}>
-              {fallbackPace ? `${formatPaceValue(fallbackPace)}/km` : "Libero"}
-            </span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <span
+                  style={{
+                    background: "var(--sabbia-chip)",
+                    border: "1px solid var(--border-airbnb)",
+                    borderRadius: "var(--radius-pill)",
+                    padding: "4px 10px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    color: "var(--inchiostro)",
+                  }}
+                >
+                  {session.sport === "cycling" ? "Bici" : session.sport === "strength_training" ? "Forza" : "Corsa"}
+                </span>
+                {groups.length > 0 && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: "var(--inchiostro-50)",
+                    }}
+                  >
+                    {groups.length} {groups.length === 1 ? "fase" : "fasi"}
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                <span
+                  className="font-mono"
+                  style={{
+                    fontSize: 42,
+                    fontWeight: 700,
+                    color: "var(--inchiostro)",
+                    letterSpacing: "-0.03em",
+                    lineHeight: 1,
+                  }}
+                >
+                  {distanceKm > 0 ? distanceKm.toFixed(1) : "—"}
+                </span>
+                <span style={{ fontSize: 18, fontWeight: 600, color: "var(--inchiostro-50)" }}>km</span>
+              </div>
+
+              <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "4px 0 0", fontWeight: 500 }}>
+                Distanza programmata
+              </p>
+            </div>
+
+            {/* 3D Illustration - static, clean Airbnb look */}
+            <div
+              style={{
+                width: 76,
+                height: 76,
+                position: "relative",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Image
+                src={illustrationSrc}
+                alt="Illustrazione allenamento"
+                width={76}
+                height={76}
+                style={{ objectFit: "contain" }}
+                priority
+              />
+            </div>
           </div>
 
-          <div style={{ width: 1, height: 26, background: "var(--border-airbnb)" }} />
+          {/* Metric Badges Strip */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              marginTop: 18,
+              paddingTop: 16,
+              borderTop: "1px solid var(--border-airbnb)",
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <span style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--inchiostro-50)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Passo target
+              </span>
+              <span className="font-mono" style={{ display: "block", fontSize: 15, fontWeight: 600, color: "var(--inchiostro)", marginTop: 2 }}>
+                {fallbackPace ? `${formatPaceValue(fallbackPace)}/km` : "Libero"}
+              </span>
+            </div>
 
-          <div style={{ flex: 1 }}>
-            <span style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--inchiostro-50)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              Intensità
-            </span>
-            <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: hasInterval ? "var(--corallo)" : "var(--verde)", marginTop: 2 }}>
-              {hasInterval ? "Ripetute" : "Costante"}
-            </span>
+            <div style={{ width: 1, height: 26, background: "var(--border-airbnb)" }} />
+
+            <div style={{ flex: 1 }}>
+              <span style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--inchiostro-50)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Intensità
+              </span>
+              <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: hasInterval ? "var(--corallo)" : "var(--verde)", marginTop: 2 }}>
+                {hasInterval ? "Ripetute" : "Costante"}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      </SlideUp>
 
       {/* Structured Steps Section */}
-      <div style={{ marginTop: 28 }}>
+      <SlideUp delayMs={100} style={{ marginTop: 28 }}>
         <h2
           style={{
             fontSize: 12,
@@ -257,80 +262,82 @@ export function SessionDetailBody({
             const km = groupDistanceKm(group, fallbackPace);
 
             return (
-              <div
-                key={i}
-                style={{
-                  background: isKey ? "linear-gradient(135deg, #FF6F61 0%, #E85D4E 100%)" : "var(--crema-card)",
-                  color: isKey ? "#FFFFFF" : "var(--inchiostro)",
-                  border: isKey ? "none" : "1px solid var(--border-airbnb)",
-                  borderRadius: 18,
-                  padding: "14px 18px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 12,
-                  boxShadow: isKey ? "0 4px 14px rgba(232, 93, 78, 0.2)" : "0 1px 3px rgba(0,0,0,0.02)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-                  <div
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: "50%",
-                      background: isKey ? "rgba(255, 255, 255, 0.2)" : "var(--sabbia-chip)",
-                      color: isKey ? "#FFFFFF" : "var(--inchiostro)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <StepKindIcon kind={group.kind} />
+              <SlideUp key={i} delayMs={110 + i * 25} row>
+                <div
+                  style={{
+                    background: isKey ? "linear-gradient(135deg, #FF6F61 0%, #E85D4E 100%)" : "var(--crema-card)",
+                    color: isKey ? "#FFFFFF" : "var(--inchiostro)",
+                    border: isKey ? "none" : "1px solid var(--border-airbnb)",
+                    borderRadius: 18,
+                    padding: "14px 18px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 12,
+                    boxShadow: isKey ? "0 4px 14px rgba(232, 93, 78, 0.2)" : "0 1px 3px rgba(0,0,0,0.02)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: "50%",
+                        background: isKey ? "rgba(255, 255, 255, 0.2)" : "var(--sabbia-chip)",
+                        color: isKey ? "#FFFFFF" : "var(--inchiostro)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <StepKindIcon kind={group.kind} />
+                    </div>
+
+                    <div>
+                      <span style={{ display: "block", fontSize: 14, fontWeight: 600, lineHeight: 1.2 }}>{label}</span>
+                      {detail && (
+                        <span
+                          className="font-mono"
+                          style={{
+                            display: "block",
+                            fontSize: 11.5,
+                            opacity: isKey ? 0.9 : 0.65,
+                            marginTop: 3,
+                          }}
+                        >
+                          {detail}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  <div>
-                    <span style={{ display: "block", fontSize: 14, fontWeight: 600, lineHeight: 1.2 }}>{label}</span>
-                    {detail && (
-                      <span
-                        className="font-mono"
-                        style={{
-                          display: "block",
-                          fontSize: 11.5,
-                          opacity: isKey ? 0.9 : 0.65,
-                          marginTop: 3,
-                        }}
-                      >
-                        {detail}
-                      </span>
-                    )}
-                  </div>
+                  {km > 0 && (
+                    <span
+                      className="font-mono"
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        flex: "none",
+                        background: isKey ? "rgba(255, 255, 255, 0.2)" : "var(--sabbia-chip)",
+                        borderRadius: "var(--radius-pill)",
+                        padding: "4px 10px",
+                      }}
+                    >
+                      {km.toFixed(1).replace(".", ",")} km
+                    </span>
+                  )}
                 </div>
-
-                {km > 0 && (
-                  <span
-                    className="font-mono"
-                    style={{
-                      fontSize: 12.5,
-                      fontWeight: 600,
-                      flex: "none",
-                      background: isKey ? "rgba(255, 255, 255, 0.2)" : "var(--sabbia-chip)",
-                      borderRadius: "var(--radius-pill)",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    {km.toFixed(1).replace(".", ",")} km
-                  </span>
-                )}
-              </div>
+              </SlideUp>
             );
           })}
         </div>
-      </div>
+      </SlideUp>
 
       {/* Strava Match Card */}
       {hasStravaMatch && matchData && (
-        <Link href={stravaHref} style={{ textDecoration: "none", color: "inherit", width: "100%", marginTop: 22 }}>
+        <SlideUp delayMs={150}>
+          <Link href={stravaHref} style={{ textDecoration: "none", color: "inherit", width: "100%", marginTop: 22, display: "block" }}>
           <div
             style={{
               width: "100%",
@@ -398,6 +405,7 @@ export function SessionDetailBody({
             </div>
           </div>
         </Link>
+        </SlideUp>
       )}
     </div>
   );

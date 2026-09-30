@@ -137,7 +137,7 @@ export function FindingCard({ finding, animate, delayMs }: { finding: Finding; a
       }}
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-        <p style={{ font: "600 16px/1.25 var(--font-outfit)", margin: 0 }}>{finding.headline}</p>
+        <p style={{ font: "600 16px/1.25 var(--font-sans)", margin: 0 }}>{finding.headline}</p>
         <span
           title={evidence.title}
           style={{

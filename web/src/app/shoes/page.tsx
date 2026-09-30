@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
-import { BarGrow, WordIn } from "@/components/motion/primitives";
+import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useRetireShoe, useShoes } from "@/lib/queries";
 
@@ -33,7 +33,7 @@ function ShoesScreen() {
         <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>da Strava</span>
       </div>
 
-      <WordIn active={animate} style={{ font: "600 30px/1.06 var(--font-outfit)", letterSpacing: "-.03em", marginTop: 18 }}>
+      <WordIn active={animate} style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", marginTop: 18 }}>
         Usura scarpe
       </WordIn>
 
@@ -92,40 +92,50 @@ function ShoeCard({
   retiring: boolean;
 }) {
   return (
-    <div style={{ background: highlight ? "var(--rosa-avviso)" : "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 15, fontWeight: 600, color: highlight ? "var(--rosso-testo)" : "var(--inchiostro)" }}>{shoe.name}</span>
-        <span className="font-mono" style={{ fontSize: 13, color: highlight ? "var(--rosso-avviso)" : "var(--inchiostro-50)" }}>
-          {shoe.distance_km.toFixed(0)} km
-        </span>
-      </div>
-      <div style={{ marginTop: 10 }}>
-        <BarGrow value={shoe.wear_percent / 100} color={highlight ? "var(--rosso-avviso)" : "var(--corallo)"} trackColor={highlight ? "var(--corallo-chiaro)" : "var(--sabbia-chip)"} active={active} delayMs={delay} />
-      </div>
-      <p style={{ fontSize: 12, color: highlight ? "var(--rosso-testo)" : "var(--inchiostro-50)", margin: "8px 0 0" }}>
-        {shoe.wear_percent.toFixed(0)}% dei 700 km
-        {shoe.weeks_remaining != null && ` · a questo ritmo si esauriscono in ${shoe.weeks_remaining} settiman${shoe.weeks_remaining === 1 ? "a" : "e"}`}
-      </p>
-      <button
-        type="button"
-        onClick={onRetire}
-        disabled={retiring}
-        className="tap-target"
+    <SlideUp active={active} delayMs={delay}>
+      <div
         style={{
-          marginTop: 12,
-          width: "100%",
-          background: "var(--sabbia-chip)",
-          border: "none",
-          borderRadius: "var(--radius-pill)",
-          padding: "10px 0",
-          fontSize: 13,
-          fontWeight: 600,
-          color: "var(--inchiostro-70)",
-          cursor: retiring ? "default" : "pointer",
+          background: highlight ? "var(--rosa-avviso)" : "var(--crema-card)",
+          border: highlight ? "1px solid rgba(179,74,32,0.2)" : "1px solid var(--border-airbnb)",
+          boxShadow: "var(--shadow-airbnb-subtle)",
+          borderRadius: "var(--radius-card)",
+          padding: 16,
         }}
       >
-        Segna {shoe.name} come ritirata
-      </button>
-    </div>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: highlight ? "var(--rosso-testo)" : "var(--inchiostro)" }}>{shoe.name}</span>
+          <span className="font-mono" style={{ fontSize: 13, color: highlight ? "var(--rosso-avviso)" : "var(--inchiostro-50)" }}>
+            {shoe.distance_km.toFixed(0)} km
+          </span>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <BarGrow value={shoe.wear_percent / 100} color={highlight ? "var(--rosso-avviso)" : "var(--corallo)"} trackColor={highlight ? "var(--corallo-chiaro)" : "var(--sabbia-chip)"} active={active} delayMs={delay} />
+        </div>
+        <p style={{ fontSize: 12, color: highlight ? "var(--rosso-testo)" : "var(--inchiostro-50)", margin: "8px 0 0" }}>
+          {shoe.wear_percent.toFixed(0)}% dei 700 km
+          {shoe.weeks_remaining != null && ` · a questo ritmo si esauriscono in ${shoe.weeks_remaining} settiman${shoe.weeks_remaining === 1 ? "a" : "e"}`}
+        </p>
+        <button
+          type="button"
+          onClick={onRetire}
+          disabled={retiring}
+          className="tap-target"
+          style={{
+            marginTop: 12,
+            width: "100%",
+            background: "var(--sabbia-chip)",
+            border: "none",
+            borderRadius: "var(--radius-pill)",
+            padding: "10px 0",
+            fontSize: 13,
+            fontWeight: 600,
+            color: "var(--inchiostro-70)",
+            cursor: retiring ? "default" : "pointer",
+          }}
+        >
+          Segna {shoe.name} come ritirata
+        </button>
+      </div>
+    </SlideUp>
   );
 }

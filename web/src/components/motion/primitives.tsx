@@ -18,12 +18,29 @@ interface WordInProps {
 export function WordIn({ children, active = true, delayMs = 0, as: Tag = "div", className, style }: WordInProps) {
   const { reduced } = useMotionEnabled();
   const animate = active && !reduced;
+  const MotionTag = (typeof Tag === "string" ? (motion as any)[Tag] : motion.div) || motion.div;
+
+  if (!animate) {
+    const Component = Tag as any;
+    return <Component className={className} style={style}>{children}</Component>;
+  }
+
   return (
-    <Tag className={`word-in-clip ${className ?? ""}`} style={style}>
-      <div className={animate ? "anim-word-in" : undefined} style={animate ? { animationDelay: `${Math.min(delayMs, 160)}ms` } : undefined}>
-        {children}
-      </div>
-    </Tag>
+    <MotionTag
+      className={className}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        type: "spring",
+        stiffness: 320,
+        damping: 26,
+        mass: 0.6,
+        delay: Math.min(delayMs, 200) / 1000,
+      }}
+      style={style}
+    >
+      {children}
+    </MotionTag>
   );
 }
 
@@ -51,14 +68,14 @@ export function SlideUp({ children, active = true, delayMs = 0, row = false, as:
   return (
     <MotionTag
       className={className}
-      initial={{ opacity: 0, y: row ? 10 : 16 }}
+      initial={{ opacity: 0, y: row ? 8 : 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{
         type: "spring",
-        stiffness: 340,
-        damping: 28,
-        mass: 0.8,
-        delay: Math.min(delayMs, 350) / 1000,
+        stiffness: 320,
+        damping: 26,
+        mass: 0.7,
+        delay: Math.min(delayMs, 300) / 1000,
       }}
       style={style}
     >

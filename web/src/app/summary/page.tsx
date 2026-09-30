@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton, SlideUp, WordIn } from "@/components/motion/primitives";
+import { ChevronLeft, ChevronRight } from "@/components/Icons";
 import { useMountOnce } from "@/lib/motion";
 import { useWeekSummary, useWeekSummaryNarrative } from "@/lib/queries";
 import { shiftDateKey, toDateKey } from "@/lib/sessionVisuals";
@@ -49,18 +50,18 @@ function SummaryContent() {
         <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}>resoconto</span>
       </div>
 
-      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-outfit)", letterSpacing: "-.03em", margin: "16px 0 4px" }}>
+      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 4px" }}>
         La tua settimana
       </WordIn>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
         <NavButton label="Settimana precedente" disabled={!shown} onClick={() => shown && setMonday(shiftDateKey(shown, -7))}>
-          ‹
+          <ChevronLeft size={16} />
         </NavButton>
         <span className="font-mono" style={{ fontSize: 13, color: "var(--inchiostro-70)", minWidth: 120, textAlign: "center" }}>
           {summary.data ? rangeLabel(summary.data.monday, summary.data.sunday) : "…"}
         </span>
         <NavButton label="Settimana successiva" disabled={!canGoForward} onClick={() => shown && setMonday(shiftDateKey(shown, 7))}>
-          ›
+          <ChevronRight size={16} />
         </NavButton>
       </div>
 
@@ -87,7 +88,7 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
   return (
     <>
       <SlideUp active={animate} delayMs={80} style={{ background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card-lg)", padding: 22 }}>
-        <p style={{ font: "600 20px/1.25 var(--font-outfit)", margin: 0 }}>{data.headline}</p>
+        <p style={{ font: "600 20px/1.25 var(--font-sans)", margin: 0 }}>{data.headline}</p>
         {narrative && (
           <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.4, margin: "12px 0 0" }}>
             {narrative}
@@ -119,8 +120,8 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
         </SlideUp>
       )}
 
-      <SlideUp active={animate} delayMs={220} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 16 }}>
-        <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: 0 }}>Sensazioni</p>
+      <SlideUp active={animate} delayMs={220} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 16 }}>
+        <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>Sensazioni</p>
         {data.checkin_days === 0 ? (
           <p style={{ fontSize: 13.5, margin: "6px 0 0", color: "var(--inchiostro-70)" }}>
             Nessun check-in questa settimana: bastano due tocchi dopo l&apos;allenamento, su Oggi.
@@ -145,10 +146,10 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
       </SlideUp>
 
       {(data.week_points !== 0 || data.badges.length > 0) && (
-        <SlideUp active={animate} delayMs={250} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12 }}>
+        <SlideUp active={animate} delayMs={250} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-            <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: 0 }}>Punti Disciplina</p>
-            <p style={{ font: "600 20px/1 var(--font-outfit)", margin: 0 }}>{data.week_points}</p>
+            <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>Punti Disciplina</p>
+            <p style={{ font: "600 20px/1 var(--font-sans)", margin: 0 }}>{data.week_points}</p>
           </div>
           <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", display: "flex", flexDirection: "column", gap: 4 }}>
             {data.point_lines.map((line) => (
@@ -166,8 +167,8 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
       )}
 
       {data.food_days > 0 && (
-        <SlideUp active={animate} delayMs={265} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12 }}>
-          <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: 0 }}>Carburante</p>
+        <SlideUp active={animate} delayMs={265} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12 }}>
+          <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>Carburante</p>
           <p style={{ fontSize: 14, margin: "6px 0 0" }}>
             Cibo registrato {data.food_days} {data.food_days === 1 ? "giorno" : "giorni"} su 7.
           </p>
@@ -180,8 +181,8 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
       )}
 
       {data.next_week && (
-        <SlideUp active={animate} delayMs={280} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12 }}>
-          <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: 0 }}>La prossima settimana</p>
+        <SlideUp active={animate} delayMs={280} style={{ background: "var(--sabbia)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12 }}>
+          <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>La prossima settimana</p>
           <p style={{ fontSize: 14, lineHeight: 1.45, margin: "6px 0 0" }}>
             {data.next_week.reason ??
               `${data.next_week.planned_sessions} sedute in piano, ${data.next_week.planned_minutes} minuti di corsa.`}
@@ -194,14 +195,14 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
 
 function Figure({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div style={{ flex: 1, background: accent ? "var(--corallo)" : "var(--crema-card)", color: accent ? "var(--corallo-testo)" : undefined, borderRadius: "var(--radius-card)", padding: 13 }}>
-      <p style={{ font: "500 11px var(--font-outfit)", opacity: 0.7, margin: 0 }}>{label}</p>
-      <p style={{ font: "600 24px/1 var(--font-outfit)", letterSpacing: "-.03em", margin: "8px 0 0" }}>{value}</p>
+    <div style={{ flex: 1, background: accent ? "var(--corallo)" : "var(--crema-card)", color: accent ? "var(--corallo-testo)" : undefined, border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 13 }}>
+      <p style={{ font: "500 11px var(--font-sans)", opacity: 0.7, margin: 0 }}>{label}</p>
+      <p style={{ font: "600 24px/1 var(--font-sans)", letterSpacing: "-.03em", margin: "8px 0 0" }}>{value}</p>
     </div>
   );
 }
 
-function NavButton({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: string }) {
+function NavButton({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
@@ -209,7 +210,7 @@ function NavButton({ label, disabled, onClick, children }: { label: string; disa
       disabled={disabled}
       onClick={onClick}
       className="tap-target press-soft"
-      style={{ width: 30, height: 30, borderRadius: "50%", border: "none", background: "var(--sabbia-chip)", color: "var(--inchiostro)", opacity: disabled ? 0.35 : 1, cursor: disabled ? "default" : "pointer", fontSize: 15 }}
+      style={{ width: 32, height: 32, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", border: "none", background: "var(--sabbia-chip)", color: "var(--inchiostro)", opacity: disabled ? 0.35 : 1, cursor: disabled ? "default" : "pointer", fontSize: 15 }}
     >
       {children}
     </button>

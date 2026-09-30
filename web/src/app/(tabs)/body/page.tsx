@@ -10,6 +10,7 @@ import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { ProgressRing, SlideUp, Skeleton } from "@/components/motion/primitives";
 import { TiltCard } from "@/components/motion/TiltCard";
+import { ChevronRight } from "@/components/Icons";
 import { useMountOnce } from "@/lib/motion";
 import { useBodyToday, useFuelTargets, usePlanQuery, usePrefetchFuelNarrative } from "@/lib/queries";
 import { useWatchSyncStatus } from "@/lib/watchSync";
@@ -187,7 +188,7 @@ export default function RecoveryPage() {
             <NavRow href="/body/fuel" label="Carburante" />
           </SlideUp>
         ) : (
-          <SlideUp active={animate} delayMs={500} style={{ marginTop: 10 }}>
+          <SlideUp active={animate} delayMs={220} style={{ marginTop: 10 }}>
             <TiltCard
               maxTilt={4}
               style={{
@@ -210,7 +211,7 @@ export default function RecoveryPage() {
                     <p style={{ fontWeight: 700, fontSize: 15, margin: "0 0 3px" }}>Carburante</p>
                     <p style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: 0 }}>{fuelSubtitle(fuel.tomorrow)}</p>
                   </div>
-                  <span className="anim-chev" aria-hidden="true">→</span>
+                  <ChevronRight size={16} style={{ color: "var(--crema)" }} />
                 </div>
                 {fuel.tomorrow.carb_g && (
                   <p className="font-mono" style={{ fontSize: 30, fontWeight: 500, color: "var(--corallo)", margin: "10px 0 0" }}>
@@ -222,7 +223,7 @@ export default function RecoveryPage() {
                   {fuel.advice}
                 </p>
               </Link>
-              <Illustration name="fuel" width={84} height={84} right={10} bottom={10} active={animate} delayMs={560} />
+              <Illustration name="fuel" width={84} height={84} right={10} bottom={10} active={animate} delayMs={260} />
             </TiltCard>
           </SlideUp>
         )
@@ -278,7 +279,7 @@ function NavRow({ href, label }: { href: string; label: string }) {
     <motion.div whileHover={{ x: 4, scale: 1.01 }} whileTap={{ scale: 0.98 }} transition={{ type: "spring", stiffness: 450, damping: 26 }}>
       <Link href={href} className="body-nav-row tap-target">
         <span style={{ fontSize: 14, fontWeight: 600 }}>{label}</span>
-        <span className="anim-chev" aria-hidden="true">→</span>
+        <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
       </Link>
     </motion.div>
   );
