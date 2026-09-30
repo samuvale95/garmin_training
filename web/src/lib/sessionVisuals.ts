@@ -27,7 +27,7 @@ export interface SessionVisual {
 const VISUALS: Record<SessionKind, Omit<SessionVisual, "kind">> = {
   riposo: { label: "Riposo", background: "var(--sabbia)", foreground: "var(--inchiostro-70)", illustration: "riposo" },
   ripetute: { label: "Ripetute", background: "var(--corallo)", foreground: "var(--corallo-testo)", illustration: "corsa" },
-  fondo_lento: { label: "Fondo lento", background: "var(--azzurro)", foreground: "var(--azzurro-testo)", illustration: null },
+  fondo_lento: { label: "Fondo lento", background: "var(--azzurro)", foreground: "var(--azzurro-testo)", illustration: "fondo_lento" },
   forza: { label: "Forza", background: "var(--lilla)", foreground: "var(--lilla-testo)", illustration: "forza" },
   lungo: { label: "Lungo", background: "var(--verde)", foreground: "var(--verde-testo)", illustration: "bici" },
 };

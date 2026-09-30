@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { useMotionEnabled } from "@/lib/motion";
 
@@ -11,11 +12,11 @@ interface ClayLoaderProps {
 
 /**
  * Airbnb-style 3D clay loader with soft pulsing ambient rings,
- * floating spheres, and smooth spring kinetics.
+ * floating 3D hourglass, and smooth spring kinetics.
  */
 export function ClayLoader({
   label,
-  size = 54,
+  size = 64,
   color = "var(--accent)",
 }: ClayLoaderProps) {
   const { reduced } = useMotionEnabled();
@@ -47,8 +48,8 @@ export function ClayLoader({
         {!reduced && (
           <motion.div
             animate={{
-              scale: [1, 1.35, 1],
-              opacity: [0.35, 0.1, 0.35],
+              scale: [1, 1.3, 1],
+              opacity: [0.35, 0.12, 0.35],
             }}
             transition={{
               duration: 2.4,
@@ -57,39 +58,44 @@ export function ClayLoader({
             }}
             style={{
               position: "absolute",
-              inset: -4,
+              inset: -6,
               borderRadius: "50%",
               background: `radial-gradient(circle, ${color} 0%, transparent 70%)`,
-              filter: "blur(6px)",
+              filter: "blur(8px)",
             }}
           />
         )}
 
-        {/* Central 3D Clay Orb */}
+        {/* Floating 3D Clay Hourglass */}
         <motion.div
           animate={
             reduced
               ? undefined
               : {
-                  y: [0, -6, 0],
-                  scale: [1, 1.05, 1],
+                  y: [0, -8, 0],
+                  rotateZ: [-2, 2, -2],
                 }
           }
           transition={{
-            duration: 1.8,
+            duration: 2.4,
             repeat: Infinity,
             ease: "easeInOut",
           }}
           style={{
-            width: size * 0.65,
-            height: size * 0.65,
-            borderRadius: "50%",
-            background: `radial-gradient(circle at 35% 30%, #ffffff 0%, ${color} 70%, #9e1435 100%)`,
-            boxShadow: "0 6px 16px -2px rgba(217, 45, 85, 0.35), inset 0 2px 4px rgba(255,255,255,0.6)",
+            width: size,
+            height: size,
             position: "relative",
             zIndex: 2,
           }}
-        />
+        >
+          <Image
+            src="/illustrazioni/loading.webp"
+            alt=""
+            fill
+            sizes={`${size}px`}
+            style={{ objectFit: "contain" }}
+          />
+        </motion.div>
 
         {/* Orbiting Satellite Dots */}
         {!reduced && (

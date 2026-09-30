@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { SlideUp } from "@/components/motion/primitives";
+import { Illustration } from "@/components/Illustration";
 import { formatMinutes, weekdayInitial } from "@/lib/format";
 import type { HrvPoint, ReadinessFactor, SleepPhases } from "@/lib/types";
 
@@ -57,6 +58,8 @@ export function SleepCard({ sleep, animate, delayMs }: { sleep: SleepPhases; ani
         boxShadow: "var(--shadow-airbnb-subtle)",
         borderRadius: "var(--radius-card)",
         padding: 16,
+        position: "relative",
+        overflow: "hidden",
       }}
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
@@ -78,10 +81,16 @@ export function SleepCard({ sleep, animate, delayMs }: { sleep: SleepPhases; ani
         )}
       </div>
 
-      <p className="font-mono" style={{ fontSize: 26, fontWeight: 500, letterSpacing: "-.02em", margin: "8px 0 0" }}>
-        {formatMinutes(total)}
-      </p>
-      <p style={{ fontSize: 11.5, opacity: 0.75, margin: "2px 0 0" }}>dormite in tutto</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <p className="font-mono" style={{ fontSize: 26, fontWeight: 500, letterSpacing: "-.02em", margin: "8px 0 0" }}>
+            {formatMinutes(total)}
+          </p>
+          <p style={{ fontSize: 11.5, opacity: 0.75, margin: "2px 0 0" }}>dormite in tutto</p>
+        </div>
+      </div>
+
+      <Illustration name="sonno" width={56} height={56} right={12} bottom={62} active={animate} delayMs={delayMs + 80} breathe float />
 
       <div style={{ display: "flex", height: 7, borderRadius: 100, overflow: "hidden", marginTop: 12 }}>
         {SLEEP_PHASES.map((phase) => {

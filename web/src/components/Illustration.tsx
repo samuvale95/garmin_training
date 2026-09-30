@@ -27,6 +27,9 @@ export const ILLUSTRATION_SOURCES = {
   fiamma: "/illustrazioni/fiamma.webp",
   scarpe: "/illustrazioni/scarpe.webp",
   loading: "/illustrazioni/loading.webp",
+  strava_sync: "/illustrazioni/strava_sync.webp",
+  obiettivo: "/illustrazioni/obiettivo.webp",
+  scarico: "/illustrazioni/scarico.webp",
 } as const;
 
 export type IllustrationName = keyof typeof ILLUSTRATION_SOURCES;
@@ -39,7 +42,10 @@ const FALLBACKS: Partial<Record<IllustrationName, string>> = {
   sonno: "/illustrazioni/riposo.webp",
   fiamma: "/illustrazioni/esultanza.webp",
   scarpe: "/illustrazioni/corsa.webp",
-  loading: "/illustrazioni/attesa.webp",
+  loading: "/illustrazioni/loading.webp",
+  strava_sync: "/illustrazioni/sync.webp",
+  obiettivo: "/illustrazioni/esultanza.webp",
+  scarico: "/illustrazioni/crollo.webp",
 };
 
 interface IllustrationProps {
