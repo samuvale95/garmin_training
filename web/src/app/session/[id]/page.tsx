@@ -176,8 +176,28 @@ export default function SessionDetailPage() {
       error={deleteError}
       actions={
         <>
-          <Link href={`/session/${sessionId}/edit`} className="tap-target" aria-label="Modifica allenamento" style={{ color: "var(--crema)", fontSize: 18, textDecoration: "none" }}>
-            ✎
+          <Link
+            href={`/session/${sessionId}/edit`}
+            className="tap-target"
+            aria-label="Modifica allenamento"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              background: "var(--sabbia-chip)",
+              border: "1px solid var(--border-airbnb)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--inchiostro)",
+              textDecoration: "none",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
           </Link>
           <DeleteIconButton onClick={handleDelete} disabled={isDeleting} />
         </>
@@ -193,21 +213,31 @@ export default function SessionDetailPage() {
         )
       }
       footer={
-        <div style={{ width: "100%", marginTop: 24, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ width: "100%", marginTop: 28, display: "flex", flexDirection: "column", gap: 10 }}>
           <PrimaryButton background="var(--verde)" textColor="var(--verde-testo)" fillColor="var(--verde)" successColor="var(--verde)">
-            Già sul calendario
+            ✓ Già sul calendario
           </PrimaryButton>
           <button
             type="button"
             onClick={moveToTomorrow}
             disabled={isMoving}
             className="tap-target"
-            style={{ background: "none", border: "none", color: "var(--inchiostro-su-scuro)", fontSize: 13, cursor: isMoving ? "default" : "pointer" }}
+            style={{
+              background: "var(--sabbia-chip)",
+              border: "1px solid var(--border-airbnb)",
+              borderRadius: "var(--radius-pill)",
+              padding: "10px 16px",
+              color: "var(--inchiostro)",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: isMoving ? "default" : "pointer",
+              transition: "all 0.15s ease",
+            }}
           >
             {isMoving ? "Sposto…" : `Sposta a ${formatWeekday(nextDayKey())}`}
           </button>
           {displayMoveError && (
-            <p style={{ color: "var(--rosso-avviso)", fontSize: 13, textAlign: "center" }} role="alert">
+            <p style={{ color: "var(--rosso-avviso)", fontSize: 13, textAlign: "center", margin: "4px 0 0" }} role="alert">
               {displayMoveError}
             </p>
           )}

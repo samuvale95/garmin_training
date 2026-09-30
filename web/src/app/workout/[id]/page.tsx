@@ -99,9 +99,24 @@ function WorkoutDetailContent() {
               href={`/workout/${params.id}/edit?date=${date}`}
               className="tap-target"
               aria-label="Modifica allenamento"
-              style={{ color: "var(--crema)", fontSize: 18, textDecoration: "none" }}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                background: "var(--sabbia-chip)",
+                border: "1px solid var(--border-airbnb)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--inchiostro)",
+                textDecoration: "none",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              }}
             >
-              ✎
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
             </Link>
           )}
           <DeleteIconButton onClick={handleDelete} disabled={isDeleting} />
@@ -122,7 +137,21 @@ function WorkoutDetailContent() {
           <Link
             href="/week"
             className="tap-target"
-            style={{ color: "var(--crema)", fontSize: 14, fontWeight: 600, textDecoration: "none" }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              background: "var(--sabbia-chip)",
+              border: "1px solid var(--border-airbnb)",
+              borderRadius: "var(--radius-pill)",
+              padding: "10px 20px",
+              color: "var(--inchiostro)",
+              fontSize: 13,
+              fontWeight: 600,
+              textDecoration: "none",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              transition: "all 0.15s ease",
+            }}
           >
             Torna alla settimana
           </Link>

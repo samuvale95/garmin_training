@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { WordIn } from "@/components/motion/primitives";
 import { DetailScaffold } from "@/components/DetailScaffold";
 import { SkeletonStravaPanel } from "@/components/skeletons";
 import { StravaMatchPanel } from "@/components/StravaMatchPanel";
@@ -38,22 +37,39 @@ export function StravaComparisonScreen({
 }) {
   return (
     <DetailScaffold backHref={backHref} caption={date ? `${formatFullDate(date)} · da Strava` : undefined}>
-      <div style={{ alignSelf: "stretch" }}>
+      <div style={{ width: "100%", marginTop: 12 }}>
         {title && (
-          <WordIn active={animate} style={{ font: "600 26px/1.1 var(--font-outfit)", marginTop: 16 }}>
+          <h1
+            style={{
+              fontSize: 24,
+              fontWeight: 700,
+              color: "var(--inchiostro)",
+              margin: "12px 0 16px",
+              letterSpacing: "-0.02em",
+            }}
+          >
             {title}
-          </WordIn>
+          </h1>
         )}
 
         {!stravaConnected ? (
           <div style={{ marginTop: 20 }}>
-            <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-su-scuro)", margin: 0 }}>
+            <p style={{ fontSize: 14, color: "var(--inchiostro-70)", margin: 0, lineHeight: 1.5 }}>
               Strava non è collegato, quindi non posso confrontare il pianificato con lo svolto.
             </p>
             <Link
               href="/connect-strava"
               className="tap-target"
-              style={{ display: "inline-block", marginTop: 14, color: "var(--corallo)", fontSize: 14, fontWeight: 600 }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                marginTop: 14,
+                color: "var(--corallo)",
+                fontSize: 14,
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
             >
               Collega Strava →
             </Link>
@@ -64,11 +80,25 @@ export function StravaComparisonScreen({
           <StravaMatchPanel match={match} isLoading={isLoading} shoesFrom={shoesFrom} />
         )}
 
-        <div style={{ marginTop: 28, textAlign: "center" }}>
+        <div style={{ marginTop: 32, textAlign: "center" }}>
           <Link
             href={backHref}
             className="tap-target"
-            style={{ color: "var(--crema)", fontSize: 14, fontWeight: 600, textDecoration: "none" }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "var(--sabbia-chip)",
+              border: "1px solid var(--border-airbnb)",
+              borderRadius: "var(--radius-pill)",
+              padding: "10px 20px",
+              color: "var(--inchiostro)",
+              fontSize: 13,
+              fontWeight: 600,
+              textDecoration: "none",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              transition: "all 0.15s ease",
+            }}
           >
             {backLabel}
           </Link>

@@ -15,12 +15,10 @@ export function PageHeader({ backHref, color = "var(--inchiostro)" }: PageHeader
   const { reduced } = useMotionEnabled();
   const href = backHref ?? "/today";
   const label = backHref ? "Indietro" : "Torna alla home";
-  const glyph = backHref ? "←" : "⌂";
-
   return (
     <motion.div
-      whileHover={reduced ? undefined : { scale: 1.15, x: backHref ? -2 : 0 }}
-      whileTap={reduced ? undefined : { scale: 0.85 }}
+      whileHover={reduced ? undefined : { scale: 1.08, x: backHref ? -2 : 0 }}
+      whileTap={reduced ? undefined : { scale: 0.92 }}
       transition={{ type: "spring", stiffness: 450, damping: 22 }}
       style={{ display: "inline-flex" }}
     >
@@ -30,20 +28,30 @@ export function PageHeader({ backHref, color = "var(--inchiostro)" }: PageHeader
         aria-label={label}
         style={{
           color,
-          fontSize: 20,
           textDecoration: "none",
           flex: "none",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          width: 34,
-          height: 34,
+          width: 36,
+          height: 36,
           borderRadius: "50%",
           background: "var(--sabbia-chip)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+          border: "1px solid var(--border-airbnb)",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
         }}
       >
-        {glyph}
+        {backHref ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+        ) : (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+        )}
       </Link>
     </motion.div>
   );

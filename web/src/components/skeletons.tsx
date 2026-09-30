@@ -66,28 +66,23 @@ export function SkeletonTodayHero() {
   );
 }
 
-/** The detail screens' body: distance ring, title, and a few step rows. */
+/** The detail screens' body: title, hero stat card, and step rows. */
 export function SkeletonDetailBody() {
   return (
     <div
       aria-hidden="true"
-      style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", marginTop: 8 }}
+      style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", marginTop: 12 }}
     >
-      <div
-        style={{
-          width: 180,
-          height: 180,
-          borderRadius: "50%",
-          border: `12px solid ${DARK_FILL}`,
-          boxSizing: "border-box",
-        }}
-      />
-      <div style={{ marginTop: 20, width: "70%" }}>
-        <SkeletonBlock height={26} radius={8} dark />
+      <div style={{ margin: "12px 0 16px", width: "55%" }}>
+        <SkeletonBlock height={28} radius={8} />
       </div>
-      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10, marginTop: 24 }}>
+      <SkeletonBlock height={168} radius={24} />
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10, marginTop: 28 }}>
+        <div style={{ width: "40%", marginBottom: 4 }}>
+          <SkeletonBlock height={14} radius={4} />
+        </div>
         {[0, 1, 2].map((i) => (
-          <SkeletonBlock key={i} height={62} radius={16} dark />
+          <SkeletonBlock key={i} height={60} radius={18} />
         ))}
       </div>
     </div>
@@ -131,15 +126,15 @@ export function SkeletonStravaPanel() {
     <div aria-hidden="true">
       <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
         <div style={{ flex: 1 }}>
-          <SkeletonBlock height={96} radius={18} dark />
+          <SkeletonBlock height={96} radius={18} />
         </div>
         <div style={{ flex: 1 }}>
-          <SkeletonBlock height={96} radius={18} dark />
+          <SkeletonBlock height={96} radius={18} />
         </div>
       </div>
       {[0, 1, 2].map((i) => (
         <div key={i} style={{ marginTop: 10 }}>
-          <SkeletonBlock height={62} radius={16} dark />
+          <SkeletonBlock height={62} radius={16} />
         </div>
       ))}
     </div>

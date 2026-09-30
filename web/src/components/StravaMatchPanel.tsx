@@ -20,7 +20,7 @@ export function StravaMatchPanel({
 }) {
   if (!match || !match.matched) {
     return (
-      <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-su-scuro)", marginTop: 20 }}>
+      <p style={{ fontSize: 14, color: "var(--inchiostro-50)", marginTop: 20, textAlign: "center" }}>
         {isLoading ? "Cerco l'attività su Strava..." : "Nessuna attività Strava corrispondente trovata per questa data."}
       </p>
     );
@@ -28,23 +28,48 @@ export function StravaMatchPanel({
 
   return (
     <>
-      <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-        <div style={{ flex: 1, background: "rgba(246,238,218,.08)", borderRadius: "var(--radius-card)", padding: 14 }}>
-          <p style={{ fontSize: 11, color: "var(--inchiostro-su-scuro)", margin: "0 0 6px" }}>pianificato</p>
-          <p className="font-mono" style={{ fontSize: 22, fontWeight: 500, margin: 0 }}>
-            {match.planned_distance_km != null ? match.planned_distance_km.toFixed(1) : "—"} km
+      <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+        <div
+          style={{
+            flex: 1,
+            background: "var(--crema-card)",
+            border: "1px solid var(--border-airbnb)",
+            borderRadius: 20,
+            padding: 16,
+            boxShadow: "var(--shadow-airbnb-subtle)",
+          }}
+        >
+          <p style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--inchiostro-50)", margin: "0 0 6px" }}>
+            Pianificato
           </p>
-          <p style={{ fontSize: 11, color: "var(--inchiostro-su-scuro)", margin: "4px 0 0" }}>
-            {match.planned_pace_sec_per_km != null ? `${formatPaceValue(match.planned_pace_sec_per_km)} target` : "nessun passo target"}
+          <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, color: "var(--inchiostro)", margin: 0 }}>
+            {match.planned_distance_km != null ? match.planned_distance_km.toFixed(1) : "—"}{" "}
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--inchiostro-50)" }}>km</span>
+          </p>
+          <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>
+            {match.planned_pace_sec_per_km != null ? `${formatPaceValue(match.planned_pace_sec_per_km)}/km target` : "Passo libero"}
           </p>
         </div>
-        <div style={{ flex: 1, background: "var(--corallo)", color: "var(--corallo-testo)", borderRadius: "var(--radius-card)", padding: 14 }}>
-          <p style={{ fontSize: 11, opacity: 0.75, margin: "0 0 6px" }}>svolto</p>
-          <p className="font-mono" style={{ fontSize: 22, fontWeight: 500, margin: 0 }}>
-            {match.distance_km != null ? match.distance_km.toFixed(1) : "—"} km
+
+        <div
+          style={{
+            flex: 1,
+            background: "linear-gradient(135deg, #FF6F61 0%, #E85D4E 100%)",
+            color: "#FFFFFF",
+            borderRadius: 20,
+            padding: 16,
+            boxShadow: "0 4px 14px rgba(232, 93, 78, 0.22)",
+          }}
+        >
+          <p style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", opacity: 0.85, margin: "0 0 6px" }}>
+            Svolto
           </p>
-          <p style={{ fontSize: 11, margin: "4px 0 0" }}>
-            {match.avg_pace_sec_per_km != null ? `${formatPaceValue(match.avg_pace_sec_per_km)} medio` : "—"}
+          <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>
+            {match.distance_km != null ? match.distance_km.toFixed(1) : "—"}{" "}
+            <span style={{ fontSize: 14, fontWeight: 500, opacity: 0.85 }}>km</span>
+          </p>
+          <p style={{ fontSize: 12, opacity: 0.9, margin: "4px 0 0" }}>
+            {match.avg_pace_sec_per_km != null ? `${formatPaceValue(match.avg_pace_sec_per_km)}/km medio` : "—"}
           </p>
         </div>
       </div>
@@ -57,7 +82,6 @@ export function StravaMatchPanel({
       <StravaRow label="Dislivello">
         {match.elevation_gain_m != null ? `+${Math.round(match.elevation_gain_m)} m` : "—"}
         {" · nessuno pianificato"}
-
       </StravaRow>
 
       {match.felt_note && (
@@ -65,21 +89,57 @@ export function StravaMatchPanel({
       )}
 
       <Link href={`/shoes?from=${encodeURIComponent(shoesFrom)}`} style={{ textDecoration: "none", color: "inherit" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(246,238,218,.07)", borderRadius: "var(--radius-row)", padding: 14, marginTop: 10 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            background: "var(--crema-card)",
+            border: "1px solid var(--border-airbnb)",
+            borderRadius: 18,
+            padding: "14px 18px",
+            marginTop: 10,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+          }}
+        >
           <span style={{ flex: 1 }}>
-            <span style={{ display: "block", fontSize: 13, fontWeight: 600 }}>Scarpe</span>
-            <span className="font-mono" style={{ display: "block", fontSize: 11.5, opacity: 0.8, marginTop: 2 }}>
-              {match.gear_name ?? "—"}
+            <span style={{ display: "block", fontSize: 13.5, fontWeight: 600, color: "var(--inchiostro)" }}>Scarpe</span>
+            <span className="font-mono" style={{ display: "block", fontSize: 12, color: "var(--inchiostro-50)", marginTop: 2 }}>
+              {match.gear_name ?? "Nessuna scarpa registrata"}
             </span>
           </span>
-          <span aria-hidden="true">›</span>
+          <div
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: "50%",
+              background: "var(--sabbia-chip)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--inchiostro-50)",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </div>
         </div>
       </Link>
 
       {match.plan_note && (
-        <div style={{ background: "var(--azzurro)", color: "var(--azzurro-testo)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 16 }}>
-          <p style={{ fontWeight: 600, margin: "0 0 6px", fontSize: 14 }}>Cosa cambia nel piano</p>
-          <p className="font-serif-italic" style={{ fontSize: 13.5, margin: 0 }}>{match.plan_note}</p>
+        <div
+          style={{
+            background: "var(--azzurro)",
+            color: "var(--azzurro-testo)",
+            border: "1px solid rgba(74, 144, 226, 0.2)",
+            borderRadius: 18,
+            padding: "16px 18px",
+            marginTop: 16,
+          }}
+        >
+          <p style={{ fontWeight: 700, margin: "0 0 4px", fontSize: 14 }}>Cosa cambia nel piano</p>
+          <p style={{ fontSize: 13.5, margin: 0, lineHeight: 1.45 }}>{match.plan_note}</p>
         </div>
       )}
     </>
@@ -88,9 +148,22 @@ export function StravaMatchPanel({
 
 function StravaRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: "rgba(246,238,218,.07)", borderRadius: "var(--radius-row)", padding: 14, marginTop: 10 }}>
-      <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 4px" }}>{label}</p>
-      <p className="font-mono" style={{ fontSize: 12, opacity: 0.85, margin: 0 }}>{children}</p>
+    <div
+      style={{
+        background: "var(--crema-card)",
+        border: "1px solid var(--border-airbnb)",
+        borderRadius: 18,
+        padding: "14px 18px",
+        marginTop: 10,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+      }}
+    >
+      <p style={{ fontSize: 11.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--inchiostro-50)", margin: "0 0 4px" }}>
+        {label}
+      </p>
+      <p className="font-mono" style={{ fontSize: 13.5, fontWeight: 500, color: "var(--inchiostro)", margin: 0 }}>
+        {children}
+      </p>
     </div>
   );
 }

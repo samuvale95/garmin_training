@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Reorder } from "framer-motion";
-import { PrimaryButton, WordIn } from "@/components/motion/primitives";
+import { PrimaryButton } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { checkMoveAfterwards } from "@/lib/moveWarnings";
 import { findPlanSession, useAddSession, useIsRewritten, useApplyDeletion, useInvalidateCalendarData, usePlanQuery, useRemoveSession, useStartSync, useSyncJobStatus, useUpdateSession, useWorkoutsForDate } from "@/lib/queries";
@@ -377,8 +377,29 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   return (
     <div style={{ minHeight: "100dvh", background: "var(--crema)", padding: "22px 20px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <button type="button" onClick={() => router.push(originHref)} className="tap-target" aria-label="Chiudi" style={{ background: "none", border: "none", fontSize: 22, color: "var(--inchiostro)", cursor: "pointer" }}>
-          ×
+        <button
+          type="button"
+          onClick={() => router.push(originHref)}
+          className="tap-target"
+          aria-label="Chiudi"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: "50%",
+            background: "var(--sabbia-chip)",
+            border: "1px solid var(--border-airbnb)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--inchiostro)",
+            cursor: "pointer",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
         {mode !== "create" ? (
           <button
@@ -386,23 +407,40 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
             onClick={handleDelete}
             className="tap-target"
             aria-label="Elimina allenamento"
-            style={{ background: "none", border: "none", fontSize: 18, color: "var(--rosso-avviso)", cursor: "pointer" }}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              background: "var(--sabbia-chip)",
+              border: "1px solid var(--border-airbnb)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--rosso-forte)",
+              cursor: "pointer",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            }}
           >
-            🗑
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
           </button>
         ) : (
-          <span style={{ width: 24 }} />
+          <span style={{ width: 36 }} />
         )}
       </div>
 
       {confirmDelete && (
-        <div style={{ background: "var(--rosa-avviso)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
-          <p style={{ fontSize: 13, color: "var(--rosso-testo)", margin: 0, flex: 1 }}>
+        <div style={{ background: "var(--rosa-avviso)", border: "1px solid rgba(224, 75, 59, 0.25)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
+          <p style={{ fontSize: 13, color: "var(--rosso-testo)", fontWeight: 500, margin: 0, flex: 1 }}>
             {mode === "garmin"
               ? "Eliminare questo allenamento dal calendario Garmin?"
               : "Eliminare questo allenamento dal piano e dal calendario Garmin?"}
           </p>
-          <button type="button" onClick={handleDelete} className="tap-target" style={{ background: "var(--rosso-forte)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+          <button type="button" onClick={handleDelete} className="tap-target" style={{ background: "var(--rosso-forte)", color: "#fff", border: "none", borderRadius: "var(--radius-pill)", padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
             Elimina
           </button>
           <button type="button" onClick={() => setConfirmDelete(false)} className="tap-target" style={{ background: "none", border: "none", fontSize: 12, color: "var(--inchiostro-50)", cursor: "pointer" }}>
@@ -411,9 +449,9 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
         </div>
       )}
 
-      <WordIn active={animate} style={{ font: "600 30px/1.06 var(--font-outfit)", letterSpacing: "-.03em", marginTop: 18 }}>
+      <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--inchiostro)", letterSpacing: "-0.03em", marginTop: 18, marginBottom: 0 }}>
         {mode === "create" ? "Crea allenamento" : "Modifica allenamento"}
-      </WordIn>
+      </h1>
 
       <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
         {SPORT_CHIPS.map((chip) => {
@@ -501,9 +539,23 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
                   onClick={() => removeBlock(item._id)}
                   className="tap-target"
                   aria-label="Elimina blocco"
-                  style={{ background: "none", border: "none", fontSize: 14, color: "var(--inchiostro-50)", cursor: "pointer" }}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: "50%",
+                    background: "rgba(0,0,0,0.05)",
+                    border: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--inchiostro-50)",
+                    cursor: "pointer",
+                  }}
                 >
-                  ✕
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                 </button>
               </div>
 
@@ -626,19 +678,28 @@ function DayField({
       aria-label={label}
       style={{
         background: "var(--sabbia-chip)",
-        border: "none",
+        border: "1px solid var(--border-airbnb)",
         borderRadius: "var(--radius-pill)",
         width: 32,
         height: 32,
         flex: "none",
-        fontSize: 16,
-        lineHeight: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         color: "var(--inchiostro)",
         cursor: isValid ? "pointer" : "not-allowed",
         opacity: isValid ? 1 : 0.35,
       }}
     >
-      {delta > 0 ? "›" : "‹"}
+      {delta > 0 ? (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      ) : (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+      )}
     </button>
   );
 
@@ -723,18 +784,46 @@ function StepRow({
         onClick={onEdit}
         className="tap-target"
         aria-label={`Modifica ${stepTypeLabel(step.type).toLowerCase()}`}
-        style={{ background: "none", border: "none", fontSize: 14, color: "inherit", opacity: 0.7, cursor: "pointer" }}
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: "50%",
+          background: isKey ? "rgba(255,255,255,0.2)" : "var(--sabbia-chip)",
+          border: isKey ? "none" : "1px solid var(--border-airbnb)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "inherit",
+          cursor: "pointer",
+        }}
       >
-        ✎
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
       </button>
       <button
         type="button"
         onClick={onRemove}
         className="tap-target"
         aria-label={`Elimina ${stepTypeLabel(step.type).toLowerCase()}`}
-        style={{ background: "none", border: "none", fontSize: 14, color: "inherit", opacity: 0.55, cursor: "pointer" }}
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: "50%",
+          background: isKey ? "rgba(255,255,255,0.2)" : "var(--sabbia-chip)",
+          border: isKey ? "none" : "1px solid var(--border-airbnb)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "inherit",
+          cursor: "pointer",
+        }}
       >
-        ✕
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
       </button>
     </div>
   );

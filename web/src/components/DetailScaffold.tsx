@@ -36,37 +36,39 @@ export function DetailScaffold({
     <div
       style={{
         minHeight: "100dvh",
-        background: "var(--inchiostro)",
-        color: "var(--crema)",
-        padding: "24px 22px 32px",
+        background: "var(--crema)",
+        color: "var(--inchiostro)",
+        padding: "24px 20px 40px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
       }}
     >
-      <div style={{ alignSelf: "stretch", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <PageHeader backHref={backHref} color="var(--crema)" />
-          {caption && (
-            <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)" }}>
-              {caption}
-            </span>
-          )}
+      <div style={{ width: "100%", maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+            <PageHeader backHref={backHref} color="var(--inchiostro)" />
+            {caption && (
+              <span className="font-mono" style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+                {caption}
+              </span>
+            )}
+          </div>
+          {actions && <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "none" }}>{actions}</div>}
         </div>
-        {actions && <div style={{ display: "flex", alignItems: "center", gap: 14, flex: "none" }}>{actions}</div>}
+
+        {confirm}
+
+        {error && (
+          <p style={{ color: "var(--rosso-avviso)", fontSize: 13, marginTop: 12 }} role="alert">
+            {error}
+          </p>
+        )}
+
+        {children}
+
+        {footer}
       </div>
-
-      {confirm}
-
-      {error && (
-        <p style={{ alignSelf: "stretch", color: "var(--rosso-avviso)", fontSize: 13, marginTop: 10 }} role="alert">
-          {error}
-        </p>
-      )}
-
-      {children}
-
-      {footer}
     </div>
   );
 }
@@ -87,7 +89,8 @@ export function DeleteConfirmStrip({
     <div
       style={{
         alignSelf: "stretch",
-        background: "rgba(246,238,218,.1)",
+        background: "var(--rosa-avviso)",
+        border: "1px solid rgba(224, 75, 59, 0.25)",
         borderRadius: "var(--radius-card)",
         padding: 14,
         marginTop: 14,
@@ -96,7 +99,7 @@ export function DeleteConfirmStrip({
         gap: 10,
       }}
     >
-      <p style={{ fontSize: 13, margin: 0, flex: 1 }}>{message}</p>
+      <p style={{ fontSize: 13, color: "var(--rosso-testo)", fontWeight: 500, margin: 0, flex: 1 }}>{message}</p>
       <button
         type="button"
         onClick={onConfirm}
@@ -104,7 +107,7 @@ export function DeleteConfirmStrip({
         className="tap-target"
         style={{
           background: "var(--rosso-forte)",
-          color: "var(--crema)",
+          color: "#fff",
           border: "none",
           borderRadius: "var(--radius-pill)",
           padding: "8px 14px",
@@ -120,7 +123,7 @@ export function DeleteConfirmStrip({
         onClick={onCancel}
         disabled={isDeleting}
         className="tap-target"
-        style={{ background: "none", border: "none", fontSize: 12, color: "var(--inchiostro-su-scuro)", cursor: "pointer" }}
+        style={{ background: "none", border: "none", fontSize: 12, color: "var(--inchiostro-50)", cursor: "pointer" }}
       >
         Annulla
       </button>
@@ -138,15 +141,27 @@ export function DeleteIconButton({ onClick, disabled }: { onClick: () => void; d
       className="tap-target"
       aria-label="Elimina allenamento"
       style={{
-        background: "none",
-        border: "none",
-        fontSize: 18,
-        color: "var(--rosso-avviso)",
+        width: 36,
+        height: 36,
+        borderRadius: "50%",
+        background: "var(--sabbia-chip)",
+        border: "1px solid var(--border-airbnb)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "var(--rosso-forte)",
         cursor: disabled ? "default" : "pointer",
-        opacity: disabled ? 0.6 : 1,
+        opacity: disabled ? 0.5 : 1,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        transition: "all 0.15s ease",
       }}
     >
-      🗑
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        <line x1="10" y1="11" x2="10" y2="17" />
+        <line x1="14" y1="11" x2="14" y2="17" />
+      </svg>
     </button>
   );
 }
