@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { BarGrow, SlideUp } from "@/components/motion/primitives";
 import { DraggableWeekCard, RestCard, type DayCardData } from "@/components/WeekCards";
@@ -542,9 +543,11 @@ function WeekHeaderRow({ start, end, offset, onPrev, onNext, onToday }: WeekHead
     <>
       <div className="screen-brand-row">
         <BrandMark height={22} />
-        <Link href="/week/new" className="tap-target add-workout-link">
-          <span aria-hidden="true">+</span> Allenamento
-        </Link>
+        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.94 }}>
+          <Link href="/week/new" className="tap-target add-workout-link">
+            <span aria-hidden="true">+</span> Allenamento
+          </Link>
+        </motion.div>
       </div>
       <header className="screen-intro">
         <h1>La tua settimana</h1>
@@ -559,7 +562,16 @@ function WeekHeaderRow({ start, end, offset, onPrev, onNext, onToday }: WeekHead
         <NavButton label="Settimana successiva" onClick={onNext}>›</NavButton>
       </div>
       {offset !== 0 && (
-        <button type="button" onClick={onToday} className="tap-target week-reset">Torna a questa settimana</button>
+        <motion.button
+          type="button"
+          onClick={onToday}
+          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.03 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          className="tap-target week-reset"
+        >
+          Torna a questa settimana
+        </motion.button>
       )}
     </>
   );
@@ -576,26 +588,30 @@ function WeekHeader(props: WeekHeaderProps) {
 
 function NavButton({ label, onClick, children }: { label: string; onClick: () => void; children: string }) {
   return (
-    <button
-      className="tap-target press-soft"
+    <motion.button
+      className="tap-target"
       aria-label={label}
       onClick={onClick}
+      whileTap={{ scale: 0.84 }}
+      whileHover={{ scale: 1.15 }}
+      transition={{ type: "spring", stiffness: 500, damping: 22 }}
       style={{
-        width: 30,
-        height: 30,
+        width: 32,
+        height: 32,
         borderRadius: "50%",
         background: "var(--sabbia-chip)",
         color: "var(--inchiostro)",
         border: "none",
-        fontSize: 15,
+        fontSize: 16,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         cursor: "pointer",
         flex: "none",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
       }}
     >
       {children}
-    </button>
+    </motion.button>
   );
 }

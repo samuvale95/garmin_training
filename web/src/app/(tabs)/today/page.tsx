@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
@@ -253,32 +254,66 @@ export default function TodayPage() {
 
       {progress.data && (
         <Link href="/progress" style={{ textDecoration: "none", color: "inherit" }}>
-          <SlideUp active={animate} delayMs={295} className="press-soft" style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: "10px 14px", marginTop: 12, display: "flex", alignItems: "center", gap: 12 }}>
-            <Mascot state={progress.data.mascot.state} size={52} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontWeight: 600, fontSize: 15, margin: 0 }}>
-                {progress.data.streak} {progress.data.streak === 1 ? "settimana" : "settimane"} di fila
-              </p>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                <Tokens tokens={progress.data.tokens} max={progress.data.max_tokens} />
-                <span className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)" }}>
-                  {progress.data.week_points} punti questa settimana
-                </span>
+          <SlideUp active={animate} delayMs={295}>
+            <motion.div
+              whileHover={{ y: -2.5, scale: 1.012 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              style={{
+                background: "var(--crema-card)",
+                border: "var(--border-airbnb)",
+                boxShadow: "var(--shadow-airbnb-subtle)",
+                borderRadius: "var(--radius-card)",
+                padding: "12px 16px",
+                marginTop: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <Mascot state={progress.data.mascot.state} size={52} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontWeight: 600, fontSize: 15, margin: 0 }}>
+                  {progress.data.streak} {progress.data.streak === 1 ? "settimana" : "settimane"} di fila
+                </p>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                  <Tokens tokens={progress.data.tokens} max={progress.data.max_tokens} />
+                  <span className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)" }}>
+                    {progress.data.week_points} punti questa settimana
+                  </span>
+                </div>
               </div>
-            </div>
-            <span className="anim-chev" aria-hidden="true">→</span>
+              <span className="anim-chev" aria-hidden="true">→</span>
+            </motion.div>
           </SlideUp>
         </Link>
       )}
 
       {earlyInWeek && lastWeek.data && lastWeek.data.done_sessions + lastWeek.data.planned_sessions > 0 && (
         <Link href="/summary" style={{ textDecoration: "none", color: "inherit" }}>
-          <SlideUp active={animate} delayMs={300} className="press-soft" style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: 0 }}>La settimana scorsa</p>
-              <p style={{ fontSize: 14, margin: "3px 0 0" }}>{lastWeek.data.headline}</p>
-            </div>
-            <span className="anim-chev" aria-hidden="true">→</span>
+          <SlideUp active={animate} delayMs={300}>
+            <motion.div
+              whileHover={{ y: -2.5, scale: 1.012 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              style={{
+                background: "var(--sabbia)",
+                border: "var(--border-airbnb)",
+                boxShadow: "var(--shadow-airbnb-subtle)",
+                borderRadius: "var(--radius-card)",
+                padding: 14,
+                marginTop: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <p style={{ font: "500 11.5px var(--font-outfit)", color: "var(--inchiostro-50)", margin: 0 }}>La settimana scorsa</p>
+                <p style={{ fontSize: 14, margin: "3px 0 0" }}>{lastWeek.data.headline}</p>
+              </div>
+              <span className="anim-chev" aria-hidden="true">→</span>
+            </motion.div>
           </SlideUp>
         </Link>
       )}
@@ -394,24 +429,36 @@ export default function TodayPage() {
               active={animate}
               delayMs={720 + i * 80}
               row
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 2px", borderTop: "1px solid var(--sabbia-bordo)" }}
             >
-              <span style={{ font: "500 11px var(--font-outfit)", color: "var(--inchiostro-35)", width: 34, flex: "none" }}>
-                {new Date(session.date).toLocaleDateString("it-IT", { weekday: "short" })}
-              </span>
-              <span style={{ font: "500 13.5px var(--font-outfit)", flex: 1 }}>{session.title}</span>
-              {match?.matched && match.distance_km != null ? (
-                <span className="font-mono" style={{ fontSize: 11, color: "var(--verde-tratto-scuro)", width: 60, textAlign: "right", flex: "none" }}>
-                  svolto {match.distance_km.toFixed(0)}
+              <motion.div
+                whileHover={{ x: 5 }}
+                transition={{ type: "spring", stiffness: 450, damping: 26 }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "7px 4px",
+                  borderRadius: "var(--radius-sm)",
+                  borderTop: "1px solid var(--sabbia-bordo)",
+                }}
+              >
+                <span style={{ font: "500 11px var(--font-outfit)", color: "var(--inchiostro-35)", width: 34, flex: "none" }}>
+                  {new Date(session.date).toLocaleDateString("it-IT", { weekday: "short" })}
                 </span>
-              ) : km > 0 && (
-                <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", width: 38, textAlign: "right", flex: "none" }}>
-                  {km.toFixed(0)} km
-                </span>
-              )}
-              <div style={{ width: 70, height: 4, flex: "none" }}>
-                <BarGrow value={Math.min(1, km / 20)} height={4} color={visual.background} trackColor="var(--sabbia-chip)" active={animate} delayMs={800 + i * 80} />
-              </div>
+                <span style={{ font: "500 13.5px var(--font-outfit)", flex: 1 }}>{session.title}</span>
+                {match?.matched && match.distance_km != null ? (
+                  <span className="font-mono" style={{ fontSize: 11, color: "var(--verde-tratto-scuro)", width: 60, textAlign: "right", flex: "none" }}>
+                    svolto {match.distance_km.toFixed(0)}
+                  </span>
+                ) : km > 0 && (
+                  <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", width: 38, textAlign: "right", flex: "none" }}>
+                    {km.toFixed(0)} km
+                  </span>
+                )}
+                <div style={{ width: 70, height: 4, flex: "none" }}>
+                  <BarGrow value={Math.min(1, km / 20)} height={4} color={visual.background} trackColor="var(--sabbia-chip)" active={animate} delayMs={800 + i * 80} />
+                </div>
+              </motion.div>
             </SlideUp>
           );
         })}
@@ -426,9 +473,11 @@ function TodayHeader() {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
       <BrandMark height={22} />
-      <Link href="/settings" aria-label="Impostazioni" className="tap-target" style={{ display: "block" }}>
-        <Avatar size={36} />
-      </Link>
+      <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} transition={{ type: "spring", stiffness: 450, damping: 22 }}>
+        <Link href="/settings" aria-label="Impostazioni" className="tap-target" style={{ display: "block" }}>
+          <Avatar size={36} />
+        </Link>
+      </motion.div>
     </div>
   );
 }
@@ -455,17 +504,31 @@ function MetricCard({
   barColor: string;
 }) {
   return (
-    <SlideUp active={active} delayMs={delay} style={{ flex: 1, background, color, borderRadius: "var(--radius-card)", padding: 15 }}>
-      <p style={{ font: "500 11.5px var(--font-outfit)", color: color ? undefined : "var(--inchiostro-50)", opacity: color ? 0.7 : 1, margin: 0 }}>{label}</p>
-      <div style={{ marginTop: 8, overflow: "hidden" }}>
-        <WordIn active={active} delayMs={delay + 160} style={{ font: "600 25px/1 var(--font-outfit)", letterSpacing: "-.03em" }}>
-          {value}
-          {unit && <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}> {unit}</span>}
-        </WordIn>
-      </div>
-      <div style={{ marginTop: 11 }}>
-        <BarGrow value={fraction} height={4} color={barColor} trackColor="rgba(0,0,0,.08)" active={active} delayMs={delay + 260} />
-      </div>
+    <SlideUp active={active} delayMs={delay} style={{ flex: 1 }}>
+      <motion.div
+        whileHover={{ y: -3, scale: 1.025 }}
+        whileTap={{ scale: 0.97 }}
+        transition={{ type: "spring", stiffness: 420, damping: 24 }}
+        style={{
+          background,
+          color,
+          borderRadius: "var(--radius-card)",
+          padding: 15,
+          border: "var(--border-airbnb)",
+          boxShadow: "var(--shadow-airbnb-subtle)",
+        }}
+      >
+        <p style={{ font: "500 11.5px var(--font-outfit)", color: color ? undefined : "var(--inchiostro-50)", opacity: color ? 0.7 : 1, margin: 0 }}>{label}</p>
+        <div style={{ marginTop: 8, overflow: "hidden" }}>
+          <WordIn active={active} delayMs={delay + 160} style={{ font: "600 25px/1 var(--font-outfit)", letterSpacing: "-.03em" }}>
+            {value}
+            {unit && <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}> {unit}</span>}
+          </WordIn>
+        </div>
+        <div style={{ marginTop: 11 }}>
+          <BarGrow value={fraction} height={4} color={barColor} trackColor="rgba(0,0,0,.08)" active={active} delayMs={delay + 260} />
+        </div>
+      </motion.div>
     </SlideUp>
   );
 }

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { PlanWaiting } from "@/components/PlanWaiting";
+import { Illustration } from "@/components/Illustration";
 import { SlideUp } from "@/components/motion/primitives";
 import { formatFullDate } from "@/lib/format";
 import { useAdaptation, useAdaptationCheckStartedAt, useAnswerAdaptation } from "@/lib/queries";
@@ -26,16 +28,23 @@ export function AdaptationCard({ animate, delayMs = 0 }: { animate: boolean; del
 
   return (
     <SlideUp active={animate} delayMs={delayMs} style={card}>
-      <p style={{ font: "600 16px/1.2 var(--font-outfit)", margin: 0 }}>
-        {pending ? "Ti propongo di adattare il piano" : "Ho adattato il piano"}
-      </p>
-      <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", display: "flex", flexDirection: "column", gap: 4 }}>
-        {adaptation.events.map((event) => (
-          <li key={`${event.kind}-${event.day}`} className="font-serif-italic" style={{ fontSize: 13.5, color: "var(--inchiostro-70)" }}>
-            {event.message}.
-          </li>
-        ))}
-      </ul>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <div>
+          <p style={{ font: "600 16px/1.2 var(--font-outfit)", margin: 0 }}>
+            {pending ? "Ti propongo di adattare il piano" : "Ho adattato il piano"}
+          </p>
+          <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", display: "flex", flexDirection: "column", gap: 4 }}>
+            {adaptation.events.map((event) => (
+              <li key={`${event.kind}-${event.day}`} className="font-serif-italic" style={{ fontSize: 13.5, color: "var(--inchiostro-70)" }}>
+                {event.message}.
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div style={{ flexShrink: 0 }}>
+          <Illustration name="scarico" size={48} float />
+        </div>
+      </div>
 
       {adaptation.changes.length > 0 && (
         <ul style={{ listStyle: "none", padding: 0, margin: "12px 0 0", display: "flex", flexDirection: "column", gap: 8 }}>
@@ -61,20 +70,44 @@ export function AdaptationCard({ animate, delayMs = 0 }: { animate: boolean; del
         </p>
       ))}
 
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
         {pending ? (
           <>
-            <button type="button" className="press-soft" style={pill(true)} disabled={answer.isPending} onClick={() => answer.mutate({ id: adaptation.id, action: "accept" })}>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.94 }}
+              whileHover={{ scale: 1.03, y: -1 }}
+              transition={{ type: "spring", stiffness: 450, damping: 25 }}
+              style={pill(true)}
+              disabled={answer.isPending}
+              onClick={() => answer.mutate({ id: adaptation.id, action: "accept" })}
+            >
               Accetta
-            </button>
-            <button type="button" className="press-soft" style={pill(false)} disabled={answer.isPending} onClick={() => answer.mutate({ id: adaptation.id, action: "reject" })}>
+            </motion.button>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.94 }}
+              whileHover={{ scale: 1.03, y: -1 }}
+              transition={{ type: "spring", stiffness: 450, damping: 25 }}
+              style={pill(false)}
+              disabled={answer.isPending}
+              onClick={() => answer.mutate({ id: adaptation.id, action: "reject" })}
+            >
               Rifiuta
-            </button>
+            </motion.button>
           </>
         ) : (
-          <button type="button" className="press-soft" style={pill(false)} disabled={answer.isPending} onClick={() => answer.mutate({ id: adaptation.id, action: "undo" })}>
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.94 }}
+            whileHover={{ scale: 1.03, y: -1 }}
+            transition={{ type: "spring", stiffness: 450, damping: 25 }}
+            style={pill(false)}
+            disabled={answer.isPending}
+            onClick={() => answer.mutate({ id: adaptation.id, action: "undo" })}
+          >
             Annulla le modifiche
-          </button>
+          </motion.button>
         )}
       </div>
       {answer.data?.adaptation?.status === "stale" && (

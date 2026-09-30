@@ -50,8 +50,9 @@ const FALLBACKS: Partial<Record<IllustrationName, string>> = {
 
 interface IllustrationProps {
   name: IllustrationName;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
+  size?: number;
   /** Only the protagonist illustration of a screen should breathe (MOTION.md §4: one per screen, counts toward the 3-concurrent-animation ceiling). */
   breathe?: boolean;
   /** Enable 3D organic clay levitation with soft reactive contact shadow */
@@ -70,8 +71,9 @@ interface IllustrationProps {
 // for mkPulseRing, applied here defensively too).
 export function Illustration({
   name,
-  width,
-  height,
+  width: rawWidth,
+  height: rawHeight,
+  size,
   breathe = true,
   float = false,
   active = true,
@@ -80,6 +82,8 @@ export function Illustration({
   bottom = 0,
   priority = false,
 }: IllustrationProps) {
+  const width = size ?? rawWidth ?? 64;
+  const height = size ?? rawHeight ?? 64;
   const { reduced } = useMotionEnabled();
   const animate = active && !reduced;
   const src = ILLUSTRATION_SOURCES[name] ?? FALLBACKS[name] ?? "/illustrazioni/corsa.webp";

@@ -1,6 +1,8 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { useMotionEnabled } from "@/lib/motion";
+import { Illustration } from "@/components/Illustration";
 import { EVIDENCE_LABELS, clearPendingMove, recordMoveDecision, usePendingMove } from "@/lib/moveWarnings";
 import { useUpdateSession } from "@/lib/queries";
 import { formatFullDate } from "@/lib/format";
@@ -28,29 +30,39 @@ export function MoveWarningSheet() {
   }
 
   return (
-    <div
+    <motion.div
       role="dialog"
       aria-modal="true"
       aria-labelledby="move-warning-title"
-      style={{ position: "fixed", inset: 0, background: "rgba(28,26,22,.4)", display: "flex", alignItems: "flex-end", zIndex: 40 }}
+      initial={reduced ? undefined : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{ position: "fixed", inset: 0, background: "rgba(28,26,22,.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", zIndex: 40 }}
     >
-      <div
-        className={reduced ? undefined : "anim-slide-up"}
-        style={{ width: "100%", background: "var(--crema)", borderRadius: "22px 22px 0 0", padding: "10px 20px 28px", display: "flex", flexDirection: "column", gap: 14 }}
+      <motion.div
+        initial={reduced ? undefined : { y: "100%" }}
+        animate={{ y: 0 }}
+        transition={{ type: "spring", stiffness: 380, damping: 30 }}
+        style={{ width: "100%", background: "var(--crema)", borderRadius: "24px 24px 0 0", padding: "12px 20px 32px", display: "flex", flexDirection: "column", gap: 14, boxShadow: "0 -8px 32px rgba(28,26,22,0.18)" }}
       >
-        <div style={{ width: 36, height: 4, borderRadius: 100, background: "var(--sabbia-bordo)", margin: "0 auto" }} />
-        <div>
-          <p id="move-warning-title" style={{ font: "600 19px/1.2 var(--font-outfit)", margin: 0 }}>
-            Attenzione a questo spostamento
-          </p>
-          <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>
-            Spostata a {formatFullDate(move.to)}. Puoi tenerla così: decidi tu.
-          </p>
+        <div style={{ width: 40, height: 4.5, borderRadius: 100, background: "var(--sabbia-bordo)", margin: "0 auto" }} />
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            <p id="move-warning-title" style={{ font: "600 20px/1.2 var(--font-outfit)", margin: 0 }}>
+              Attenzione a questo spostamento
+            </p>
+            <p style={{ fontSize: 13, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>
+              Spostata a {formatFullDate(move.to)}. Puoi tenerla così: decidi tu.
+            </p>
+          </div>
+          <div style={{ flexShrink: 0 }}>
+            <Illustration name="scarico" size={48} float />
+          </div>
         </div>
 
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 }}>
           {move.check.warnings.map((warning) => (
-            <li key={warning.fingerprint} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 12 }}>
+            <li key={warning.fingerprint} style={{ background: "var(--crema-card)", border: "var(--border-airbnb)", borderRadius: "var(--radius-card)", padding: 13 }}>
               <p style={{ fontSize: 14, lineHeight: 1.45, margin: 0 }}>{warning.message}</p>
               <p className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>
                 {EVIDENCE_LABELS[warning.evidence]}
@@ -59,21 +71,42 @@ export function MoveWarningSheet() {
           ))}
         </ul>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
           {adapted && (
-            <button type="button" className="press-soft" style={button(true)} onClick={() => answer("adatta")}>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.96 }}
+              whileHover={{ scale: 1.015, y: -1 }}
+              transition={{ type: "spring", stiffness: 450, damping: 25 }}
+              style={button(true)}
+              onClick={() => answer("adatta")}
+            >
               Adatta: {adapted.title}
-            </button>
+            </motion.button>
           )}
-          <button type="button" className="press-soft" style={button(!adapted)} onClick={() => answer("confermo")}>
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.96 }}
+            whileHover={{ scale: 1.015, y: -1 }}
+            transition={{ type: "spring", stiffness: 450, damping: 25 }}
+            style={button(!adapted)}
+            onClick={() => answer("confermo")}
+          >
             Confermo, mi prendo il rischio
-          </button>
-          <button type="button" className="press-soft" style={button(false)} onClick={() => answer("annulla")}>
+          </motion.button>
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.96 }}
+            whileHover={{ scale: 1.015, y: -1 }}
+            transition={{ type: "spring", stiffness: 450, damping: 25 }}
+            style={button(false)}
+            onClick={() => answer("annulla")}
+          >
             Annulla, rimettila a {formatFullDate(move.from)}
-          </button>
+          </motion.button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

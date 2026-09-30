@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { SlideUp } from "@/components/motion/primitives";
 import { useCheckAdaptation, useSaveCheckIn } from "@/lib/queries";
 import type { CheckIn, CheckInBody, CheckInEffort, PainArea } from "@/lib/types";
@@ -80,9 +81,16 @@ export function CheckInCard({
         <p style={{ fontSize: 13, margin: 0, flex: 1, color: "var(--inchiostro-70)" }}>
           <span style={{ fontWeight: 600, color: "var(--inchiostro)" }}>Check-in {dayLabel}:</span> {parts.filter(Boolean).join(" · ")}
         </p>
-        <button type="button" className="press-soft" style={linkButton} onClick={() => setEditing(true)}>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.92 }}
+          whileHover={{ scale: 1.05 }}
+          transition={{ type: "spring", stiffness: 450, damping: 25 }}
+          style={linkButton}
+          onClick={() => setEditing(true)}
+        >
           Cambia
-        </button>
+        </motion.button>
       </SlideUp>
     );
   }
@@ -155,12 +163,14 @@ function ChipRow<T extends string>({
         {options.map(([key, text]) => {
           const selected = value === key;
           return (
-            <button
+            <motion.button
               key={key}
               type="button"
               role="radio"
               aria-checked={selected}
-              className="press-soft"
+              whileTap={{ scale: 0.93 }}
+              whileHover={{ scale: 1.05, y: -1 }}
+              transition={{ type: "spring", stiffness: 450, damping: 25 }}
               onClick={() => onChange(key)}
               style={{
                 background: selected ? "var(--inchiostro)" : "var(--sabbia-chip)",
@@ -171,10 +181,11 @@ function ChipRow<T extends string>({
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: "pointer",
+                boxShadow: selected ? "0 2px 8px rgba(28,26,22,0.18)" : "none",
               }}
             >
               {text}
-            </button>
+            </motion.button>
           );
         })}
       </div>

@@ -19,14 +19,35 @@ export function TabBar() {
       {TABS.map((tab) => {
         const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
         return (
-          <Link key={tab.href} href={tab.href} className="tap-target tab-link" aria-current={active ? "page" : undefined}>
-            {active && (reduced ? <span className="tab-indicator" /> :
-              <motion.span className="tab-indicator" layoutId="tab-pill" transition={{ type: "spring", stiffness: 420, damping: 36 }} />)}
-            <span className="tab-link-content">
-              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={tab.path} /></svg>
-              <span>{tab.label}</span>
-            </span>
-          </Link>
+          <motion.div
+            key={tab.href}
+            whileTap={{ scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 500, damping: 25 }}
+            style={{ flex: 1, display: "flex", justifyContent: "center" }}
+          >
+            <Link href={tab.href} className="tap-target tab-link" aria-current={active ? "page" : undefined}>
+              {active && (reduced ? <span className="tab-indicator" /> :
+                <motion.span className="tab-indicator" layoutId="tab-pill" transition={{ type: "spring", stiffness: 420, damping: 36 }} />)}
+              <span className="tab-link-content">
+                <motion.svg
+                  width="23"
+                  height="23"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                  animate={active && !reduced ? { scale: [1, 1.15, 1] } : { scale: 1 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                >
+                  <path d={tab.path} />
+                </motion.svg>
+                <span>{tab.label}</span>
+              </span>
+            </Link>
+          </motion.div>
         );
       })}
     </nav>

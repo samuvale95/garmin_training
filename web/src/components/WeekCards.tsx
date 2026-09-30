@@ -45,26 +45,33 @@ export function RestCard({ animate, delayMs, withIllustration }: { animate: bool
       active={animate}
       delayMs={delayMs}
       row
-      style={{
-        background: visual.background,
-        color: visual.foreground,
-        borderRadius: "var(--radius-card)",
-        padding: "14px 16px",
-        minHeight: withIllustration ? 70 : 54,
-        position: "relative",
-        overflow: "hidden",
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-      }}
     >
-      <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Riposo</p>
-      <p className="font-serif-italic" style={{ fontSize: 13.5, margin: 0, opacity: 0.8 }}>
-        e va bene così
-      </p>
-      {withIllustration && visual.illustration && (
-        <Illustration name={visual.illustration} width={56} height={62} breathe={false} active={animate} delayMs={200 + delayMs} />
-      )}
+      <motion.div
+        whileHover={{ y: -2, scale: 1.01 }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        style={{
+          background: visual.background,
+          color: visual.foreground,
+          borderRadius: "var(--radius-card)",
+          padding: "14px 16px",
+          minHeight: withIllustration ? 70 : 54,
+          position: "relative",
+          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          boxShadow: "var(--shadow-airbnb-subtle)",
+          border: "var(--border-airbnb)",
+        }}
+      >
+        <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Riposo</p>
+        <p className="font-serif-italic" style={{ fontSize: 13.5, margin: 0, opacity: 0.8 }}>
+          e va bene così
+        </p>
+        {withIllustration && visual.illustration && (
+          <Illustration name={visual.illustration} width={56} height={62} breathe={false} active={animate} delayMs={200 + delayMs} float={true} />
+        )}
+      </motion.div>
     </SlideUp>
   );
 }
@@ -220,7 +227,7 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
           svolto {matchKm.toFixed(1)} km
         </p>
       )}
-      {visual.illustration && <Illustration name={visual.illustration} width={58} height={64} breathe={false} active={animate} delayMs={200 + delayMs} />}
+      {visual.illustration && <Illustration name={visual.illustration} width={58} height={64} breathe={false} active={animate} delayMs={200 + delayMs} float={true} />}
     </SlideUp>
   );
 
@@ -248,10 +255,12 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
         reduced
           ? undefined
           : lifted
-            ? { scale: 1.035, boxShadow: "0 18px 34px rgba(28,26,22,.26)" }
-            : { scale: phase === "pressing" ? 0.988 : 1, boxShadow: "0 0px 0px rgba(28,26,22,0)" }
+            ? { scale: 1.035, y: -4, boxShadow: "0 18px 34px rgba(28,26,22,.26)" }
+            : { scale: phase === "pressing" ? 0.985 : 1, y: 0, boxShadow: "var(--shadow-airbnb-subtle)" }
       }
-      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={reduced || lifted ? undefined : { y: -2.5, scale: 1.012, boxShadow: "var(--shadow-airbnb-hover)" }}
+      whileTap={reduced || lifted ? undefined : { scale: 0.985 }}
+      transition={{ type: "spring", stiffness: 400, damping: 26 }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={endGesture}

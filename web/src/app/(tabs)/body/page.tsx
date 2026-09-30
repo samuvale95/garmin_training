@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { Avatar } from "@/components/Avatar";
 import { HrvCard, ReadinessMeaning, SleepCard } from "@/components/BodyCards";
 import { BrandMark } from "@/components/motion/BrandMark";
@@ -57,7 +58,9 @@ export default function RecoveryPage() {
     <div style={{ padding: "22px 20px 12px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <BrandMark height={22} />
-        <Link href="/settings" className="tap-target" aria-label="Impostazioni"><Avatar size={32} /></Link>
+        <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} transition={{ type: "spring", stiffness: 450, damping: 22 }}>
+          <Link href="/settings" className="tap-target" aria-label="Impostazioni"><Avatar size={32} /></Link>
+        </motion.div>
       </div>
 
       <header className="screen-intro">
@@ -246,7 +249,19 @@ function SmallMetric({
   children?: ReactNode;
 }) {
   return (
-    <div style={{ flex: 1, minWidth: 0, background, borderRadius: "var(--radius-row)", padding: 12 }}>
+    <motion.div
+      whileHover={{ y: -2.5, scale: 1.02 }}
+      transition={{ type: "spring", stiffness: 420, damping: 24 }}
+      style={{
+        flex: 1,
+        minWidth: 0,
+        background,
+        borderRadius: "var(--radius-row)",
+        padding: 12,
+        border: "var(--border-airbnb)",
+        boxShadow: "var(--shadow-airbnb-subtle)",
+      }}
+    >
       <p className="font-mono" style={{ fontSize: 16, margin: "0 0 2px" }}>
         {value}
         {unit && <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}> {unit}</span>}
@@ -254,15 +269,17 @@ function SmallMetric({
       <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>{label}</p>
       {caption && <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>{caption}</p>}
       {children}
-    </div>
+    </motion.div>
   );
 }
 
 function NavRow({ href, label }: { href: string; label: string }) {
   return (
-    <Link href={href} className="body-nav-row tap-target press-soft">
-      <span style={{ fontSize: 14, fontWeight: 600 }}>{label}</span>
-      <span className="anim-chev" aria-hidden="true">→</span>
-    </Link>
+    <motion.div whileHover={{ x: 4, scale: 1.01 }} whileTap={{ scale: 0.98 }} transition={{ type: "spring", stiffness: 450, damping: 26 }}>
+      <Link href={href} className="body-nav-row tap-target">
+        <span style={{ fontSize: 14, fontWeight: 600 }}>{label}</span>
+        <span className="anim-chev" aria-hidden="true">→</span>
+      </Link>
+    </motion.div>
   );
 }

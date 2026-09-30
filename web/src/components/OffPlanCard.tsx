@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { SlideUp } from "@/components/motion/primitives";
 import type { StoredActivity } from "@/lib/types";
 
@@ -23,24 +24,29 @@ export function OffPlanCard({ activity, animate, delayMs }: { activity: StoredAc
       active={animate}
       delayMs={delayMs}
       row
-      style={{
-        border: "1.5px dashed var(--sabbia-bordo)",
-        borderRadius: "var(--radius-card)",
-        padding: "11px 14px",
-        background: "transparent",
-      }}
     >
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-        <p style={{ fontSize: 14, fontWeight: 600, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {activity.title || activity.label}
+      <motion.div
+        whileHover={{ y: -2, scale: 1.01 }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        style={{
+          border: "1.5px dashed var(--sabbia-bordo)",
+          borderRadius: "var(--radius-card)",
+          padding: "11px 14px",
+          background: "transparent",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+          <p style={{ fontSize: 14, fontWeight: 600, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {activity.title || activity.label}
+          </p>
+          <span className="font-mono" style={{ fontSize: 10, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--inchiostro-50)", flex: "none" }}>
+            fuori piano · {activity.label}
+          </span>
+        </div>
+        <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>
+          {details.join(" · ")}
         </p>
-        <span className="font-mono" style={{ fontSize: 10, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--inchiostro-50)", flex: "none" }}>
-          fuori piano · {activity.label}
-        </span>
-      </div>
-      <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>
-        {details.join(" · ")}
-      </p>
+      </motion.div>
     </SlideUp>
   );
 }

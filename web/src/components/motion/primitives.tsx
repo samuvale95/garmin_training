@@ -1,13 +1,10 @@
 "use client";
 
 import type { CSSProperties, ElementType, ReactNode } from "react";
+import { motion } from "framer-motion";
 import { useMotionEnabled } from "@/lib/motion";
 
 // ---- entrance primitives (MOTION.md §3.1) --------------------------------------------------
-// When `active` is false (reduced motion, or not this screen's first mount), no
-// animation class is applied and the element sits directly in its resting state --
-// translateY(0)/opacity:1 -- which is exactly the animation's end state, so nothing
-// extra needs to be computed for the "already settled" look.
 
 interface WordInProps {
   children: ReactNode;
@@ -43,14 +40,30 @@ interface SlideUpProps {
 export function SlideUp({ children, active = true, delayMs = 0, row = false, as: Tag = "div", className, style }: SlideUpProps) {
   const { reduced } = useMotionEnabled();
   const animate = active && !reduced;
-  const animClass = row ? "anim-slide-up-row" : "anim-slide-up";
+
+  if (!animate) {
+    const Component = Tag as any;
+    return <Component className={className} style={style}>{children}</Component>;
+  }
+
+  const MotionTag = (typeof Tag === "string" ? (motion as any)[Tag] : motion.div) || motion.div;
+
   return (
-    <Tag
-      className={`${animate ? animClass : ""} ${className ?? ""}`}
-      style={animate ? { animationDelay: `${Math.min(delayMs, 160)}ms`, ...style } : style}
+    <MotionTag
+      className={className}
+      initial={{ opacity: 0, y: row ? 10 : 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        type: "spring",
+        stiffness: 340,
+        damping: 28,
+        mass: 0.8,
+        delay: Math.min(delayMs, 350) / 1000,
+      }}
+      style={style}
     >
       {children}
-    </Tag>
+    </MotionTag>
   );
 }
 
@@ -74,15 +87,14 @@ export function BarGrow({ value, active = true, delayMs = 0, vertical = false, c
   if (vertical) {
     return (
       <div className={className} style={{ position: "relative", width: "100%", height: "100%", background: trackColor, borderRadius: 100, overflow: "hidden", display: "flex", alignItems: "flex-end" }}>
-        <div
-          className={animate ? "anim-bar-grow-y" : undefined}
+        <motion.div
+          initial={animate ? { height: 0 } : false}
+          animate={{ height: `${clamped * 100}%` }}
+          transition={{ type: "spring", stiffness: 260, damping: 26, delay: Math.min(delayMs, 250) / 1000 }}
           style={{
             width: "100%",
-            height: `${clamped * 100}%`,
             background: color,
             borderRadius: 100,
-            transformOrigin: "bottom",
-            animationDelay: animate ? `${Math.min(delayMs, 160)}ms` : undefined,
           }}
         />
       </div>
@@ -91,15 +103,14 @@ export function BarGrow({ value, active = true, delayMs = 0, vertical = false, c
 
   return (
     <div className={className} style={{ height, borderRadius: 100, background: trackColor, overflow: "hidden" }}>
-      <div
-        className={animate ? "anim-bar-grow" : undefined}
+      <motion.div
+        initial={animate ? { width: 0 } : false}
+        animate={{ width: `${clamped * 100}%` }}
+        transition={{ type: "spring", stiffness: 260, damping: 26, delay: Math.min(delayMs, 250) / 1000 }}
         style={{
           height: "100%",
-          width: `${clamped * 100}%`,
           background: color,
           borderRadius: 100,
-          transformOrigin: "left",
-          animationDelay: animate ? `${Math.min(delayMs, 160)}ms` : undefined,
         }}
       />
     </div>
@@ -238,11 +249,14 @@ export function PrimaryButton({
   const isLoading = state === "loading";
 
   return (
-    <button
+    <motion.button
       type={type}
       onClick={onClick}
       disabled={disabled}
       className="tap-target"
+      whileTap={reduced || disabled ? undefined : { scale: 0.96 }}
+      whileHover={reduced || disabled ? undefined : { scale: 1.015, y: -1 }}
+      transition={{ type: "spring", stiffness: 450, damping: 25 }}
       style={{
         position: "relative",
         overflow: "hidden",
@@ -255,20 +269,7 @@ export function PrimaryButton({
         cursor: disabled ? "default" : "pointer",
         background: state === "disabled" ? "var(--sabbia-chip)" : isSuccess ? successColor : background,
         color: state === "disabled" ? "var(--inchiostro-35)" : isSuccess ? "var(--verde-testo)" : textColor,
-        transition: reduced ? undefined : `transform ${120}ms var(--ease)`,
-      }}
-      onPointerDown={(e) => {
-        if (disabled || reduced) return;
-        e.currentTarget.style.transform = "scale(0.97)";
-        e.currentTarget.style.filter = "brightness(0.96)";
-      }}
-      onPointerUp={(e) => {
-        e.currentTarget.style.transform = "scale(1)";
-        e.currentTarget.style.filter = "none";
-      }}
-      onPointerLeave={(e) => {
-        e.currentTarget.style.transform = "scale(1)";
-        e.currentTarget.style.filter = "none";
+        boxShadow: disabled ? "none" : "0 4px 14px rgba(232, 98, 58, 0.22)",
       }}
     >
       {!reduced && !disabled && (
@@ -292,7 +293,7 @@ export function PrimaryButton({
         />
       )}
       <span style={{ position: "relative", zIndex: 2 }}>{children}</span>
-    </button>
+    </motion.button>
   );
 }
 

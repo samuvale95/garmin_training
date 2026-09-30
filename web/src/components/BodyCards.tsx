@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { SlideUp } from "@/components/motion/primitives";
 import { Illustration } from "@/components/Illustration";
 import { formatMinutes, weekdayInitial } from "@/lib/format";
@@ -51,17 +52,21 @@ export function SleepCard({ sleep, animate, delayMs }: { sleep: SleepPhases; ani
     <SlideUp
       active={animate}
       delayMs={delayMs}
-      style={{
-        background: "var(--azzurro)",
-        color: "var(--azzurro-testo)",
-        border: "var(--border-airbnb)",
-        boxShadow: "var(--shadow-airbnb-subtle)",
-        borderRadius: "var(--radius-card)",
-        padding: 16,
-        position: "relative",
-        overflow: "hidden",
-      }}
     >
+      <motion.div
+        whileHover={{ y: -3, scale: 1.012 }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        style={{
+          background: "var(--azzurro)",
+          color: "var(--azzurro-testo)",
+          border: "var(--border-airbnb)",
+          boxShadow: "var(--shadow-airbnb-subtle)",
+          borderRadius: "var(--radius-card)",
+          padding: 16,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
         <p className="font-mono" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", margin: 0 }}>
           Sonno
@@ -119,6 +124,7 @@ export function SleepCard({ sleep, animate, delayMs }: { sleep: SleepPhases; ani
       <p style={{ fontSize: 11, opacity: 0.7, margin: "10px 0 0", lineHeight: 1.4 }}>
         Riferimento: profondo {SLEEP_PHASES[0].share}, REM {SLEEP_PHASES[1].share}.
       </p>
+      </motion.div>
     </SlideUp>
   );
 }
@@ -131,7 +137,12 @@ export function SleepPhaseLegend({ sleep }: { sleep: SleepPhases }) {
         const minutes = phaseMinutes(sleep, phase.key);
         if (minutes == null) return null;
         return (
-          <div key={phase.key} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-row)", padding: "13px 16px" }}>
+          <motion.div
+            key={phase.key}
+            whileHover={{ y: -2, scale: 1.01 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            style={{ background: "var(--crema-card)", borderRadius: "var(--radius-row)", padding: "13px 16px", border: "var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)" }}
+          >
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 600, fontSize: 14.5 }}>
                 <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: "50%", background: phase.color }} />
@@ -145,7 +156,7 @@ export function SleepPhaseLegend({ sleep }: { sleep: SleepPhases }) {
             <p className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-35)", margin: "5px 0 0" }}>
               di solito {phase.share}
             </p>
-          </div>
+          </motion.div>
         );
       })}
     </div>
@@ -184,89 +195,96 @@ export function HrvCard({
     <SlideUp
       active={animate}
       delayMs={delayMs}
-      style={{
-        background: "var(--crema)",
-        border: "var(--border-airbnb)",
-        boxShadow: "var(--shadow-airbnb-subtle)",
-        borderRadius: "var(--radius-card)",
-        padding: 16,
-      }}
     >
-      <p className="font-mono" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", margin: 0, color: "var(--inchiostro-50)" }}>
-        Variabilità cardiaca
-      </p>
-
-      <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginTop: 8 }}>
-        <span className="font-mono" style={{ fontSize: 26, fontWeight: 500, letterSpacing: "-.02em" }}>
-          {lastNight ?? "—"}
-        </span>
-        <span style={{ fontSize: 12.5, color: "var(--inchiostro-50)" }}>ms stanotte</span>
-      </div>
-
-      {baseline != null && (
-        <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>
-          media delle altre {earlier.length} notti: {Math.round(baseline)} ms
-          {delta != null && ` · ${delta > 0 ? "+" : ""}${delta}%`}
+      <motion.div
+        whileHover={{ y: -3, scale: 1.012 }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        style={{
+          background: "var(--crema)",
+          border: "var(--border-airbnb)",
+          boxShadow: "var(--shadow-airbnb-subtle)",
+          borderRadius: "var(--radius-card)",
+          padding: 16,
+        }}
+      >
+        <p className="font-mono" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", margin: 0, color: "var(--inchiostro-50)" }}>
+          Variabilità cardiaca
         </p>
-      )}
 
-      <div style={{ position: "relative", height: HRV_CHART_HEIGHT, marginTop: 14 }}>
-        {baseline != null && (
-          <div
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: `${(baseline / max) * HRV_CHART_HEIGHT}px`,
-              borderTop: "1px dashed var(--inchiostro-35)",
-            }}
-          />
-        )}
-        <div style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 4, height: "100%" }}>
-          {points.map((point, i) => {
-            const isLast = i === points.length - 1;
-            const value = point.value_ms ?? 0;
-            return (
-              <div
-                key={point.date}
-                className={isLast ? "anim-tip-grow" : undefined}
-                title={`${point.value_ms ?? "—"} ms`}
-                style={{
-                  flex: 1,
-                  height: `${Math.max(5, (value / max) * HRV_CHART_HEIGHT)}px`,
-                  background: isLast ? "var(--verde-tratto-scuro)" : "var(--neutro-barra)",
-                  borderRadius: 3,
-                }}
-              />
-            );
-          })}
-        </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
-        {points.map((point, i) => (
-          <span
-            key={point.date}
-            className="font-mono"
-            style={{
-              flex: 1,
-              textAlign: "center",
-              fontSize: 10,
-              color: i === points.length - 1 ? "var(--inchiostro)" : "var(--inchiostro-35)",
-              fontWeight: i === points.length - 1 ? 700 : 400,
-            }}
-          >
-            {weekdayInitial(point.date)}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginTop: 8 }}>
+          <span className="font-mono" style={{ fontSize: 26, fontWeight: 500, letterSpacing: "-.02em" }}>
+            {lastNight ?? "—"}
           </span>
-        ))}
-      </div>
+          <span style={{ fontSize: 12.5, color: "var(--inchiostro-50)" }}>ms stanotte</span>
+        </div>
 
-      <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "10px 0 0", lineHeight: 1.4 }}>
-        Una barra per notte, l&apos;ultima è stanotte. Quanto varia la distanza fra un battito e
-        l&apos;altro mentre dormi: sale quando sei recuperato, scende quando il corpo sta ancora
-        lavorando. Conta solo rispetto alla tua media, mai a quella di altri.
-      </p>
+        {baseline != null && (
+          <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>
+            media delle altre {earlier.length} notti: {Math.round(baseline)} ms
+            {delta != null && ` · ${delta > 0 ? "+" : ""}${delta}%`}
+          </p>
+        )}
+
+        <div style={{ position: "relative", height: HRV_CHART_HEIGHT, marginTop: 14 }}>
+          {baseline != null && (
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: `${(baseline / max) * HRV_CHART_HEIGHT}px`,
+                borderTop: "1px dashed var(--inchiostro-35)",
+              }}
+            />
+          )}
+          <div style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 4, height: "100%" }}>
+            {points.map((point, i) => {
+              const isLast = i === points.length - 1;
+              const value = point.value_ms ?? 0;
+              return (
+                <motion.div
+                  key={point.date}
+                  whileHover={{ scaleY: 1.15, y: -2 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                  title={`${point.value_ms ?? "—"} ms`}
+                  style={{
+                    flex: 1,
+                    height: `${Math.max(5, (value / max) * HRV_CHART_HEIGHT)}px`,
+                    background: isLast ? "var(--verde-tratto-scuro)" : "var(--neutro-barra)",
+                    borderRadius: 3,
+                    transformOrigin: "bottom",
+                  }}
+                />
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+          {points.map((point, i) => (
+            <span
+              key={point.date}
+              className="font-mono"
+              style={{
+                flex: 1,
+                textAlign: "center",
+                fontSize: 10,
+                color: i === points.length - 1 ? "var(--inchiostro)" : "var(--inchiostro-35)",
+                fontWeight: i === points.length - 1 ? 700 : 400,
+              }}
+            >
+              {weekdayInitial(point.date)}
+            </span>
+          ))}
+        </div>
+
+        <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "10px 0 0", lineHeight: 1.4 }}>
+          Una barra per notte, l&apos;ultima è stanotte. Quanto varia la distanza fra un battito e
+          l&apos;altro mentre dormi: sale quando sei recuperato, scende quando il corpo sta ancora
+          lavorando. Conta solo rispetto alla tua media, mai a quella di altri.
+        </p>
+      </motion.div>
     </SlideUp>
   );
 }
@@ -296,7 +314,12 @@ export function ReadinessFactorList({ factors }: { factors: ReadinessFactor[] })
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
       {factors.map((factor) => (
-        <div key={factor.key} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-row)", padding: "12px 15px" }}>
+        <motion.div
+          key={factor.key}
+          whileHover={{ y: -2, scale: 1.01 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          style={{ background: "var(--crema-card)", borderRadius: "var(--radius-row)", padding: "12px 15px", border: "var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)" }}
+        >
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
             <span style={{ fontSize: 14, fontWeight: 600 }}>{factor.label}</span>
             <span className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-50)", flex: "none" }}>
@@ -315,7 +338,7 @@ export function ReadinessFactorList({ factors }: { factors: ReadinessFactor[] })
               />
             </div>
           )}
-        </div>
+        </motion.div>
       ))}
     </div>
   );
