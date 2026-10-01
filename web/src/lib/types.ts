@@ -258,6 +258,43 @@ export interface FitnessFatigueData {
   race_assessment?: RaceTaperingAssessment | null;
 }
 
+// ---- Aerobic Efficiency & Cardiac Decoupling ----
+
+export interface EFPoint {
+  date: string;
+  activity_id: number;
+  ef: number;
+  avg_hr: number;
+  avg_pace_min_km: number;
+  duration_min: number;
+  distance_km: number;
+  decoupling_pct: number | null;
+}
+
+export interface EFTrend {
+  current_ef: number;
+  ef_4w_ago: number;
+  change_pct: number;
+  slope: number;
+  classification: "miglioramento" | "stabile" | "calo";
+}
+
+export interface AerobicFinding {
+  key: string;
+  headline: string;
+  measured: string;
+  evidence: string;
+  standard?: string | null;
+  action?: string | null;
+  severity: string;
+}
+
+export interface AerobicEfficiencyData {
+  trend: EFTrend | null;
+  history: EFPoint[];
+  findings: AerobicFinding[];
+}
+
 /** One comparison between the plan and the race, carrying both numbers -- "il più lungo
  * in programma è 24 km, per questa distanza se ne fanno almeno 30". */
 export interface GoalObservation {

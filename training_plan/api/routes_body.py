@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
-from .. import body_insights, checkin, db, fitness_fatigue, history, llm, models, plan_store, readiness
+from .. import aerobic_efficiency, body_insights, checkin, db, fitness_fatigue, history, llm, models, plan_store, readiness
 from . import garmin_session, schemas
 from .auth import current_user_id
 from .cache import (
@@ -276,3 +276,33 @@ async def body_conflict(
     next_session = payload.next_session.to_model() if payload.next_session else None
     assessment = body_insights.assess_conflict(snapshot, next_session)
     return schemas.ConflictResponse.from_model(assessment)
+
+
+@router.get("/body/aerobic-efficiency", response_model=schemas.AerobicEfficiencyResponse)
+async def body_aerobic_efficiency(
+    lookback_days: int = 90,
+    user_id: str = Depends(current_user_id),
+) -> schemas.AerobicEfficiencyResponse:
+    """Efficiency Factor trend and Cardiac Decoupling on easy runs.
+
+    Reads stored activity streams (HR and velocity) and computes:
+    - EF (speed / HR) for every qualifying easy run
+    - Cardiac decoupling (first half vs second half EF) for runs >= 45 min
+    - Linear trend over the lookback window
+    """
+    from .. import intensity
+    from .routes_coach import _zones
+
+    def compute() -> schemas.AerobicEfficiencyResponse:
+        zones = _zones(user_id)
+        if zones is None:
+            return schemas.AerobicEfficiencyResponse()
+
+        result = aerobic_efficiency.compute_aerobic_efficiency(
+            user_id=user_id,
+            lookback_days=lookback_days,
+            zones=zones,
+        )
+        return schemas.AerobicEfficiencyResponse.from_model(result)
+
+    return await run_in_threadpool(compute)

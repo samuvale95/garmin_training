@@ -16,6 +16,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from .. import (
+    aerobic_efficiency,
     body_insights,
     db,
     fitness_fatigue,
@@ -2094,6 +2095,86 @@ class HistorySyncResponse(BaseModel):
 
     started: bool
     mode: str | None = None
+
+
+# ---- aerobic efficiency & cardiac decoupling -----------------------------------------------
+
+
+class EFPointOut(BaseModel):
+    date: date_type
+    activity_id: int
+    ef: float
+    avg_hr: float
+    avg_pace_min_km: float
+    duration_min: float
+    distance_km: float
+    decoupling_pct: float | None = None
+
+    @classmethod
+    def from_model(cls, pt: "aerobic_efficiency.EFPoint") -> "EFPointOut":
+        return cls(
+            date=pt.date,
+            activity_id=pt.activity_id,
+            ef=round(pt.ef, 4),
+            avg_hr=round(pt.avg_hr, 1),
+            avg_pace_min_km=round(pt.avg_pace_min_km, 2),
+            duration_min=round(pt.duration_min, 1),
+            distance_km=round(pt.distance_km, 2),
+            decoupling_pct=round(pt.decoupling_pct, 1) if pt.decoupling_pct is not None else None,
+        )
+
+
+class EFTrendOut(BaseModel):
+    current_ef: float
+    ef_4w_ago: float
+    change_pct: float
+    slope: float
+    classification: str  # "miglioramento" | "stabile" | "calo"
+
+    @classmethod
+    def from_model(cls, t: "aerobic_efficiency.EFTrend") -> "EFTrendOut":
+        return cls(
+            current_ef=round(t.current_ef, 4),
+            ef_4w_ago=round(t.ef_4w_ago, 4),
+            change_pct=round(t.change_pct, 1),
+            slope=round(t.slope, 6),
+            classification=t.classification,
+        )
+
+
+class FindingOut(BaseModel):
+    key: str
+    headline: str
+    measured: str
+    evidence: str
+    standard: str | None = None
+    action: str | None = None
+    severity: str = "info"
+
+
+class AerobicEfficiencyResponse(BaseModel):
+    trend: EFTrendOut | None = None
+    history: list[EFPointOut] = Field(default_factory=list)
+    findings: list[FindingOut] = Field(default_factory=list)
+
+    @classmethod
+    def from_model(cls, res: "aerobic_efficiency.AerobicEfficiencyResult") -> "AerobicEfficiencyResponse":
+        return cls(
+            trend=EFTrendOut.from_model(res.trend) if res.trend else None,
+            history=[EFPointOut.from_model(p) for p in res.history],
+            findings=[
+                FindingOut(
+                    key=f.key,
+                    headline=f.headline,
+                    measured=f.measured,
+                    evidence=f.evidence,
+                    standard=f.standard,
+                    action=f.action,
+                    severity=f.severity,
+                )
+                for f in res.findings
+            ],
+        )
 
 
 class ErrorResponse(BaseModel):

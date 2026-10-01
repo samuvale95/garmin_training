@@ -6,7 +6,8 @@ import { SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { numberToItalianWords } from "@/lib/format";
 import { FitnessFatigueCard } from "@/components/FitnessFatigueCard";
-import { useBodyLoad, useFitnessFatigue, usePlanQuery } from "@/lib/queries";
+import { AerobicEfficiencyCard } from "@/components/AerobicEfficiencyCard";
+import { useAerobicEfficiency, useBodyLoad, useFitnessFatigue, usePlanQuery } from "@/lib/queries";
 import { isoWeekNumber, sessionDistanceKm, toDateKey } from "@/lib/sessionVisuals";
 import { countdownLabel, goalTitle } from "@/lib/raceGoal";
 
@@ -113,6 +114,7 @@ export default function LoadPage() {
   const animate = useMountOnce("body-load");
   const { data, isLoading } = useBodyLoad();
   const { data: ffData } = useFitnessFatigue(60);
+  const { data: aeData } = useAerobicEfficiency(90);
   // The plan drives every "previsto" bar and the whole trend story, so the screen waits
   // for it to come back out of localStorage too: reading it before hydration would show
   // a plan-less "ancora poco da leggere" for a beat, to someone who has a plan.
@@ -280,6 +282,12 @@ export default function LoadPage() {
           {ffData && (
             <div style={{ marginTop: 14 }}>
               <FitnessFatigueCard data={ffData} animate={animate} />
+            </div>
+          )}
+
+          {aeData && (
+            <div style={{ marginTop: 14 }}>
+              <AerobicEfficiencyCard data={aeData} animate={animate} />
             </div>
           )}
 

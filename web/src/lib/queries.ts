@@ -7,6 +7,7 @@ import { shiftDateKey, toDateKey, weekBounds } from "./sessionVisuals";
 import type {
   ActivityForm,
   Adaptation,
+  AerobicEfficiencyData,
   CoachTrend,
   AthleteLevel,
   AthleteProfile,
@@ -955,6 +956,15 @@ export function useFitnessFatigue(lookbackDays = 60) {
     queryFn: ({ signal }) =>
       apiGet<FitnessFatigueData>(`/body/fitness-fatigue?lookback_days=${lookbackDays}`, undefined, signal),
     staleTime: 5 * 60_000,
+  });
+}
+
+export function useAerobicEfficiency(lookbackDays = 90) {
+  return useQuery({
+    queryKey: ["body", "aerobic-efficiency", lookbackDays],
+    queryFn: ({ signal }) =>
+      apiGet<AerobicEfficiencyData>(`/body/aerobic-efficiency?lookback_days=${lookbackDays}`, undefined, signal),
+    staleTime: 10 * 60_000,
   });
 }
 
