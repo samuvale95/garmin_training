@@ -40,14 +40,24 @@ export const SOURCE_LABELS: Record<string, string> = {
   manual: "scritto a mano",
 };
 
-/** The quick choices for "how much of it did you eat". Multiples of the plate that was
- * photographed or described, so ½ means half of what the model saw. */
-export const PORTIONS = [0.25, 0.5, 0.75, 1, 1.5, 2] as const;
+/** The quick choices for "how much of it did you eat". Multiples of the plate:
+ * 50% (Metà), 75% (Tre quarti), 100% (Intera), 125% (Abbondante), 150% (Una e mezza), 200% (Doppia). */
+export const PORTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 
-const PORTION_GLYPHS: Record<number, string> = { 0.25: "¼", 0.5: "½", 0.75: "¾", 1: "1", 1.5: "1½", 2: "2" };
+export function portionDescriptor(portion: number): string {
+  if (portion <= 0.3) return "Un assaggio";
+  if (portion <= 0.6) return "Mezza porzione";
+  if (portion <= 0.85) return "Porzione leggera";
+  if (portion >= 0.95 && portion <= 1.05) return "Porzione standard";
+  if (portion <= 1.35) return "Abbondante";
+  if (portion <= 1.65) return "Una e mezza";
+  if (portion <= 2.2) return "Doppia porzione";
+  return `${Math.round(portion * 100)}% del piatto`;
+}
 
 export function portionLabel(portion: number): string {
-  return PORTION_GLYPHS[portion] ?? `×${portion.toLocaleString("it-IT", { maximumFractionDigits: 2 })}`;
+  const pct = Math.round(portion * 100);
+  return `${pct}%`;
 }
 
 /** A macro field's text at a new portion. Recomputed from the saved entry while the user
@@ -58,16 +68,129 @@ export function macroAtPortion(saved: number | null, savedPortion: number, typed
   return typed === "" ? "" : String(Math.round((Number(typed) / from) * to));
 }
 
-/** "Quanto ne hai mangiato": one row of chips. Changing it never marks the entry
- * corrected on its own -- see `EntryPatchRequest` in schemas.py. */
+/** "Quanto ne hai mangiato": sleek interactive stepper with percentage pill presets. */
 export function PortionPicker({ value, onChange, disabled }: { value: number; onChange: (portion: number) => void; disabled?: boolean }) {
-  const options: number[] = PORTIONS.includes(value as (typeof PORTIONS)[number]) ? [...PORTIONS] : [...PORTIONS, value].sort((a, b) => a - b);
+  const currentPct = Math.round(value * 100);
+  const descriptor = portionDescriptor(value);
+
+  const handleStep = (delta: number) => {
+    if (disabled) return;
+    const next = Math.max(0.1, Math.min(3.0, Math.round((value + delta) * 100) / 100));
+    onChange(next);
+  };
+
   return (
-    <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-chip)", padding: 12 }}>
-      <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "0 0 8px" }}>quanto ne hai mangiato</p>
-      <div role="radiogroup" aria-label="Porzione mangiata" style={{ display: "flex", gap: 6 }}>
-        {options.map((option) => {
-          const selected = option === value;
+    <div
+      style={{
+        background: "var(--crema-card)",
+        borderRadius: "var(--radius-card)",
+        padding: "16px 16px 14px",
+        border: "1px solid rgba(0,0,0,0.04)",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--inchiostro-50)" }}>
+          Porzione consumata
+        </span>
+        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--inchiostro-70)" }}>
+          {descriptor}
+        </span>
+      </div>
+
+      {/* Main Stepper Card */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          background: "var(--crema)",
+          borderRadius: "var(--radius-chip)",
+          padding: "6px 8px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+          border: "1px solid rgba(0,0,0,0.05)",
+          marginBottom: 12,
+        }}
+      >
+        <button
+          type="button"
+          aria-label="Diminuisci porzione"
+          disabled={disabled || value <= 0.25}
+          onClick={() => handleStep(-0.25)}
+          className="tap-target"
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: "var(--radius-chip)",
+            border: "none",
+            background: "var(--sabbia)",
+            color: "var(--inchiostro)",
+            fontSize: 20,
+            fontWeight: 500,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: disabled || value <= 0.25 ? "not-allowed" : "pointer",
+            opacity: disabled || value <= 0.25 ? 0.35 : 1,
+            transition: "background 0.15s ease, transform 0.1s ease",
+          }}
+        >
+          −
+        </button>
+
+        <div style={{ textAlign: "center", flex: 1, padding: "0 8px" }}>
+          <div style={{ display: "inline-flex", alignItems: "baseline", gap: 3 }}>
+            <span className="font-mono" style={{ fontSize: 26, fontWeight: 800, color: "var(--inchiostro)", letterSpacing: "-0.03em" }}>
+              {currentPct}
+            </span>
+            <span className="font-mono" style={{ fontSize: 15, fontWeight: 700, color: "var(--inchiostro-50)" }}>
+              %
+            </span>
+          </div>
+          <p style={{ margin: 0, fontSize: 11, color: "var(--inchiostro-50)", fontWeight: 500 }}>
+            {value === 1 ? "1 piatto intero" : `×${value.toLocaleString("it-IT", { maximumFractionDigits: 2 })}`}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          aria-label="Aumenta porzione"
+          disabled={disabled || value >= 3.0}
+          onClick={() => handleStep(0.25)}
+          className="tap-target"
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: "var(--radius-chip)",
+            border: "none",
+            background: "var(--sabbia)",
+            color: "var(--inchiostro)",
+            fontSize: 20,
+            fontWeight: 500,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: disabled || value >= 3.0 ? "not-allowed" : "pointer",
+            opacity: disabled || value >= 3.0 ? 0.35 : 1,
+            transition: "background 0.15s ease, transform 0.1s ease",
+          }}
+        >
+          +
+        </button>
+      </div>
+
+      {/* Quick selection presets */}
+      <div
+        role="radiogroup"
+        aria-label="Scelta rapida porzione"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(6, 1fr)",
+          gap: 6,
+        }}
+      >
+        {PORTIONS.map((option) => {
+          const selected = Math.abs(option - value) < 0.01;
+          const pct = Math.round(option * 100);
           return (
             <button
               key={option}
@@ -76,10 +199,25 @@ export function PortionPicker({ value, onChange, disabled }: { value: number; on
               aria-checked={selected}
               disabled={disabled}
               onClick={() => onChange(option)}
-              className="font-mono"
-              style={{ flex: 1, minHeight: 40, border: "none", borderRadius: "var(--radius-pill)", background: selected ? "var(--inchiostro)" : "var(--sabbia-chip)", color: selected ? "var(--crema)" : "var(--inchiostro)", fontSize: 15, fontWeight: 600, cursor: disabled ? "default" : "pointer" }}
+              className="tap-target"
+              style={{
+                height: 38,
+                border: "none",
+                borderRadius: "var(--radius-chip)",
+                background: selected ? "var(--inchiostro)" : "rgba(0,0,0,0.035)",
+                color: selected ? "var(--crema)" : "var(--inchiostro)",
+                fontSize: 12,
+                fontWeight: selected ? 700 : 500,
+                cursor: disabled ? "default" : "pointer",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.15s ease",
+                boxShadow: selected ? "0 2px 8px rgba(0,0,0,0.12)" : "none",
+              }}
             >
-              {portionLabel(option)}
+              <span className="font-mono">{pct}%</span>
             </button>
           );
         })}
