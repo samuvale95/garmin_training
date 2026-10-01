@@ -194,26 +194,9 @@ export function FuelReminderCard({
         </div>
       </div>
 
-      {/* Action button */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
-        {notifStatus.permission !== "granted" ? (
-          <button
-            type="button"
-            onClick={handleEnable}
-            style={{
-              background: "var(--inchiostro)",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "var(--radius-pill)",
-              padding: "10px 18px",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            🔔 Attiva promemoria sul dispositivo
-          </button>
-        ) : (
+      {/* Action button & instructions */}
+      <div style={{ marginTop: 12 }}>
+        {notifStatus.permission === "granted" ? (
           <button
             type="button"
             onClick={handleTest}
@@ -231,6 +214,38 @@ export function FuelReminderCard({
           >
             {testSent ? "Invio in corso..." : "🔔 Invia notifica di prova"}
           </button>
+        ) : notifStatus.permission === "denied" ? (
+          <div style={{ background: "rgba(239, 68, 68, 0.08)", padding: "10px 14px", borderRadius: "var(--radius-card)", marginTop: 6 }}>
+            <p style={{ fontSize: 12.5, fontWeight: 700, color: "#b91c1c", margin: "0 0 4px" }}>
+              Le notifiche risultano bloccate dal browser o dal sistema operativo
+            </p>
+            <p style={{ fontSize: 11.5, color: "var(--inchiostro-70)", margin: 0, lineHeight: 1.4 }}>
+              Per riattivarle: tocca l&apos;icona delle impostazioni del sito (il lucchetto o levetta a sinistra dell&apos;URL nella barra del browser), vai su <strong>Permessi / Notifiche</strong> e seleziona <strong>Consenti</strong>. Poi ricarica la pagina.
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <button
+              type="button"
+              onClick={handleEnable}
+              style={{
+                alignSelf: "flex-start",
+                background: "var(--inchiostro)",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "var(--radius-pill)",
+                padding: "10px 18px",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              🔔 Tocca qui per consentire le notifiche
+            </button>
+            <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: 0 }}>
+              (Se stai usando un iPhone / Safari, aggiungi l&apos;app alla schermata Home con <em>Condividi → Aggiungi alla schermata Home</em> per ricevere le notifiche push).
+            </p>
+          </div>
         )}
       </div>
 
