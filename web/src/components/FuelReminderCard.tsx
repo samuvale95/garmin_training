@@ -41,20 +41,26 @@ export function FuelReminderCard({
   animate = true,
   delayMs = 0,
 }: FuelReminderCardProps) {
+  const [mounted, setMounted] = useState(false);
   const [notifStatus, setNotifStatus] = useState<NotificationStatus>({ supported: false, permission: "default" });
   const [testSent, setTestSent] = useState(false);
   const [schedulingFeedback, setSchedulingFeedback] = useState<string | null>(null);
 
   useEffect(() => {
+    setMounted(true);
     setNotifStatus(getNotificationStatus());
   }, []);
+
+  if (!todayTarget || todayTarget.load === "riposo") {
+    return null;
+  }
 
   const slotInfo = SLOT_TIMES[timeSlot] || SLOT_TIMES.pomeriggio;
   const snackTime = subtractMinutes(slotInfo.hour, slotInfo.minute, 90);
   const waterTime = subtractMinutes(slotInfo.hour, slotInfo.minute, 45);
 
-  const hydrationMl = calculateHydrationMl(todayTarget?.duration_minutes, todayTarget?.load === "molto_lungo");
-  const snackGrams = calculateSnackGrams(todayTarget?.load);
+  const hydrationMl = calculateHydrationMl(todayTarget.duration_minutes, todayTarget.load === "molto_lungo");
+  const snackGrams = calculateSnackGrams(todayTarget.load);
 
   async function handleEnable() {
     const perm = await requestNotificationPermission();
@@ -106,7 +112,20 @@ export function FuelReminderCard({
           Promemoria Merenda & Idratazione
         </p>
 
-        {notifStatus.permission === "granted" ? (
+        {!mounted || notifStatus.permission === "default" ? (
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              padding: "3px 9px",
+              borderRadius: "var(--radius-pill)",
+              background: "rgba(34, 34, 34, 0.05)",
+              color: "var(--inchiostro-50)",
+            }}
+          >
+            Da abilitare
+          </span>
+        ) : notifStatus.permission === "granted" ? (
           <span
             style={{
               fontSize: 11,
@@ -119,7 +138,7 @@ export function FuelReminderCard({
           >
             🔔 Notifiche attive
           </span>
-        ) : notifStatus.permission === "denied" ? (
+        ) : (
           <span
             style={{
               fontSize: 11,
@@ -131,19 +150,6 @@ export function FuelReminderCard({
             }}
           >
             Notifiche bloccate
-          </span>
-        ) : (
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              padding: "3px 9px",
-              borderRadius: "var(--radius-pill)",
-              background: "rgba(34, 34, 34, 0.05)",
-              color: "var(--inchiostro-50)",
-            }}
-          >
-            Da abilitare
           </span>
         )}
       </div>

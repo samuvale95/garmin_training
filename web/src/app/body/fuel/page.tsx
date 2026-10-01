@@ -277,7 +277,31 @@ export default function FuelPage() {
         </p>
       </div>
 
-      {fuelQuery.isLoading || !fuel ? (
+      {fuelQuery.isError ? (
+        <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 20, marginTop: 18, border: "var(--border-airbnb)", textAlign: "center" }}>
+          <p style={{ fontWeight: 700, fontSize: 16, margin: "0 0 6px" }}>Non riusciamo a caricare il carburante</p>
+          <p className="font-serif-italic" style={{ fontSize: 13.5, color: "var(--inchiostro-70)", margin: "0 0 16px" }}>
+            Si è verificato un problema di connessione con i dati di alimentazione.
+          </p>
+          <button
+            type="button"
+            onClick={() => fuelQuery.refetch()}
+            className="tap-target"
+            style={{
+              background: "var(--inchiostro)",
+              color: "var(--crema)",
+              border: "none",
+              borderRadius: "var(--radius-pill)",
+              padding: "10px 20px",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Riprova
+          </button>
+        </div>
+      ) : fuelQuery.isLoading || !fuel ? (
         <FuelSkeleton />
       ) : (
         <>
