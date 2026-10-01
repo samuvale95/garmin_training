@@ -7,7 +7,13 @@ import { PulseRing, Skeleton, SlideUp } from "@/components/motion/primitives";
 import { ChevronLeft, ChevronRight, ArrowRight, PencilIcon } from "@/components/Icons";
 import { FuelCorrectionSheet } from "@/components/FuelCorrectionSheet";
 import { DayEnergyCard } from "@/components/DayEnergyCard";
-import { EnergyBlock, FoodEquivalencesBlock, FuelComment, FuelHero, MealList, SessionFuelBlock, TodayFuelBlock } from "@/components/FuelBlocks";
+import {
+  SessionTimeSelectorCard,
+  DayFuelTimelineBlock,
+  TomorrowFuelBanner,
+  MealList,
+  type RunTimeSlot,
+} from "@/components/FuelBlocks";
 import { useMountOnce } from "@/lib/motion";
 import { formatWeekday } from "@/lib/format";
 import { useCalendarAccess } from "@/lib/guards";
@@ -122,6 +128,7 @@ export default function FuelPage() {
   const cancelledRef = useRef(false);
   const [flow, setFlow] = useState<Flow>({ kind: "idle" });
   const [correcting, setCorrecting] = useState<FoodEntry | null>(null);
+  const [runTimeSlot, setRunTimeSlot] = useState<RunTimeSlot>("pomeriggio");
 
   function openCamera() {
     fileInputRef.current?.click();
@@ -261,11 +268,11 @@ export default function FuelPage() {
       </div>
 
       <div style={{ marginTop: 14 }}>
-        <h1 style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: 0 }}>
-          Carburante
+        <h1 style={{ font: "600 28px/1.1 var(--font-sans)", letterSpacing: "-.03em", margin: 0 }}>
+          Cosa mangiare oggi
         </h1>
-        <p className="font-serif-italic" style={{ fontSize: 15.5, color: "var(--inchiostro-70)", margin: "6px 0 0", lineHeight: 1.35 }}>
-          L&apos;energia che ti serve per l&apos;allenamento di oggi.
+        <p className="font-serif-italic" style={{ fontSize: 15.5, color: "var(--inchiostro-70)", margin: "4px 0 0", lineHeight: 1.35 }}>
+          La tua giornata a tavola intorno all&apos;allenamento.
         </p>
       </div>
 
@@ -273,25 +280,29 @@ export default function FuelPage() {
         <FuelSkeleton />
       ) : (
         <>
-          {/* 1. OGGI: Primary hero block */}
-          <TodayFuelBlock animate={animate} fuel={fuel} totals={day?.totals} hasPlan={hasPlan} level={level.data?.level ?? 2} lines={statusQuery.data?.lines} />
+          {/* 1. SCHEDA SEDUTA & SELETTORE ORARIO (Chiara, amichevole, discreta) */}
+          <SessionTimeSelectorCard
+            animate={animate}
+            fuel={fuel}
+            timeSlot={runTimeSlot}
+            onSelectTimeSlot={setRunTimeSlot}
+          />
 
-          {/* 2. ESEMPI PRATICI NEL PIATTO: Didactic food equivalences and timing */}
-          <FoodEquivalencesBlock animate={animate} />
+          {/* 2. TIMELINE DELLA GIORNATA ALIMENTARE (IL PROTAGONISTA) */}
+          <DayFuelTimelineBlock
+            animate={animate}
+            fuel={fuel}
+            timeSlot={runTimeSlot}
+          />
 
-          {/* 3. DOMANI: Evening preparation for tomorrow's run */}
-          <FuelHero animate={animate} fuel={fuel} narrativeText={narrative} />
+          {/* 3. DOMANI IN ARRIVO */}
+          <TomorrowFuelBanner animate={animate} fuel={fuel} />
 
-          {/* 4. DURING & POST WORKOUT FUELING (if applicable today) */}
-          <SessionFuelBlock animate={animate} during={fuel.during} recovery={fuel.recovery} />
-
-          {/* 5. TODAY'S LOGGED MEALS */}
+          {/* 4. TODAY'S LOGGED MEALS (se presenti) */}
           <MealList entries={entries} animate={animate} onSelect={setCorrecting} />
 
-          {/* 5. ENERGY BALANCE (cross-check with Garmin and theoretical needs) */}
+          {/* 5. ENERGY BALANCE (se abilitato dai livelli atleta) */}
           {dayEnergy.data && <DayEnergyCard energy={dayEnergy.data} numbers={showEnergy} animate={animate} delayMs={280} />}
-
-          {showEnergy && <EnergyBlock animate={animate} target={fuel.today} />}
 
           {/* 6. NAVIGATION: Diary & 7-Day History */}
           <SlideUp active={animate} delayMs={340} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
@@ -312,8 +323,6 @@ export default function FuelPage() {
               <ChevronRight size={15} style={{ color: "var(--inchiostro-50)" }} />
             </Link>
           </SlideUp>
-
-          {commentText && <FuelComment animate={animate} text={commentText} />}
         </>
       )}
 

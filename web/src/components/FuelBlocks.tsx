@@ -1,9 +1,8 @@
 "use client";
 
-import { type CSSProperties, type ReactNode } from "react";
+import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { SlideUp } from "@/components/motion/primitives";
-import { TiltCard } from "@/components/motion/TiltCard";
 import { FoodThumb } from "@/components/FuelCorrectionSheet";
 import { capitalize, formatClockTime } from "@/lib/format";
 import type {
@@ -17,8 +16,7 @@ import type {
   SessionLoad,
 } from "@/lib/types";
 
-// Design System Passo 2026: Ultra-clean, modern Airbnb-style elevation, high glanceability,
-// zero wall-of-text. Built for runners to understand what they need in 2 seconds.
+export type RunTimeSlot = "mattina" | "pomeriggio" | "sera";
 
 const LOAD_LABELS: Record<SessionLoad, string> = {
   riposo: "riposo",
@@ -32,152 +30,326 @@ function formatRange(range: [number, number]): string {
   return `${range[0]}–${range[1]}`;
 }
 
-// ---- BLOCCO 1: OGGI (HERO SIGNATURE DARK PASSO) ---------------------------------------------
+// ---- BLOCCO 1: SCHEDA SEDUTA & SELETTORE ORARIO -----------------------------------------------
 
-export function TodayFuelBlock({
+export function SessionTimeSelectorCard({
   animate,
   fuel,
-  totals,
-  hasPlan,
-  level = 2,
-  lines = [],
+  timeSlot,
+  onSelectTimeSlot,
 }: {
   animate: boolean;
   fuel: FuelTargets;
-  totals: DayTotals | undefined;
-  hasPlan: boolean;
-  level?: number;
-  lines?: ComplianceLine[];
+  timeSlot: RunTimeSlot;
+  onSelectTimeSlot: (slot: RunTimeSlot) => void;
 }) {
   const t: DayTarget = fuel.today;
-  const hasEntries = !!totals && totals.entries > 0;
-  const title = t.session_title ? capitalize(t.session_title) : t.load === "riposo" ? "Riposo attivo" : "Allenamento di oggi";
-  const degraded = fuel.weight_source === "reference";
-
-  const carbLogged = Math.round(totals?.carb_g ?? 0);
-  const carbTarget = t.carb_g;
-  const carbRemaining = carbTarget ? Math.max(0, carbTarget[0] - carbLogged) : 0;
-  const carbPct = carbTarget ? Math.min(1, carbLogged / carbTarget[1]) : 0;
+  const isRest = t.load === "riposo";
+  const title = t.session_title ? capitalize(t.session_title) : isRest ? "Riposo attivo" : "Allenamento di oggi";
+  const targetCarb = t.carb_g ? Math.round((t.carb_g[0] + t.carb_g[1]) / 2) : 250;
 
   return (
     <SlideUp active={animate} delayMs={80} style={{ marginTop: 14 }}>
-      <TiltCard
-        maxTilt={3}
+      <div
         style={{
-          background: "var(--inchiostro)",
-          color: "var(--crema)",
-          borderRadius: 26,
-          padding: 22,
-          boxShadow: "0 10px 28px rgba(0, 0, 0, 0.12)",
+          background: "var(--crema-card)",
+          border: "var(--border-airbnb)",
+          borderRadius: 22,
+          padding: "15px 16px",
           display: "flex",
           flexDirection: "column",
-          gap: 16,
+          gap: 13,
+          boxShadow: "var(--shadow-airbnb-subtle)",
         }}
       >
-        {/* Top header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-          <span
-            className="font-mono"
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: ".06em",
-              textTransform: "uppercase",
-              background: "rgba(255, 255, 255, 0.15)",
-              color: "var(--crema)",
-              borderRadius: "var(--radius-pill)",
-              padding: "4px 10px",
-            }}
-          >
-            OGGI
-          </span>
-          <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--inchiostro-su-scuro)" }}>
-            {title} · {LOAD_LABELS[t.load]}
-          </span>
-        </div>
-
-        {/* Main Metric */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: ".05em",
-              color: "var(--inchiostro-su-scuro)",
-            }}
-          >
-            Fabbisogno stimato
-          </span>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
             <span
               className="font-mono"
               style={{
-                fontSize: 38,
+                fontSize: 10.5,
                 fontWeight: 700,
-                letterSpacing: "-.03em",
-                color: "var(--corallo)",
-                lineHeight: 1,
+                letterSpacing: ".05em",
+                textTransform: "uppercase",
+                background: "var(--corallo)",
+                color: "var(--corallo-testo)",
+                padding: "3px 8px",
+                borderRadius: "var(--radius-pill)",
+                flexShrink: 0,
               }}
             >
-              {carbTarget ? formatRange(carbTarget) : "210–280"}
+              OGGI
             </span>
-            <span style={{ fontSize: 15, fontWeight: 500, color: "var(--crema)" }}>
-              g di carboidrati
+            <span
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: "var(--inchiostro)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {title}
             </span>
+          </div>
+
+          <div
+            className="font-mono"
+            style={{
+              fontSize: 11.5,
+              fontWeight: 600,
+              color: "var(--inchiostro-70)",
+              background: "var(--crema)",
+              border: "var(--border-airbnb)",
+              padding: "4px 9px",
+              borderRadius: 100,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+          >
+            Target: <strong style={{ color: "var(--inchiostro)" }}>~{targetCarb}g carbo</strong>
           </div>
         </div>
 
-        {/* Macro row */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 8,
-            paddingTop: 14,
-            borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 11, color: "var(--inchiostro-su-scuro)" }}>Proteine</span>
-            <span className="font-mono" style={{ fontSize: 15, fontWeight: 600, color: "var(--crema)" }}>
-              {t.protein_g ? formatRange(t.protein_g) : "110–125"} g
+        {!isRest && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: ".05em",
+                color: "var(--inchiostro-50)",
+              }}
+            >
+              Quando prevedi di correre?
             </span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 11, color: "var(--inchiostro-su-scuro)" }}>Grassi buoni</span>
-            <span className="font-mono" style={{ fontSize: 15, fontWeight: 600, color: "var(--crema)" }}>
-              {t.fat_g ? formatRange(t.fat_g) : "55–70"} g
-            </span>
-          </div>
-        </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 5,
+                background: "var(--sabbia)",
+                padding: 3,
+                borderRadius: 13,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => onSelectTimeSlot("mattina")}
+                style={{
+                  border: "none",
+                  background: timeSlot === "mattina" ? "var(--crema)" : "transparent",
+                  color: timeSlot === "mattina" ? "var(--inchiostro)" : "var(--inchiostro-70)",
+                  boxShadow: timeSlot === "mattina" ? "0 2px 5px rgba(0,0,0,0.06)" : "none",
+                  padding: "7px 4px",
+                  borderRadius: 10,
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  whiteSpace: "nowrap",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span>🌅</span> Mattina
+              </button>
 
-        {/* Progress line if user has logged */}
-        {hasEntries && totals ? (
-          <div style={{ background: "rgba(255, 255, 255, 0.08)", borderRadius: 12, padding: "10px 12px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 500 }}>
-              <span style={{ color: "var(--corallo)" }}>Registrati: <strong>{carbLogged} g</strong></span>
-              <span style={{ color: "var(--inchiostro-su-scuro)" }}>{carbRemaining > 0 ? `Mancano ~${carbRemaining} g` : "Target raggiunto ✓"}</span>
-            </div>
-            <div style={{ height: 4, borderRadius: 10, background: "rgba(255, 255, 255, 0.15)", overflow: "hidden", marginTop: 6 }}>
-              <div style={{ width: `${carbPct * 100}%`, height: "100%", background: "var(--corallo)", borderRadius: 10 }} />
+              <button
+                type="button"
+                onClick={() => onSelectTimeSlot("pomeriggio")}
+                style={{
+                  border: "none",
+                  background: timeSlot === "pomeriggio" ? "var(--crema)" : "transparent",
+                  color: timeSlot === "pomeriggio" ? "var(--inchiostro)" : "var(--inchiostro-70)",
+                  boxShadow: timeSlot === "pomeriggio" ? "0 2px 5px rgba(0,0,0,0.06)" : "none",
+                  padding: "7px 4px",
+                  borderRadius: 10,
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  whiteSpace: "nowrap",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span>☀️</span> Pomeriggio (18:00)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onSelectTimeSlot("sera")}
+                style={{
+                  border: "none",
+                  background: timeSlot === "sera" ? "var(--crema)" : "transparent",
+                  color: timeSlot === "sera" ? "var(--inchiostro)" : "var(--inchiostro-70)",
+                  boxShadow: timeSlot === "sera" ? "0 2px 5px rgba(0,0,0,0.06)" : "none",
+                  padding: "7px 4px",
+                  borderRadius: 10,
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  whiteSpace: "nowrap",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span>🌙</span> Sera
+              </button>
             </div>
           </div>
-        ) : null}
-
-        {degraded && (
-          <p style={{ fontSize: 11, color: "var(--inchiostro-su-scuro)", margin: 0 }}>
-            Calcolato su 70 kg di riferimento · <Link href="/settings/body" style={{ color: "var(--corallo)", textDecoration: "underline" }}>Imposta peso reale</Link>
-          </p>
         )}
-      </TiltCard>
+      </div>
     </SlideUp>
   );
 }
 
-// ---- BLOCCO 2: INTORNO ALL'ALLENAMENTO (3 RIGHE ULTRA-PULITE) --------------------------------
+// ---- BLOCCO 2: TIMELINE DELLA GIORNATA (IL PROTAGONISTA) -------------------------------------
 
-export function FoodEquivalencesBlock({ animate }: { animate: boolean }) {
+interface MealStep {
+  tag: string;
+  isPre?: boolean;
+  isPost?: boolean;
+  dish: string;
+  tip: string;
+  estimate: string;
+}
+
+export function DayFuelTimelineBlock({
+  animate,
+  fuel,
+  timeSlot,
+}: {
+  animate: boolean;
+  fuel: FuelTargets;
+  timeSlot: RunTimeSlot;
+}) {
+  const t: DayTarget = fuel.today;
+  const isRest = t.load === "riposo";
+  const title = t.session_title ? capitalize(t.session_title) : "Corsa";
+  const isLong = t.load === "molto_lungo" || t.load === "duro";
+
+  let preRunMeals: MealStep[] = [];
+  let runLabel = "";
+  let runNote = "Solo acqua ed elettroliti";
+  let postRunMeals: MealStep[] = [];
+
+  if (isRest) {
+    return (
+      <div style={{ marginTop: 18 }}>
+        <p className="font-mono" style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: "0 0 10px 2px" }}>
+          La tua giornata di riposo
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+          <MealCard
+            step={{
+              tag: "Pranzo e Cena",
+              dish: "Porzioni normali con carboidrati moderati",
+              tip: "Oggi non c'è bisogno di carichi particolari. Mantieni un buon apporto di verdure e proteine.",
+              estimate: "Ricarica regolare",
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (timeSlot === "mattina") {
+    runLabel = "Ore 07:30 · " + title;
+    runNote = isLong ? "Acqua + gel ogni 45 min" : "Solo acqua";
+    preRunMeals = [
+      {
+        tag: "Prima di uscire (ore 07:00)",
+        isPre: true,
+        dish: "Acqua + 1 caffè o 2 biscotti / fette biscottate",
+        tip: "Uno zuccherino leggero se non ami correre a digiuno, senza impegnare la digestione.",
+        estimate: "~15g carbo",
+      },
+    ];
+    postRunMeals = [
+      {
+        tag: "Colazione (ore 08:30) · Recupero",
+        isPost: true,
+        dish: "Porridge d'avena o pane tostato + yogurt / uova e frutto",
+        tip: "Ricarica subito le gambe di carboidrati e dai proteine ai muscoli per rigenerarsi.",
+        estimate: "~60g carbo + 20g prot",
+      },
+      {
+        tag: "Pranzo (ore 13:00)",
+        dish: "Pasta o riso (80–100g) con verdure e secondo",
+        tip: "Completa la ricarica energetica della giornata.",
+        estimate: "~80g carbo",
+      },
+    ];
+  } else if (timeSlot === "sera") {
+    runLabel = "Ore 20:00 · " + title;
+    runNote = isLong ? "Acqua + gel" : "Solo acqua";
+    preRunMeals = [
+      {
+        tag: "Pranzo (ore 13:00) · Base energetica",
+        isPre: true,
+        dish: "Pasta o riso (80–100g) condimento leggero",
+        tip: "Costruisce le scorte di glicogeno che userai questa sera.",
+        estimate: "~80g carbo",
+      },
+      {
+        tag: "Merenda (ore 17:30) · 2h prima",
+        isPre: true,
+        dish: "Pane con marmellata o toast leggero + banana",
+        tip: "Energia pronta per non arrivare alla corsa con la fame del pomeriggio.",
+        estimate: "~45g carbo",
+      },
+    ];
+    postRunMeals = [
+      {
+        tag: "Cena (ore 21:15) · Recupero",
+        isPost: true,
+        dish: "Secondo digeribile (pesce/uova/pollo) + riso o pane",
+        tip: "Ripara le fibre muscolari prima del sonno senza appesantire la notte.",
+        estimate: "~30g prot + carbo",
+      },
+    ];
+  } else {
+    // Pomeriggio (standard ore 18:00)
+    runLabel = "Ore 18:00 · " + title;
+    runNote = isLong ? "Acqua + 1 gel se >80 min" : "Solo acqua";
+    preRunMeals = [
+      {
+        tag: "Pranzo (ore 13:00) · 2–3h prima",
+        isPre: true,
+        dish: "Pasta o riso (80–100g) al pomodoro fresco",
+        tip: "Carboidrati digeribili per riempire i muscoli di energia senza appesantire lo stomaco.",
+        estimate: "~80g carbo",
+      },
+      {
+        tag: "Merenda (ore 17:00) · 1h prima",
+        isPre: true,
+        dish: "1 banana oppure pane e marmellata",
+        tip: "Zuccheri pronti all'uso per partire senza cali di energia (solo se hai fame).",
+        estimate: "~25g carbo",
+      },
+    ];
+    postRunMeals = [
+      {
+        tag: "Cena (ore 20:00) · Recupero",
+        isPost: true,
+        dish: "Pesce o pollo (150g) + patate al forno o riso",
+        tip: "Proteine per riparare le fibre muscolari e carboidrati per ripristinare le scorte consumate.",
+        estimate: "~30g prot + carbo",
+      },
+    ];
+  }
+
   return (
     <div style={{ marginTop: 18 }}>
       <p
@@ -191,191 +363,123 @@ export function FoodEquivalencesBlock({ animate }: { animate: boolean }) {
           margin: "0 0 10px 2px",
         }}
       >
-        Intorno all&apos;allenamento
+        La tua giornata alimentare
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-        {/* Step 1: Pre-allenamento */}
-        <SlideUp active={animate} delayMs={140}>
-          <div
-            style={{
-              background: "var(--crema-card)",
-              border: "var(--border-airbnb)",
-              borderRadius: 18,
-              padding: "14px 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
-          >
-            <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-              <span
-                className="font-mono"
-                style={{
-                  fontSize: 10.5,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: ".04em",
-                  color: "var(--corallo-testo)",
-                }}
-              >
-                2–3h prima
-              </span>
-              <span
-                style={{
-                  fontSize: 14.5,
-                  fontWeight: 600,
-                  color: "var(--inchiostro)",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                Pasta o riso (80–100g)
-              </span>
-            </div>
-            <span
-              className="font-mono"
-              style={{
-                fontSize: 12,
-                color: "var(--inchiostro-50)",
-                background: "var(--crema)",
-                border: "var(--border-airbnb)",
-                padding: "4px 10px",
-                borderRadius: 100,
-                flexShrink: 0,
-              }}
-            >
-              ~75g carbo
-            </span>
-          </div>
-        </SlideUp>
+        {preRunMeals.map((meal) => (
+          <MealCard key={meal.tag} step={meal} highlight={meal.isPre} />
+        ))}
 
-        {/* Step 2: Snack veloce */}
-        <SlideUp active={animate} delayMs={190}>
-          <div
+        {/* Workout marker in timeline */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "9px 14px",
+            background: "var(--corallo-chiaro)",
+            border: "1px dashed var(--corallo)",
+            borderRadius: 14,
+          }}
+        >
+          <span style={{ fontSize: 15 }}>🏃‍♂️</span>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--corallo-testo)" }}>
+            {runLabel}
+          </span>
+          <span
+            className="font-mono"
             style={{
-              background: "var(--crema-card)",
-              border: "var(--border-airbnb)",
-              borderRadius: 18,
-              padding: "14px 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
+              fontSize: 11,
+              color: "var(--corallo-testo)",
+              opacity: 0.85,
+              marginLeft: "auto",
+              whiteSpace: "nowrap",
             }}
           >
-            <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-              <span
-                className="font-mono"
-                style={{
-                  fontSize: 10.5,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: ".04em",
-                  color: "var(--giallo-testo)",
-                }}
-              >
-                1h prima (se serve)
-              </span>
-              <span
-                style={{
-                  fontSize: 14.5,
-                  fontWeight: 600,
-                  color: "var(--inchiostro)",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                Banana o pane con miele
-              </span>
-            </div>
-            <span
-              className="font-mono"
-              style={{
-                fontSize: 12,
-                color: "var(--inchiostro-50)",
-                background: "var(--crema)",
-                border: "var(--border-airbnb)",
-                padding: "4px 10px",
-                borderRadius: 100,
-                flexShrink: 0,
-              }}
-            >
-              ~25g carbo
-            </span>
-          </div>
-        </SlideUp>
+            {runNote}
+          </span>
+        </div>
 
-        {/* Step 3: Recupero post-corsa */}
-        <SlideUp active={animate} delayMs={240}>
-          <div
-            style={{
-              background: "var(--crema-card)",
-              border: "var(--border-airbnb)",
-              borderRadius: 18,
-              padding: "14px 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
-          >
-            <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-              <span
-                className="font-mono"
-                style={{
-                  fontSize: 10.5,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: ".04em",
-                  color: "var(--verde-testo)",
-                }}
-              >
-                Dopo la corsa
-              </span>
-              <span
-                style={{
-                  fontSize: 14.5,
-                  fontWeight: 600,
-                  color: "var(--inchiostro)",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                Proteine + patate o riso
-              </span>
-            </div>
-            <span
-              className="font-mono"
-              style={{
-                fontSize: 12,
-                color: "var(--inchiostro-50)",
-                background: "var(--crema)",
-                border: "var(--border-airbnb)",
-                padding: "4px 10px",
-                borderRadius: 100,
-                flexShrink: 0,
-              }}
-            >
-              recupero
-            </span>
-          </div>
-        </SlideUp>
+        {postRunMeals.map((meal) => (
+          <MealCard key={meal.tag} step={meal} highlight={meal.isPost} />
+        ))}
       </div>
     </div>
   );
 }
 
-// ---- BLOCCO 3: DOMANI (ANTEPRIMA SINTETICA IN 1 ROW) -------------------------------------------
+function MealCard({ step, highlight = false }: { step: MealStep; highlight?: boolean }) {
+  const dotColor = step.isPre ? "var(--corallo-testo)" : step.isPost ? "var(--verde-testo)" : "var(--inchiostro-50)";
+  const tagColor = step.isPre ? "var(--corallo-testo)" : step.isPost ? "var(--verde-testo)" : "var(--inchiostro-70)";
 
-export function FuelHero({ animate, fuel, narrativeText }: { animate: boolean; fuel: FuelTargets; narrativeText?: string }) {
+  return (
+    <div
+      style={{
+        background: highlight ? "var(--crema)" : "var(--crema-card)",
+        border: highlight ? "1px solid rgba(0, 0, 0, 0.09)" : "var(--border-airbnb)",
+        borderRadius: 18,
+        padding: "14px 16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 5,
+        boxShadow: highlight ? "0 4px 12px rgba(0, 0, 0, 0.04)" : "var(--shadow-airbnb-subtle)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+          <span
+            className="font-mono"
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: ".04em",
+              color: tagColor,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {step.tag}
+          </span>
+        </div>
+        <span
+          className="font-mono"
+          style={{
+            fontSize: 11,
+            color: "var(--inchiostro-50)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {step.estimate}
+        </span>
+      </div>
+
+      <div style={{ fontSize: 14.5, fontWeight: 700, color: "var(--inchiostro)", lineHeight: 1.3 }}>
+        {step.dish}
+      </div>
+
+      <div
+        className="font-serif-italic"
+        style={{
+          fontSize: 13.5,
+          color: "var(--inchiostro-70)",
+          lineHeight: 1.35,
+        }}
+      >
+        {step.tip}
+      </div>
+    </div>
+  );
+}
+
+// ---- BLOCCO 3: DOMANI IN ARRIVO ---------------------------------------------------------------
+
+export function TomorrowFuelBanner({ animate, fuel }: { animate: boolean; fuel: FuelTargets }) {
   const t = fuel.tomorrow;
-  const title = t.session_title ? capitalize(t.session_title) : t.load === "riposo" ? "Riposo" : "Allenamento";
   const isHardTomorrow = t.load === "duro" || t.load === "molto_lungo";
+  const title = t.session_title ? capitalize(t.session_title) : t.load === "riposo" ? "Riposo" : "Allenamento";
+  const targetTomorrow = t.carb_g ? Math.round((t.carb_g[0] + t.carb_g[1]) / 2) : 250;
 
   return (
     <SlideUp active={animate} delayMs={280} style={{ marginTop: 14 }}>
@@ -383,113 +487,50 @@ export function FuelHero({ animate, fuel, narrativeText }: { animate: boolean; f
         style={{
           background: isHardTomorrow ? "var(--corallo-chiaro)" : "var(--sabbia)",
           border: "var(--border-airbnb)",
-          borderRadius: 20,
-          padding: "15px 18px",
+          borderRadius: 17,
+          padding: "13px 15px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 12,
+          gap: 10,
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
           <span
             className="font-mono"
             style={{
               fontSize: 10.5,
               fontWeight: 700,
               textTransform: "uppercase",
-              letterSpacing: ".06em",
+              letterSpacing: ".05em",
               color: isHardTomorrow ? "var(--corallo-testo)" : "var(--inchiostro-50)",
             }}
           >
             Domani · {title}
           </span>
-          <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--inchiostro)" }}>
-            {isHardTomorrow ? "Stasera fai il pieno a cena" : "Cena regolare"}
-          </span>
-          <span
-            className="font-serif-italic"
-            style={{
-              fontSize: 13,
-              color: isHardTomorrow ? "var(--corallo-testo)" : "var(--inchiostro-70)",
-            }}
-          >
-            {isHardTomorrow ? "Una porzione abbondante di carboidrati" : "Domani seduta leggera o riposo"}
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--inchiostro)" }}>
+            {isHardTomorrow ? "Stasera a cena aggiungi una porzione extra di carboidrati" : "Cena regolare senza carichi"}
           </span>
         </div>
 
-        {t.carb_g && (
-          <span
-            className="font-mono"
-            style={{
-              fontSize: 15,
-              fontWeight: 700,
-              color: isHardTomorrow ? "var(--corallo-testo)" : "var(--inchiostro)",
-              flexShrink: 0,
-            }}
-          >
-            ~{Math.round((t.carb_g[0] + t.carb_g[1]) / 2)}g
-          </span>
-        )}
+        <span
+          className="font-mono"
+          style={{
+            fontSize: 13.5,
+            fontWeight: 700,
+            color: isHardTomorrow ? "var(--corallo-testo)" : "var(--inchiostro)",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+        >
+          ~{targetTomorrow}g
+        </span>
       </div>
     </SlideUp>
   );
 }
 
-// ---- DURANTE E DOPO (SOLO SE LUNGO) -----------------------------------------------------------
-
-export function SessionFuelBlock({ animate, during, recovery }: { animate: boolean; during: DuringSession | null; recovery: RecoveryWindow | null }) {
-  if (!during && !recovery) return null;
-  return (
-    <div style={{ marginTop: 12 }}>
-      {during && (
-        <SlideUp active={animate} delayMs={310}>
-          <div style={{ background: "var(--corallo-chiaro)", border: "var(--border-airbnb)", borderRadius: 18, padding: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <span className="font-mono" style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", color: "var(--corallo-testo)" }}>
-                Durante la corsa di oggi
-              </span>
-              <span className="font-mono" style={{ fontSize: 12, fontWeight: 600, color: "var(--corallo-testo)" }}>
-                {during.carb_g_per_hour[0]}–{during.carb_g_per_hour[1]} g/ora
-              </span>
-            </div>
-            <p style={{ fontSize: 12.5, margin: "4px 0 0", color: "var(--corallo-testo)" }}>
-              {during.note}
-            </p>
-          </div>
-        </SlideUp>
-      )}
-    </div>
-  );
-}
-
-// ---- FABBISOGNO ENERGETICO ------------------------------------------------------------------
-
-export function EnergyBlock({ animate, target }: { animate: boolean; target: DayTarget }) {
-  const energy = target.energy;
-  if (!energy || energy.need_kcal == null) return null;
-
-  return (
-    <SlideUp active={animate} delayMs={330} style={{ marginTop: 12 }}>
-      <div style={{ background: "var(--crema)", border: "var(--border-airbnb)", borderRadius: "var(--radius-card)", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--inchiostro-50)" }}>Stima consumo totale</span>
-          <p className="font-mono" style={{ fontSize: 18, fontWeight: 700, margin: "2px 0 0", color: "var(--inchiostro)" }}>
-            {energy.need_kcal.toLocaleString("it-IT")} <span style={{ fontSize: 12, fontWeight: 400, color: "var(--inchiostro-50)" }}>kcal</span>
-          </p>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <span style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>Seduta di oggi</span>
-          <p className="font-mono" style={{ fontSize: 15, fontWeight: 600, color: "var(--corallo-testo)", margin: "2px 0 0" }}>
-            ~{energy.training_kcal} kcal
-          </p>
-        </div>
-      </div>
-    </SlideUp>
-  );
-}
-
-// ---- PASTI REGISTRATI -----------------------------------------------------------------------
+// ---- PASTI REGISTRATI (SOLO SE PRESENTI) ----------------------------------------------------
 
 export function MealList({ entries, animate, onSelect }: { entries: FoodEntry[]; animate: boolean; onSelect: (e: FoodEntry) => void }) {
   if (entries.length === 0) return null;
@@ -547,8 +588,4 @@ export function MealRow({ entry, onSelect }: { entry: FoodEntry; onSelect: (e: F
       </span>
     </button>
   );
-}
-
-export function FuelComment({ animate, text, style }: { animate: boolean; text: string; style?: CSSProperties }) {
-  return null;
 }
