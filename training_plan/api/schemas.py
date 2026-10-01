@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from .. import (
     aerobic_efficiency,
     body_insights,
+    correlations,
     db,
     fitness_fatigue,
     garmin_sync,
@@ -2370,6 +2371,88 @@ class ZoneRecalibrationResponse(BaseModel):
             diff_pace_formatted=res.diff_pace_formatted,
             zones=[ZoneBoundaryOut.from_model(z) for z in res.zones],
             supporting_workouts=[SupportingWorkoutOut.from_model(w) for w in res.supporting_workouts],
+        )
+
+
+# ---- personal correlations (sleep / hrv vs performance) ---------------------------------
+
+
+class CorrelationInsightOut(BaseModel):
+    metric_x: str
+    metric_y: str
+    title: str
+    headline: str
+    finding: str
+    action: str
+    sample_size: int
+    correlation_r: float | None = None
+    significance: str
+    good_band_label: str
+    good_band_avg: str
+    bad_band_label: str
+    bad_band_avg: str
+    delta_pct: float | None = None
+
+    @classmethod
+    def from_model(cls, ins: "correlations.CorrelationInsight") -> "CorrelationInsightOut":
+        return cls(
+            metric_x=ins.metric_x,
+            metric_y=ins.metric_y,
+            title=ins.title,
+            headline=ins.headline,
+            finding=ins.finding,
+            action=ins.action,
+            sample_size=ins.sample_size,
+            correlation_r=ins.correlation_r,
+            significance=ins.significance,
+            good_band_label=ins.good_band_label,
+            good_band_avg=ins.good_band_avg,
+            bad_band_label=ins.bad_band_label,
+            bad_band_avg=ins.bad_band_avg,
+            delta_pct=ins.delta_pct,
+        )
+
+
+class PairedRunOut(BaseModel):
+    date: str
+    title: str
+    sleep_hours: float | None = None
+    hrv_ms: float | None = None
+    pace_formatted: str
+    ef: float
+
+
+class PersonalCorrelationsResponse(BaseModel):
+    status: str
+    status_label: str
+    status_color: str
+    headline: str
+    summary: str
+    total_paired_runs: int
+    insights: list[CorrelationInsightOut] = Field(default_factory=list)
+    paired_runs: list[PairedRunOut] = Field(default_factory=list)
+
+    @classmethod
+    def from_model(cls, res: "correlations.PersonalCorrelationsResult") -> "PersonalCorrelationsResponse":
+        return cls(
+            status=res.status,
+            status_label=res.status_label,
+            status_color=res.status_color,
+            headline=res.headline,
+            summary=res.summary,
+            total_paired_runs=res.total_paired_runs,
+            insights=[CorrelationInsightOut.from_model(ins) for ins in res.insights],
+            paired_runs=[
+                PairedRunOut(
+                    date=p["date"],
+                    title=p["title"],
+                    sleep_hours=p.get("sleep_hours"),
+                    hrv_ms=p.get("hrv_ms"),
+                    pace_formatted=p["pace_formatted"],
+                    ef=p["ef"],
+                )
+                for p in res.paired_runs
+            ],
         )
 
 

@@ -34,6 +34,7 @@ import type {
   GoalFit,
   LoadSnapshot,
   Narrative,
+  PersonalCorrelationsData,
   PlanDiff,
   Progress,
   RaceGoal,
@@ -986,6 +987,16 @@ export function useAerobicEfficiency(lookbackDays = 90) {
     queryFn: ({ signal }) =>
       apiGet<AerobicEfficiencyData>(`/body/aerobic-efficiency?lookback_days=${lookbackDays}`, undefined, signal),
     staleTime: 10 * 60_000,
+  });
+}
+
+/** Personal correlations: sleep, overnight HRV, and resting HR vs running efficiency and pace. */
+export function usePersonalCorrelations(lookbackDays = 90) {
+  return useQuery({
+    queryKey: ["body", "correlations", lookbackDays],
+    queryFn: ({ signal }) =>
+      apiGet<PersonalCorrelationsData>(`/body/correlations?lookback_days=${lookbackDays}`, undefined, signal),
+    staleTime: 15 * 60_000,
   });
 }
 

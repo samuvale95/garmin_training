@@ -11,8 +11,9 @@ import { Illustration } from "@/components/Illustration";
 import { ProgressRing, SlideUp, Skeleton } from "@/components/motion/primitives";
 import { TiltCard } from "@/components/motion/TiltCard";
 import { ChevronRight } from "@/components/Icons";
+import { PersonalCorrelationsCard } from "@/components/PersonalCorrelationsCard";
 import { useMountOnce } from "@/lib/motion";
-import { useBodyToday, useFuelTargets, usePlanQuery, usePrefetchFuelNarrative } from "@/lib/queries";
+import { useBodyToday, useFuelTargets, usePersonalCorrelations, usePlanQuery, usePrefetchFuelNarrative } from "@/lib/queries";
 import { useWatchSyncStatus } from "@/lib/watchSync";
 import { toDateKey } from "@/lib/sessionVisuals";
 import { formatFullDate, stressCaption } from "@/lib/format";
@@ -33,6 +34,7 @@ export default function RecoveryPage() {
   const router = useRouter();
   const animate = useMountOnce("body-recovery");
   const { data, isLoading } = useBodyToday();
+  const { data: correlations } = usePersonalCorrelations(90);
   const { data: plan, isHydrated } = usePlanQuery();
   const manualWeight = usePassoStore((s) => s.manualWeight);
   const sessions = plan?.sessions ?? [];
@@ -256,6 +258,12 @@ export default function RecoveryPage() {
             </TiltCard>
           </SlideUp>
         )
+      )}
+
+      {correlations && (
+        <div style={{ marginTop: 14 }}>
+          <PersonalCorrelationsCard data={correlations} animate={animate} delayMs={260} />
+        </div>
       )}
     </div>
   );

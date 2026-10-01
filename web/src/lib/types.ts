@@ -383,6 +383,45 @@ export interface ZoneRecalibrationData {
   supporting_workouts: SupportingWorkout[];
 }
 
+// ---- Personal Correlations (Sleep / HRV vs Performance) ----
+
+export interface CorrelationInsight {
+  metric_x: string;
+  metric_y: string;
+  title: string;
+  headline: string;
+  finding: string;
+  action: string;
+  sample_size: number;
+  correlation_r?: number | null;
+  significance: "forte" | "moderata" | "preliminare" | "insufficiente";
+  good_band_label: string;
+  good_band_avg: string;
+  bad_band_label: string;
+  bad_band_avg: string;
+  delta_pct?: number | null;
+}
+
+export interface PairedRun {
+  date: string;
+  title: string;
+  sleep_hours?: number | null;
+  hrv_ms?: number | null;
+  pace_formatted: string;
+  ef: number;
+}
+
+export interface PersonalCorrelationsData {
+  status: "solido" | "preliminare" | "dati_insufficienti";
+  status_label: string;
+  status_color: string;
+  headline: string;
+  summary: string;
+  total_paired_runs: number;
+  insights: CorrelationInsight[];
+  paired_runs: PairedRun[];
+}
+
 /** One comparison between the plan and the race, carrying both numbers -- "il più lungo
  * in programma è 24 km, per questa distanza se ne fanno almeno 30". */
 export interface GoalObservation {

@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
-from .. import aerobic_efficiency, body_insights, checkin, db, fitness_fatigue, history, llm, models, plan_store, readiness
+from .. import aerobic_efficiency, body_insights, checkin, correlations, db, fitness_fatigue, history, llm, models, plan_store, readiness
 from . import garmin_session, schemas
 from .auth import current_user_id
 from .cache import (
@@ -306,3 +306,24 @@ async def body_aerobic_efficiency(
         return schemas.AerobicEfficiencyResponse.from_model(result)
 
     return await run_in_threadpool(compute)
+
+
+@router.get("/body/correlations", response_model=schemas.PersonalCorrelationsResponse)
+async def body_correlations(
+    lookback_days: int = 90,
+    user_id: str = Depends(current_user_id),
+) -> schemas.PersonalCorrelationsResponse:
+    """Analyze pairings between sleep, overnight HRV, resting HR and same-day athletic performance."""
+    from .routes_coach import _zones
+
+    def compute() -> schemas.PersonalCorrelationsResponse:
+        zones = _zones(user_id)
+        result = correlations.compute_personal_correlations(
+            user_id=user_id,
+            zones=zones,
+            lookback_days=lookback_days,
+        )
+        return schemas.PersonalCorrelationsResponse.from_model(result)
+
+    return await run_in_threadpool(compute)
+
