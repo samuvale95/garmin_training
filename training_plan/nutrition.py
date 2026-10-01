@@ -68,21 +68,21 @@ SessionLoad = Literal["riposo", "facile", "moderato", "duro", "molto_lungo"]
 # table at all, and that is deliberate: no session a plan in this app can describe earns
 # it. `EnergyCheck` then trims whatever is left over against the day's real cost.
 CARB_G_PER_KG: dict[SessionLoad, tuple[float, float]] = {
-    "riposo": (3.0, 4.0),
-    "facile": (4.0, 5.0),
-    "moderato": (5.0, 6.5),
-    "duro": (6.0, 8.0),
-    "molto_lungo": (8.0, 10.0),
+    "riposo": (2.2, 3.2),
+    "facile": (3.0, 4.0),
+    "moderato": (4.0, 5.0),
+    "duro": (5.0, 6.5),
+    "molto_lungo": (6.5, 8.0),
 }
 
 # Flat across every day: protein supports repair, and repair happens on the rest day too.
-PROTEIN_G_PER_KG = (1.6, 2.0)
+PROTEIN_G_PER_KG = (1.6, 1.8)
 
 # Flat across every day too, for the same reason: fat is not periodized around a
 # session the way carbohydrate is. The range is the standard endurance-athlete floor
 # (essential fatty acids, hormone production) up to a share that still leaves room for
 # the carbohydrate a hard day needs.
-FAT_G_PER_KG = (0.8, 1.2)
+FAT_G_PER_KG = (0.8, 1.0)
 
 # What a second hard day in a row adds to the night before it, in g/kg. An addition, not
 # a jump to the next band: the old rule promoted the whole load one step, which turned a
@@ -103,10 +103,10 @@ QUALITY_PACE_DELTA_SEC_PER_KM = 20.0
 # but not enough of it to move the day's carbohydrate need.
 MIN_QUALITY_MINUTES = 30.0
 
-# Minutes above which an otherwise-easy session is "long" -- the plan's "hard *or* long,
-# 1-3 h" row -- and above which it is very long.
-LONG_MINUTES = 90.0
-VERY_LONG_MINUTES = 180.0
+# Minutes above which an otherwise-easy session is "duro" (substantial glycogen depletion),
+# and above which it is "molto_lungo" (true marathon long run).
+LONG_MINUTES = 75.0
+VERY_LONG_MINUTES = 140.0
 
 # Sports that do not deplete glycogen the way running does. Strength work is real
 # training and gets protein, but a 70-minute gym session is not a 70-minute tempo run
@@ -153,7 +153,7 @@ ENERGY_TOLERANCE = 1.10
 # The carbohydrate floor the trim will never go under, in g/kg. Below this the advice
 # stops being "eat less than the table said" and becomes a low-carbohydrate diet, which
 # is not a thing this app recommends by accident.
-MIN_CARB_G_PER_KG = 3.0
+MIN_CARB_G_PER_KG = 2.2
 
 
 @dataclass
@@ -315,13 +315,13 @@ def classify_load(session: TrainingSession | None) -> SessionLoad:
     if session.sport in LOW_GLYCOGEN_SPORTS:
         return "moderato" if minutes >= LONG_MINUTES else "facile"
 
-    if minutes > VERY_LONG_MINUTES:
+    if minutes >= VERY_LONG_MINUTES:
         return "molto_lungo"
     if minutes >= LONG_MINUTES:
         return "duro"
     if has_quality_work(session) and minutes >= MIN_QUALITY_MINUTES:
         return "duro"
-    if minutes >= 60:
+    if minutes >= 50:
         return "moderato"
     return "facile"
 
@@ -743,12 +743,12 @@ def meal_plan(today: DayTarget, tomorrow: DayTarget) -> list[MealSlot]:
     return slots
 
 
-# Carbohydrate per hour of work, by how long the session is. The consensus ladder:
-# nothing is needed under an hour, 30-60 g/h from there, and only beyond about two and a
-# half hours does the 60-90 g/h range (which needs a glucose-fructose mix to absorb at
-# all) start to make sense.
-DURING_THRESHOLD_MINUTES = 75.0
-DURING_HIGH_THRESHOLD_MINUTES = 150.0
+# Carbohydrate per hour of work, by how long the session is.
+# Up to 80 minutes: water and electrolytes are enough; carbs are not needed for easy/moderate work.
+# 80-120 minutes: 30-45 g/h (1 gel or isotonic drink every 40-45 min).
+# 120+ minutes (long run): 45-60 g/h (gut-friendly marathon race fueling simulation).
+DURING_THRESHOLD_MINUTES = 80.0
+DURING_HIGH_THRESHOLD_MINUTES = 120.0
 
 
 def during_session(today: DayTarget) -> DuringSession | None:
@@ -765,11 +765,11 @@ def during_session(today: DayTarget) -> DuringSession | None:
 
     hours = minutes / 60.0
     if minutes >= DURING_HIGH_THRESHOLD_MINUTES:
-        per_hour = (60, 90)
-        note = "oltre le due ore serve un mix di zuccheri diversi: gel o bevanda, non solo glucosio"
+        per_hour = (45, 60)
+        note = "1 gel ogni 35-45 minuti o bevanda con maltodestrine: allena l'intestino al ritmo gara"
     else:
-        per_hour = (30, 60)
-        note = "un gel o una borraccia zuccherata ogni mezz'ora, prima di avere fame"
+        per_hour = (30, 45)
+        note = "1 gel o sorsi regolari di bevanda isotonica a metà allenamento"
 
     return DuringSession(
         carb_g_per_hour=per_hour,
@@ -778,9 +778,9 @@ def during_session(today: DayTarget) -> DuringSession | None:
     )
 
 
-# The post-session window: 1.0-1.2 g/kg of carbohydrate and 0.3 g/kg of protein inside
+# The post-session window: 0.8 g/kg of carbohydrate and 0.3 g/kg of protein inside
 # the hour. Only worth naming after a session that actually emptied something.
-RECOVERY_CARB_G_PER_KG = 1.0
+RECOVERY_CARB_G_PER_KG = 0.8
 RECOVERY_PROTEIN_G_PER_KG = 0.3
 
 
@@ -794,7 +794,7 @@ def recovery_window(today: DayTarget, weight_kg: float) -> RecoveryWindow | None
     return RecoveryWindow(
         carb_g=carb_g,
         protein_g=protein_g,
-        note="entro un'ora dalla fine: è la finestra in cui il muscolo ricarica più in fretta",
+        note="entro un'ora dalla fine: finestra ottimale per il ripristino del glicogeno e la sintesi muscolare",
         portions=[*carb_portions, *protein_portions],
     )
 

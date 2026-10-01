@@ -264,48 +264,31 @@ export default function FuelPage() {
         <FuelSkeleton />
       ) : (
         <>
-          <FuelHero animate={animate} fuel={fuel} narrativeText={narrative} />
-
-          {fuel.weight_source === "reference" && (
-            <SlideUp active={animate} delayMs={200} style={{ marginTop: 10 }}>
-              <Link
-                href="/settings/body"
-                className="press-soft"
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: "16px 18px", textDecoration: "none", color: "inherit" }}
-              >
-                <span>
-                  <span style={{ fontWeight: 600, fontSize: 15, display: "block" }}>Aggiungi il tuo peso</span>
-                  <span style={{ fontSize: 12.5, color: "var(--inchiostro-50)" }}>dieci secondi, una volta sola</span>
-                </span>
-                <span aria-hidden="true" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--inchiostro)", color: "var(--crema)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
-                  <ArrowRight size={16} strokeWidth={2.4} />
-                </span>
-              </Link>
-            </SlideUp>
-          )}
-
+          {/* 1. OGGI: Primary hero block */}
           <TodayFuelBlock animate={animate} fuel={fuel} totals={day?.totals} hasPlan={hasPlan} lines={statusQuery.data?.lines} />
 
-          {/* The cross-check, then the plan. In that order on purpose: the grams above
-              have to stop looking arbitrary before a list of plates built on them is
-              worth reading. */}
+          {/* 2. DOMANI: Evening preparation for tomorrow's run */}
+          <FuelHero animate={animate} fuel={fuel} narrativeText={narrative} />
+
+          {/* 3. DURING & POST WORKOUT FUELING (if applicable today) */}
+          <SessionFuelBlock animate={animate} during={fuel.during} recovery={fuel.recovery} />
+
+          {/* 4. TODAY'S LOGGED MEALS */}
+          <MealList entries={entries} animate={animate} onSelect={setCorrecting} />
+
+          {/* 5. ENERGY BALANCE (cross-check with Garmin and theoretical needs) */}
           {dayEnergy.data && <DayEnergyCard energy={dayEnergy.data} numbers={showEnergy} animate={animate} delayMs={280} />}
 
           {showEnergy && <EnergyBlock animate={animate} target={fuel.today} />}
 
-          <SessionFuelBlock animate={animate} during={fuel.during} recovery={fuel.recovery} />
-
-          <MealList entries={entries} animate={animate} onSelect={setCorrecting} />
-
-          {/* Shown on an empty day too: the week's shape and the meals already logged
-              are exactly what someone who hasn't photographed anything today wants. */}
-          <SlideUp active={animate} delayMs={340} style={{ display: "flex", gap: 10, marginTop: 10 }}>
+          {/* 6. NAVIGATION: Diary & 7-Day History */}
+          <SlideUp active={animate} delayMs={340} style={{ display: "flex", gap: 10, marginTop: 14 }}>
             <Link
               href="/body/fuel/diario"
               className="press-soft"
               style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "14px 16px", textDecoration: "none", color: "inherit" }}
             >
-              <span style={{ fontSize: 14, fontWeight: 600 }}>Diario</span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Diario dei pasti</span>
               <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
             </Link>
             <Link
@@ -313,7 +296,7 @@ export default function FuelPage() {
               className="press-soft"
               style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "14px 16px", textDecoration: "none", color: "inherit" }}
             >
-              <span style={{ fontSize: 14, fontWeight: 600 }}>Sette giorni</span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Andamento 7 giorni</span>
               <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
             </Link>
           </SlideUp>

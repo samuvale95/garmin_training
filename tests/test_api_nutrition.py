@@ -12,9 +12,26 @@ import base64
 import pytest
 from fastapi.testclient import TestClient
 
-from training_plan import llm, nutrition
+from training_plan import db, llm, nutrition
 from training_plan.api import app as fastapi_app
 from training_plan.api import routes_body
+
+
+@pytest.fixture(autouse=True)
+def clean_db():
+    try:
+        with db.connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM food_entry WHERE user_id = 'test-user'")
+    except Exception:
+        pass
+    yield
+    try:
+        with db.connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM food_entry WHERE user_id = 'test-user'")
+    except Exception:
+        pass
 
 
 @pytest.fixture(autouse=True)
@@ -93,9 +110,8 @@ def test_tomorrows_session_drives_the_target(client, weighed):
     body = response.json()
     assert body["tomorrow"]["load"] == "molto_lungo"
     assert body["tomorrow"]["session_title"] == "Lungo 35 km"
-    # 64 kg against the top band, 8-10 g/kg. It used to be 10-12 -- the row belonging to
-    # athletes training four hours a day, which a 35 km long run is not.
-    assert body["tomorrow"]["carb_g"] == [512, 640]
+    # 64 kg against the marathon top band, 6.5-8.0 g/kg.
+    assert body["tomorrow"]["carb_g"] == [416, 512]
     assert body["advice"]
 
 

@@ -94,9 +94,9 @@ def test_a_session_with_no_steps_is_light_not_rest():
 def test_targets_are_the_range_times_the_weight():
     target = nutrition.day_target(date(2026, 8, 10), _session([_time_step(200, _pace(360))]), 70.0)
     assert target.load == "molto_lungo"
-    assert target.carb_g_per_kg == (8.0, 10.0)
-    assert target.carb_g == (560, 700)
-    assert target.protein_g == (112, 140)
+    assert target.carb_g_per_kg == (6.5, 8.0)
+    assert target.carb_g == (455, 560)
+    assert target.protein_g == (112, 126)
 
 
 def test_the_top_band_is_not_the_ultra_endurance_row():
@@ -106,14 +106,14 @@ def test_the_top_band_is_not_the_ultra_endurance_row():
     is whose row 10-12 g/kg is. At 70 kg the old top band asked for 840 g of
     carbohydrate -- arithmetically correct, and not a thing a person eats.
     """
-    assert max(high for _, high in nutrition.CARB_G_PER_KG.values()) <= 10.0
+    assert max(high for _, high in nutrition.CARB_G_PER_KG.values()) <= 8.0
 
 
 def test_without_a_weight_there_are_no_absolute_grams():
     target = nutrition.day_target(date(2026, 8, 10), None, None)
     assert target.carb_g is None
     assert target.protein_g is None
-    assert target.carb_g_per_kg == (3.0, 4.0)
+    assert target.carb_g_per_kg == (2.2, 3.2)
 
 
 def test_a_missing_weight_falls_back_to_the_reference_and_says_so():
@@ -154,7 +154,7 @@ def test_back_to_back_hard_days_raise_the_night_before():
     fuelling = nutrition.daily_fuelling(date(2026, 8, 10), sessions, weight_kg=70.0)
     assert nutrition.classify_load(sessions[0]) == "duro"
     assert fuelling.tomorrow.load == "duro"
-    assert fuelling.tomorrow.carb_g_per_kg == (7.0, 9.0)
+    assert fuelling.tomorrow.carb_g_per_kg == (6.0, 7.5)
 
 
 def test_a_single_hard_day_is_not_raised():
@@ -240,7 +240,7 @@ def test_a_band_the_day_cannot_justify_is_trimmed():
     """
     profile = nutrition.BodyProfile(height_cm=165.0, age_years=45, sex="female")
     target = nutrition.day_target(
-        date(2026, 8, 10), _session([_time_step(95, _pace(360))]), 60.0, load_override="molto_lungo", profile=profile
+        date(2026, 8, 10), _session([_time_step(50, _pace(360))]), 60.0, load_override="molto_lungo", profile=profile
     )
     assert target.energy.trimmed
     assert target.carb_g_per_kg[1] < nutrition.CARB_G_PER_KG["molto_lungo"][1]
@@ -306,7 +306,7 @@ def test_a_long_session_gets_carbohydrate_inside_it():
     sessions = [_session([_time_step(180, _pace(360))], day=date(2026, 8, 10))]
     fuelling = nutrition.daily_fuelling(date(2026, 8, 10), sessions, weight_kg=70.0)
     assert fuelling.during is not None
-    assert fuelling.during.carb_g_per_hour == (60, 90)
+    assert fuelling.during.carb_g_per_hour == (45, 60)
     assert fuelling.recovery is not None
 
 
