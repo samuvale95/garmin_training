@@ -31,6 +31,7 @@ from .. import (
     race_prediction,
     readiness,
     technique,
+    zone_recalibration,
 )
 
 
@@ -2272,6 +2273,103 @@ class RacePredictionResponse(BaseModel):
                 )
                 for f in res.factors
             ],
+        )
+
+
+# ---- zone recalibration & LTHR -----------------------------------------------------------
+
+
+class ZoneBoundaryOut(BaseModel):
+    zone_number: int
+    name: str
+    hr_min: int
+    hr_max: int
+    pace_min_sec: int
+    pace_max_sec: int
+    hr_range_formatted: str
+    pace_range_formatted: str
+    description: str
+
+    @classmethod
+    def from_model(cls, z: "zone_recalibration.ZoneBoundary") -> "ZoneBoundaryOut":
+        return cls(
+            zone_number=z.zone_number,
+            name=z.name,
+            hr_min=z.hr_min,
+            hr_max=z.hr_max,
+            pace_min_sec=z.pace_min_sec,
+            pace_max_sec=z.pace_max_sec,
+            hr_range_formatted=z.hr_range_formatted,
+            pace_range_formatted=z.pace_range_formatted,
+            description=z.description,
+        )
+
+
+class SupportingWorkoutOut(BaseModel):
+    activity_id: int
+    date: date_type
+    title: str
+    distance_km: float
+    duration_min: float
+    avg_hr: int
+    avg_pace_sec_km: int
+    avg_pace_formatted: str
+    effort_type: str
+
+    @classmethod
+    def from_model(cls, w: "zone_recalibration.SupportingWorkout") -> "SupportingWorkoutOut":
+        return cls(
+            activity_id=w.activity_id,
+            date=w.date,
+            title=w.title,
+            distance_km=w.distance_km,
+            duration_min=w.duration_min,
+            avg_hr=w.avg_hr,
+            avg_pace_sec_km=w.avg_pace_sec_km,
+            avg_pace_formatted=w.avg_pace_formatted,
+            effort_type=w.effort_type,
+        )
+
+
+class ZoneRecalibrationResponse(BaseModel):
+    status: str
+    status_label: str
+    status_color: str
+    headline: str
+    summary: str
+    advice: str
+    current_lthr: int | None = None
+    estimated_lthr: int | None = None
+    diff_lthr_bpm: int | None = None
+    current_threshold_pace_sec: int | None = None
+    estimated_threshold_pace_sec: int | None = None
+    diff_pace_sec: int | None = None
+    current_threshold_pace_formatted: str | None = None
+    estimated_threshold_pace_formatted: str | None = None
+    diff_pace_formatted: str | None = None
+    zones: list[ZoneBoundaryOut] = Field(default_factory=list)
+    supporting_workouts: list[SupportingWorkoutOut] = Field(default_factory=list)
+
+    @classmethod
+    def from_model(cls, res: "zone_recalibration.ZoneRecalibrationResult") -> "ZoneRecalibrationResponse":
+        return cls(
+            status=res.status,
+            status_label=res.status_label,
+            status_color=res.status_color,
+            headline=res.headline,
+            summary=res.summary,
+            advice=res.advice,
+            current_lthr=res.current_lthr,
+            estimated_lthr=res.estimated_lthr,
+            diff_lthr_bpm=res.diff_lthr_bpm,
+            current_threshold_pace_sec=res.current_threshold_pace_sec,
+            estimated_threshold_pace_sec=res.estimated_threshold_pace_sec,
+            diff_pace_sec=res.diff_pace_sec,
+            current_threshold_pace_formatted=res.current_threshold_pace_formatted,
+            estimated_threshold_pace_formatted=res.estimated_threshold_pace_formatted,
+            diff_pace_formatted=res.diff_pace_formatted,
+            zones=[ZoneBoundaryOut.from_model(z) for z in res.zones],
+            supporting_workouts=[SupportingWorkoutOut.from_model(w) for w in res.supporting_workouts],
         )
 
 

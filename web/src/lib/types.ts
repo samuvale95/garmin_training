@@ -337,6 +337,52 @@ export interface RacePredictionData {
   factors: PredictionFactor[];
 }
 
+// ---- Zone Recalibration & LTHR ----
+
+export interface ZoneBoundary {
+  zone_number: number;
+  name: string;
+  hr_min: number;
+  hr_max: number;
+  pace_min_sec: number;
+  pace_max_sec: number;
+  hr_range_formatted: string;
+  pace_range_formatted: string;
+  description: string;
+}
+
+export interface SupportingWorkout {
+  activity_id: number;
+  date: string;
+  title: string;
+  distance_km: number;
+  duration_min: number;
+  avg_hr: number;
+  avg_pace_sec_km: number;
+  avg_pace_formatted: string;
+  effort_type: string;
+}
+
+export interface ZoneRecalibrationData {
+  status: "ricalibrazione_consigliata" | "migliorato" | "allineato" | "dati_insufficienti";
+  status_label: string;
+  status_color: string;
+  headline: string;
+  summary: string;
+  advice: string;
+  current_lthr?: number | null;
+  estimated_lthr?: number | null;
+  diff_lthr_bpm?: number | null;
+  current_threshold_pace_sec?: number | null;
+  estimated_threshold_pace_sec?: number | null;
+  diff_pace_sec?: number | null;
+  current_threshold_pace_formatted?: string | null;
+  estimated_threshold_pace_formatted?: string | null;
+  diff_pace_formatted?: string | null;
+  zones: ZoneBoundary[];
+  supporting_workouts: SupportingWorkout[];
+}
+
 /** One comparison between the plan and the race, carrying both numbers -- "il più lungo
  * in programma è 24 km, per questa distanza se ne fanno almeno 30". */
 export interface GoalObservation {

@@ -17,7 +17,7 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, Query
 from fastapi.concurrency import run_in_threadpool
 
-from .. import history, intensity, llm, nutrition, paces, prescription, technique
+from .. import history, intensity, llm, nutrition, paces, prescription, technique, zone_recalibration
 from . import garmin_session, routes_strava, schemas
 from .auth import current_user_id
 from .cache import (
@@ -134,6 +134,26 @@ def _zones(user_id: str) -> intensity.Zones | None:
         return cache.get_or_call("coach:zones", user_id, "threshold", TTL_COACH_ZONES, read)
     except _NoZones:
         return None
+
+
+@router.get("/coach/zones/recalibrate", response_model=schemas.ZoneRecalibrationResponse)
+async def coach_zones_recalibrate(
+    lookback_days: int = 70,
+    user_id: str = Depends(current_user_id),
+) -> schemas.ZoneRecalibrationResponse:
+    """Analyze running stream history to estimate actual LTHR and Threshold Pace,
+    proposing updated 5 zones and highlighting performance improvements."""
+    def compute() -> schemas.ZoneRecalibrationResponse:
+        current = _zones(user_id)
+        result = zone_recalibration.recalibrate_zones(
+            user_id=user_id,
+            current_zones=current,
+            lookback_days=lookback_days,
+        )
+        return schemas.ZoneRecalibrationResponse.from_model(result)
+
+    return await run_in_threadpool(compute)
+
 
 
 @router.post("/coach/execution", response_model=schemas.ExecutionBlockResponse)

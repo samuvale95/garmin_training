@@ -47,6 +47,7 @@ import type {
   SyncJobStatus,
   TrainingSession,
   WeekSummary,
+  ZoneRecalibrationData,
 } from "./types";
 
 // ---- how long an answer stays good --------------------------------------------------------
@@ -1099,6 +1100,16 @@ export function useCoachPlan(days = 365) {
     queryKey: ["coach", "plan", days],
     queryFn: ({ signal }) => apiGet<CoachPlan>("/coach/plan", { days: String(days) }, signal),
     staleTime: 60 * 60_000,
+  });
+}
+
+/** Automatic recalibration of LTHR and threshold pace, plus 5 training zones. */
+export function useZoneRecalibration(lookbackDays = 70) {
+  return useQuery({
+    queryKey: ["coach", "zones", "recalibrate", lookbackDays],
+    queryFn: ({ signal }) =>
+      apiGet<ZoneRecalibrationData>(`/coach/zones/recalibrate?lookback_days=${lookbackDays}`, undefined, signal),
+    staleTime: 30 * 60_000,
   });
 }
 

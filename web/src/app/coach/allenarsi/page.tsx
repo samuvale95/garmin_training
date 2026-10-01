@@ -6,8 +6,9 @@ import { Skeleton, SlideUp } from "@/components/motion/primitives";
 import { ChevronRight } from "@/components/Icons";
 import { DistributionBar, FindingCard } from "@/components/ExecutionBlocks";
 import { PaceProfileCard, PrescriptionCard, SensitivityTable } from "@/components/PrescriptionCard";
+import { ZoneRecalibrationCard } from "@/components/ZoneRecalibrationCard";
 import { useMountOnce } from "@/lib/motion";
-import { useCoachPlan } from "@/lib/queries";
+import { useCoachPlan, useZoneRecalibration } from "@/lib/queries";
 import { formatShortDate } from "@/lib/format";
 
 /** Screen "Come ti alleni": the diagnosis, and the sessions that change it.
@@ -23,6 +24,7 @@ import { formatShortDate } from "@/lib/format";
 export default function CoachTrainingPage() {
   const animate = useMountOnce("coach-allenarsi");
   const { data, isPending, isError, refetch, isFetching } = useCoachPlan();
+  const { data: recalibration } = useZoneRecalibration(70);
 
   return (
     <div style={{ padding: "22px 20px 40px" }}>
@@ -41,12 +43,18 @@ export default function CoachTrainingPage() {
       ) : isError && !data ? (
         <Failed onRetry={() => refetch()} retrying={isFetching} />
       ) : !data?.zones ? (
-        <Empty
-          title="Mi mancano le tue zone"
-          body="Per dire se una seduta è stata facile mi serve la tua frequenza di soglia, che Garmin stima dalle sedute dure. Non la trovo sul tuo account. Preferisco non dirti niente piuttosto che ricavare le zone da 220 meno l'età: l'errore di quella formula è più largo delle zone che dovrebbe definire."
-          href="/settings"
-          cta="Controlla la connessione a Garmin"
-        />
+        recalibration?.estimated_lthr ? (
+          <div style={{ marginTop: 18 }}>
+            <ZoneRecalibrationCard data={recalibration} animate={animate} delayMs={80} />
+          </div>
+        ) : (
+          <Empty
+            title="Mi mancano le tue zone"
+            body="Per dire se una seduta è stata facile mi serve la tua frequenza di soglia, che Garmin stima dalle sedute dure. Non la trovo sul tuo account. Preferisco non dirti niente piuttosto che ricavare le zone da 220 meno l'età: l'errore di quella formula è più largo delle zone che dovrebbe definire."
+            href="/settings"
+            cta="Controlla la connessione a Garmin"
+          />
+        )
       ) : !data.block ? (
         <Empty
           title="Non ho ancora abbastanza corse"
@@ -78,6 +86,12 @@ export default function CoachTrainingPage() {
           </SlideUp>
 
           <DistributionBar block={data.block} animate={animate} />
+
+          {recalibration && (
+            <div style={{ marginTop: 22 }}>
+              <ZoneRecalibrationCard data={recalibration} animate={animate} delayMs={140} />
+            </div>
+          )}
 
           <div style={{ marginTop: 22 }}>
             <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
