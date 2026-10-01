@@ -14,6 +14,7 @@ import {
   MealList,
   type RunTimeSlot,
 } from "@/components/FuelBlocks";
+import { FuelReminderCard } from "@/components/FuelReminderCard";
 import { useMountOnce } from "@/lib/motion";
 import { formatWeekday } from "@/lib/format";
 import { useCalendarAccess } from "@/lib/guards";
@@ -286,6 +287,14 @@ export default function FuelPage() {
             fuel={fuel}
             timeSlot={runTimeSlot}
             onSelectTimeSlot={setRunTimeSlot}
+          />
+
+          {/* 1.5 PROMEMORIA MERENDA & IDRATAZIONE PRE-CORSA */}
+          <FuelReminderCard
+            animate={animate}
+            delayMs={120}
+            todayTarget={fuel.today}
+            timeSlot={runTimeSlot}
           />
 
           {/* 2. TIMELINE DELLA GIORNATA ALIMENTARE (IL PROTAGONISTA) */}
