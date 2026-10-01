@@ -206,6 +206,8 @@ export interface BodySnapshot {
   stress_level: number | null;
   rhr_norm?: BiometricNorm | null;
   hrv_norm?: BiometricNorm | null;
+  overnight_reliability?: "affidabile" | "parziale" | "assente";
+  overnight_reliability_note?: string | null;
 }
 
 export interface WeeklyLoad {
@@ -528,6 +530,8 @@ export interface SessionExecution {
    * threshold is the session working, not a discrepancy. */
   honoured: boolean | null;
   detail: string;
+  hr_quality?: "alta" | "media" | "bassa" | null;
+  spikes_repaired?: number;
 }
 
 /** One thing the data says, with the strength of the claim attached.

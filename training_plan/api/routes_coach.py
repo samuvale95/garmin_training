@@ -205,6 +205,8 @@ async def coach_execution(
                 heart_rates=heart_rates,
                 times=streams.get("time"),
                 zones=zones,
+                cadences=streams.get("cadence"),
+                speeds=streams.get("velocity_smooth"),
             )
             if execution is not None:
                 executions.append(execution)
@@ -269,6 +271,8 @@ def coach_state(
                 heart_rates=streams["heartrate"],
                 times=streams.get("time"),
                 zones=zones,
+                cadences=streams.get("cadence"),
+                speeds=streams.get("velocity_smooth"),
             )
             if execution is None:
                 continue

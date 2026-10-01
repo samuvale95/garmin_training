@@ -32,6 +32,8 @@ import logging
 from dataclasses import dataclass
 from typing import Sequence
 
+from training_plan.hr_cleaning import clean_heart_rate_stream
+
 logger = logging.getLogger(__name__)
 
 # How far from the target heart rate a sample may sit and still count, in bpm. Wide
@@ -142,18 +144,24 @@ def build_profile(
 
 
 def samples_from_streams(
-    streams: dict[str, list], *, near: Sequence[int] | None = None, tolerance: int = HR_TOLERANCE_BPM
+    streams: dict[str, list],
+    *,
+    near: Sequence[int] | None = None,
+    tolerance: int = HR_TOLERANCE_BPM,
+    clean: bool = True,
 ) -> list[tuple[float | None, float | None]]:
     """`(heart_rate, speed)` pairs out of one decoded stream, as far as both run.
 
     With `near`, only the pairs `pace_at_heart_rate` could ever use for those target
-    heart rates are kept. A year of running is on the order of a million samples, and a
-    profile only reads the few percent sitting within a few beats of two thresholds that
-    are known before the first stream is decoded -- keeping the rest would hold the
-    whole history in memory to throw nearly all of it away.
+    heart rates are kept. When `clean=True`, spikes and cadence lock are filtered first.
     """
     heart_rates = streams.get("heartrate") or []
     speeds = streams.get("velocity_smooth") or []
+    if clean and heart_rates:
+        times = streams.get("time")
+        cadences = streams.get("cadence")
+        cleaning_res = clean_heart_rate_stream(heart_rates, times=times, cadences=cadences, speeds=speeds)
+        heart_rates = cleaning_res.cleaned_heart_rates
     pairs = zip(heart_rates, speeds)
     if near is None:
         return list(pairs)

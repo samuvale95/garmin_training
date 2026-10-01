@@ -279,22 +279,54 @@ def read_signals(
 ) -> list[Signal]:
     """Every threshold that today's numbers cross, strongest first -- plus what the user
     reported in the check-in (`checkin.signals`), counted like any other signal."""
-    candidates = [
-        *reported,
+    is_partial_overnight = getattr(snapshot, "overnight_reliability", "affidabile") == "parziale"
+
+    overnight_candidates = [
         _hrv_signal(snapshot),
         _rhr_signal(snapshot),
         _sleep_signal(snapshot),
         _readiness_signal(snapshot),
         _stress_signal(snapshot),
         _battery_signal(snapshot),
+    ]
+
+    processed_overnight: list[Signal] = []
+    for s in overnight_candidates:
+        if s is None:
+            continue
+        if is_partial_overnight and s.severity == SEVERITY_STRONG:
+            note = " (dato notturno parziale)"
+            detail = s.detail if note in s.detail else f"{s.detail}{note}"
+            processed_overnight.append(
+                Signal(key=s.key, label=s.label, detail=detail, severity=SEVERITY_MODERATE)
+            )
+        else:
+            processed_overnight.append(s)
+
+    info_signals: list[Signal] = []
+    if is_partial_overnight:
+        reliability_note = getattr(snapshot, "overnight_reliability_note", None) or "Registrazione notturna incompleta: interpretare con cautela"
+        info_signals.append(
+            Signal(
+                key="affidabilita",
+                label="Dato notturno parziale",
+                detail=reliability_note,
+                severity=SEVERITY_INFO,
+            )
+        )
+
+    candidates = [
+        *reported,
+        *processed_overnight,
         _load_signal(acute_chronic_ratio),
+        *info_signals,
     ]
     signals = [signal for signal in candidates if signal is not None]
     order = {SEVERITY_STRONG: 0, SEVERITY_MODERATE: 1, SEVERITY_INFO: 2}
     return sorted(signals, key=lambda s: order[s.severity])
 
 
-def state_from_signals(signals: list[Signal]) -> str:
+def state_from_signals(signals: list[Signal], is_partial_overnight: bool = False) -> str:
     """Counting, not weighting.
 
     Two strong signals, or one strong plus any other, or three moderate ones, is a body
@@ -308,6 +340,8 @@ def state_from_signals(signals: list[Signal]) -> str:
         s.severity == SEVERITY_STRONG and s.key in ("rhr", "hrv") and "norma" in s.label for s in signals
     )
     if biometric_severe or strong >= 2 or (strong == 1 and moderate >= 1) or moderate >= 3:
+        if is_partial_overnight and strong == 0:
+            return STATE_CAUTIOUS
         return STATE_DEPLETED
     if strong == 1 or moderate >= 1:
         return STATE_CAUTIOUS
@@ -439,10 +473,11 @@ def assess_day(
             has_data=False,
         )
 
+    is_partial_overnight = getattr(snapshot, "overnight_reliability", "affidabile") == "parziale"
     signals = (
         read_signals(snapshot, acute_chronic_ratio, reported) if snapshot.has_overnight_data else list(reported)
     )
-    state = state_from_signals(signals)
+    state = state_from_signals(signals, is_partial_overnight=is_partial_overnight)
 
     # The alternative decides the action, not the other way round: two separate ladders
     # drifted apart the moment one of them grew a case (an "alleggerisci" verdict

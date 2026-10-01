@@ -111,6 +111,27 @@ export default function RecoveryPage() {
                 <p className="font-serif-italic" style={{ fontSize: 14, margin: "6px 0 0" }}>
                   {data.readiness_message ?? "Tocca il punteggio per vedere da cosa nasce."}
                 </p>
+                {data.overnight_reliability === "parziale" && (
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
+                      background: "rgba(255, 255, 255, 0.45)",
+                      color: "var(--verde-testo)",
+                      padding: "3px 8px",
+                      borderRadius: 6,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      marginTop: 8,
+                    }}
+                  >
+                    <span>⚠️ Dato notturno parziale</span>
+                    {data.overnight_reliability_note && (
+                      <span style={{ fontWeight: 400, opacity: 0.85 }}>· {data.overnight_reliability_note}</span>
+                    )}
+                  </div>
+                )}
               </div>
             </TiltCard>
           </SlideUp>

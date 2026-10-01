@@ -165,6 +165,8 @@ class BodySnapshot:
     stress_level: int | None = None
     rhr_norm: BiometricNorm | None = None
     hrv_norm: BiometricNorm | None = None
+    overnight_reliability: str = "affidabile"
+    overnight_reliability_note: str | None = None
 
 
 @dataclass
@@ -351,14 +353,14 @@ def fetch_body_snapshot(
         else None
     )
 
+    reliability, reliability_note = evaluate_overnight_reliability(
+        sleep_phases, hrv_last_night_ms, has_overnight_data
+    )
+
     return BodySnapshot(
         date=day,
         has_overnight_data=has_overnight_data,
         readiness_score=_get(readiness, "score"),
-        # Garmin returns a lookup key here (`MOD_RT_LOW_SS_GOOD`), not a sentence. It
-        # used to be printed verbatim under the day's score; `garmin_labels` decodes it,
-        # and anything it cannot decode becomes no sentence at all rather than an
-        # identifier on screen.
         readiness_message=readiness_feedback(_get(readiness, "feedbackLong", "feedbackShort")),
         readiness_level=readiness_level_label(_get(readiness, "level")),
         readiness_factors=_readiness_factors(readiness),
@@ -369,7 +371,29 @@ def fetch_body_snapshot(
         resting_heart_rate_delta=resting_heart_rate_delta,
         battery_percent=_get(stats, "bodyBatteryMostRecentValue"),
         stress_level=_get(stress, "avgStressLevel", "overallStressLevel"),
+        overnight_reliability=reliability,
+        overnight_reliability_note=reliability_note,
     )
+
+
+def evaluate_overnight_reliability(
+    sleep: SleepPhases | None,
+    hrv_last_night_ms: int | None,
+    has_overnight_data: bool,
+) -> tuple[str, str | None]:
+    """Assess whether overnight telemetry is complete enough for rigorous decision making."""
+    if not has_overnight_data:
+        return "assente", "Nessun dato registrato per questa notte"
+
+    total_min = sleep.total_minutes if sleep else None
+    if total_min is None or total_min < 240:
+        mins_str = f"{total_min // 60}h{total_min % 60:02d}" if total_min is not None else "0h"
+        return "parziale", f"Sonno breve ({mins_str} registrate): affidabilità parziale"
+
+    if hrv_last_night_ms is None:
+        return "parziale", "Dati HRV non disponibili per questa notte"
+
+    return "affidabile", None
 
 
 def _primary_device_training_status(status) -> dict | None:

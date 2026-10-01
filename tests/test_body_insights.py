@@ -216,3 +216,42 @@ def test_compute_biometric_norm_filters_none_values():
     norm = body_insights.compute_biometric_norm(history_with_nones)
     assert norm is not None
     assert norm.sample_count == 14
+
+
+# ---- evaluate_overnight_reliability --------------------------------------------------------
+
+
+def test_evaluate_overnight_reliability_full_night():
+    sleep = body_insights.SleepPhases(
+        deep_minutes=60, light_minutes=200, rem_minutes=90, awake_minutes=10, total_minutes=350
+    )
+    rel, note = body_insights.evaluate_overnight_reliability(sleep, hrv_last_night_ms=50, has_overnight_data=True)
+    assert rel == "affidabile"
+    assert note is None
+
+
+def test_evaluate_overnight_reliability_short_sleep():
+    sleep = body_insights.SleepPhases(
+        deep_minutes=30, light_minutes=100, rem_minutes=50, awake_minutes=10, total_minutes=180
+    )
+    rel, note = body_insights.evaluate_overnight_reliability(sleep, hrv_last_night_ms=50, has_overnight_data=True)
+    assert rel == "parziale"
+    assert note is not None
+    assert "Sonno breve" in note
+
+
+def test_evaluate_overnight_reliability_missing_hrv():
+    sleep = body_insights.SleepPhases(
+        deep_minutes=60, light_minutes=200, rem_minutes=90, awake_minutes=10, total_minutes=360
+    )
+    rel, note = body_insights.evaluate_overnight_reliability(sleep, hrv_last_night_ms=None, has_overnight_data=True)
+    assert rel == "parziale"
+    assert note is not None
+    assert "HRV non disponibili" in note
+
+
+def test_evaluate_overnight_reliability_no_data():
+    rel, note = body_insights.evaluate_overnight_reliability(None, hrv_last_night_ms=None, has_overnight_data=False)
+    assert rel == "assente"
+    assert note is not None
+    assert "Nessun dato" in note

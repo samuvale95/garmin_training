@@ -314,3 +314,43 @@ def test_insufficient_norm_samples_falls_back_to_7_day_delta():
     assert "media" in hrv.label.lower()
     assert "-23%" in hrv.detail
 
+
+def test_partial_overnight_caps_strong_alerts_and_avoids_depleted():
+    norm = BiometricNorm(mean=48.0, sd=2.5, normal_min=44.25, normal_max=51.75, sample_count=30, has_personal_norm=True)
+    # RHR 55 bpm is > 2.0 SD, sleep is only 200 min -> reliability parziale
+    snapshot = _snapshot(
+        resting_heart_rate=55,
+        resting_heart_rate_delta=7,
+        rhr_norm=norm,
+        sleep=SleepPhases(deep_minutes=30, light_minutes=120, rem_minutes=40, awake_minutes=10, total_minutes=200),
+        overnight_reliability="parziale",
+        overnight_reliability_note="Sonno breve (3h20 registrate): affidabilità parziale",
+    )
+    verdict = readiness.assess_day(snapshot, REPEATS, today=TODAY)
+    # Critical depleted state must NOT be triggered on partial overnight data
+    assert verdict.state == readiness.STATE_CAUTIOUS
+    [rhr] = [s for s in verdict.signals if s.key == "rhr"]
+    assert rhr.severity == readiness.SEVERITY_MODERATE
+    assert "(dato notturno parziale)" in rhr.detail
+
+    [affidabilita] = [s for s in verdict.signals if s.key == "affidabilita"]
+    assert affidabilita.severity == readiness.SEVERITY_INFO
+    assert "Sonno breve" in affidabilita.detail
+
+
+def test_partial_overnight_allows_depleted_if_user_reported_strong_issue():
+    norm = BiometricNorm(mean=48.0, sd=2.5, normal_min=44.25, normal_max=51.75, sample_count=30, has_personal_norm=True)
+    snapshot = _snapshot(
+        resting_heart_rate=55,
+        rhr_norm=norm,
+        sleep=SleepPhases(deep_minutes=30, light_minutes=120, rem_minutes=40, awake_minutes=10, total_minutes=200),
+        overnight_reliability="parziale",
+    )
+    reported = [
+        readiness.Signal(key="dolore", label="Dolore al tendine", detail="Forte fitta", severity=readiness.SEVERITY_STRONG)
+    ]
+    verdict = readiness.assess_day(snapshot, REPEATS, today=TODAY, reported=reported)
+    # User-reported strong signal + moderate biometric signal allows depleted
+    assert verdict.state == readiness.STATE_DEPLETED
+
+

@@ -36,13 +36,16 @@ def test_body_today_returns_snapshot(client):
     body = response.json()
     assert body["has_overnight_data"] is True
     assert body["readiness_score"] == 78
+    assert body["overnight_reliability"] == "affidabile"
 
 
 def test_body_today_missing_overnight_data(client, fake_garmin_sync):
     fake_garmin_sync.client_cls = EmptyGarminClient
     response = client.get("/body/today")
     assert response.status_code == 200
-    assert response.json()["has_overnight_data"] is False
+    body = response.json()
+    assert body["has_overnight_data"] is False
+    assert body["overnight_reliability"] == "assente"
 
 
 def test_body_load_returns_weeks(client):

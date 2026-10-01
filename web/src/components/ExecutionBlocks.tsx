@@ -214,6 +214,23 @@ export function SessionExecutionRow({
             ok
           </span>
         )}
+        {execution.hr_quality && execution.hr_quality !== "alta" && (
+          <span
+            style={{
+              background: execution.hr_quality === "bassa" ? "rgba(220, 38, 38, 0.12)" : "rgba(234, 179, 8, 0.15)",
+              color: execution.hr_quality === "bassa" ? "#b91c1c" : "#854d0e",
+              borderRadius: "var(--radius-pill)",
+              padding: "2px 8px",
+              fontSize: 10,
+              fontWeight: 600,
+              flex: "none",
+            }}
+            title={execution.spikes_repaired ? `${execution.spikes_repaired} spike corretti` : undefined}
+          >
+            cardio {execution.hr_quality}
+            {execution.spikes_repaired ? ` (${execution.spikes_repaired})` : ""}
+          </span>
+        )}
         <span style={{ fontSize: 12, color: "var(--inchiostro-50)", lineHeight: 1.4 }}>{execution.detail}</span>
       </div>
     </SlideUp>

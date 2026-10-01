@@ -603,6 +603,8 @@ class BodySnapshotResponse(BaseModel):
     stress_level: int | None = None
     rhr_norm: BiometricNormOut | None = None
     hrv_norm: BiometricNormOut | None = None
+    overnight_reliability: str = "affidabile"
+    overnight_reliability_note: str | None = None
 
     @classmethod
     def from_model(cls, snapshot: "body_insights.BodySnapshot") -> "BodySnapshotResponse":
@@ -625,6 +627,8 @@ class BodySnapshotResponse(BaseModel):
             stress_level=snapshot.stress_level,
             rhr_norm=BiometricNormOut.from_model(snapshot.rhr_norm),
             hrv_norm=BiometricNormOut.from_model(snapshot.hrv_norm),
+            overnight_reliability=getattr(snapshot, "overnight_reliability", "affidabile"),
+            overnight_reliability_note=getattr(snapshot, "overnight_reliability_note", None),
         )
 
 
@@ -1394,6 +1398,8 @@ class SessionExecutionOut(BaseModel):
     zones: TimeInZoneOut
     honoured: bool | None = None
     detail: str
+    hr_quality: str | None = None
+    spikes_repaired: int = 0
 
     @classmethod
     def from_model(cls, execution: "intensity.SessionExecution") -> "SessionExecutionOut":
@@ -1405,6 +1411,8 @@ class SessionExecutionOut(BaseModel):
             zones=TimeInZoneOut.from_model(execution.zones),
             honoured=execution.honoured,
             detail=execution.detail,
+            hr_quality=execution.hr_quality,
+            spikes_repaired=execution.spikes_repaired,
         )
 
 

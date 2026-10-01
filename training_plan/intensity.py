@@ -42,6 +42,8 @@ from dataclasses import dataclass, field
 from datetime import date as date_type
 from typing import Literal, Sequence
 
+from training_plan.hr_cleaning import clean_heart_rate_stream
+
 # ---- zone boundaries -------------------------------------------------------------------
 #
 # Expressed as fractions of lactate-threshold heart rate, which is the anchor with the
@@ -180,22 +182,29 @@ class TimeInZone:
 
 
 def time_in_zone(
-    heart_rates: Sequence[float | None], times: Sequence[float] | None, zones: Zones
+    heart_rates: Sequence[float | None],
+    times: Sequence[float] | None,
+    zones: Zones,
+    *,
+    clean: bool = True,
+    cadences: Sequence[float | None] | None = None,
+    speeds: Sequence[float | None] | None = None,
 ) -> TimeInZone:
     """Seconds per zone, from a heart-rate stream and its time axis.
 
     Streams are not evenly sampled -- Strava records "smart" intervals that stretch when
     nothing is changing -- so each sample is weighted by the gap to the next one rather
-    than counted as one second. Assuming a uniform 1 Hz (which the first version of this
-    did) systematically under-weights the steady parts of a run, which are exactly the
-    parts this analysis is about.
+    than counted as one second.
 
-    A `None` sample is a dropout: the strap lost contact. It contributes no time at all
-    rather than being interpolated, so a lost signal narrows the measurement instead of
-    inventing a zone for it.
+    When `clean=True`, synthetic spikes and cadence lock are filtered before zone bucketing.
     """
     if not heart_rates:
         return TimeInZone(0, 0, 0)
+    if clean:
+        res = clean_heart_rate_stream(
+            heart_rates, times=times, cadences=cadences, speeds=speeds, max_hr=zones.threshold_hr * 1.15
+        )
+        heart_rates = res.cleaned_heart_rates
     axis = list(times) if times is not None else list(range(len(heart_rates)))
     if len(axis) != len(heart_rates):
         axis = list(range(len(heart_rates)))
@@ -220,21 +229,19 @@ def time_in_zone(
 
 
 def heart_rate_histogram(
-    heart_rates: Sequence[float | None], times: Sequence[float] | None
+    heart_rates: Sequence[float | None],
+    times: Sequence[float] | None,
+    *,
+    clean: bool = True,
+    cadences: Sequence[float | None] | None = None,
+    speeds: Sequence[float | None] | None = None,
 ) -> dict[int, float]:
-    """Seconds spent at each whole bpm.
-
-    The same walk as `time_in_zone`, kept before the zones are applied. It is what makes
-    the threshold-sensitivity table affordable: asking "and what if the threshold were
-    172 instead of 183" is then a re-bucketing of a few hundred integers rather than a
-    second pass over six hundred thousand samples, and the honest answer to a verdict
-    that pivots on one estimated number is to show how much it moves.
-
-    Histograms add, so a whole history folds into one with `collections.Counter`-style
-    accumulation and costs nothing to keep.
-    """
+    """Seconds spent at each whole bpm."""
     if not heart_rates:
         return {}
+    if clean:
+        res = clean_heart_rate_stream(heart_rates, times=times, cadences=cadences, speeds=speeds)
+        heart_rates = res.cleaned_heart_rates
     axis = list(times) if times is not None else list(range(len(heart_rates)))
     if len(axis) != len(heart_rates):
         axis = list(range(len(heart_rates)))
@@ -314,6 +321,8 @@ class SessionExecution:
     # True only for a session the plan billed as easy that was, in fact, easy.
     honoured: bool | None
     detail: str
+    hr_quality: str | None = None
+    spikes_repaired: int = 0
 
 
 def read_execution(
@@ -326,6 +335,8 @@ def read_execution(
     heart_rates: Sequence[float | None],
     times: Sequence[float] | None,
     zones: Zones,
+    cadences: Sequence[float | None] | None = None,
+    speeds: Sequence[float | None] | None = None,
 ) -> SessionExecution | None:
     """One session's distribution, and whether it did what it said it would.
 
@@ -333,7 +344,10 @@ def read_execution(
     spending time above threshold is the session working, not a discrepancy, and marking
     it "not honoured" would bury the finding that matters under six that do not.
     """
-    in_zone = time_in_zone(heart_rates, times, zones)
+    cleaning_res = clean_heart_rate_stream(
+        heart_rates, times=times, cadences=cadences, speeds=speeds, max_hr=zones.threshold_hr * 1.15
+    )
+    in_zone = time_in_zone(cleaning_res.cleaned_heart_rates, times, zones, clean=False)
     if in_zone.total_seconds < MIN_ANALYSABLE_SECONDS:
         return None
 
@@ -364,6 +378,8 @@ def read_execution(
         zones=in_zone,
         honoured=honoured,
         detail=detail,
+        hr_quality=cleaning_res.quality,
+        spikes_repaired=cleaning_res.spikes_detected,
     )
 
 
