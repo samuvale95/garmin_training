@@ -204,26 +204,32 @@ export default function RecoveryPage() {
                 href="/body/fuel"
                 className="tap-target"
                 onPointerDown={() => prefetchNarrative(today, sessions, manualWeight?.weightKg)}
-                style={{ display: "block", color: "inherit", textDecoration: "none", position: "relative", zIndex: 2, paddingRight: 80 }}
+                style={{ display: "block", color: "inherit", textDecoration: "none", position: "relative", zIndex: 2 }}
               >
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-                  <div>
-                    <p style={{ fontWeight: 700, fontSize: 15, margin: "0 0 3px" }}>Carburante</p>
-                    <p style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: 0 }}>{fuelSubtitle(fuel.tomorrow)}</p>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <p style={{ fontWeight: 700, fontSize: 15, margin: 0 }}>Carburante</p>
+                      <ChevronRight size={15} style={{ color: "var(--crema)", opacity: 0.8 }} />
+                    </div>
+                    <p style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: "3px 0 0" }}>{fuelSubtitle(fuel.tomorrow)}</p>
+
+                    {fuel.tomorrow.carb_g && (
+                      <p className="font-mono" style={{ fontSize: 28, fontWeight: 500, color: "var(--corallo)", margin: "10px 0 0" }}>
+                        {fuel.tomorrow.carb_g[0]}–{fuel.tomorrow.carb_g[1]}{" "}
+                        <span style={{ fontSize: 14, fontWeight: 400, color: "var(--crema)" }}>g di carboidrati</span>
+                      </p>
+                    )}
+                    <p className="font-serif-italic" style={{ fontSize: 13.5, color: "var(--inchiostro-su-scuro)", margin: "8px 0 0", lineHeight: 1.35 }}>
+                      {fuel.advice}
+                    </p>
                   </div>
-                  <ChevronRight size={16} style={{ color: "var(--crema)" }} />
+
+                  <div style={{ width: 72, height: 72, position: "relative", flexShrink: 0, marginTop: 4 }}>
+                    <Illustration name="fuel" width={72} height={72} position="relative" active={animate} delayMs={260} />
+                  </div>
                 </div>
-                {fuel.tomorrow.carb_g && (
-                  <p className="font-mono" style={{ fontSize: 30, fontWeight: 500, color: "var(--corallo)", margin: "10px 0 0" }}>
-                    {fuel.tomorrow.carb_g[0]}–{fuel.tomorrow.carb_g[1]}{" "}
-                    <span style={{ fontSize: 14, fontWeight: 400, color: "var(--crema)" }}>g di carboidrati</span>
-                  </p>
-                )}
-                <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-su-scuro)", margin: "8px 0 0" }}>
-                  {fuel.advice}
-                </p>
               </Link>
-              <Illustration name="fuel" width={84} height={84} right={10} bottom={10} active={animate} delayMs={260} />
             </TiltCard>
           </SlideUp>
         )

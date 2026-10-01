@@ -74,8 +74,8 @@ export function RaceGoalCard({
                 {pace != null && ` (${formatPaceSecPerKm(pace)}/km)`}
               </p>
             </div>
-            <div style={{ flexShrink: 0, marginLeft: 8 }}>
-              <Illustration name="obiettivo" size={48} />
+            <div style={{ flexShrink: 0, marginLeft: 8, width: 48, height: 48, position: "relative" }}>
+              <Illustration name="obiettivo" size={48} position="relative" />
             </div>
           </div>
         </TiltCard>
@@ -121,8 +121,8 @@ function MissingGoalCard({ sessions, animate, delayMs }: { sessions: number; ani
                 </div>
               </div>
             </div>
-            <div style={{ flexShrink: 0, marginLeft: 8 }}>
-              <Illustration name="obiettivo" size={48} />
+            <div style={{ flexShrink: 0, marginLeft: 8, width: 48, height: 48, position: "relative" }}>
+              <Illustration name="obiettivo" size={48} position="relative" />
             </div>
           </div>
         </motion.div>

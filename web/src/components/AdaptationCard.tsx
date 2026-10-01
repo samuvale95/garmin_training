@@ -42,8 +42,8 @@ export function AdaptationCard({ animate, delayMs = 0 }: { animate: boolean; del
             ))}
           </ul>
         </div>
-        <div style={{ flexShrink: 0 }}>
-          <Illustration name="scarico" size={48} />
+        <div style={{ flexShrink: 0, width: 48, height: 48, position: "relative" }}>
+          <Illustration name="scarico" size={48} position="relative" />
         </div>
       </div>
 

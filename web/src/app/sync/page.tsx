@@ -78,12 +78,14 @@ function SyncScreenInner() {
         <Count value={queued} label="in coda" color="var(--inchiostro-su-scuro)" />
       </div>
 
-      <div style={{ flex: 1, position: "relative", minHeight: 160, marginTop: 20, background: "rgba(246,238,218,.05)", borderRadius: "var(--radius-card-lg)", padding: 18, boxSizing: "border-box", overflow: "hidden" }}>
-        <p style={{ fontWeight: 700, fontSize: 15, margin: "0 0 4px" }}>Puoi chiudere</p>
-        <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-su-scuro)", maxWidth: 180, margin: 0 }}>
-          Continuo io. Ti trovo il riepilogo quando torni.
-        </p>
-        <Illustration name="attesa" width={190} height={206} right={14} bottom={0} />
+      <div style={{ flex: 1, position: "relative", minHeight: 150, marginTop: 20, background: "rgba(246,238,218,.05)", borderRadius: "var(--radius-card-lg)", padding: 18, boxSizing: "border-box", overflow: "hidden" }}>
+        <div style={{ maxWidth: 160, position: "relative", zIndex: 2 }}>
+          <p style={{ fontWeight: 700, fontSize: 15, margin: "0 0 4px" }}>Puoi chiudere</p>
+          <p className="font-serif-italic" style={{ fontSize: 14.5, color: "var(--inchiostro-su-scuro)", margin: 0, lineHeight: 1.35 }}>
+            Continuo io. Ti trovo il riepilogo quando torni.
+          </p>
+        </div>
+        <Illustration name="attesa" width={120} height={130} right={10} bottom={0} />
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>

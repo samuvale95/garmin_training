@@ -59,6 +59,7 @@ interface IllustrationProps {
   float?: boolean;
   active?: boolean;
   delayMs?: number;
+  position?: "absolute" | "relative";
   top?: number;
   left?: number;
   right?: number;
@@ -80,6 +81,7 @@ export function Illustration({
   float = false,
   active = true,
   delayMs = 900,
+  position = "absolute",
   top,
   left,
   right,
@@ -92,17 +94,17 @@ export function Illustration({
   const animate = active && !reduced;
   const src = ILLUSTRATION_SOURCES[name] ?? FALLBACKS[name] ?? "/illustrazioni/corsa.webp";
 
-  const resolvedRight = right !== undefined ? right : left !== undefined ? undefined : 0;
-  const resolvedBottom = bottom !== undefined ? bottom : top !== undefined ? undefined : 0;
+  const resolvedRight = position === "absolute" ? (right !== undefined ? right : left !== undefined ? undefined : 0) : undefined;
+  const resolvedBottom = position === "absolute" ? (bottom !== undefined ? bottom : top !== undefined ? undefined : 0) : undefined;
 
   return (
     <div
       aria-hidden="true"
       className={animate ? "anim-land" : undefined}
       style={{
-        position: "absolute",
-        top,
-        left,
+        position,
+        top: position === "absolute" ? top : undefined,
+        left: position === "absolute" ? left : undefined,
         right: resolvedRight,
         bottom: resolvedBottom,
         width,

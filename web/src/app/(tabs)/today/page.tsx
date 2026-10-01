@@ -196,42 +196,48 @@ export default function TodayPage() {
             position: "relative",
             overflow: "hidden",
             boxSizing: "border-box",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
           }}
         >
-          <div className="today-hero-copy">
-            {heroSession ? (
-              <>
-                <p className="font-mono" style={{ fontSize: 12, opacity: 0.7, margin: "0 0 6px" }}>
-                  {relativeDayLabel(heroSession.date, today)} · {formatFullDate(heroSession.date)}
-                </p>
-                <p style={{ font: "600 22px/1.15 var(--font-sans)", margin: "0 0 8px", maxWidth: 200 }}>{heroSession.title}</p>
-                {heroMainGroup && (
-                  <p className="font-mono" style={{ fontSize: 13, opacity: 0.85, margin: 0, maxWidth: 200 }}>{stepGroupLine(heroMainGroup)}</p>
-                )}
-                {heroMatch?.matched && heroMatch.distance_km != null && (
-                  <p className="font-mono" style={{ fontSize: 12, opacity: 0.75, margin: "6px 0 0", maxWidth: 200 }}>
-                    svolto {heroMatch.distance_km.toFixed(1)} km
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {heroSession ? (
+                <>
+                  <p className="font-mono" style={{ fontSize: 12, opacity: 0.7, margin: "0 0 6px" }}>
+                    {relativeDayLabel(heroSession.date, today)} · {formatFullDate(heroSession.date)}
                   </p>
-                )}
-              </>
-            ) : (
-              <p className="font-serif-italic" style={{ fontSize: 17, maxWidth: 200 }}>Oggi è un giorno di riposo. E va bene così.</p>
-            )}
+                  <p style={{ font: "600 22px/1.15 var(--font-sans)", margin: "0 0 8px" }}>{heroSession.title}</p>
+                  {heroMainGroup && (
+                    <p className="font-mono" style={{ fontSize: 13, opacity: 0.85, margin: 0 }}>{stepGroupLine(heroMainGroup)}</p>
+                  )}
+                  {heroMatch?.matched && heroMatch.distance_km != null && (
+                    <p className="font-mono" style={{ fontSize: 12, opacity: 0.75, margin: "6px 0 0" }}>
+                      svolto {heroMatch.distance_km.toFixed(1)} km
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="font-serif-italic" style={{ fontSize: 17, margin: "4px 0 0" }}>Oggi è un giorno di riposo. E va bene così.</p>
+              )}
+            </div>
+
+            <div style={{ width: 96, height: 104, position: "relative", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", transform: "translateZ(26px)" }}>
+              <Illustration
+                name={heroSession ? classifySession(heroSession).illustration ?? "corsa" : "riposo"}
+                width={96}
+                height={104}
+                position="relative"
+                active={animate}
+                delayMs={160}
+                breathe
+                float
+              />
+            </div>
           </div>
-          <div className="today-hero-art" style={{ transform: "translateZ(26px)" }}>
-            <Illustration
-              name={heroSession ? classifySession(heroSession).illustration ?? "corsa" : "riposo"}
-              width={110}
-              height={120}
-              right={0}
-              bottom={0}
-              active={animate}
-              delayMs={160}
-              breathe
-              float
-            />
-          </div>
-          <Link href={heroHref} className="tap-target today-hero-action" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+
+          <Link href={heroHref} className="tap-target today-hero-action" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, marginTop: 18 }}>
             <span>{heroSession ? "Vedi allenamento" : "Esplora la settimana"}</span>
             <ArrowUpRight size={15} />
           </Link>

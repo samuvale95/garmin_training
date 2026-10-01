@@ -53,7 +53,7 @@ export function RestCard({ animate, delayMs, withIllustration }: { animate: bool
           background: visual.background,
           color: visual.foreground,
           borderRadius: "var(--radius-card)",
-          padding: "14px 16px",
+          padding: withIllustration ? "14px 64px 14px 16px" : "14px 16px",
           minHeight: withIllustration ? 70 : 54,
           position: "relative",
           overflow: "hidden",
@@ -218,12 +218,12 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
       }}
     >
       <span className="session-kind" style={{ background: visual.background, color: visual.foreground }}>{visual.label}</span>
-      <p style={{ fontSize: 15.5, fontWeight: 600, margin: 0, paddingRight: 54, letterSpacing: "-.01em" }}>{card.session.title}</p>
-      <p className="font-serif-italic" style={{ fontSize: 13.5, margin: "4px 0 0", color: "var(--inchiostro-70)", paddingRight: 54 }}>
+      <p style={{ fontSize: 15.5, fontWeight: 600, margin: 0, paddingRight: 64, letterSpacing: "-.01em" }}>{card.session.title}</p>
+      <p className="font-serif-italic" style={{ fontSize: 13.5, margin: "4px 0 0", color: "var(--inchiostro-70)", paddingRight: 64 }}>
         {detail}
       </p>
       {matchKm != null && (
-        <p className="font-mono" style={{ fontSize: 11, margin: "6px 0 0", opacity: 0.75, paddingRight: 54 }}>
+        <p className="font-mono" style={{ fontSize: 11, margin: "6px 0 0", opacity: 0.75, paddingRight: 64 }}>
           svolto {matchKm.toFixed(1)} km
         </p>
       )}

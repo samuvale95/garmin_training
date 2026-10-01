@@ -79,14 +79,14 @@ export default function EntryPage() {
             borderRadius: "var(--radius-card-lg)",
             overflow: "hidden",
             boxSizing: "border-box",
-            padding: 18,
+            padding: "20px 22px",
             boxShadow: "var(--shadow-airbnb-subtle)",
           }}
         >
-          <p style={{ font: "600 15px/1.3 var(--font-sans)", color: "var(--corallo-testo)", margin: 0, maxWidth: 140 }}>
+          <p style={{ font: "600 16px/1.3 var(--font-sans)", color: "var(--corallo-testo)", margin: 0, maxWidth: 135, position: "relative", zIndex: 2 }}>
             nessuna password Passo da ricordare
           </p>
-          <Illustration name="corsa" width={196} height={212} right={12} bottom={0} active={animate} delayMs={900} priority />
+          <Illustration name="corsa" width={148} height={160} right={8} bottom={0} active={animate} delayMs={900} priority />
         </div>
       </SlideUp>
 

@@ -67,21 +67,28 @@ function ResultScreenInner() {
           color: "var(--verde-testo)",
           borderRadius: "var(--radius-card-lg)",
           padding: 20,
-          height: 216,
+          minHeight: 200,
           position: "relative",
           overflow: "hidden",
           boxSizing: "border-box",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
         }}
       >
-        <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", margin: 0 }}>scritte sul calendario</p>
-        <WordIn active={animate} delayMs={300} style={{ font: "600 52px/1 var(--font-sans)", letterSpacing: "-.045em", marginTop: 8 }}>
-          {succeeded}
-          <span style={{ fontSize: 24, opacity: 0.5 }}>/{total}</span>
-        </WordIn>
-        <p className="font-serif-italic" style={{ fontSize: 15, margin: "8px 0 0" }}>
-          {failed.length === 0 ? "Il blocco è pronto." : "Quasi tutto pronto."}
-        </p>
-        <Illustration name="esultanza" width={172} height={186} right={8} bottom={0} active={animate} delayMs={700} />
+        <div style={{ flex: 1, minWidth: 0, position: "relative", zIndex: 2 }}>
+          <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", margin: 0 }}>scritte sul calendario</p>
+          <WordIn active={animate} delayMs={300} style={{ font: "600 52px/1 var(--font-sans)", letterSpacing: "-.045em", marginTop: 8 }}>
+            {succeeded}
+            <span style={{ fontSize: 24, opacity: 0.5 }}>/{total}</span>
+          </WordIn>
+          <p className="font-serif-italic" style={{ fontSize: 15, margin: "8px 0 0" }}>
+            {failed.length === 0 ? "Il blocco è pronto." : "Quasi tutto pronto."}
+          </p>
+        </div>
+        <div style={{ width: 110, height: 120, position: "relative", flexShrink: 0 }}>
+          <Illustration name="esultanza" width={110} height={120} position="relative" active={animate} delayMs={700} />
+        </div>
       </div>
 
       {failed.length > 0 && (

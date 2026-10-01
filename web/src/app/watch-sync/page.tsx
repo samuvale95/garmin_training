@@ -132,7 +132,7 @@ export default function WatchSyncPage() {
               <p style={{ font: "500 12px/1.55 var(--font-sans)", opacity: 0.8, margin: "10px 0 0" }}>{note}</p>
             )}
           </div>
-          <Illustration name="sync" width={346} height={346} right={-44} bottom={-28} active={animate} delayMs={600} />
+          <Illustration name="sync" width={220} height={220} right={8} bottom={12} active={animate} delayMs={600} />
         </SlideUp>
       </div>
 
