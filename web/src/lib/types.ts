@@ -835,6 +835,9 @@ export interface FoodEntry {
   fat_g: number | null;
   confidence: FoodConfidence | null;
   corrected: boolean;
+  // Multiple of the photographed/described plate actually eaten (0.5 = half, 2 = double).
+  // The macros above already include it: they are always what was eaten.
+  portion: number;
   // Relative to API_BASE_URL, e.g. "/nutrition/entry/12/photo" -- never a filesystem path.
   image_url: string | null;
 }

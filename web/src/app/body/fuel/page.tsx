@@ -5,7 +5,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { PulseRing, Skeleton, SlideUp } from "@/components/motion/primitives";
 import { ChevronLeft, ChevronRight, ArrowRight, PencilIcon } from "@/components/Icons";
-import { FuelCorrectionSheet } from "@/components/FuelCorrectionSheet";
+import { FuelCorrectionSheet, PortionPicker, macroAtPortion } from "@/components/FuelCorrectionSheet";
 import { DayEnergyCard } from "@/components/DayEnergyCard";
 import {
   SessionTimeSelectorCard,
@@ -717,33 +717,43 @@ function ReviewScreen({ entry, preview, onDiscard, onSaved }: { entry: FoodEntry
   const [protein, setProtein] = useState(entry.protein_g != null ? String(Math.round(entry.protein_g)) : "");
   const [fat, setFat] = useState(entry.fat_g != null ? String(Math.round(entry.fat_g)) : "");
   const [kcal, setKcal] = useState(entry.kcal != null ? String(Math.round(entry.kcal)) : "");
+  const [portion, setPortion] = useState(entry.portion);
+  const [macrosEdited, setMacrosEdited] = useState(false);
 
-  const dirty =
-    description !== (entry.description ?? "") ||
-    carb !== (entry.carb_g != null ? String(Math.round(entry.carb_g)) : "") ||
-    protein !== (entry.protein_g != null ? String(Math.round(entry.protein_g)) : "") ||
-    fat !== (entry.fat_g != null ? String(Math.round(entry.fat_g)) : "") ||
-    kcal !== (entry.kcal != null ? String(Math.round(entry.kcal)) : "");
+  function edit(setter: (v: string) => void) {
+    return (v: string) => {
+      setMacrosEdited(true);
+      setter(v);
+    };
+  }
+
+  function choosePortion(next: number) {
+    setCarb(macroAtPortion(entry.carb_g, entry.portion, carb, macrosEdited, portion, next));
+    setProtein(macroAtPortion(entry.protein_g, entry.portion, protein, macrosEdited, portion, next));
+    setFat(macroAtPortion(entry.fat_g, entry.portion, fat, macrosEdited, portion, next));
+    setKcal(macroAtPortion(entry.kcal, entry.portion, kcal, macrosEdited, portion, next));
+    setPortion(next);
+  }
 
   function save() {
     // Confirming an unedited estimate is not a correction -- only an actual change
     // marks the entry `corrected` (see EDITABLE_FIELDS in db.py). Otherwise the row
-    // stays exactly as the vision model wrote it, confidence chip and all.
-    if (!dirty) {
+    // stays exactly as the vision model wrote it, confidence chip and all. A portion
+    // on its own is sent alone: the server rescales the estimate and it stays one.
+    const patch: Parameters<typeof updateEntry.mutate>[0] = { id: entry.id };
+    if (description !== (entry.description ?? "")) patch.description = description || null;
+    if (macrosEdited) {
+      patch.carb_g = carb === "" ? null : Number(carb);
+      patch.protein_g = protein === "" ? null : Number(protein);
+      patch.fat_g = fat === "" ? null : Number(fat);
+      patch.kcal = kcal === "" ? null : Number(kcal);
+    }
+    if (portion !== entry.portion) patch.portion = portion;
+    if (Object.keys(patch).length === 1) {
       onSaved();
       return;
     }
-    updateEntry.mutate(
-      {
-        id: entry.id,
-        description: description || null,
-        carb_g: carb === "" ? null : Number(carb),
-        protein_g: protein === "" ? null : Number(protein),
-        fat_g: fat === "" ? null : Number(fat),
-        kcal: kcal === "" ? null : Number(kcal),
-      },
-      { onSuccess: onSaved }
-    );
+    updateEntry.mutate(patch, { onSuccess: onSaved });
   }
 
   const low = entry.confidence === "low";
@@ -790,9 +800,13 @@ function ReviewScreen({ entry, preview, onDiscard, onSaved }: { entry: FoodEntry
       </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-        <ReviewMacroField label="carboidrati" value={carb} onChange={setCarb} />
-        <ReviewMacroField label="proteine" value={protein} onChange={setProtein} />
-        <ReviewMacroField label="grassi" value={fat} onChange={setFat} />
+        <ReviewMacroField label="carboidrati" value={carb} onChange={edit(setCarb)} />
+        <ReviewMacroField label="proteine" value={protein} onChange={edit(setProtein)} />
+        <ReviewMacroField label="grassi" value={fat} onChange={edit(setFat)} />
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <PortionPicker value={portion} onChange={choosePortion} disabled={updateEntry.isPending} />
       </div>
 
       <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -801,7 +815,7 @@ function ReviewScreen({ entry, preview, onDiscard, onSaved }: { entry: FoodEntry
           <input
             inputMode="numeric"
             value={kcal}
-            onChange={(e) => setKcal(e.target.value.replace(/\D/g, ""))}
+            onChange={(e) => edit(setKcal)(e.target.value.replace(/\D/g, ""))}
             className="font-mono"
             style={{ width: 70, textAlign: "right", border: "none", background: "none", fontSize: 20, fontWeight: 600, outline: "none", color: "var(--inchiostro)" }}
           />

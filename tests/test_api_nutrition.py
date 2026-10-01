@@ -193,6 +193,31 @@ def test_a_correction_marks_the_entry(client):
     assert response.json()["carb_g"] == 120
 
 
+def test_a_portion_scales_the_macros_without_marking_a_correction(client, monkeypatch):
+    """"I ate half of it" scales the model's numbers; it doesn't vouch for them."""
+    _photo(monkeypatch, llm.MacroEstimate(description="pasta", kcal=800, carb_g=100, protein_g=30, fat_g=20, confidence="medium"))
+    created = client.post("/nutrition/photo", files={"image": ("p.jpg", b"jpeg", "image/jpeg")}).json()
+    entry = client.patch(f"/nutrition/entry/{created['id']}", json={"portion": 0.5}).json()
+    assert (entry["portion"], entry["carb_g"], entry["kcal"]) == (0.5, 50, 400)
+    assert entry["corrected"] is False
+    # Rescaled from the stored factor, not compounded: 0.5 -> 1.5 is the plate x1.5.
+    entry = client.patch(f"/nutrition/entry/{created['id']}", json={"portion": 1.5}).json()
+    assert (entry["carb_g"], entry["protein_g"]) == (150, 45)
+    totals = client.get("/nutrition/day", params={"date": entry["date"]}).json()["totals"]
+    assert totals["carb_g"] == 150
+
+
+def test_macros_sent_with_a_portion_are_taken_as_typed(client):
+    created = client.post("/nutrition/entry", json={"date": "2026-08-10", "carb_g": 90, "fat_g": 10}).json()
+    entry = client.patch(f"/nutrition/entry/{created['id']}", json={"portion": 2, "carb_g": 100}).json()
+    assert (entry["carb_g"], entry["fat_g"], entry["corrected"]) == (100, 20, True)
+
+
+def test_a_non_positive_portion_is_rejected(client):
+    created = client.post("/nutrition/entry", json={"date": "2026-08-10", "carb_g": 90}).json()
+    assert client.patch(f"/nutrition/entry/{created['id']}", json={"portion": 0}).status_code == 422
+
+
 def test_correcting_a_missing_entry_is_a_404(client):
     assert client.patch("/nutrition/entry/999", json={"carb_g": 1}).status_code == 404
 

@@ -1711,6 +1711,12 @@ interface ManualEntryFields {
   fat_g?: number | null;
 }
 
+/** A patch may also change how much of the plate was eaten; the server rescales the
+ * macros not sent alongside it (see `db.update_entry`). */
+interface EntryPatchFields extends ManualEntryFields {
+  portion?: number;
+}
+
 export function useAddManualEntry() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1724,7 +1730,7 @@ export function useAddManualEntry() {
 export function useUpdateEntry() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...fields }: ManualEntryFields & { id: number }) =>
+    mutationFn: ({ id, ...fields }: EntryPatchFields & { id: number }) =>
       apiPatch<FoodEntry>(`/nutrition/entry/${id}`, fields),
     onSuccess: () => invalidateNutrition(queryClient),
   });
