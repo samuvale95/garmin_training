@@ -78,7 +78,7 @@ function SyncScreenInner() {
         <Count value={queued} label="in coda" color="var(--inchiostro-su-scuro)" />
       </div>
 
-      <div style={{ flex: 1, position: "relative", minHeight: 160, marginTop: 20, background: "rgba(246,238,218,.05)", borderRadius: "var(--radius-card-lg)", padding: 18, boxSizing: "border-box" }}>
+      <div style={{ flex: 1, position: "relative", minHeight: 160, marginTop: 20, background: "rgba(246,238,218,.05)", borderRadius: "var(--radius-card-lg)", padding: 18, boxSizing: "border-box", overflow: "hidden" }}>
         <p style={{ fontWeight: 700, fontSize: 15, margin: "0 0 4px" }}>Puoi chiudere</p>
         <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-su-scuro)", maxWidth: 180, margin: 0 }}>
           Continuo io. Ti trovo il riepilogo quando torni.

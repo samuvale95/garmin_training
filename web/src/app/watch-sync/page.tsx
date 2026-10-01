@@ -109,7 +109,7 @@ export default function WatchSyncPage() {
           delayMs={100}
           as="p"
           className="font-serif-italic"
-          style={{ font: "italic 400 17.5px/1.4 var(--font-instrument-serif)", color: "var(--inchiostro-70)", maxWidth: 290, margin: 0 }}
+          style={{ font: "italic 400 17.5px/1.4 var(--font-sans)", color: "var(--inchiostro-70)", maxWidth: 290, margin: 0 }}
         >
           Apri Garmin Connect con l&apos;orologio al polso: venti secondi e torno a dirti come stai.
         </SlideUp>

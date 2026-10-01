@@ -216,7 +216,18 @@ export function SessionDetailBody({
               <span style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--inchiostro-50)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                 Intensità
               </span>
-              <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: hasInterval ? "var(--corallo)" : "var(--verde)", marginTop: 2 }}>
+              <span
+                style={{
+                  display: "inline-block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: hasInterval ? "var(--corallo-testo)" : "var(--verde-testo)",
+                  background: hasInterval ? "var(--corallo)" : "var(--verde)",
+                  padding: "2px 8px",
+                  borderRadius: "var(--radius-pill)",
+                  marginTop: 3,
+                }}
+              >
                 {hasInterval ? "Ripetute" : "Costante"}
               </span>
             </div>

@@ -223,7 +223,7 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
         {detail}
       </p>
       {matchKm != null && (
-        <p className="font-mono" style={{ fontSize: 11, margin: "6px 0 0", opacity: 0.75 }}>
+        <p className="font-mono" style={{ fontSize: 11, margin: "6px 0 0", opacity: 0.75, paddingRight: 54 }}>
           svolto {matchKm.toFixed(1)} km
         </p>
       )}

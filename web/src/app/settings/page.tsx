@@ -333,10 +333,15 @@ function Card({ children }: { children: React.ReactNode }) {
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", cursor: "pointer" }}>
+    <label
+      onClick={(e) => {
+        e.preventDefault();
+        onChange(!checked);
+      }}
+      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", cursor: "pointer", userSelect: "none" }}
+    >
       <span style={{ fontSize: 14 }}>{label}</span>
       <span
-        onClick={() => onChange(!checked)}
         style={{
           width: 44,
           height: 26,

@@ -195,8 +195,8 @@ export default function LoadPage() {
             style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 18, marginTop: 10 }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 14, marginBottom: 10 }}>
-              <Legend color="var(--corallo)" label="fatto · carico" />
-              <Legend color="var(--sabbia-bordo)" label="previsto · km" />
+              <Legend color="var(--accent)" label="fatto · carico" />
+              <Legend color="rgba(34, 34, 34, 0.22)" label="previsto · km" />
             </div>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: ROW_HEIGHT }}>
               {weeks.map((week) => {
@@ -206,9 +206,9 @@ export default function LoadPage() {
                   <div key={week.week_start} style={{ flex: 1, display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 3, height: ROW_HEIGHT }}>
                     <div
                       className={week.in_progress ? "anim-bar-settle" : undefined}
-                      style={{ width: "45%", height: completedPx, background: "var(--corallo)", borderRadius: "4px 4px 0 0", transformOrigin: "bottom" }}
+                      style={{ width: "45%", height: completedPx, background: "var(--accent)", borderRadius: "4px 4px 0 0", transformOrigin: "bottom" }}
                     />
-                    <div style={{ width: "45%", height: plannedPx, background: "var(--sabbia-bordo)", borderRadius: "4px 4px 0 0" }} />
+                    <div style={{ width: "45%", height: plannedPx, background: "rgba(34, 34, 34, 0.22)", borderRadius: "4px 4px 0 0" }} />
                   </div>
                 );
               })}

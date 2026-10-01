@@ -133,7 +133,7 @@ export function FuelHero({ animate, fuel, narrativeText }: { animate: boolean; f
           <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "0 9px", marginTop: 18 }}>
             <span
               className="font-mono"
-              style={{ fontSize: 42, fontWeight: 500, lineHeight: 1, letterSpacing: "-.03em", color: "var(--corallo)" }}
+              style={{ fontSize: 42, fontWeight: 500, lineHeight: 1, letterSpacing: "-.03em", color: degraded ? "var(--corallo-testo)" : "var(--corallo)" }}
             >
               {formatRange(t.carb_g)}
             </span>
@@ -487,7 +487,7 @@ export function EnergyBlock({ animate, target }: { animate: boolean; target: Day
         </div>
         <span aria-hidden="true" style={{ fontSize: 18, color: "var(--inchiostro-35)", paddingBottom: 14 }}>·</span>
         <div>
-          <p className="font-mono" style={{ fontSize: 28, fontWeight: 500, letterSpacing: "-.02em", margin: 0, color: "var(--corallo)" }}>
+          <p className="font-mono" style={{ fontSize: 28, fontWeight: 500, letterSpacing: "-.02em", margin: 0, color: "var(--corallo-testo)" }}>
             {midpoint.toLocaleString("it-IT")}
           </p>
           <p style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>kcal nei target qui sopra</p>
@@ -501,10 +501,10 @@ export function EnergyBlock({ animate, target }: { animate: boolean; target: Day
         <div style={{ width: `${(energy.training_kcal / energy.need_kcal) * 100}%`, background: "var(--corallo)" }} />
       </div>
       <div style={{ display: "flex", gap: 14, marginTop: 9, flexWrap: "wrap" }}>
-        <MacroLabel color="var(--azzurro)">
+        <MacroLabel color="var(--azzurro-tratto)">
           {living.toLocaleString("it-IT")} kcal per vivere
         </MacroLabel>
-        <MacroLabel color="var(--corallo)">
+        <MacroLabel color="var(--corallo-testo)">
           {energy.training_kcal.toLocaleString("it-IT")} kcal per la seduta
         </MacroLabel>
       </div>

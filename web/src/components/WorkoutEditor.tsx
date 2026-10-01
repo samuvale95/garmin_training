@@ -918,11 +918,35 @@ function StepEditorModal({ step, onSave, onCancel }: { step: EditableStep; onSav
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(28,26,22,.45)", display: "flex", alignItems: "flex-end", zIndex: 20 }} onClick={onCancel}>
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(28,26,22,.45)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "flex-end",
+        zIndex: 40,
+      }}
+      onClick={onCancel}
+    >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: "100%", background: "var(--crema)", borderRadius: "22px 22px 0 0", padding: "22px 20px 28px", display: "flex", flexDirection: "column", gap: 14 }}
+        style={{
+          width: "100%",
+          maxHeight: "88dvh",
+          overflowY: "auto",
+          background: "var(--crema)",
+          borderRadius: "24px 24px 0 0",
+          padding: "16px 20px calc(28px + env(safe-area-inset-bottom, 0px))",
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+          boxShadow: "var(--shadow-airbnb-floating)",
+        }}
       >
+        <div style={{ width: 36, height: 4, borderRadius: 100, background: "var(--sabbia-bordo)", margin: "0 auto" }} />
         <p style={{ font: "600 18px var(--font-sans)", margin: 0 }}>Modifica step</p>
 
         <Field label="Tipo">

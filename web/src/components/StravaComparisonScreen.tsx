@@ -67,7 +67,7 @@ export function StravaComparisonScreen({
                 alignItems: "center",
                 gap: 6,
                 marginTop: 14,
-                color: "var(--corallo)",
+                color: "var(--accent)",
                 fontSize: 14,
                 fontWeight: 600,
                 textDecoration: "none",

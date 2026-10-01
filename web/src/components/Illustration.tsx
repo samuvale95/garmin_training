@@ -59,6 +59,8 @@ interface IllustrationProps {
   float?: boolean;
   active?: boolean;
   delayMs?: number;
+  top?: number;
+  left?: number;
   right?: number;
   bottom?: number;
   /** True for the above-the-fold hero illustration on a screen's first paint (e.g. the entry screen), so Next avoids the "missing priority on the LCP image" warning. */
@@ -78,8 +80,10 @@ export function Illustration({
   float = false,
   active = true,
   delayMs = 900,
-  right = 0,
-  bottom = 0,
+  top,
+  left,
+  right,
+  bottom,
   priority = false,
 }: IllustrationProps) {
   const width = size ?? rawWidth ?? 64;
@@ -88,14 +92,19 @@ export function Illustration({
   const animate = active && !reduced;
   const src = ILLUSTRATION_SOURCES[name] ?? FALLBACKS[name] ?? "/illustrazioni/corsa.webp";
 
+  const resolvedRight = right !== undefined ? right : left !== undefined ? undefined : 0;
+  const resolvedBottom = bottom !== undefined ? bottom : top !== undefined ? undefined : 0;
+
   return (
     <div
       aria-hidden="true"
       className={animate ? "anim-land" : undefined}
       style={{
         position: "absolute",
-        right,
-        bottom,
+        top,
+        left,
+        right: resolvedRight,
+        bottom: resolvedBottom,
         width,
         height,
         transformOrigin: "bottom center",

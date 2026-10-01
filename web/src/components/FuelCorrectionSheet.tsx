@@ -96,16 +96,31 @@ export function FuelCorrectionSheet({ entry, onClose }: { entry: FoodEntry; onCl
 
   const sheetStyle: CSSProperties = {
     width: "100%",
+    maxHeight: "88dvh",
+    overflowY: "auto",
     background: "var(--crema)",
-    borderRadius: "22px 22px 0 0",
-    padding: "10px 20px 28px",
+    borderRadius: "24px 24px 0 0",
+    padding: "12px 20px calc(28px + env(safe-area-inset-bottom, 0px))",
     display: "flex",
     flexDirection: "column",
     gap: 16,
+    boxShadow: "var(--shadow-airbnb-floating)",
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(28,26,22,.4)", display: "flex", alignItems: "flex-end", zIndex: 30 }} onClick={onClose}>
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(28,26,22,.45)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "flex-end",
+        zIndex: 40,
+      }}
+      onClick={onClose}
+    >
       <div
         onClick={(e) => e.stopPropagation()}
         className={reduced ? undefined : "anim-slide-up"}

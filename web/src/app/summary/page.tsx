@@ -159,7 +159,7 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
             ))}
           </ul>
           {data.badges.length > 0 && (
-            <p style={{ fontSize: 13, fontWeight: 600, margin: "10px 0 0", color: "var(--corallo)" }}>
+            <p style={{ fontSize: 13, fontWeight: 600, margin: "10px 0 0", color: "var(--corallo-testo)" }}>
               Traguardi: {data.badges.join(", ")}
             </p>
           )}
