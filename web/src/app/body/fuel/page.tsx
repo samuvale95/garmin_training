@@ -7,7 +7,7 @@ import { PulseRing, Skeleton, SlideUp } from "@/components/motion/primitives";
 import { ChevronLeft, ChevronRight, ArrowRight, PencilIcon } from "@/components/Icons";
 import { FuelCorrectionSheet } from "@/components/FuelCorrectionSheet";
 import { DayEnergyCard } from "@/components/DayEnergyCard";
-import { EnergyBlock, FuelComment, FuelHero, MealList, SessionFuelBlock, TodayFuelBlock } from "@/components/FuelBlocks";
+import { EnergyBlock, FoodEquivalencesBlock, FuelComment, FuelHero, MealList, SessionFuelBlock, TodayFuelBlock } from "@/components/FuelBlocks";
 import { useMountOnce } from "@/lib/motion";
 import { formatWeekday } from "@/lib/format";
 import { useCalendarAccess } from "@/lib/guards";
@@ -265,15 +265,18 @@ export default function FuelPage() {
       ) : (
         <>
           {/* 1. OGGI: Primary hero block */}
-          <TodayFuelBlock animate={animate} fuel={fuel} totals={day?.totals} hasPlan={hasPlan} lines={statusQuery.data?.lines} />
+          <TodayFuelBlock animate={animate} fuel={fuel} totals={day?.totals} hasPlan={hasPlan} level={level.data?.level ?? 2} lines={statusQuery.data?.lines} />
 
-          {/* 2. DOMANI: Evening preparation for tomorrow's run */}
+          {/* 2. ESEMPI PRATICI NEL PIATTO: Didactic food equivalences and timing */}
+          <FoodEquivalencesBlock animate={animate} />
+
+          {/* 3. DOMANI: Evening preparation for tomorrow's run */}
           <FuelHero animate={animate} fuel={fuel} narrativeText={narrative} />
 
-          {/* 3. DURING & POST WORKOUT FUELING (if applicable today) */}
+          {/* 4. DURING & POST WORKOUT FUELING (if applicable today) */}
           <SessionFuelBlock animate={animate} during={fuel.during} recovery={fuel.recovery} />
 
-          {/* 4. TODAY'S LOGGED MEALS */}
+          {/* 5. TODAY'S LOGGED MEALS */}
           <MealList entries={entries} animate={animate} onSelect={setCorrecting} />
 
           {/* 5. ENERGY BALANCE (cross-check with Garmin and theoretical needs) */}
