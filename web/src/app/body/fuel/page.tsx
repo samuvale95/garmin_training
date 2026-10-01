@@ -252,12 +252,21 @@ export default function FuelPage() {
 
   return (
     <div style={{ padding: "22px 20px 148px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <PageHeader backHref="/body" />
-        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Carburante</h1>
-        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "6px 12px" }}>
-          {formatWeekday(today)} {new Date(`${today}T00:00:00`).getDate()}
+        <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}>corpo</span>
+        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "5px 12px", marginLeft: "auto" }}>
+          Oggi · {formatWeekday(today)} {new Date(`${today}T00:00:00`).getDate()}
         </span>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <h1 style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: 0 }}>
+          Carburante
+        </h1>
+        <p className="font-serif-italic" style={{ fontSize: 15.5, color: "var(--inchiostro-70)", margin: "6px 0 0", lineHeight: 1.35 }}>
+          L&apos;energia che ti serve per l&apos;allenamento di oggi.
+        </p>
       </div>
 
       {fuelQuery.isLoading || !fuel ? (
@@ -285,22 +294,22 @@ export default function FuelPage() {
           {showEnergy && <EnergyBlock animate={animate} target={fuel.today} />}
 
           {/* 6. NAVIGATION: Diary & 7-Day History */}
-          <SlideUp active={animate} delayMs={340} style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <SlideUp active={animate} delayMs={340} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
             <Link
               href="/body/fuel/diario"
               className="press-soft"
-              style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "14px 16px", textDecoration: "none", color: "inherit" }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "13px 15px", textDecoration: "none", color: "inherit" }}
             >
-              <span style={{ fontSize: 14, fontWeight: 600 }}>Diario dei pasti</span>
-              <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Diario pasti</span>
+              <ChevronRight size={15} style={{ color: "var(--inchiostro-50)" }} />
             </Link>
             <Link
               href="/body/fuel/history"
               className="press-soft"
-              style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "14px 16px", textDecoration: "none", color: "inherit" }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "13px 15px", textDecoration: "none", color: "inherit" }}
             >
-              <span style={{ fontSize: 14, fontWeight: 600 }}>Andamento 7 giorni</span>
-              <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Storico 7 giorni</span>
+              <ChevronRight size={15} style={{ color: "var(--inchiostro-50)" }} />
             </Link>
           </SlideUp>
 
@@ -311,20 +320,15 @@ export default function FuelPage() {
       <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={onFileSelected} style={{ display: "none" }} />
 
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center", zIndex: 15, pointerEvents: "none" }}>
-        {/* The CTA floats over a scrolling list, so it gets a scrim of the page's own
-            background rather than letting rows slide edge-to-edge under a hard button. */}
         <div
           style={{
             width: "100%",
             maxWidth: "var(--frame-max-width)",
-            padding: "30px 20px 16px",
+            padding: "24px 20px 14px",
             pointerEvents: "auto",
-            background: "linear-gradient(to top, var(--crema) 62%, rgba(246,238,218,0))",
+            background: "linear-gradient(to top, var(--crema) 75%, rgba(255,255,255,0))",
           }}
         >
-          {/* Two ways to log the same meal, side by side rather than one hidden
-              behind the other: a photo is quicker, a sentence is more precise when the
-              quantity is known, and neither is the fallback. */}
           <div style={{ display: "flex", gap: 10 }}>
             <button
               type="button"
@@ -336,19 +340,19 @@ export default function FuelPage() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 9,
-                background: "var(--corallo)",
-                color: "var(--corallo-testo)",
-                border: "none",
+                gap: 7,
+                background: "var(--sabbia-chip)",
+                color: "var(--inchiostro)",
+                border: "var(--border-airbnb)",
                 borderRadius: "var(--radius-pill)",
-                padding: "17px 18px",
-                fontSize: 15.5,
+                padding: "12px 16px",
+                fontSize: 13,
                 fontWeight: 600,
                 cursor: "pointer",
-                boxShadow: "0 10px 24px rgba(28,26,22,.16)",
+                boxShadow: "var(--shadow-airbnb-subtle)",
               }}
             >
-              <span aria-hidden="true">📷</span> Fotografa
+              <span aria-hidden="true">📷</span> Fotografa pasto
             </button>
             <button
               type="button"
@@ -360,23 +364,23 @@ export default function FuelPage() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 9,
-                background: "var(--inchiostro)",
-                color: "var(--crema)",
-                border: "none",
+                gap: 7,
+                background: "var(--sabbia-chip)",
+                color: "var(--inchiostro)",
+                border: "var(--border-airbnb)",
                 borderRadius: "var(--radius-pill)",
-                padding: "17px 18px",
-                fontSize: 15.5,
+                padding: "12px 16px",
+                fontSize: 13,
                 fontWeight: 600,
                 cursor: "pointer",
-                boxShadow: "0 10px 24px rgba(28,26,22,.16)",
+                boxShadow: "var(--shadow-airbnb-subtle)",
               }}
             >
-              <PencilIcon size={14} style={{ display: "inline-block", verticalAlign: "middle", marginRight: 4 }} /> Scrivi
+              <PencilIcon size={13} style={{ display: "inline-block", verticalAlign: "middle" }} /> Scrivi pasto
             </button>
           </div>
-          <p style={{ textAlign: "center", fontSize: 11, color: "var(--inchiostro-35)", fontWeight: 500, margin: "9px 0 0" }}>
-            Orientamento sportivo generale, non un consiglio clinico.
+          <p style={{ textAlign: "center", fontSize: 11, color: "var(--inchiostro-50)", margin: "8px 0 0" }}>
+            Orientamento per l&apos;allenamento. Non è una dieta prescrittiva.
           </p>
         </div>
       </div>
