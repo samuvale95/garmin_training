@@ -28,6 +28,7 @@ from .. import (
     nutrition,
     paces,
     prescription,
+    race_prediction,
     readiness,
     technique,
 )
@@ -2173,6 +2174,103 @@ class AerobicEfficiencyResponse(BaseModel):
                     severity=f.severity,
                 )
                 for f in res.findings
+            ],
+        )
+
+
+# ---- race prediction & goal confidence ----------------------------------------------------
+
+
+class ReferenceEffortOut(BaseModel):
+    activity_id: int
+    date: date_type
+    title: str
+    distance_km: float
+    duration_min: float
+    pace_min_km: float
+    avg_hr: int | None = None
+
+    @classmethod
+    def from_model(cls, ref: "race_prediction.ReferenceEffort") -> "ReferenceEffortOut":
+        return cls(
+            activity_id=ref.activity_id,
+            date=ref.date,
+            title=ref.title,
+            distance_km=ref.distance_km,
+            duration_min=ref.duration_min,
+            pace_min_km=ref.pace_min_km,
+            avg_hr=ref.avg_hr,
+        )
+
+
+class PredictionFactorOut(BaseModel):
+    key: str
+    label: str
+    detail: str
+    severity: str
+
+
+class RacePredictionResponse(BaseModel):
+    predicted_time_seconds: int | None = None
+    predicted_time_formatted: str | None = None
+    predicted_pace_sec_km: int | None = None
+    predicted_pace_formatted: str | None = None
+    target_time_seconds: int | None = None
+    target_time_formatted: str | None = None
+    gap_seconds: int | None = None
+    gap_formatted: str | None = None
+    confidence: str
+    confidence_score: int
+    confidence_label: str
+    confidence_color: str
+    headline: str
+    verdict: str
+    advice: str
+    reference_effort: ReferenceEffortOut | None = None
+    longest_completed_km: float | None = None
+    guide_longest_km: float | None = None
+    volume_adherence_pct: float | None = None
+    factors: list[PredictionFactorOut] = Field(default_factory=list)
+
+    @classmethod
+    def from_model(cls, res: "race_prediction.RacePredictionResult") -> "RacePredictionResponse":
+        pred_time_fmt = race_prediction.format_duration(res.predicted_time_seconds) if res.predicted_time_seconds else None
+        pred_pace_fmt = race_prediction.format_pace(res.predicted_pace_sec_km) if res.predicted_pace_sec_km else None
+        tgt_time_fmt = race_prediction.format_duration(res.target_time_seconds) if res.target_time_seconds else None
+        
+        gap_fmt = None
+        if res.gap_seconds is not None:
+            sign = "+" if res.gap_seconds > 0 else "-"
+            gap_fmt = f"{sign}{race_prediction.format_duration(abs(res.gap_seconds))}"
+
+        return cls(
+            predicted_time_seconds=res.predicted_time_seconds,
+            predicted_time_formatted=pred_time_fmt,
+            predicted_pace_sec_km=res.predicted_pace_sec_km,
+            predicted_pace_formatted=pred_pace_fmt,
+            target_time_seconds=res.target_time_seconds,
+            target_time_formatted=tgt_time_fmt,
+            gap_seconds=res.gap_seconds,
+            gap_formatted=gap_fmt,
+            confidence=res.confidence,
+            confidence_score=res.confidence_score,
+            confidence_label=res.confidence_label,
+            confidence_color=res.confidence_color,
+            headline=res.headline,
+            verdict=res.verdict,
+            advice=res.advice,
+            reference_effort=ReferenceEffortOut.from_model(res.reference_effort) if res.reference_effort else None,
+            longest_completed_km=res.longest_completed_km,
+            guide_longest_km=res.guide_longest_km,
+            volume_adherence_pct=res.volume_adherence_pct,
+            factors=[
+                PredictionFactorOut(
+                    key=f.key,
+                    label=f.label,
+                    detail=f.detail,
+                    severity=f.severity,
+                )
+                for f in res.factors
             ],
         )
 

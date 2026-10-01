@@ -6,8 +6,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { SlideUp } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
-import { GOAL_LOOKAHEAD_DAYS, useGoalFit, useGoalFitNarrative, usePlanQuery, useRaceGoal, useSetRaceGoal, useWorkouts } from "@/lib/queries";
+import { GOAL_LOOKAHEAD_DAYS, useGoalFit, useGoalFitNarrative, useGoalPrediction, usePlanQuery, useRaceGoal, useSetRaceGoal, useWorkouts } from "@/lib/queries";
 import { GoalFitBlock } from "@/components/GoalFitBlock";
+import { GoalPredictionCard } from "@/components/GoalPredictionCard";
 import { countdownLabel, distanceLabel, formatPaceSecPerKm, formatTargetTime, targetPaceSecPerKm } from "@/lib/raceGoal";
 import { formatFullDate } from "@/lib/format";
 import { shiftDateKey, toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
@@ -82,6 +83,7 @@ export default function RaceGoalSettingsPage() {
 
   const fitQuery = useGoalFit(sessions, goal, !!goal && !editing);
   const fitNarrative = useGoalFitNarrative(sessions, goal, !!goal && !editing && !!fitQuery.data);
+  const predictionQuery = useGoalPrediction(sessions, goal, !!goal && !editing);
 
   function startEdit() {
     setName(goal?.name ?? "");
@@ -160,9 +162,14 @@ export default function RaceGoalSettingsPage() {
       ) : goal ? (
         <>
           <GoalSummary goal={goal} animate={animate} onEdit={startEdit} />
+          {predictionQuery.data && (
+            <div style={{ marginTop: 22 }}>
+              <GoalPredictionCard prediction={predictionQuery.data} animate={animate} delayMs={180} />
+            </div>
+          )}
           {fitQuery.data ? (
             <>
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: "22px 0 0" }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: "24px 0 0" }}>
                 Il piano che hai già
               </p>
               <GoalFitBlock fit={fitQuery.data} narrative={fitNarrative.data?.text} animate={animate} delayMs={240} />

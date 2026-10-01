@@ -295,6 +295,48 @@ export interface AerobicEfficiencyData {
   findings: AerobicFinding[];
 }
 
+// ---- Race Prediction & Goal Confidence ----
+
+export interface ReferenceEffort {
+  activity_id: number;
+  date: string;
+  title: string;
+  distance_km: number;
+  duration_min: number;
+  pace_min_km: number;
+  avg_hr?: number | null;
+}
+
+export interface PredictionFactor {
+  key: string;
+  label: string;
+  detail: string;
+  severity: "ok" | "attenzione" | "sconosciuto";
+}
+
+export interface RacePredictionData {
+  predicted_time_seconds?: number | null;
+  predicted_time_formatted?: string | null;
+  predicted_pace_sec_km?: number | null;
+  predicted_pace_formatted?: string | null;
+  target_time_seconds?: number | null;
+  target_time_formatted?: string | null;
+  gap_seconds?: number | null;
+  gap_formatted?: string | null;
+  confidence: "alta" | "media" | "cauta" | "non_valutabile";
+  confidence_score: number;
+  confidence_label: string;
+  confidence_color: string;
+  headline: string;
+  verdict: string;
+  advice: string;
+  reference_effort?: ReferenceEffort | null;
+  longest_completed_km?: number | null;
+  guide_longest_km?: number | null;
+  volume_adherence_pct?: number | null;
+  factors: PredictionFactor[];
+}
+
 /** One comparison between the plan and the race, carrying both numbers -- "il più lungo
  * in programma è 24 km, per questa distanza se ne fanno almeno 30". */
 export interface GoalObservation {

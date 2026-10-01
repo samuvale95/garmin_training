@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, Upl
 from fastapi.responses import JSONResponse
 from fastapi.concurrency import run_in_threadpool
 
-from .. import checkin, db, history, levels, move_check, plan_adaptation, plan_generator, plan_rules, plan_store, readiness, service
+from .. import checkin, db, history, levels, move_check, plan_adaptation, plan_generator, plan_rules, plan_store, race_prediction, readiness, service
 from .. import goal_fit, llm
 from ..parser import parse_plan_document, serialize_plan
 from . import garmin_session, schemas
@@ -471,6 +471,55 @@ async def plan_goal_fit_narrative(
     return await run_in_threadpool(
         lambda: cache.get_or_call("plan:goal-fit-narrative", user_id, key, TTL_GOAL_FIT_NARRATIVE, compute, refresh=refresh)
     )
+
+
+@router.post("/plan/goal-prediction", response_model=schemas.RacePredictionResponse)
+async def plan_goal_prediction(
+    payload: schemas.GoalFitRequest,
+    user_id: str = Depends(current_user_id),
+) -> schemas.RacePredictionResponse:
+    """Predict race finish time and calculate honest goal confidence from executed runs.
+
+    Uses Peter Riegel formula on recent performance efforts, checks volume adherence,
+    and cross-checks the longest completed run against recommended guides.
+    """
+    today = payload.date or date.today()
+    goal = payload.goal.to_model()
+    sessions = [s.to_model() for s in payload.sessions]
+
+    def compute() -> schemas.RacePredictionResponse:
+        start_date = today - timedelta(days=60)
+        acts = history.activities_between(user_id, start_date, today)
+
+        vo2max = None
+        try:
+            status_dict = garmin_session.run(user_id, lambda sync: sync.training_status())
+            if isinstance(status_dict, dict):
+                vo2max = status_dict.get("vo2MaxPreciseValue") or status_dict.get("vo2MaxValue")
+                if vo2max:
+                    vo2max = float(vo2max)
+        except Exception:
+            pass
+
+        aerobic_thr_hr = None
+        try:
+            zones = _zones(user_id)
+            if zones:
+                aerobic_thr_hr = zones.aerobic_hr
+        except Exception:
+            pass
+
+        res = race_prediction.assess_race_prediction(
+            activities=acts,
+            goal=goal,
+            planned_sessions=sessions,
+            today=today,
+            vo2max=vo2max,
+            aerobic_threshold_hr=aerobic_thr_hr,
+        )
+        return schemas.RacePredictionResponse.from_model(res)
+
+    return await run_in_threadpool(compute)
 
 
 @router.post("/plan/diff", response_model=schemas.DiffResponse)
