@@ -13,11 +13,13 @@ happens to be the correct behavior for the "no overnight sync yet" empty state.
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date as date_type
 from datetime import timedelta
+from typing import Sequence
 
 from .garmin_labels import readiness_feedback, readiness_level_label
 from .garmin_sync import GarminSync
@@ -31,6 +33,72 @@ MAX_PARALLEL_GARMIN_CALLS = 6
 
 READINESS_LOW_THRESHOLD = 60
 HRV_DELTA_ALERT_MS = -15  # a drop of this many ms vs. baseline reads as a meaningful signal
+MIN_NORM_SAMPLES = 14  # At least 14 recorded nights over 28-60 days for statistical norms
+
+
+@dataclass
+class BiometricNorm:
+    """Personal baseline distribution for resting HR or overnight HRV over 28-60 days.
+
+    Calculated from sample mean and standard deviation (ddof=1). Normal variation band
+    is defined as mean ± 1.5 standard deviations.
+    """
+
+    mean: float
+    sd: float
+    normal_min: float
+    normal_max: float
+    sample_count: int
+    has_personal_norm: bool = True
+
+
+def compute_biometric_norm(
+    values: Sequence[float | int | None],
+    min_samples: int = MIN_NORM_SAMPLES,
+    min_sd: float = 1.0,
+) -> BiometricNorm | None:
+    """Calculate personal biometric norm from historical readings.
+
+    Returns None if fewer than `min_samples` valid readings exist.
+    """
+    valid = [float(v) for v in values if v is not None]
+    if len(valid) < min_samples:
+        return None
+    mean = sum(valid) / len(valid)
+    variance = sum((x - mean) ** 2 for x in valid) / (len(valid) - 1)
+    sd = max(math.sqrt(variance), min_sd)
+    return BiometricNorm(
+        mean=round(mean, 1),
+        sd=round(sd, 2),
+        normal_min=round(mean - 1.5 * sd, 1),
+        normal_max=round(mean + 1.5 * sd, 1),
+        sample_count=len(valid),
+        has_personal_norm=True,
+    )
+
+
+def compute_user_biometric_norms(
+    user_id: str,
+    target_date: date_type | None = None,
+    lookback_days: int = 60,
+) -> tuple[BiometricNorm | None, BiometricNorm | None]:
+    """Compute (rhr_norm, hrv_norm) from stored wellness_day history.
+
+    Returns (None, None) if history is unavailable or has insufficient sample depth.
+    """
+    try:
+        from . import history
+
+        day = target_date or date_type.today()
+        start = day - timedelta(days=lookback_days)
+        rows = history.wellness_between(user_id, start, day)
+        rhr_values = [r.get("resting_hr") for r in rows]
+        hrv_values = [r.get("hrv_ms") for r in rows]
+        return compute_biometric_norm(rhr_values), compute_biometric_norm(hrv_values)
+    except Exception:
+        logger.warning("Could not compute biometric norms from history for user %s", user_id, exc_info=True)
+        return None, None
+
 
 
 def _get(d, *keys, default=None):
@@ -95,6 +163,8 @@ class BodySnapshot:
     resting_heart_rate_delta: int | None = None
     battery_percent: int | None = None
     stress_level: int | None = None
+    rhr_norm: BiometricNorm | None = None
+    hrv_norm: BiometricNorm | None = None
 
 
 @dataclass

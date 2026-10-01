@@ -154,8 +154,27 @@ class DayVerdict:
 
 
 def _hrv_signal(snapshot) -> Signal | None:
+    if snapshot.hrv_last_night_ms is None:
+        return None
+
+    # Check for personal biometric norm first
+    norm = getattr(snapshot, "hrv_norm", None)
+    if norm is not None and getattr(norm, "has_personal_norm", False):
+        moderate_drop = norm.mean - 1.5 * norm.sd
+        severe_drop = norm.mean - 2.0 * norm.sd
+        if snapshot.hrv_last_night_ms >= moderate_drop:
+            return None
+        severity = SEVERITY_STRONG if snapshot.hrv_last_night_ms <= severe_drop else SEVERITY_MODERATE
+        return Signal(
+            key="hrv",
+            label="HRV sotto la tua norma",
+            detail=f"{snapshot.hrv_last_night_ms} ms stanotte, sotto la norma personale ({round(norm.normal_min)}–{round(norm.normal_max)} ms, media {round(norm.mean)} ms)",
+            severity=severity,
+        )
+
+    # Fallback to rolling 7-day delta when personal norm history is insufficient
     nights = [value for _, value in snapshot.hrv_seven_day if value is not None]
-    if len(nights) < HRV_MIN_NIGHTS or snapshot.hrv_last_night_ms is None:
+    if len(nights) < HRV_MIN_NIGHTS:
         return None
     baseline_nights = nights[:-1] if nights[-1] == snapshot.hrv_last_night_ms else nights
     if not baseline_nights:
@@ -177,6 +196,22 @@ def _hrv_signal(snapshot) -> Signal | None:
 
 
 def _rhr_signal(snapshot) -> Signal | None:
+    # Check for personal biometric norm first
+    norm = getattr(snapshot, "rhr_norm", None)
+    if norm is not None and getattr(norm, "has_personal_norm", False) and snapshot.resting_heart_rate is not None:
+        moderate_rise = norm.mean + 1.5 * norm.sd
+        severe_rise = norm.mean + 2.0 * norm.sd
+        if snapshot.resting_heart_rate <= moderate_rise:
+            return None
+        severity = SEVERITY_STRONG if snapshot.resting_heart_rate >= severe_rise else SEVERITY_MODERATE
+        return Signal(
+            key="rhr",
+            label="Frequenza a riposo sopra la tua norma",
+            detail=f"{snapshot.resting_heart_rate} bpm stanotte, sopra la norma personale ({round(norm.normal_min)}–{round(norm.normal_max)} bpm, media {round(norm.mean)} bpm)",
+            severity=severity,
+        )
+
+    # Fallback to 7-day delta when personal norm is unavailable
     delta = snapshot.resting_heart_rate_delta
     if delta is None or delta < RHR_RISE_MODERATE:
         return None
@@ -264,11 +299,15 @@ def state_from_signals(signals: list[Signal]) -> str:
 
     Two strong signals, or one strong plus any other, or three moderate ones, is a body
     saying the same thing in several ways at once -- that is what `scarico` means here.
+    An extreme biometric anomaly (HRV or RHR > 2.0 SD) is also sufficient to trigger scarico.
     One isolated signal is a reason to pay attention, not to stop.
     """
     strong = sum(1 for s in signals if s.severity == SEVERITY_STRONG)
     moderate = sum(1 for s in signals if s.severity == SEVERITY_MODERATE)
-    if strong >= 2 or (strong == 1 and moderate >= 1) or moderate >= 3:
+    biometric_severe = any(
+        s.severity == SEVERITY_STRONG and s.key in ("rhr", "hrv") and "norma" in s.label for s in signals
+    )
+    if biometric_severe or strong >= 2 or (strong == 1 and moderate >= 1) or moderate >= 3:
         return STATE_DEPLETED
     if strong == 1 or moderate >= 1:
         return STATE_CAUTIOUS

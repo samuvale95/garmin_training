@@ -53,7 +53,7 @@ def _body_snapshot(user_id: str, refresh: bool = False) -> body_insights.BodySna
     need exactly the same answer -- the conflict endpoint used to recompute the whole
     thing, doubling the cost of the Oggi screen for data Garmin only updates overnight.
     """
-    return cache.get_or_call(
+    snapshot = cache.get_or_call(
         "body:today",
         user_id,
         None,
@@ -61,6 +61,11 @@ def _body_snapshot(user_id: str, refresh: bool = False) -> body_insights.BodySna
         lambda: garmin_session.run(user_id, lambda sync: body_insights.fetch_body_snapshot(sync=sync)),
         refresh=refresh,
     )
+    if snapshot.rhr_norm is None and snapshot.hrv_norm is None:
+        rhr_norm, hrv_norm = body_insights.compute_user_biometric_norms(user_id, snapshot.date)
+        snapshot.rhr_norm = rhr_norm
+        snapshot.hrv_norm = hrv_norm
+    return snapshot
 
 
 @router.get("/body/today", response_model=schemas.BodySnapshotResponse)

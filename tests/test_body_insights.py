@@ -180,3 +180,39 @@ def test_assess_conflict_no_conflict_without_overnight_data():
     assessment = body_insights.assess_conflict(snapshot, _session_with_intervals())
 
     assert assessment.has_conflict is False
+
+
+# ---- compute_biometric_norm ---------------------------------------------------------------
+
+
+def test_compute_biometric_norm_with_sufficient_history():
+    # 28 days of readings around 60 ms with slight variation
+    history = [58, 62, 60, 59, 61, 63, 57, 60, 62, 59, 61, 58, 60, 62,
+               59, 61, 60, 58, 62, 63, 57, 59, 61, 60, 62, 58, 60, 61]
+    norm = body_insights.compute_biometric_norm(history)
+
+    assert norm is not None
+    assert norm.has_personal_norm is True
+    assert norm.sample_count == 28
+    assert round(norm.mean) == 60
+    assert norm.normal_min < norm.mean < norm.normal_max
+    assert norm.normal_min == round(norm.mean - 1.5 * norm.sd, 1)
+    assert norm.normal_max == round(norm.mean + 1.5 * norm.sd, 1)
+
+
+def test_compute_biometric_norm_with_insufficient_samples_returns_none():
+    short_history = [60, 62, 58, 61, 59, 63]  # Only 6 readings (< 14)
+    norm = body_insights.compute_biometric_norm(short_history)
+    assert norm is None
+
+
+def test_compute_biometric_norm_filters_none_values():
+    history_with_nones = [60, None, 62, 58, None, 61, 59, 63, 60, 62, 58, 61, 59, 60, 62]
+    # 13 valid values, should return None (< 14)
+    assert body_insights.compute_biometric_norm(history_with_nones) is None
+
+    # Add 1 more valid value -> 14 valid values -> should return norm
+    history_with_nones.append(60)
+    norm = body_insights.compute_biometric_norm(history_with_nones)
+    assert norm is not None
+    assert norm.sample_count == 14

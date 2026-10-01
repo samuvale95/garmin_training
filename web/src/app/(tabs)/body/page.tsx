@@ -128,7 +128,7 @@ export default function RecoveryPage() {
                 <p style={{ fontSize: 13, margin: "8px 0 0" }}>Non disponibile</p>
               </SlideUp>
             )}
-            <HrvCard points={data.hrv_seven_day} lastNight={data.hrv_last_night_ms} animate={animate} delayMs={340} />
+            <HrvCard points={data.hrv_seven_day} lastNight={data.hrv_last_night_ms} animate={animate} delayMs={340} norm={data.hrv_norm} />
           </div>
 
           <div style={{ display: "flex", gap: 9, marginTop: 9 }}>
@@ -137,9 +137,11 @@ export default function RecoveryPage() {
               value={data.resting_heart_rate != null ? `${data.resting_heart_rate}` : "—"}
               unit="bpm"
               caption={
-                data.resting_heart_rate_delta != null
-                  ? `${data.resting_heart_rate_delta > 0 ? "+" : ""}${data.resting_heart_rate_delta} sulla tua media di 7 giorni`
-                  : undefined
+                data.rhr_norm?.has_personal_norm
+                  ? `norma ${Math.round(data.rhr_norm.normal_min)}–${Math.round(data.rhr_norm.normal_max)} bpm (media ${Math.round(data.rhr_norm.mean)})`
+                  : data.resting_heart_rate_delta != null
+                    ? `${data.resting_heart_rate_delta > 0 ? "+" : ""}${data.resting_heart_rate_delta} sulla tua media di 7 giorni`
+                    : undefined
               }
               background="var(--crema-card)"
             />

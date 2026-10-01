@@ -62,7 +62,51 @@ export function MoveWarningSheet() {
 
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 }}>
           {move.check.warnings.map((warning) => (
-            <li key={warning.fingerprint} style={{ background: "var(--crema-card)", border: "var(--border-airbnb)", borderRadius: "var(--radius-card)", padding: 13 }}>
+            <li
+              key={warning.fingerprint}
+              style={{
+                background: "var(--crema-card)",
+                border: warning.key === "acwr_excessive" ? "1.5px solid var(--corallo)" : "var(--border-airbnb)",
+                borderRadius: "var(--radius-card)",
+                padding: 13,
+              }}
+            >
+              {warning.key === "acwr_excessive" && (
+                <span
+                  style={{
+                    display: "inline-block",
+                    background: "var(--corallo)",
+                    color: "var(--corallo-testo)",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "2px 8px",
+                    borderRadius: "var(--radius-pill)",
+                    textTransform: "uppercase",
+                    letterSpacing: ".05em",
+                    marginBottom: 6,
+                  }}
+                >
+                  Rischio infortunio · Carico critico
+                </span>
+              )}
+              {warning.key === "acwr_high" && (
+                <span
+                  style={{
+                    display: "inline-block",
+                    background: "var(--giallo)",
+                    color: "var(--giallo-testo)",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "2px 8px",
+                    borderRadius: "var(--radius-pill)",
+                    textTransform: "uppercase",
+                    letterSpacing: ".05em",
+                    marginBottom: 6,
+                  }}
+                >
+                  Attenzione · Sovraccarico acuto
+                </span>
+              )}
               <p style={{ fontSize: 14, lineHeight: 1.45, margin: 0 }}>{warning.message}</p>
               <p className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>
                 {EVIDENCE_LABELS[warning.evidence]}

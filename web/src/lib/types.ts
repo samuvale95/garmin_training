@@ -178,6 +178,15 @@ export interface ReadinessFactor {
   verdict: string | null;
 }
 
+export interface BiometricNorm {
+  mean: number;
+  sd: number;
+  normal_min: number;
+  normal_max: number;
+  sample_count: number;
+  has_personal_norm: boolean;
+}
+
 export interface BodySnapshot {
   date: string;
   has_overnight_data: boolean;
@@ -195,6 +204,8 @@ export interface BodySnapshot {
   resting_heart_rate_delta: number | null;
   battery_percent: number | null;
   stress_level: number | null;
+  rhr_norm?: BiometricNorm | null;
+  hrv_norm?: BiometricNorm | null;
 }
 
 export interface WeeklyLoad {

@@ -13,7 +13,7 @@ from datetime import date, timedelta
 import pytest
 
 from training_plan import readiness
-from training_plan.body_insights import BodySnapshot, SleepPhases
+from training_plan.body_insights import BiometricNorm, BodySnapshot, SleepPhases
 from training_plan.models import RaceGoal, RepeatBlock, Step, TrainingSession
 
 TODAY = date(2026, 9, 10)
@@ -221,3 +221,96 @@ def test_the_model_is_handed_a_decision_not_a_question():
     assert facts["alternativa"] == verdict.alternative.label
     assert facts["gara_fra_giorni"] == 70
     assert all(set(signal) == {"cosa", "misura", "peso"} for signal in facts["segnali"])
+
+
+# ---- personal biometric norms (points 1 & 3) ----------------------------------------
+
+
+def test_hrv_drop_within_personal_variance_causes_no_false_alarm():
+    # Mean 60, SD 5 -> normal range [52.5, 67.5]
+    norm = BiometricNorm(mean=60.0, sd=5.0, normal_min=52.5, normal_max=67.5, sample_count=30, has_personal_norm=True)
+    # 54 ms is -10% below 60, but within personal norm (>= 52.5)
+    snapshot = _snapshot(
+        hrv_last_night_ms=54,
+        hrv_seven_day=_hrv_series(54, baseline=60),
+        hrv_norm=norm,
+    )
+    verdict = readiness.assess_day(snapshot, REPEATS, today=TODAY)
+    assert verdict.state == readiness.STATE_READY
+    assert not any(s.key == "hrv" for s in verdict.signals)
+
+
+def test_hrv_drop_exceeding_personal_variance_triggers_caution():
+    # Mean 60, SD 5 -> normal range [52.5, 67.5], severe threshold < 50.0
+    norm = BiometricNorm(mean=60.0, sd=5.0, normal_min=52.5, normal_max=67.5, sample_count=30, has_personal_norm=True)
+    # 51 ms is below 52.5 (-1.5 SD) but above 50.0 (-2.0 SD)
+    snapshot = _snapshot(
+        hrv_last_night_ms=51,
+        hrv_seven_day=_hrv_series(51, baseline=60),
+        hrv_norm=norm,
+    )
+    verdict = readiness.assess_day(snapshot, REPEATS, today=TODAY)
+    assert verdict.state == readiness.STATE_CAUTIOUS
+    [hrv] = [s for s in verdict.signals if s.key == "hrv"]
+    assert hrv.severity == readiness.SEVERITY_MODERATE
+    assert "norma" in hrv.label.lower()
+    assert "51 ms stanotte" in hrv.detail
+
+
+def test_hrv_severe_drop_exceeding_2_sd_triggers_depleted():
+    norm = BiometricNorm(mean=60.0, sd=5.0, normal_min=52.5, normal_max=67.5, sample_count=30, has_personal_norm=True)
+    # 48 ms is <= 50.0 (mean - 2.0 * sd)
+    snapshot = _snapshot(
+        hrv_last_night_ms=48,
+        hrv_seven_day=_hrv_series(48, baseline=60),
+        hrv_norm=norm,
+    )
+    verdict = readiness.assess_day(snapshot, REPEATS, today=TODAY)
+    assert verdict.state == readiness.STATE_DEPLETED
+    [hrv] = [s for s in verdict.signals if s.key == "hrv"]
+    assert hrv.severity == readiness.SEVERITY_STRONG
+
+
+def test_rhr_rise_within_personal_norm_causes_no_false_alarm():
+    # Mean 48, SD 2.5 -> normal max = 48 + 1.5*2.5 = 51.75
+    norm = BiometricNorm(mean=48.0, sd=2.5, normal_min=44.25, normal_max=51.75, sample_count=30, has_personal_norm=True)
+    # 51 bpm (+3 bpm) would trigger under old static rule, but is <= 51.75
+    snapshot = _snapshot(
+        resting_heart_rate=51,
+        resting_heart_rate_delta=3,
+        rhr_norm=norm,
+    )
+    verdict = readiness.assess_day(snapshot, REPEATS, today=TODAY)
+    assert verdict.state == readiness.STATE_READY
+    assert not any(s.key == "rhr" for s in verdict.signals)
+
+
+def test_rhr_rise_exceeding_2_sd_triggers_depleted():
+    norm = BiometricNorm(mean=48.0, sd=2.5, normal_min=44.25, normal_max=51.75, sample_count=30, has_personal_norm=True)
+    # 54 bpm > 48 + 2.0*2.5 = 53.0
+    snapshot = _snapshot(
+        resting_heart_rate=54,
+        resting_heart_rate_delta=6,
+        rhr_norm=norm,
+    )
+    verdict = readiness.assess_day(snapshot, REPEATS, today=TODAY)
+    assert verdict.state == readiness.STATE_DEPLETED
+    [rhr] = [s for s in verdict.signals if s.key == "rhr"]
+    assert rhr.severity == readiness.SEVERITY_STRONG
+    assert "norma" in rhr.label.lower()
+
+
+def test_insufficient_norm_samples_falls_back_to_7_day_delta():
+    # Sample count 6 < 14, has_personal_norm=False
+    norm = BiometricNorm(mean=60.0, sd=5.0, normal_min=52.5, normal_max=67.5, sample_count=6, has_personal_norm=False)
+    snapshot = _snapshot(
+        hrv_last_night_ms=46,
+        hrv_seven_day=_hrv_series(46, baseline=60),
+        hrv_norm=norm,
+    )
+    verdict = readiness.assess_day(snapshot, EASY, today=TODAY)
+    [hrv] = [s for s in verdict.signals if s.key == "hrv"]
+    # Fallback uses 7-day delta label and percentage
+    assert "media" in hrv.label.lower()
+    assert "-23%" in hrv.detail
+

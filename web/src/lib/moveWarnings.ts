@@ -73,3 +73,41 @@ export const EVIDENCE_LABELS: Record<MoveWarning["evidence"], string> = {
   consenso: "condiviso dagli allenatori",
   prudenza: "per prudenza",
 };
+
+export function isAcwrWarning(key: string): boolean {
+  return key === "acwr_high" || key === "acwr_excessive";
+}
+
+/** Compute projected 7-day acute volume and ACWR for a given date given a chronic baseline. */
+export function computeProjectedAcwr(
+  sessions: TrainingSession[],
+  chronicWeeklyMinutes: number | null,
+  targetDate: string
+): { acwr: number | null; acuteMinutes: number } {
+  if (!chronicWeeklyMinutes || chronicWeeklyMinutes < 10) {
+    return { acwr: null, acuteMinutes: 0 };
+  }
+  const target = new Date(targetDate);
+  const start = new Date(target);
+  start.setDate(target.getDate() - 6);
+
+  let acuteMinutes = 0;
+  for (const s of sessions) {
+    if (s.sport !== "running") continue;
+    const d = new Date(s.date);
+    if (d >= start && d <= target) {
+      for (const step of s.steps || []) {
+        if ("reps" in step) {
+          for (const sub of step.steps || []) {
+            if (sub.duration_type === "time") acuteMinutes += sub.duration_value * step.reps;
+          }
+        } else if (step.duration_type === "time") {
+          acuteMinutes += step.duration_value;
+        }
+      }
+    }
+  }
+
+  const acwr = Math.round((acuteMinutes / chronicWeeklyMinutes) * 100) / 100;
+  return { acwr, acuteMinutes: Math.round(acuteMinutes) };
+}

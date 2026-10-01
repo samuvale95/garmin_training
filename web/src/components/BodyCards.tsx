@@ -179,17 +179,20 @@ export function HrvCard({
   lastNight,
   animate,
   delayMs,
+  norm,
 }: {
   points: HrvPoint[];
   lastNight: number | null;
   animate: boolean;
   delayMs: number;
+  norm?: import("@/lib/types").BiometricNorm | null;
 }) {
   const values = points.map((p) => p.value_ms).filter((v): v is number => v != null);
-  const max = Math.max(...values, 1);
+  const max = Math.max(...values, norm?.normal_max ?? 0, 1);
   const earlier = values.slice(0, -1);
   const baseline = earlier.length > 0 ? earlier.reduce((sum, v) => sum + v, 0) / earlier.length : null;
   const delta = baseline != null && lastNight != null ? Math.round(((lastNight - baseline) / baseline) * 100) : null;
+  const hasNorm = norm?.has_personal_norm ?? false;
 
   return (
     <SlideUp
@@ -218,15 +221,40 @@ export function HrvCard({
           <span style={{ fontSize: 12.5, color: "var(--inchiostro-50)" }}>ms stanotte</span>
         </div>
 
-        {baseline != null && (
+        {hasNorm && norm ? (
+          <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>
+            norma personale: {Math.round(norm.normal_min)}–{Math.round(norm.normal_max)} ms (media {Math.round(norm.mean)})
+            {lastNight != null && (
+              <span style={{ color: lastNight < norm.normal_min ? "var(--corallo-testo)" : "var(--verde-testo)", fontWeight: 600 }}>
+                {lastNight < norm.normal_min ? " · sotto norma" : " · nella norma"}
+              </span>
+            )}
+          </p>
+        ) : baseline != null ? (
           <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>
             media delle altre {earlier.length} notti: {Math.round(baseline)} ms
             {delta != null && ` · ${delta > 0 ? "+" : ""}${delta}%`}
           </p>
-        )}
+        ) : null}
 
         <div style={{ position: "relative", height: HRV_CHART_HEIGHT, marginTop: 14 }}>
-          {baseline != null && (
+          {hasNorm && norm ? (
+            <div
+              aria-hidden="true"
+              title={`Norma personale: ${Math.round(norm.normal_min)}–${Math.round(norm.normal_max)} ms`}
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: `${(norm.normal_min / max) * HRV_CHART_HEIGHT}px`,
+                height: `${Math.max(4, ((norm.normal_max - norm.normal_min) / max) * HRV_CHART_HEIGHT)}px`,
+                background: "rgba(46,125,50,0.08)",
+                borderTop: "1px dashed rgba(46,125,50,0.35)",
+                borderBottom: "1px dashed rgba(46,125,50,0.35)",
+                borderRadius: 2,
+              }}
+            />
+          ) : baseline != null ? (
             <div
               aria-hidden="true"
               style={{
@@ -237,7 +265,7 @@ export function HrvCard({
                 borderTop: "1px dashed var(--inchiostro-35)",
               }}
             />
-          )}
+          ) : null}
           <div style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 4, height: "100%" }}>
             {points.map((point, i) => {
               const isLast = i === points.length - 1;

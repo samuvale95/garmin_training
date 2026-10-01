@@ -565,6 +565,28 @@ class HrvPointOut(BaseModel):
     value_ms: int | None
 
 
+class BiometricNormOut(BaseModel):
+    mean: float
+    sd: float
+    normal_min: float
+    normal_max: float
+    sample_count: int
+    has_personal_norm: bool = True
+
+    @classmethod
+    def from_model(cls, norm: "body_insights.BiometricNorm | None") -> "BiometricNormOut | None":
+        if norm is None:
+            return None
+        return cls(
+            mean=norm.mean,
+            sd=norm.sd,
+            normal_min=norm.normal_min,
+            normal_max=norm.normal_max,
+            sample_count=norm.sample_count,
+            has_personal_norm=norm.has_personal_norm,
+        )
+
+
 class BodySnapshotResponse(BaseModel):
     date: date_type
     has_overnight_data: bool
@@ -579,6 +601,8 @@ class BodySnapshotResponse(BaseModel):
     resting_heart_rate_delta: int | None = None
     battery_percent: int | None = None
     stress_level: int | None = None
+    rhr_norm: BiometricNormOut | None = None
+    hrv_norm: BiometricNormOut | None = None
 
     @classmethod
     def from_model(cls, snapshot: "body_insights.BodySnapshot") -> "BodySnapshotResponse":
@@ -599,6 +623,8 @@ class BodySnapshotResponse(BaseModel):
             resting_heart_rate_delta=snapshot.resting_heart_rate_delta,
             battery_percent=snapshot.battery_percent,
             stress_level=snapshot.stress_level,
+            rhr_norm=BiometricNormOut.from_model(snapshot.rhr_norm),
+            hrv_norm=BiometricNormOut.from_model(snapshot.hrv_norm),
         )
 
 

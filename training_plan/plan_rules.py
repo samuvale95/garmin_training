@@ -76,6 +76,8 @@ RULES: dict[str, Rule] = {
         Rule("easy_share", EVIDENCE_RESEARCH, False, (0.90, 0.80, 0.75)),
         Rule("long_run_growth", EVIDENCE_CAUTION, False, (0.15, 0.15, 0.15)),
         Rule("deload", EVIDENCE_CONSENSUS, False, (0.80, 0.80, 0.85)),
+        Rule("acwr_high", EVIDENCE_RESEARCH, True, (1.35, 1.35, 1.35)),
+        Rule("acwr_excessive", EVIDENCE_RESEARCH, True, (1.50, 1.50, 1.50)),
     )
 }
 
@@ -469,6 +471,42 @@ def _deload(weeks, ctx: RuleContext, start: date_type, end: date_type) -> list[V
     return out
 
 
+def _acwr_limits(planned: list[_Planned], ctx: RuleContext) -> list[Violation]:
+    from . import plan_limits
+
+    assessment = plan_limits.find_peak_acwr(planned, ctx.recent_weekly_minutes)
+    level = ctx.effective_level
+    if assessment.status == plan_limits.STATUS_EXCESSIVE:
+        ratio = assessment.acwr or 1.50
+        date_str = f" ({_fmt_day(assessment.peak_date)})" if assessment.peak_date else ""
+        return [
+            _v(
+                "acwr_excessive",
+                level,
+                f"Picco critico di carico acuto{date_str}: rapporto acuto/cronico a {ratio:.2f} "
+                f"(limite massimo 1.50). Elevato rischio infortuni: valuta di alleggerire la seduta o distanziare i carichi.",
+                ratio,
+                1.50,
+                assessment.involved_sessions,
+            )
+        ]
+    if assessment.status == plan_limits.STATUS_HIGH:
+        ratio = assessment.acwr or 1.35
+        date_str = f" ({_fmt_day(assessment.peak_date)})" if assessment.peak_date else ""
+        return [
+            _v(
+                "acwr_high",
+                level,
+                f"Carico acuto alto{date_str}: rapporto acuto/cronico a {ratio:.2f} "
+                f"(limite consigliato 1.35). Aumenta il rischio di sovraccarico.",
+                ratio,
+                1.35,
+                assessment.involved_sessions,
+            )
+        ]
+    return []
+
+
 # ---- the whole thing ---------------------------------------------------------------------
 
 
@@ -502,6 +540,7 @@ def validate(
         *_easy_share(planned, context),
         *_long_run_growth(planned, context),
         *_deload(weeks, context, start, end),
+        *_acwr_limits(planned, context),
     ]
     if only_move_warnings:
         violations = [v for v in violations if v.warn_on_move]
