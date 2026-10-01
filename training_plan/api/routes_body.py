@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
-from .. import body_insights, checkin, llm, readiness
+from .. import body_insights, checkin, db, fitness_fatigue, history, llm, models, plan_store, readiness
 from . import garmin_session, schemas
 from .auth import current_user_id
 from .cache import (
@@ -87,6 +87,79 @@ async def body_load(refresh: bool = False, user_id: str = Depends(current_user_i
         )
     )
     return schemas.LoadSnapshotResponse.from_model(snapshot)
+
+
+def _load_user_sessions(user_id: str) -> list[models.TrainingSession]:
+    sessions: list[models.TrainingSession] = []
+    try:
+        raw_list = plan_store.list_sessions(user_id)
+        for item in raw_list:
+            try:
+                sessions.append(schemas.TrainingSessionIn.model_validate(item).to_model())
+            except Exception:
+                d = item.get("date")
+                if isinstance(d, str):
+                    d = date.fromisoformat(d)
+                if d:
+                    sessions.append(
+                        models.TrainingSession(
+                            date=d,
+                            sport=item.get("sport") or "running",
+                            title=item.get("title") or "Sessione",
+                        )
+                    )
+    except Exception:
+        logger.warning("Could not load plan sessions for user %s", user_id, exc_info=True)
+    return sessions
+
+
+def _load_user_goal(user_id: str) -> models.RaceGoal | None:
+    try:
+        plan = db.get_plan(user_id)
+        if plan and plan.goal:
+            return schemas.RaceGoalIn.model_validate(plan.goal).to_model()
+    except Exception:
+        logger.warning("Could not load goal for user %s", user_id, exc_info=True)
+    return None
+
+
+def _load_user_activities(user_id: str, lookback_days: int = 90) -> list[dict]:
+    try:
+        today = date.today()
+        start = today - timedelta(days=lookback_days)
+        return history.activities_between(user_id, start, today)
+    except Exception:
+        logger.warning("Could not load activities for user %s", user_id, exc_info=True)
+        return []
+
+
+@router.get("/body/fitness-fatigue", response_model=schemas.FitnessFatigueResponse)
+async def body_fitness_fatigue(
+    lookback_days: int = 60,
+    refresh: bool = False,
+    user_id: str = Depends(current_user_id),
+) -> schemas.FitnessFatigueResponse:
+    """Continuous CTL, ATL, and TSB timeline with forward race projection."""
+    def compute() -> schemas.FitnessFatigueResponse:
+        activities = _load_user_activities(user_id, lookback_days=max(lookback_days, 60))
+        sessions = _load_user_sessions(user_id)
+        goal = _load_user_goal(user_id)
+        today = date.today()
+        wellness = history.wellness_between(user_id, today - timedelta(days=7), today)
+        rhrs = [w.get("resting_hr") for w in wellness if w.get("resting_hr")]
+        resting_hr = round(sum(rhrs) / len(rhrs)) if rhrs else 48
+
+        result = fitness_fatigue.compute_fitness_fatigue_timeline(
+            activities=activities,
+            planned_sessions=sessions,
+            goal=goal,
+            today=today,
+            lookback_days=lookback_days,
+            resting_hr=resting_hr,
+        )
+        return schemas.FitnessFatigueResponse.from_model(result)
+
+    return await run_in_threadpool(compute)
 
 
 @router.get("/body/metrics", response_model=schemas.BodyMetricsResponse)

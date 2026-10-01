@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from .. import (
     body_insights,
     db,
+    fitness_fatigue,
     garmin_sync,
     goal_fit,
     intensity,
@@ -662,6 +663,89 @@ class LoadSnapshotResponse(BaseModel):
             ],
             acute_chronic_ratio=snapshot.acute_chronic_ratio,
             vo2max=snapshot.vo2max,
+        )
+
+
+# ---- fitness, fatigue, and form (CTL, ATL, TSB) -------------------------------------------
+
+
+class FormStatusOut(BaseModel):
+    key: str
+    label: str
+    caption: str
+    color: str
+
+    @classmethod
+    def from_model(cls, status: "fitness_fatigue.FormStatus") -> "FormStatusOut":
+        return cls(
+            key=status.key,
+            label=status.label,
+            caption=status.caption,
+            color=status.color,
+        )
+
+
+class FitnessFatiguePointOut(BaseModel):
+    date: date_type
+    ctl: float
+    atl: float
+    tsb: float
+    load: float
+    status: FormStatusOut
+    is_projection: bool = False
+
+    @classmethod
+    def from_model(cls, pt: "fitness_fatigue.DailyMetrics") -> "FitnessFatiguePointOut":
+        return cls(
+            date=pt.date,
+            ctl=pt.ctl,
+            atl=pt.atl,
+            tsb=pt.tsb,
+            load=pt.load,
+            status=FormStatusOut.from_model(pt.status),
+            is_projection=pt.is_projection,
+        )
+
+
+class RaceTaperingOut(BaseModel):
+    race_date: date_type
+    race_name: str
+    days_to_race: int
+    projected_ctl: float
+    projected_atl: float
+    projected_tsb: float
+    status: FormStatusOut
+    verdict: str
+    advice: str
+
+    @classmethod
+    def from_model(cls, a: "fitness_fatigue.RaceTaperingAssessment") -> "RaceTaperingOut":
+        return cls(
+            race_date=a.race_date,
+            race_name=a.race_name,
+            days_to_race=a.days_to_race,
+            projected_ctl=a.projected_ctl,
+            projected_atl=a.projected_atl,
+            projected_tsb=a.projected_tsb,
+            status=FormStatusOut.from_model(a.status),
+            verdict=a.verdict,
+            advice=a.advice,
+        )
+
+
+class FitnessFatigueResponse(BaseModel):
+    current: FitnessFatiguePointOut
+    history: list[FitnessFatiguePointOut]
+    projection: list[FitnessFatiguePointOut]
+    race_assessment: RaceTaperingOut | None = None
+
+    @classmethod
+    def from_model(cls, res: "fitness_fatigue.FitnessFatigueResult") -> "FitnessFatigueResponse":
+        return cls(
+            current=FitnessFatiguePointOut.from_model(res.current),
+            history=[FitnessFatiguePointOut.from_model(p) for p in res.history],
+            projection=[FitnessFatiguePointOut.from_model(p) for p in res.projection],
+            race_assessment=RaceTaperingOut.from_model(res.race_assessment) if res.race_assessment else None,
         )
 
 

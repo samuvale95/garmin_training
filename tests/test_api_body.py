@@ -81,3 +81,17 @@ def test_body_conflict_with_demanding_next_session(client):
     # test exists to prove the endpoint wires the request through, not to re-assert
     # assess_conflict's own logic (already covered in test_body_insights.py).
     assert "has_conflict" in body
+
+
+def test_body_fitness_fatigue_endpoint(client):
+    response = client.get("/body/fitness-fatigue?lookback_days=30")
+    assert response.status_code == 200
+    body = response.json()
+    assert "current" in body
+    assert "ctl" in body["current"]
+    assert "atl" in body["current"]
+    assert "tsb" in body["current"]
+    assert "status" in body["current"]
+    assert "history" in body
+    assert len(body["history"]) >= 30
+    assert "projection" in body

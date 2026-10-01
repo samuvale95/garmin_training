@@ -21,6 +21,7 @@ import type {
   DayVerdict,
   DeleteResult,
   DeviceInfo,
+  FitnessFatigueData,
   FoodDay,
   FoodEntries,
   FoodEntry,
@@ -944,6 +945,15 @@ export function useBodyLoad() {
   return useQuery({
     queryKey: ["body", "load"],
     queryFn: ({ signal }) => apiGet<LoadSnapshot>("/body/load", undefined, signal),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useFitnessFatigue(lookbackDays = 60) {
+  return useQuery({
+    queryKey: ["body", "fitness-fatigue", lookbackDays],
+    queryFn: ({ signal }) =>
+      apiGet<FitnessFatigueData>(`/body/fitness-fatigue?lookback_days=${lookbackDays}`, undefined, signal),
     staleTime: 5 * 60_000,
   });
 }

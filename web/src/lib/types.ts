@@ -222,6 +222,42 @@ export interface LoadSnapshot {
   vo2max: number | null;
 }
 
+export interface FormStatus {
+  key: string;
+  label: string;
+  caption: string;
+  color: string;
+}
+
+export interface FitnessFatiguePoint {
+  date: string;
+  ctl: number;
+  atl: number;
+  tsb: number;
+  load: number;
+  status: FormStatus;
+  is_projection?: boolean;
+}
+
+export interface RaceTaperingAssessment {
+  race_date: string;
+  race_name: string;
+  days_to_race: number;
+  projected_ctl: number;
+  projected_atl: number;
+  projected_tsb: number;
+  status: FormStatus;
+  verdict: string;
+  advice: string;
+}
+
+export interface FitnessFatigueData {
+  current: FitnessFatiguePoint;
+  history: FitnessFatiguePoint[];
+  projection: FitnessFatiguePoint[];
+  race_assessment?: RaceTaperingAssessment | null;
+}
+
 /** One comparison between the plan and the race, carrying both numbers -- "il più lungo
  * in programma è 24 km, per questa distanza se ne fanno almeno 30". */
 export interface GoalObservation {
