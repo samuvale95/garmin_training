@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS food_entry (
 );
 CREATE INDEX IF NOT EXISTS idx_food_entry_user_date ON food_entry(user_id, date);
 ALTER TABLE food_entry ADD COLUMN IF NOT EXISTS thumbnail BYTEA;
+ALTER TABLE food_entry ADD COLUMN IF NOT EXISTS portion DOUBLE PRECISION NOT NULL DEFAULT 1;
 
 CREATE TABLE IF NOT EXISTS user_plan (
   user_id      TEXT PRIMARY KEY,
@@ -109,6 +110,12 @@ class FoodEntry:
     # response the client already fetches with `Authorization` set, and become a
     # `data:` URI at the schema layer (`schemas.FoodEntryOut.from_model`).
     thumbnail: bytes | None
+    # How much of what was photographed or described was actually eaten, as a multiple
+    # of it (0.5 = half the plate, 2 = two of them). The macros above are already
+    # scaled by it -- they are always what was eaten -- so every sum over this table
+    # stays a plain SUM; this only remembers the factor so the next change of portion
+    # can rescale from it instead of compounding a guess.
+    portion: float = 1.0
 
     @classmethod
     def from_row(cls, row: DictRow) -> "FoodEntry":
@@ -125,6 +132,7 @@ class FoodEntry:
             confidence=row["confidence"],
             corrected=bool(row["corrected"]),
             thumbnail=bytes(row["thumbnail"]) if row["thumbnail"] is not None else None,
+            portion=row["portion"],
         )
 
 
@@ -278,26 +286,47 @@ def entries_between(user_id: str, start: date_type, end: date_type) -> list[Food
 # The fields a correction may touch. `source`, `date` and `logged_at` are not among them:
 # an edit changes what was eaten, never when it was logged or how it got here.
 EDITABLE_FIELDS = ("description", "kcal", "carb_g", "protein_g", "fat_g")
+MACRO_FIELDS = ("kcal", "carb_g", "protein_g", "fat_g")
 
 
 def update_entry(user_id: str, entry_id: int, **fields: Any) -> FoodEntry | None:
-    """Apply a correction. Any touched entry is marked `corrected`, permanently.
+    """Apply a correction and/or a change of portion.
 
-    That flag is the point of the operation as much as the new numbers are: it records
-    that a human looked at this row, which is the only thing that separates a measured
-    figure from a guessed one once both are sitting in the same table.
+    A correction marks the entry `corrected`, permanently. That flag is the point of the
+    operation as much as the new numbers are: it records that a human looked at this
+    row, which is the only thing that separates a measured figure from a guessed one
+    once both are sitting in the same table.
+
+    A change of `portion` alone does **not**: saying "I ate half of it" is not checking
+    the model's numbers, it is scaling them. Every macro the same call does not set
+    explicitly is rescaled by new/old portion, in the same statement (the right-hand
+    side of an UPDATE reads the row as it was, so `portion` there is the old one).
+    Macros the call does set are taken as already meaning the new portion -- they are
+    what the user sees on screen and typed in.
     """
     updates = {k: v for k, v in fields.items() if k in EDITABLE_FIELDS}
-    if not updates:
+    portion = fields.get("portion")
+    if not updates and portion is None:
         return get_entry(user_id, entry_id)
 
-    assignments = ", ".join(f"{key} = %s" for key in updates)
+    assignments = [f"{key} = %s" for key in updates]
+    params: list[Any] = list(updates.values())
+    if portion is not None:
+        for macro in MACRO_FIELDS:
+            if macro not in updates:
+                assignments.append(f"{macro} = {macro} * %s / portion")
+                params.append(portion)
+        assignments.append("portion = %s")
+        params.append(portion)
+    if updates:
+        assignments.append("corrected = TRUE")
+
     with connect() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
-                f"UPDATE food_entry SET {assignments}, corrected = TRUE "
+                f"UPDATE food_entry SET {', '.join(assignments)} "
                 "WHERE id = %s AND user_id = %s RETURNING *",
-                (*updates.values(), entry_id, user_id),
+                (*params, entry_id, user_id),
             )
             row = cur.fetchone()
     return FoodEntry.from_row(row) if row else None

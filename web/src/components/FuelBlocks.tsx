@@ -3,7 +3,7 @@
 import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { SlideUp } from "@/components/motion/primitives";
-import { FoodThumb } from "@/components/FuelCorrectionSheet";
+import { FoodThumb, portionLabel } from "@/components/FuelCorrectionSheet";
 import { capitalize, formatClockTime } from "@/lib/format";
 import type {
   DayTarget,
@@ -581,6 +581,7 @@ export function MealRow({ entry, onSelect }: { entry: FoodEntry; onSelect: (e: F
         </p>
         <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: 0 }}>
           {entry.carb_g != null ? Math.round(entry.carb_g) : "—"} g C · {entry.protein_g != null ? Math.round(entry.protein_g) : "—"} g P
+          {entry.portion !== 1 && ` · ${portionLabel(entry.portion)} porz.`}
         </p>
       </div>
       <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", flexShrink: 0 }}>

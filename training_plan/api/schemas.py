@@ -1193,6 +1193,9 @@ class FoodEntryOut(BaseModel):
     fat_g: float | None = None
     confidence: str | None = None
     corrected: bool = False
+    # Multiple of the photographed/described plate actually eaten. The macros above
+    # already include it -- they are always what was eaten.
+    portion: float = 1.0
     # Null unless a low-quality thumbnail was saved alongside this entry -- the full
     # photo is never written to disk (see `db.py`), only the small client-compressed
     # copy used for the meal-list icon. A `data:` URI, not a link: every route requires
@@ -1214,6 +1217,7 @@ class FoodEntryOut(BaseModel):
             fat_g=entry.fat_g,
             confidence=entry.confidence,
             corrected=entry.corrected,
+            portion=entry.portion,
             image_url=(
                 f"data:image/jpeg;base64,{base64.b64encode(entry.thumbnail).decode('ascii')}"
                 if entry.thumbnail
@@ -1274,13 +1278,19 @@ class FoodEntriesResponse(BaseModel):
 
 class EntryPatchRequest(BaseModel):
     """A correction. Every field optional: an untouched field keeps its estimate, and
-    sending any of them marks the entry as corrected by the user."""
+    sending any of them marks the entry as corrected by the user.
+
+    `portion` is the exception: it says how much of the plate was eaten (0.5 = half,
+    2 = double) and rescales the macros not sent alongside it, without marking the
+    entry corrected -- the numbers are still the model's, just multiplied
+    (see `db.update_entry`)."""
 
     description: str | None = None
     kcal: float | None = None
     carb_g: float | None = None
     protein_g: float | None = None
     fat_g: float | None = None
+    portion: float | None = Field(default=None, gt=0, le=10)
 
 
 class DeleteEntryResponse(BaseModel):
