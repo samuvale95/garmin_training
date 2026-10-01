@@ -19,6 +19,16 @@ export function useSession(): SessionState {
   const [state, setState] = useState<SessionState>({ session: null, loading: true });
 
   useEffect(() => {
+    const devToken = typeof window !== "undefined" ? localStorage.getItem("passo_dev_token") : null;
+    if (devToken) {
+      const mockSession = {
+        access_token: devToken,
+        user: { id: "dev-athlete", email: "dev@passo.app" },
+      } as unknown as Session;
+      setState({ session: mockSession, loading: false });
+      return;
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       setState({ session: data.session, loading: false });
     });
@@ -34,12 +44,21 @@ export function useSession(): SessionState {
 }
 
 /** The bearer token for the current Supabase session, or `null` when signed out --
- * read by `apiClient.ts` on every request. `getSession()` returns the cached session
- * synchronously-fast and refreshes it under the hood when near expiry, so this never
- * needs its own refresh logic. */
+ * read by `apiClient.ts` on every request. */
 export async function getAccessToken(): Promise<string | null> {
+  if (typeof window !== "undefined") {
+    const devToken = localStorage.getItem("passo_dev_token");
+    if (devToken) return devToken;
+  }
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token ?? null;
+}
+
+export function signInDev(): void {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("passo_dev_token", "dev-athlete");
+    window.location.href = "/today";
+  }
 }
 
 export async function signInWithGoogle(): Promise<void> {
@@ -51,5 +70,8 @@ export async function signInWithGoogle(): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("passo_dev_token");
+  }
   await supabase.auth.signOut();
 }

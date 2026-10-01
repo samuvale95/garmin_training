@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { BrandMark } from "@/components/motion/BrandMark";
-import { signInWithGoogle } from "@/lib/auth";
+import { signInDev, signInWithGoogle } from "@/lib/auth";
 
 export default function LoginPage() {
   const [pending, setPending] = useState(false);
@@ -251,6 +251,23 @@ export default function LoginPage() {
             </>
           )}
         </motion.button>
+
+        <button
+          type="button"
+          onClick={() => signInDev()}
+          style={{
+            marginTop: 14,
+            background: "transparent",
+            border: "none",
+            color: "var(--inchiostro-50)",
+            fontSize: 12,
+            textDecoration: "underline",
+            cursor: "pointer",
+            padding: "6px 12px",
+          }}
+        >
+          Accedi in locale (Modalità Sviluppo)
+        </button>
       </motion.div>
 
       {/* Footer Info */}
