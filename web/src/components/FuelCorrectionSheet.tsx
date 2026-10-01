@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
 import { useMotionEnabled } from "@/lib/motion";
 import { apiUrl } from "@/lib/apiClient";
 import { formatClockTime } from "@/lib/format";
@@ -40,24 +40,23 @@ export const SOURCE_LABELS: Record<string, string> = {
   manual: "scritto a mano",
 };
 
-/** The quick choices for "how much of it did you eat". Multiples of the plate:
- * 50% (Metà), 75% (Tre quarti), 100% (Intera), 125% (Abbondante), 150% (Una e mezza), 200% (Doppia). */
-export const PORTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
-
-export function portionDescriptor(portion: number): string {
-  if (portion <= 0.3) return "Un assaggio";
-  if (portion <= 0.6) return "Mezza porzione";
-  if (portion <= 0.85) return "Porzione leggera";
-  if (portion >= 0.95 && portion <= 1.05) return "Porzione standard";
-  if (portion <= 1.35) return "Abbondante";
-  if (portion <= 1.65) return "Una e mezza";
-  if (portion <= 2.2) return "Doppia porzione";
-  return `${Math.round(portion * 100)}% del piatto`;
-}
+/** Numeric choices for portions, expressed in clean numbers (e.g. 0.5, 0.75, 1.0, 1.25, 1.5, 2.0). */
+export const PORTIONS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0] as const;
 
 export function portionLabel(portion: number): string {
-  const pct = Math.round(portion * 100);
-  return `${pct}%`;
+  // Clean decimal formatting (e.g. 1, 0.5, 1.25, 1.5, 2)
+  return Number.isInteger(portion) ? portion.toFixed(0) : portion.toString().replace(".", ",");
+}
+
+export function portionDescriptor(portion: number): string {
+  if (portion <= 0.3) return "Assaggio";
+  if (portion <= 0.6) return "Mezza porzione";
+  if (portion <= 0.85) return "Ridotta";
+  if (portion >= 0.95 && portion <= 1.05) return "Porzione intera (1 piatto)";
+  if (portion <= 1.35) return "Abbondante";
+  if (portion <= 1.65) return "Una e mezza";
+  if (portion <= 2.2) return "Doppia";
+  return `${portionLabel(portion)} porzioni`;
 }
 
 /** A macro field's text at a new portion. Recomputed from the saved entry while the user
@@ -68,15 +67,67 @@ export function macroAtPortion(saved: number | null, savedPortion: number, typed
   return typed === "" ? "" : String(Math.round((Number(typed) / from) * to));
 }
 
-/** "Quanto ne hai mangiato": sleek interactive stepper with percentage pill presets. */
-export function PortionPicker({ value, onChange, disabled }: { value: number; onChange: (portion: number) => void; disabled?: boolean }) {
-  const currentPct = Math.round(value * 100);
-  const descriptor = portionDescriptor(value);
+const ITEM_HEIGHT = 44;
+const VISIBLE_ITEMS = 3; // 1 center, 1 above, 1 below
 
-  const handleStep = (delta: number) => {
+/** iOS Wheel Picker for portions with clean decimal numbers, smooth snapping and tactile styling. */
+export function PortionPicker({ value, onChange, disabled }: { value: number; onChange: (portion: number) => void; disabled?: boolean }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Ensure current value is included in list of numbers
+  const options = useMemo(() => {
+    if (PORTIONS.includes(value as (typeof PORTIONS)[number])) {
+      return [...PORTIONS];
+    }
+    return [...PORTIONS, value].sort((a, b) => a - b);
+  }, [value]);
+
+  const selectedIndex = useMemo(() => {
+    const idx = options.findIndex((opt) => Math.abs(opt - value) < 0.01);
+    return idx >= 0 ? idx : 0;
+  }, [options, value]);
+
+  // Center on mount and when value changes externally
+  useEffect(() => {
+    if (isScrollingRef.current) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const targetScrollTop = selectedIndex * ITEM_HEIGHT;
+    if (Math.abs(el.scrollTop - targetScrollTop) > 2) {
+      el.scrollTo({ top: targetScrollTop, behavior: "smooth" });
+    }
+  }, [selectedIndex]);
+
+  const handleScroll = () => {
     if (disabled) return;
-    const next = Math.max(0.1, Math.min(3.0, Math.round((value + delta) * 100) / 100));
-    onChange(next);
+    isScrollingRef.current = true;
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+
+    scrollTimeoutRef.current = setTimeout(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      const index = Math.round(el.scrollTop / ITEM_HEIGHT);
+      const clampedIndex = Math.max(0, Math.min(options.length - 1, index));
+      const targetScroll = clampedIndex * ITEM_HEIGHT;
+      el.scrollTo({ top: targetScroll, behavior: "smooth" });
+
+      const chosen = options[clampedIndex];
+      if (Math.abs(chosen - value) >= 0.01) {
+        onChange(chosen);
+      }
+      setTimeout(() => {
+        isScrollingRef.current = false;
+      }, 150);
+    }, 80);
+  };
+
+  const handleSelectIndex = (idx: number) => {
+    if (disabled) return;
+    const targetScroll = idx * ITEM_HEIGHT;
+    containerRef.current?.scrollTo({ top: targetScroll, behavior: "smooth" });
+    onChange(options[idx]);
   };
 
   return (
@@ -84,143 +135,137 @@ export function PortionPicker({ value, onChange, disabled }: { value: number; on
       style={{
         background: "var(--crema-card)",
         borderRadius: "var(--radius-card)",
-        padding: "16px 16px 14px",
+        padding: "14px 16px",
         border: "1px solid rgba(0,0,0,0.04)",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
         <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--inchiostro-50)" }}>
-          Porzione consumata
+          Quantità Porzione
         </span>
-        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--inchiostro-70)" }}>
-          {descriptor}
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro)" }}>
+          {portionDescriptor(value)}
         </span>
       </div>
 
-      {/* Main Stepper Card */}
+      {/* iOS Wheel Picker Container */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          background: "var(--crema)",
+          position: "relative",
+          height: ITEM_HEIGHT * VISIBLE_ITEMS,
           borderRadius: "var(--radius-chip)",
-          padding: "6px 8px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-          border: "1px solid rgba(0,0,0,0.05)",
-          marginBottom: 12,
+          background: "var(--crema)",
+          boxShadow: "inset 0 1px 3px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.03)",
+          overflow: "hidden",
+          border: "1px solid rgba(0,0,0,0.06)",
         }}
       >
-        <button
-          type="button"
-          aria-label="Diminuisci porzione"
-          disabled={disabled || value <= 0.25}
-          onClick={() => handleStep(-0.25)}
-          className="tap-target"
+        {/* iOS Selection Highlight Band */}
+        <div
+          aria-hidden="true"
           style={{
-            width: 44,
-            height: 44,
-            borderRadius: "var(--radius-chip)",
-            border: "none",
-            background: "var(--sabbia)",
-            color: "var(--inchiostro)",
-            fontSize: 20,
-            fontWeight: 500,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: disabled || value <= 0.25 ? "not-allowed" : "pointer",
-            opacity: disabled || value <= 0.25 ? 0.35 : 1,
-            transition: "background 0.15s ease, transform 0.1s ease",
+            position: "absolute",
+            top: ITEM_HEIGHT,
+            left: 8,
+            right: 8,
+            height: ITEM_HEIGHT,
+            background: "rgba(0,0,0,0.035)",
+            borderRadius: 10,
+            borderTop: "1px solid rgba(0,0,0,0.06)",
+            borderBottom: "1px solid rgba(0,0,0,0.06)",
+            pointerEvents: "none",
+            zIndex: 1,
+          }}
+        />
+
+        {/* Top Fade Gradient */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: ITEM_HEIGHT,
+            background: "linear-gradient(to bottom, var(--crema) 30%, transparent 100%)",
+            pointerEvents: "none",
+            zIndex: 2,
+          }}
+        />
+
+        {/* Bottom Fade Gradient */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: ITEM_HEIGHT,
+            background: "linear-gradient(to top, var(--crema) 30%, transparent 100%)",
+            pointerEvents: "none",
+            zIndex: 2,
+          }}
+        />
+
+        {/* Scrollable list */}
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          style={{
+            height: "100%",
+            overflowY: "auto",
+            scrollSnapType: "y mandatory",
+            paddingTop: ITEM_HEIGHT,
+            paddingBottom: ITEM_HEIGHT,
+            scrollbarWidth: "none",
+            WebkitOverflowScrolling: "touch",
           }}
         >
-          −
-        </button>
-
-        <div style={{ textAlign: "center", flex: 1, padding: "0 8px" }}>
-          <div style={{ display: "inline-flex", alignItems: "baseline", gap: 3 }}>
-            <span className="font-mono" style={{ fontSize: 26, fontWeight: 800, color: "var(--inchiostro)", letterSpacing: "-0.03em" }}>
-              {currentPct}
-            </span>
-            <span className="font-mono" style={{ fontSize: 15, fontWeight: 700, color: "var(--inchiostro-50)" }}>
-              %
-            </span>
-          </div>
-          <p style={{ margin: 0, fontSize: 11, color: "var(--inchiostro-50)", fontWeight: 500 }}>
-            {value === 1 ? "1 piatto intero" : `×${value.toLocaleString("it-IT", { maximumFractionDigits: 2 })}`}
-          </p>
+          {options.map((option, idx) => {
+            const isSelected = idx === selectedIndex;
+            return (
+              <div
+                key={option}
+                onClick={() => handleSelectIndex(idx)}
+                style={{
+                  height: ITEM_HEIGHT,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  scrollSnapAlign: "center",
+                  cursor: disabled ? "default" : "pointer",
+                  transition: "opacity 0.2s ease, transform 0.2s ease",
+                  opacity: isSelected ? 1 : 0.35,
+                  transform: isSelected ? "scale(1.08)" : "scale(0.92)",
+                  userSelect: "none",
+                }}
+              >
+                <span
+                  className="font-mono"
+                  style={{
+                    fontSize: isSelected ? 22 : 18,
+                    fontWeight: isSelected ? 800 : 500,
+                    color: isSelected ? "var(--inchiostro)" : "var(--inchiostro-50)",
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  {portionLabel(option)}
+                </span>
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: isSelected ? 600 : 400,
+                    color: isSelected ? "var(--inchiostro-70)" : "var(--inchiostro-35)",
+                  }}
+                >
+                  {option === 1 ? "porzione intera" : "porzione"}
+                </span>
+              </div>
+            );
+          })}
         </div>
-
-        <button
-          type="button"
-          aria-label="Aumenta porzione"
-          disabled={disabled || value >= 3.0}
-          onClick={() => handleStep(0.25)}
-          className="tap-target"
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: "var(--radius-chip)",
-            border: "none",
-            background: "var(--sabbia)",
-            color: "var(--inchiostro)",
-            fontSize: 20,
-            fontWeight: 500,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: disabled || value >= 3.0 ? "not-allowed" : "pointer",
-            opacity: disabled || value >= 3.0 ? 0.35 : 1,
-            transition: "background 0.15s ease, transform 0.1s ease",
-          }}
-        >
-          +
-        </button>
-      </div>
-
-      {/* Quick selection presets */}
-      <div
-        role="radiogroup"
-        aria-label="Scelta rapida porzione"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(6, 1fr)",
-          gap: 6,
-        }}
-      >
-        {PORTIONS.map((option) => {
-          const selected = Math.abs(option - value) < 0.01;
-          const pct = Math.round(option * 100);
-          return (
-            <button
-              key={option}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              disabled={disabled}
-              onClick={() => onChange(option)}
-              className="tap-target"
-              style={{
-                height: 38,
-                border: "none",
-                borderRadius: "var(--radius-chip)",
-                background: selected ? "var(--inchiostro)" : "rgba(0,0,0,0.035)",
-                color: selected ? "var(--crema)" : "var(--inchiostro)",
-                fontSize: 12,
-                fontWeight: selected ? 700 : 500,
-                cursor: disabled ? "default" : "pointer",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "all 0.15s ease",
-                boxShadow: selected ? "0 2px 8px rgba(0,0,0,0.12)" : "none",
-              }}
-            >
-              <span className="font-mono">{pct}%</span>
-            </button>
-          );
-        })}
       </div>
     </div>
   );
