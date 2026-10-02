@@ -1,14 +1,13 @@
 import { TabBar } from "@/components/TabBar";
-import { TabContentTransition } from "@/components/motion/RouteTransition";
+import { SwipeableTabContainer } from "@/components/SwipeableTabContainer";
 import { HistorySync } from "@/components/HistorySync";
 
 export default function TabsLayout({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
-      <div style={{ flex: 1 }}>
-        {/* Only the page body animates on a tab switch -- the TabBar sits outside so it
-            stays put and keeps its pill morph (RouteTransition's `routeKey` note). */}
-        <TabContentTransition>{children}</TabContentTransition>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        {/* Swiping between Oggi, Settimana and Corpo navigates smoothly with tactile spring animation */}
+        <SwipeableTabContainer>{children}</SwipeableTabContainer>
       </div>
       <TabBar />
       <HistorySync />

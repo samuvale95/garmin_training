@@ -117,9 +117,9 @@ button {
   min-height: 100dvh;
   position: relative;
   background: var(--crema);
-  /* Safe area handling for iPhone Notch / Dynamic Island and Android navigation bars */
+  /* Safe area handling for iPhone Notch / Dynamic Island */
   padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: 0px;
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
   /* `clip`, not `hidden`: the CSS overflow spec forces the *other* axis's computed
@@ -746,12 +746,12 @@ button {
 /* Navigation stays visually anchored while the page content changes -- Airbnb floating pill */
 .tab-bar {
   position: sticky;
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px));
   z-index: 30;
   display: flex;
   gap: 6px;
-  margin: 0 14px;
-  padding: 6px 8px;
+  margin: 0 16px;
+  padding: 5px 8px;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: var(--radius-pill);
