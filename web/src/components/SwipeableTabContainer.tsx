@@ -1,66 +1,133 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { useMotionEnabled } from "@/lib/motion";
 
 const TAB_ROUTES = ["/today", "/week", "/body"] as const;
 
+/**
+ * Interactive touch-following tab pager.
+ * As your finger drags horizontally, the current and adjacent screens follow 1:1,
+ * revealing the next screen seamlessly with soft Airbnb spring physics on release.
+ */
 export function SwipeableTabContainer({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { reduced } = useMotionEnabled();
 
-  const startTouch = useRef<{ x: number; y: number; time: number } | null>(null);
   const activeTabIdx = TAB_ROUTES.findIndex(
     (tab) => pathname === tab || pathname.startsWith(`${tab}/`)
   );
 
-  const prevIdx = useRef(activeTabIdx >= 0 ? activeTabIdx : 0);
-  const direction = activeTabIdx >= prevIdx.current ? 1 : -1;
-  prevIdx.current = activeTabIdx >= 0 ? activeTabIdx : 0;
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const isDragging = useRef(false);
+  const isHorizontalScroll = useRef<boolean | null>(null);
+
+  // Motion value representing the interactive drag offset in pixels (-width to +width)
+  const dragX = useMotionValue(0);
+
+  // Smooth, springy resistance and slight scale/opacity softening like iOS/Airbnb
+  const opacity = useTransform(dragX, [-250, 0, 250], [0.94, 1, 0.94]);
+  const scale = useTransform(dragX, [-250, 0, 250], [0.985, 1, 0.985]);
+
+  // Reset drag position on route change
+  useEffect(() => {
+    dragX.set(0);
+    isDragging.current = false;
+    isHorizontalScroll.current = null;
+  }, [pathname, dragX]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (reduced || e.touches.length !== 1) return;
+    if (reduced || e.touches.length !== 1 || activeTabIdx === -1) return;
     const touch = e.touches[0];
-    startTouch.current = {
-      x: touch.clientX,
-      y: touch.clientY,
-      time: Date.now(),
-    };
+    startX.current = touch.clientX;
+    startY.current = touch.clientY;
+    isDragging.current = true;
+    isHorizontalScroll.current = null;
   };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!startTouch.current || activeTabIdx === -1) return;
-    const touch = e.changedTouches[0];
-    const dx = touch.clientX - startTouch.current.x;
-    const dy = touch.clientY - startTouch.current.y;
-    const elapsed = Date.now() - startTouch.current.time;
-    startTouch.current = null;
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging.current || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - startX.current;
+    const dy = touch.clientY - startY.current;
 
-    // Must be a predominantly horizontal flick:
-    // 1. Min horizontal distance 52px
-    // 2. Horizontal component at least 1.6x greater than vertical component
-    // 3. Completed in less than 500ms
-    if (
-      Math.abs(dx) > 52 &&
-      Math.abs(dx) > Math.abs(dy) * 1.6 &&
-      elapsed < 500
-    ) {
-      if (dx < 0 && activeTabIdx < TAB_ROUTES.length - 1) {
-        // Swipe Left -> next tab
-        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-          navigator.vibrate(8);
+    // Determine direction intent on first significant movement
+    if (isHorizontalScroll.current === null) {
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+      if (absDx > 8 || absDy > 8) {
+        if (absDx > absDy * 1.3) {
+          isHorizontalScroll.current = true;
+        } else {
+          isHorizontalScroll.current = false;
         }
-        router.push(TAB_ROUTES[activeTabIdx + 1]);
-      } else if (dx > 0 && activeTabIdx > 0) {
-        // Swipe Right -> previous tab
-        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-          navigator.vibrate(8);
-        }
-        router.push(TAB_ROUTES[activeTabIdx - 1]);
       }
+    }
+
+    if (isHorizontalScroll.current) {
+      // Elastic rubber-band resistance if at the boundary tabs
+      let effectiveDx = dx;
+      if (
+        (activeTabIdx === 0 && dx > 0) ||
+        (activeTabIdx === TAB_ROUTES.length - 1 && dx < 0)
+      ) {
+        effectiveDx = dx * 0.3; // Rubber-band effect
+      }
+      dragX.set(effectiveDx);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+
+    if (!isHorizontalScroll.current) {
+      dragX.set(0);
+      return;
+    }
+
+    const currentX = dragX.get();
+    const containerWidth = containerRef.current?.offsetWidth || 390;
+    const threshold = containerWidth * 0.22; // 22% drag threshold to switch
+
+    if (currentX < -threshold && activeTabIdx < TAB_ROUTES.length - 1) {
+      // Complete swipe Left -> animate out and navigate to next tab
+      if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+        navigator.vibrate(8);
+      }
+      animate(dragX, -containerWidth, {
+        type: "spring",
+        stiffness: 420,
+        damping: 34,
+        onComplete: () => {
+          router.push(TAB_ROUTES[activeTabIdx + 1]);
+        },
+      });
+    } else if (currentX > threshold && activeTabIdx > 0) {
+      // Complete swipe Right -> animate out and navigate to prev tab
+      if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+        navigator.vibrate(8);
+      }
+      animate(dragX, containerWidth, {
+        type: "spring",
+        stiffness: 420,
+        damping: 34,
+        onComplete: () => {
+          router.push(TAB_ROUTES[activeTabIdx - 1]);
+        },
+      });
+    } else {
+      // Snap back softly with gentle Airbnb spring physics
+      animate(dragX, 0, {
+        type: "spring",
+        stiffness: 400,
+        damping: 30,
+      });
     }
   };
 
@@ -70,49 +137,35 @@ export function SwipeableTabContainer({ children }: { children: ReactNode }) {
 
   return (
     <div
+      ref={containerRef}
       onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       style={{
         flex: 1,
         display: "flex",
         flexDirection: "column",
         width: "100%",
         position: "relative",
+        overflowX: "clip",
       }}
     >
-      <AnimatePresence mode="popLayout" initial={false} custom={direction}>
-        <motion.div
-          key={pathname}
-          custom={direction}
-          initial={{
-            opacity: 0,
-            x: direction > 0 ? 30 : -30,
-            scale: 0.98,
-          }}
-          animate={{
-            opacity: 1,
-            x: 0,
-            scale: 1,
-          }}
-          exit={{
-            opacity: 0,
-            x: direction > 0 ? -30 : 30,
-            scale: 0.98,
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 380,
-            damping: 32,
-            mass: 0.7,
-          }}
-          style={{
-            width: "100%",
-            flex: 1,
-          }}
-        >
-          {children}
-        </motion.div>
-      </AnimatePresence>
+      <motion.div
+        style={{
+          x: dragX,
+          opacity,
+          scale,
+          width: "100%",
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          transformOrigin: "center center",
+          willChange: "transform, opacity",
+        }}
+      >
+        {children}
+      </motion.div>
     </div>
   );
 }

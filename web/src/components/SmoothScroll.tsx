@@ -17,7 +17,7 @@ export function SmoothScroll() {
       gestureOrientation: "vertical",
       smoothWheel: true,
       wheelMultiplier: 0.95,
-      touchMultiplier: 1.8,
+      syncTouch: false,
     });
 
     let rafId: number;
