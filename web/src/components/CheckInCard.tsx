@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { SlideUp } from "@/components/motion/primitives";
-import { useCheckAdaptation, useSaveCheckIn } from "@/lib/queries";
+import { useCheckAdaptation, useSaveCheckIn, useShoes } from "@/lib/queries";
 import type { CheckIn, CheckInBody, CheckInEffort, PainArea } from "@/lib/types";
 
 const EFFORTS: [CheckInEffort, string][] = [
@@ -51,6 +52,10 @@ export function CheckInCard({
   delayMs?: number;
 }) {
   const save = useSaveCheckIn();
+  const shoesQuery = useShoes();
+  const activeShoes = shoesQuery.data?.shoes.filter((s) => !s.retired) ?? [];
+  const primaryShoe = activeShoes[0] ?? null;
+
   // What was just said may be a reason to adapt the plan (pain, a session too hard).
   const checkAdaptation = useCheckAdaptation();
   const [editing, setEditing] = useState(false);
@@ -77,20 +82,50 @@ export function CheckInCard({
     const parts = [existing.effort && `seduta ${LABELS[existing.effort].toLowerCase()}`, LABELS[existing.body].toLowerCase()];
     if (existing.pain_area) parts.push(LABELS[existing.pain_area].toLowerCase());
     return (
-      <SlideUp active={animate} delayMs={delayMs} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 10 }}>
-        <p style={{ fontSize: 13, margin: 0, flex: 1, color: "var(--inchiostro-70)" }}>
-          <span style={{ fontWeight: 600, color: "var(--inchiostro)" }}>Check-in {dayLabel}:</span> {parts.filter(Boolean).join(" · ")}
-        </p>
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.92 }}
-          whileHover={{ scale: 1.05 }}
-          transition={{ type: "spring", stiffness: 450, damping: 25 }}
-          style={linkButton}
-          onClick={() => setEditing(true)}
-        >
-          Cambia
-        </motion.button>
+      <SlideUp active={animate} delayMs={delayMs} style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
+          <p style={{ fontSize: 13, margin: 0, flex: 1, color: "var(--inchiostro-70)" }}>
+            <span style={{ fontWeight: 600, color: "var(--inchiostro)" }}>Check-in {dayLabel}:</span> {parts.filter(Boolean).join(" · ")}
+          </p>
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.92 }}
+            whileHover={{ scale: 1.05 }}
+            transition={{ type: "spring", stiffness: 450, damping: 25 }}
+            style={linkButton}
+            onClick={() => setEditing(true)}
+          >
+            Cambia
+          </motion.button>
+        </div>
+
+        {primaryShoe && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid var(--border-airbnb)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 12 }}>👟</span>
+              <span style={{ fontSize: 12, color: "var(--inchiostro-70)", fontWeight: 500 }}>
+                {primaryShoe.name}
+              </span>
+              <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
+                ({Math.round(primaryShoe.distance_km)} km)
+              </span>
+            </div>
+            <Link
+              href="/shoes?from=/today"
+              style={{
+                fontSize: 11.5,
+                fontWeight: 600,
+                color: "var(--inchiostro-70)",
+                textDecoration: "none",
+                background: "var(--sabbia-chip)",
+                padding: "3px 8px",
+                borderRadius: "var(--radius-pill)",
+              }}
+            >
+              Scarpe →
+            </Link>
+          </div>
+        )}
       </SlideUp>
     );
   }

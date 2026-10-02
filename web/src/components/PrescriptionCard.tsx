@@ -131,43 +131,71 @@ export function PrescriptionCard({
  * Garmin estimated. A table that shows the verdict surviving -- or not -- across the
  * plausible range is the difference between a finding and a claim. */
 export function SensitivityTable({ rows, animate, delayMs }: { rows: SensitivityRow[]; animate: boolean; delayMs: number }) {
+  const [open, setOpen] = useState(false);
   if (rows.length === 0) return null;
+
   return (
-    <SlideUp active={animate} delayMs={delayMs} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 18, marginTop: 14 }}>
-      <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
-        e se la soglia fosse diversa
-      </p>
+    <SlideUp active={animate} delayMs={delayMs} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="press-soft"
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          background: "none",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        <div>
+          <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
+            sensibilità stima soglia
+          </p>
+          <p style={{ font: "600 14px/1.2 var(--font-sans)", margin: "4px 0 0", color: "var(--inchiostro)" }}>
+            E se la soglia fosse diversa?
+          </p>
+        </div>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", padding: "4px 10px", borderRadius: "var(--radius-pill)" }}>
+          {open ? "Nascondi" : "Mostra tabella"}
+        </span>
+      </button>
 
-      <div style={{ overflowX: "auto", marginTop: 12 }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-          <thead>
-            <tr style={{ color: "var(--inchiostro-50)" }}>
-              <th style={{ textAlign: "left", fontWeight: 600, padding: "0 8px 7px 0" }}>soglia</th>
-              <th style={{ textAlign: "right", fontWeight: 600, padding: "0 8px 7px 0" }}>facile</th>
-              <th style={{ textAlign: "right", fontWeight: 600, padding: "0 8px 7px 0" }}>intermedia</th>
-              <th style={{ textAlign: "right", fontWeight: 600, padding: "0 0 7px 0" }}>dura</th>
-            </tr>
-          </thead>
-          <tbody className="font-mono">
-            {rows.map((row) => (
-              <tr key={row.threshold_hr} style={{ fontWeight: row.is_estimate ? 700 : 400 }}>
-                <td style={{ padding: "5px 8px 5px 0", whiteSpace: "nowrap" }}>
-                  {row.threshold_hr} bpm{row.is_estimate ? " ·" : ""}
-                </td>
-                <td style={{ textAlign: "right", padding: "5px 8px 5px 0" }}>{Math.round(row.easy_share * 100)}%</td>
-                <td style={{ textAlign: "right", padding: "5px 8px 5px 0" }}>{Math.round(row.grey_share * 100)}%</td>
-                <td style={{ textAlign: "right", padding: "5px 0" }}>{Math.round(row.hard_share * 100)}%</td>
+      {open && (
+        <div style={{ overflowX: "auto", marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border-airbnb)" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+            <thead>
+              <tr style={{ color: "var(--inchiostro-50)" }}>
+                <th style={{ textAlign: "left", fontWeight: 600, padding: "0 8px 7px 0" }}>soglia</th>
+                <th style={{ textAlign: "right", fontWeight: 600, padding: "0 8px 7px 0" }}>facile</th>
+                <th style={{ textAlign: "right", fontWeight: 600, padding: "0 8px 7px 0" }}>intermedia</th>
+                <th style={{ textAlign: "right", fontWeight: 600, padding: "0 0 7px 0" }}>dura</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <p style={{ fontSize: 11.5, color: "var(--inchiostro-35)", margin: "12px 0 0", lineHeight: 1.45 }}>
-        La riga in grassetto è la stima di Garmin. Tutto quello che c&apos;è sopra dipende da quel
-        numero, quindi prima di riscrivere un blocco di allenamento su questi dati vale la pena
-        confermarlo con un test sul campo.
-      </p>
+            </thead>
+            <tbody className="font-mono">
+              {rows.map((row) => (
+                <tr key={row.threshold_hr} style={{ fontWeight: row.is_estimate ? 700 : 400 }}>
+                  <td style={{ padding: "5px 8px 5px 0", whiteSpace: "nowrap" }}>
+                    {row.threshold_hr} bpm{row.is_estimate ? " ·" : ""}
+                  </td>
+                  <td style={{ textAlign: "right", padding: "5px 8px 5px 0" }}>{Math.round(row.easy_share * 100)}%</td>
+                  <td style={{ textAlign: "right", padding: "5px 8px 5px 0" }}>{Math.round(row.grey_share * 100)}%</td>
+                  <td style={{ textAlign: "right", padding: "5px 0" }}>{Math.round(row.hard_share * 100)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p style={{ fontSize: 11.5, color: "var(--inchiostro-35)", margin: "12px 0 0", lineHeight: 1.45 }}>
+            La riga in grassetto è la stima di Garmin. Tutto quello che c&apos;è sopra dipende da quel
+            numero, quindi prima di riscrivere un blocco di allenamento su questi dati vale la pena
+            confermarlo con un test sul campo.
+          </p>
+        </div>
+      )}
     </SlideUp>
   );
 }
