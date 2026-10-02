@@ -27,10 +27,11 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "Passo",
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
   },
   other: {
     "apple-mobile-web-app-capable": "yes",
+    "mobile-web-app-capable": "yes",
   },
 };
 

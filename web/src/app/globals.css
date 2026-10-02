@@ -117,6 +117,11 @@ button {
   min-height: 100dvh;
   position: relative;
   background: var(--crema);
+  /* Safe area handling for iPhone Notch / Dynamic Island and Android navigation bars */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
   /* `clip`, not `hidden`: the CSS overflow spec forces the *other* axis's computed
      value from `visible` to `auto` whenever one axis is non-visible and non-clip --
      even when that other axis is set explicitly, not just defaulted. `overflow-x:
