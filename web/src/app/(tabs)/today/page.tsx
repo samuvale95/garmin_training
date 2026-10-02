@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -14,7 +14,11 @@ import { Mascot, Tokens } from "@/components/ProgressBits";
 import { RaceGoalCard } from "@/components/RaceGoalCard";
 import { TiltCard } from "@/components/motion/TiltCard";
 import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/motion/primitives";
-import { ChevronRight, ArrowRight, ArrowUpRight } from "@/components/Icons";
+import { ChevronRight, ArrowRight, ArrowUpRight, PlusIcon } from "@/components/Icons";
+import { TodayHeroUnified } from "@/components/TodayHeroUnified";
+import { TodayVitalStrip } from "@/components/TodayVitalStrip";
+import { PreWorkoutContextCard } from "@/components/PreWorkoutContextCard";
+import { QuickMealModal } from "@/components/QuickMealModal";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import {
@@ -23,6 +27,8 @@ import {
   useBodyToday,
   useCheckAdaptation,
   useCheckIns,
+  useFuelStatus,
+  useFuelTargets,
   useProgress,
   useWeekSummary,
   useDayVerdict,
@@ -37,7 +43,7 @@ import {
 import { useWatchSyncStatus } from "@/lib/watchSync";
 import { SkeletonTodayHero } from "@/components/skeletons";
 import { usePassoStore } from "@/lib/store";
-import { classifySession, sessionDistanceKm, shiftDateKey, toDateKey, weekBounds, type DisplaySession } from "@/lib/sessionVisuals";
+import { classifySession, sessionDistanceKm, shiftDateKey, toDateKey, weekBounds, workoutsToSessions, type DisplaySession } from "@/lib/sessionVisuals";
 import { capitalize, formatFullDate, groupSteps, numberToItalianWords, relativeDayLabel, stepGroupLine } from "@/lib/format";
 
 export default function TodayPage() {
@@ -124,13 +130,19 @@ export default function TodayPage() {
     if (access.ready && hasPlan) checkAdaptation();
   }, [access.ready, hasPlan, checkAdaptation]);
 
+  // Quick 1-tap food / snack logging modal
+  const [quickMealOpen, setQuickMealOpen] = useState(false);
+  const planOrLiveSessions = access.plan ? access.plan.sessions : workoutsToSessions(workoutsQuery.data?.workouts ?? []);
+  const fuelStatus = useFuelStatus(todayKey, undefined, access.ready);
+  const fuelTargets = useFuelTargets(todayKey, planOrLiveSessions, undefined, access.ready);
+
   // Until we know whether there's a plan or a live Garmin connection there is nothing
   // real to show -- but "nothing real" used to mean `return null`, i.e. an empty screen
   // for as long as the Garmin status check took. Render the header and the shapes.
   if (!access.ready || (!access.plan && !access.garminConnected)) {
     return (
       <div style={{ padding: "22px 20px 12px" }}>
-        <TodayHeader />
+        <TodayHeader onOpenQuickLog={() => setQuickMealOpen(true)} />
         <div style={{ marginTop: 18 }}>
           <WordIn active={animate} style={{ font: "600 34px/1.04 var(--font-sans)", letterSpacing: "-.035em" }}>Il tuo oggi</WordIn>
         </div>
@@ -175,79 +187,28 @@ export default function TodayPage() {
 
   return (
     <div style={{ padding: "22px 20px 12px" }}>
-      <TodayHeader />
+      <TodayHeader onOpenQuickLog={() => setQuickMealOpen(true)} />
 
       <header className="today-intro">
         <h1>Il tuo oggi</h1>
         <p>{capitalize(formatFullDate(todayKey))} · Un passo alla volta.</p>
       </header>
 
-      <SlideUp active={animate} delayMs={100}>
-        <TiltCard
-          maxTilt={5}
-          className="today-hero"
-          style={{
-            background: heroSession ? "var(--corallo)" : "var(--sabbia)",
-            color: heroSession ? "var(--corallo-testo)" : "var(--inchiostro)",
-            borderRadius: "var(--radius-card-lg)",
-            padding: 20,
-            marginTop: 16,
-            minHeight: 210,
-            position: "relative",
-            overflow: "hidden",
-            boxSizing: "border-box",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {heroSession ? (
-                <>
-                  <p className="font-mono" style={{ fontSize: 12, opacity: 0.7, margin: "0 0 6px" }}>
-                    {relativeDayLabel(heroSession.date, today)} · {formatFullDate(heroSession.date)}
-                  </p>
-                  <p style={{ font: "600 22px/1.15 var(--font-sans)", margin: "0 0 8px" }}>{heroSession.title}</p>
-                  {heroMainGroup && (
-                    <p className="font-mono" style={{ fontSize: 13, opacity: 0.85, margin: 0 }}>{stepGroupLine(heroMainGroup)}</p>
-                  )}
-                  {heroMatch?.matched && heroMatch.distance_km != null && (
-                    <p className="font-mono" style={{ fontSize: 12, opacity: 0.75, margin: "6px 0 0" }}>
-                      svolto {heroMatch.distance_km.toFixed(1)} km
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="font-serif-italic" style={{ fontSize: 17, margin: "4px 0 0" }}>Oggi è un giorno di riposo. E va bene così.</p>
-              )}
-            </div>
+      {/* 1. HERO ALLENAMENTO + BADGE PRONTEZZA UNIFICATI */}
+      <TodayHeroUnified
+        heroSession={heroSession}
+        heroMainGroup={heroMainGroup}
+        heroMatch={heroMatch}
+        heroHref={heroHref}
+        verdict={verdictQuery.data}
+        today={today}
+        animate={animate}
+      />
 
-            <div style={{ width: 96, height: 104, position: "relative", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", transform: "translateZ(26px)" }}>
-              <Illustration
-                name={heroSession ? classifySession(heroSession).illustration ?? "corsa" : "riposo"}
-                width={96}
-                height={104}
-                position="relative"
-                active={animate}
-                delayMs={160}
-                breathe
-                float
-              />
-            </div>
-          </div>
+      {/* 2. ADATTAMENTO DEL PIANO (Se richiesto) */}
+      {hasPlan && <AdaptationCard animate={animate} delayMs={120} />}
 
-          <Link href={heroHref} className="tap-target today-hero-action" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, marginTop: 18 }}>
-            <span>{heroSession ? "Vedi allenamento" : "Esplora la settimana"}</span>
-            <ArrowUpRight size={15} />
-          </Link>
-        </TiltCard>
-      </SlideUp>
-
-      <DayStateCard verdict={verdictQuery.data} narrative={verdictNarrative.data?.text} animate={animate} delayMs={120} />
-
-      {hasPlan && <AdaptationCard animate={animate} delayMs={140} />}
-
+      {/* 3. CHECK-IN POST CORSA (On-top prioritario appena conclusa) */}
       {checkInDay && (
         <CheckInCard
           key={checkInDay === "oggi" ? todayKey : yesterdayKey}
@@ -256,15 +217,41 @@ export default function TodayPage() {
           trained={trainedOn(checkInDay === "oggi" ? todayKey : yesterdayKey)}
           existing={checkInOn(checkInDay === "oggi" ? todayKey : yesterdayKey)}
           animate={animate}
-          delayMs={150}
+          delayMs={130}
         />
       )}
 
+      {/* 4. CONTEXT BANNER PRE-CORSA: Spuntino & Idratazione rapida (1-tap snack) */}
+      {heroSession && (
+        <PreWorkoutContextCard
+          todayTarget={fuelTargets.data?.today}
+          onOpenQuickLog={() => setQuickMealOpen(true)}
+          active={animate}
+        />
+      )}
+
+      {/* 5. VITAL STRIP COMPATTA: Prontezza, Sonno, Carbo (0 tap) */}
+      <TodayVitalStrip
+        readinessScore={readiness}
+        sleepMinutes={sleepMinutes}
+        carbLoggedG={fuelStatus.data?.totals?.carb_g ?? 0}
+        carbTargetG={fuelTargets.data?.today?.carb_g}
+        active={animate}
+      />
+
+      {/* 6. MODALE QUICK LOG PASTO / SNACK (1-tap da ovunque) */}
+      <QuickMealModal
+        isOpen={quickMealOpen}
+        onClose={() => setQuickMealOpen(false)}
+        todayDateKey={todayKey}
+      />
+
+      {/* 7. PROGRESSO E RECORD SETTIMANALI (Compatto) */}
       {progress.data && (
         <Link href="/progress" style={{ textDecoration: "none", color: "inherit" }}>
           <SlideUp active={animate} delayMs={160}>
             <motion.div
-              whileHover={{ y: -2.5, scale: 1.012 }}
+              whileHover={{ y: -2, scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
               transition={{ type: "spring", stiffness: 400, damping: 25 }}
               style={{
@@ -279,15 +266,15 @@ export default function TodayPage() {
                 gap: 12,
               }}
             >
-              <Mascot state={progress.data.mascot.state} size={52} />
+              <Mascot state={progress.data.mascot.state} size={46} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontWeight: 600, fontSize: 15, margin: 0 }}>
+                <p style={{ fontWeight: 600, fontSize: 14.5, margin: 0 }}>
                   {progress.data.streak} {progress.data.streak === 1 ? "settimana" : "settimane"} di fila
                 </p>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
                   <Tokens tokens={progress.data.tokens} max={progress.data.max_tokens} />
-                  <span className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)" }}>
-                    {progress.data.week_points} punti questa settimana
+                  <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
+                    {progress.data.week_points} pt questa settimana
                   </span>
                 </div>
               </div>
@@ -301,7 +288,7 @@ export default function TodayPage() {
         <Link href="/summary" style={{ textDecoration: "none", color: "inherit" }}>
           <SlideUp active={animate} delayMs={170}>
             <motion.div
-              whileHover={{ y: -2.5, scale: 1.012 }}
+              whileHover={{ y: -2, scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
               transition={{ type: "spring", stiffness: 400, damping: 25 }}
               style={{
@@ -309,16 +296,16 @@ export default function TodayPage() {
                 border: "var(--border-airbnb)",
                 boxShadow: "var(--shadow-airbnb-subtle)",
                 borderRadius: "var(--radius-card)",
-                padding: 14,
-                marginTop: 12,
+                padding: 13,
+                marginTop: 10,
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
               }}
             >
               <div style={{ flex: 1 }}>
-                <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>La settimana scorsa</p>
-                <p style={{ fontSize: 14, margin: "3px 0 0" }}>{lastWeek.data.headline}</p>
+                <p style={{ font: "500 11px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>La settimana scorsa</p>
+                <p style={{ fontSize: 13.5, margin: "2px 0 0" }}>{lastWeek.data.headline}</p>
               </div>
               <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
             </motion.div>
@@ -326,8 +313,7 @@ export default function TodayPage() {
         </Link>
       )}
 
-      {/* Without a race this asks for one -- counted from today forward, plan or live
-          calendar alike, so a finished block or a bare Garmin connection doesn't ask. */}
+      {/* Without a race this asks for one */}
       <RaceGoalCard
         goal={goal}
         upcomingSessions={
@@ -336,49 +322,6 @@ export default function TodayPage() {
         animate={animate}
         delayMs={180}
       />
-
-      <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
-        <MetricCard
-          label="Volume"
-          value={liveMode ? "—" : weekKm.toFixed(0)}
-          unit={liveMode ? undefined : "km"}
-          background="var(--crema-card)"
-          delay={340}
-          active={animate}
-          fraction={liveMode ? 0 : Math.min(1, weekKm / 60)}
-          barColor="var(--corallo)"
-        />
-        <MetricCard
-          label="Prontezza"
-          value={readiness != null ? String(readiness) : "—"}
-          background="var(--verde)"
-          color="var(--verde-testo)"
-          delay={420}
-          active={animate}
-          fraction={readiness != null ? readiness / 100 : 0}
-          barColor="var(--verde-tratto-scuro)"
-        />
-        <MetricCard
-          label="Sonno"
-          value={
-            sleepMinutes != null ? (
-              <>
-                {Math.floor(sleepMinutes / 60)}
-                <span style={{ fontSize: 13 }}>h</span>
-                {String(sleepMinutes % 60).padStart(2, "0")}
-              </>
-            ) : (
-              "—"
-            )
-          }
-          background="var(--azzurro)"
-          color="var(--azzurro-testo)"
-          delay={500}
-          active={animate}
-          fraction={sleepMinutes != null ? sleepMinutes / 540 : 0}
-          barColor="var(--azzurro-testo)"
-        />
-      </div>
 
       {liveMode ? (
         <Link href="/import" style={{ textDecoration: "none", color: "inherit" }}>
@@ -475,68 +418,44 @@ export default function TodayPage() {
   );
 }
 
-/** Brand mark and the settings avatar -- rendered identically whether or not the
- * screen's data has arrived, so the top of the page never flickers in. */
-function TodayHeader() {
+/** Brand mark, 1-tap quick food button, and the settings avatar */
+function TodayHeader({ onOpenQuickLog }: { onOpenQuickLog?: () => void }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
       <BrandMark height={22} />
-      <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} transition={{ type: "spring", stiffness: 450, damping: 22 }}>
-        <Link href="/settings" aria-label="Impostazioni" className="tap-target" style={{ display: "block" }}>
-          <Avatar size={36} />
-        </Link>
-      </motion.div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {onOpenQuickLog && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.94 }}
+            onClick={onOpenQuickLog}
+            className="tap-target"
+            aria-label="Registra cibo o snack"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              background: "var(--crema-card)",
+              border: "var(--border-airbnb)",
+              boxShadow: "var(--shadow-airbnb-subtle)",
+              borderRadius: "var(--radius-pill)",
+              padding: "6px 12px",
+              cursor: "pointer",
+              color: "var(--inchiostro)",
+              fontSize: 12.5,
+              fontWeight: 600,
+            }}
+          >
+            <span style={{ fontSize: 13 }}>🍽️</span>
+            <span>+ Cibo</span>
+          </motion.button>
+        )}
+        <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} transition={{ type: "spring", stiffness: 450, damping: 22 }}>
+          <Link href="/settings" aria-label="Impostazioni" className="tap-target" style={{ display: "block" }}>
+            <Avatar size={36} />
+          </Link>
+        </motion.div>
+      </div>
     </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  unit,
-  background,
-  color,
-  delay,
-  active,
-  fraction,
-  barColor,
-}: {
-  label: string;
-  value: ReactNode;
-  unit?: string;
-  background: string;
-  color?: string;
-  delay: number;
-  active: boolean;
-  fraction: number;
-  barColor: string;
-}) {
-  return (
-    <SlideUp active={active} delayMs={delay} style={{ flex: 1 }}>
-      <motion.div
-        whileHover={{ y: -3, scale: 1.025 }}
-        whileTap={{ scale: 0.97 }}
-        transition={{ type: "spring", stiffness: 420, damping: 24 }}
-        style={{
-          background,
-          color,
-          borderRadius: "var(--radius-card)",
-          padding: 15,
-          border: "var(--border-airbnb)",
-          boxShadow: "var(--shadow-airbnb-subtle)",
-        }}
-      >
-        <p style={{ font: "500 11.5px var(--font-sans)", color: color ? undefined : "var(--inchiostro-50)", opacity: color ? 0.7 : 1, margin: 0 }}>{label}</p>
-        <div style={{ marginTop: 8, overflow: "hidden" }}>
-          <WordIn active={active} delayMs={delay + 50} style={{ font: "600 25px/1 var(--font-sans)", letterSpacing: "-.03em" }}>
-            {value}
-            {unit && <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}> {unit}</span>}
-          </WordIn>
-        </div>
-        <div style={{ marginTop: 11 }}>
-          <BarGrow value={fraction} height={4} color={barColor} trackColor="rgba(0,0,0,.08)" active={active} delayMs={delay + 100} />
-        </div>
-      </motion.div>
-    </SlideUp>
   );
 }
