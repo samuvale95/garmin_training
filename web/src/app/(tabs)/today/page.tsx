@@ -222,6 +222,55 @@ export default function TodayPage() {
         />
       )}
 
+      {/* 3b. INSIGHT COACH POST-CORSA: 1-tap all'analisi della tecnica */}
+      {trainedOn(todayKey) && (
+        <SlideUp active={animate} delayMs={140} style={{ marginTop: 10 }}>
+          <Link
+            href="/coach"
+            className="press-soft"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              background: "var(--crema-card)",
+              border: "1px solid var(--border-airbnb)",
+              boxShadow: "var(--shadow-airbnb-subtle)",
+              borderRadius: "var(--radius-card)",
+              padding: "12px 16px",
+              textDecoration: "none",
+              color: "inherit",
+            }}
+          >
+            <span style={{ fontSize: 18, flex: "none" }}>🎯</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--inchiostro)" }}>
+                  Analisi Tecnica della corsa
+                </span>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: ".04em",
+                    background: "var(--azzurro)",
+                    color: "var(--azzurro-testo)",
+                    padding: "2px 6px",
+                    borderRadius: "var(--radius-pill)",
+                  }}
+                >
+                  Nuova
+                </span>
+              </div>
+              <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>
+                Contatto al suolo, cadenza e split del ritmo analizzati dal coach.
+              </p>
+            </div>
+            <ChevronRight size={16} style={{ color: "var(--inchiostro-50)", flex: "none" }} />
+          </Link>
+        </SlideUp>
+      )}
+
       {/* 4. CONTEXT BANNER PRE-CORSA: Spuntino & Idratazione rapida (1-tap snack) */}
       {heroSession && (
         <PreWorkoutContextCard
