@@ -19,11 +19,11 @@ const SEVERITY_STYLE: Record<string, { background: string; color: string; label:
   info: { background: "var(--sabbia-chip)", color: "var(--inchiostro-70)", label: "nota" },
 };
 
-const STATE_HEADER: Record<string, { background: string; color: string; overline: string }> = {
-  pronto: { background: "var(--verde)", color: "var(--verde-testo)", overline: "puoi allenarti" },
-  cauto: { background: "var(--giallo)", color: "var(--giallo-testo)", overline: "si può, con giudizio" },
-  scarico: { background: "var(--corallo)", color: "var(--corallo-testo)", overline: "oggi meglio di no" },
-  sconosciuto: { background: "var(--sabbia)", color: "var(--inchiostro-70)", overline: "dati mancanti" },
+const STATE_HEADER: Record<string, { background: string; border: string; color: string; overline: string; badgeBg: string; badgeColor: string }> = {
+  pronto: { background: "var(--crema-card)", border: "1px solid var(--verde-tratto)", color: "var(--inchiostro)", overline: "puoi allenarti", badgeBg: "var(--verde)", badgeColor: "var(--verde-testo)" },
+  cauto: { background: "var(--crema-card)", border: "1px solid var(--giallo)", color: "var(--inchiostro)", overline: "si può, con giudizio", badgeBg: "var(--giallo)", badgeColor: "var(--giallo-testo)" },
+  scarico: { background: "var(--crema-card)", border: "1px solid var(--corallo)", color: "var(--inchiostro)", overline: "oggi meglio di no", badgeBg: "var(--corallo)", badgeColor: "var(--corallo-testo)" },
+  sconosciuto: { background: "var(--crema-card)", border: "1px solid var(--biscotto-light)", color: "var(--inchiostro)", overline: "dati mancanti", badgeBg: "var(--sabbia-chip)", badgeColor: "var(--inchiostro-70)" },
 };
 
 /** Drop one repetition from a session -- the "tienila, ma più morbida" edit.
@@ -152,13 +152,34 @@ export default function DayStatePage() {
           <SlideUp
             active={animate}
             delayMs={80}
-            style={{ background: header.background, color: header.color, borderRadius: "var(--radius-card-lg)", padding: 22, marginTop: 18 }}
+            style={{
+              background: header.background,
+              border: header.border,
+              color: header.color,
+              borderRadius: "var(--radius-card-lg)",
+              padding: 22,
+              marginTop: 18,
+              boxShadow: "var(--shadow-airbnb-subtle)",
+            }}
           >
-            <p className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", opacity: 0.7, margin: 0 }}>
-              {header.overline}
-            </p>
-            <p style={{ font: "600 26px/1.15 var(--font-sans)", letterSpacing: "-.02em", margin: "10px 0 0" }}>{verdict.headline}</p>
-            <p className="font-serif-italic" style={{ fontSize: 16, lineHeight: 1.35, margin: "12px 0 0", opacity: 0.92 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: ".06em",
+                  textTransform: "uppercase",
+                  background: header.badgeBg,
+                  color: header.badgeColor,
+                  borderRadius: "var(--radius-pill)",
+                  padding: "4px 10px",
+                }}
+              >
+                {header.overline}
+              </span>
+            </div>
+            <p style={{ font: "700 24px/1.2 var(--font-sans)", letterSpacing: "-.02em", margin: "12px 0 0" }}>{verdict.headline}</p>
+            <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.4, margin: "10px 0 0", color: "var(--inchiostro-70)" }}>
               {narrativeQuery.data?.text ?? "Guarda i segnali qui sotto: sono le misure di stanotte, confrontate con le tue."}
             </p>
           </SlideUp>
