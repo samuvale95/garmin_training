@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion, useDragControls } from "framer-motion";
 import { Illustration } from "@/components/Illustration";
 import { SlideUp } from "@/components/motion/primitives";
-import { LightningIcon } from "@/components/Icons";
+import { CheckIcon, LightningIcon } from "@/components/Icons";
 import { useMotionEnabled } from "@/lib/motion";
 import { sessionDetailLine } from "@/lib/format";
 import { classifySession, sessionDistanceKm, type DisplaySession } from "@/lib/sessionVisuals";
@@ -244,8 +244,8 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
         {detail}
       </p>
       {matchKm != null && (
-        <p className="font-mono" style={{ fontSize: 11, margin: "3px 0 0", color: "var(--verde-tratto-scuro)", fontWeight: 600, paddingRight: 56 }}>
-          ✓ svolto {matchKm.toFixed(1)} km
+        <p className="font-mono" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, margin: "3px 0 0", color: "var(--verde-tratto-scuro)", fontWeight: 600, paddingRight: 56 }}>
+          <CheckIcon size={12} strokeWidth={2.8} /> svolto {matchKm.toFixed(1)} km
         </p>
       )}
       {visual.illustration && <Illustration name={visual.illustration} width={48} height={54} breathe={false} active={animate} delayMs={200 + delayMs} />}

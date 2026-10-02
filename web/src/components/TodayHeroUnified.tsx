@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight } from "@/components/Icons";
+import { ArrowUpRight, CheckIcon } from "@/components/Icons";
 import { Illustration } from "@/components/Illustration";
 import { TiltCard } from "@/components/motion/TiltCard";
 import { SlideUp, StatusDot } from "@/components/motion/primitives";
@@ -102,7 +102,9 @@ export function TodayHeroUnified({
                 )}
                 {heroMatch?.matched && heroMatch.distance_km != null && (
                   <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, background: "var(--sabbia)", padding: "3px 8px", borderRadius: 8 }}>
-                    <span style={{ fontSize: 11, color: "var(--verde-tratto-scuro)", fontWeight: 600 }}>✓ Strava</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, color: "var(--verde-tratto-scuro)", fontWeight: 600 }}>
+                      <CheckIcon size={12} strokeWidth={2.8} /> Strava
+                    </span>
                     <span className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-70)" }}>
                       {heroMatch.distance_km.toFixed(1)} km svolti
                     </span>

@@ -384,6 +384,10 @@ export function QuickMealModal({
                     disabled={saving || success}
                     onClick={handleSavePreset}
                     style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
                       width: "100%",
                       padding: 13,
                       background: success ? "var(--verde)" : "var(--corallo)",
@@ -396,7 +400,15 @@ export function QuickMealModal({
                       boxShadow: "0 3px 12px rgba(255, 111, 89, 0.25)",
                     }}
                   >
-                    {success ? "✓ Registrato con successo!" : saving ? "Salvataggio..." : "Salva Spuntino"}
+                    {success ? (
+                      <>
+                        <CheckIcon size={16} strokeWidth={2.5} /> Registrato con successo!
+                      </>
+                    ) : saving ? (
+                      "Salvataggio..."
+                    ) : (
+                      "Salva Spuntino"
+                    )}
                   </button>
                 </div>
               )}
@@ -432,6 +444,10 @@ export function QuickMealModal({
                 disabled={saving || success || !textInput.trim()}
                 onClick={handleSaveText}
                 style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
                   width: "100%",
                   padding: 13,
                   background: success ? "var(--verde)" : "var(--inchiostro)",
@@ -444,7 +460,15 @@ export function QuickMealModal({
                   opacity: !textInput.trim() ? 0.5 : 1,
                 }}
               >
-                {success ? "✓ Registrato!" : saving ? "Analisi AI del pasto..." : "Registra pasto con AI"}
+                {success ? (
+                  <>
+                    <CheckIcon size={16} strokeWidth={2.5} /> Registrato!
+                  </>
+                ) : saving ? (
+                  "Analisi AI del pasto..."
+                ) : (
+                  "Registra pasto con AI"
+                )}
               </button>
             </div>
           )}

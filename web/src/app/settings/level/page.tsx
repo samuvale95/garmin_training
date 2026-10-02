@@ -1,6 +1,7 @@
 "use client";
 
 import { PageHeader } from "@/components/PageHeader";
+import { CheckIcon } from "@/components/Icons";
 import { Skeleton, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useAthleteLevel, useSetAdaptationMode } from "@/lib/queries";
@@ -99,8 +100,8 @@ function CriteriaList({ animate, title, criteria }: { animate: boolean; title: s
           delayMs={140 + i * 50}
           style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: "14px 16px", marginTop: 8 }}
         >
-          <span aria-hidden="true" style={{ fontSize: 15, color: criterion.met ? "var(--verde-testo)" : "var(--inchiostro-35)" }}>
-            {criterion.met ? "✓" : "○"}
+          <span aria-hidden="true" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: "50%", background: criterion.met ? "rgba(5, 150, 105, 0.12)" : "rgba(34, 34, 34, 0.05)", color: criterion.met ? "var(--verde-testo)" : "var(--inchiostro-35)" }}>
+            {criterion.met ? <CheckIcon size={12} strokeWidth={2.6} /> : <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />}
           </span>
           <span style={{ flex: 1, fontSize: 14, lineHeight: 1.35 }}>{criterion.label}</span>
           <span className="font-mono" style={{ fontSize: 13, color: criterion.met ? "var(--inchiostro)" : "var(--inchiostro-50)", whiteSpace: "nowrap" }}>

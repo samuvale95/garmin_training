@@ -226,8 +226,8 @@ function DaySection({
             )}
           </div>
           {carbTarget && (
-            <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--inchiostro-50)" }}>
-              Target: {carbTarget[0]}–{carbTarget[1]} g C {inTarget ? "✓ raggiunto" : ""}
+            <p style={{ margin: "2px 0 0", fontSize: 11, color: inTarget ? "var(--verde-testo)" : "var(--inchiostro-50)" }}>
+              Target: {carbTarget[0]}–{carbTarget[1]} g C {inTarget ? "· raggiunto" : ""}
             </p>
           )}
         </div>

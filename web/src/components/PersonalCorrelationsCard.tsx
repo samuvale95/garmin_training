@@ -11,11 +11,11 @@ interface PersonalCorrelationsCardProps {
   delayMs?: number;
 }
 
-const SIGNIFICANCE_STYLE: Record<string, { label: string; color: string }> = {
-  forte: { label: "Forte correlazione", color: "#059669" },
-  moderata: { label: "Correlazione moderata", color: "var(--azzurro)" },
-  preliminare: { label: "Tendenza preliminare", color: "var(--inchiostro-50)" },
-  insufficiente: { label: "Dati insufficienti", color: "var(--inchiostro-35)" },
+const SIGNIFICANCE_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+  forte: { label: "Forte correlazione", color: "#059669", bg: "rgba(5, 150, 105, 0.1)" },
+  moderata: { label: "Correlazione moderata", color: "var(--azzurro-scuro)", bg: "rgba(37, 99, 235, 0.08)" },
+  preliminare: { label: "Tendenza preliminare", color: "var(--inchiostro-70)", bg: "rgba(34, 34, 34, 0.05)" },
+  insufficiente: { label: "Dati insufficienti", color: "var(--inchiostro-50)", bg: "rgba(34, 34, 34, 0.04)" },
 };
 
 export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: PersonalCorrelationsCardProps) {
@@ -32,7 +32,8 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
           background: "var(--crema-card)",
           borderRadius: "var(--radius-card-lg)",
           padding: 20,
-          border: "1px solid rgba(34, 34, 34, 0.06)",
+          border: "var(--border-airbnb)",
+          boxShadow: "var(--shadow-airbnb-subtle)",
         }}
       >
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
@@ -90,14 +91,24 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
                   background: "var(--crema-card)",
                   borderRadius: "var(--radius-card-lg)",
                   padding: 18,
-                  border: "1px solid rgba(34, 34, 34, 0.06)",
+                  border: "var(--border-airbnb)",
+                  boxShadow: "var(--shadow-airbnb-subtle)",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
                     {ins.title}
                   </span>
-                  <span style={{ fontSize: 10.5, fontWeight: 600, color: sig.color }}>
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      color: sig.color,
+                      background: sig.bg,
+                      padding: "2px 8px",
+                      borderRadius: "var(--radius-pill)",
+                    }}
+                  >
                     {sig.label}
                   </span>
                 </div>
@@ -171,6 +182,7 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
                   style={{
                     background: "var(--crema-card)",
                     borderRadius: "var(--radius-card)",
+                    border: "var(--border-airbnb)",
                     padding: "10px 14px",
                     display: "flex",
                     alignItems: "center",

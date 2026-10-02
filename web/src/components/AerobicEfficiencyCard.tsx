@@ -1,25 +1,42 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { AerobicEfficiencyData, EFPoint } from "@/lib/types";
 import { SlideUp } from "./motion/primitives";
+import { useAthleteLevel } from "@/lib/queries";
+import { TrendUpIcon, TrendDownIcon, TrendFlatIcon, ChevronRight } from "@/components/Icons";
 
 interface AerobicEfficiencyCardProps {
   data: AerobicEfficiencyData;
   animate?: boolean;
+  level?: number;
 }
 
-const TREND_STYLE: Record<string, { icon: string; color: string; bg: string }> = {
-  miglioramento: { icon: "↑", color: "#059669", bg: "rgba(16, 185, 129, 0.1)" },
-  stabile: { icon: "→", color: "var(--inchiostro-50)", bg: "rgba(34, 34, 34, 0.05)" },
-  calo: { icon: "↓", color: "#dc2626", bg: "rgba(239, 68, 68, 0.08)" },
+
+const TREND_CONFIG = {
+  miglioramento: {
+    Icon: TrendUpIcon,
+    label: "In miglioramento",
+    color: "#059669",
+    bg: "rgba(5, 150, 105, 0.1)",
+    border: "1px solid rgba(5, 150, 105, 0.2)",
+  },
+  stabile: {
+    Icon: TrendFlatIcon,
+    label: "Stabile",
+    color: "var(--inchiostro-70)",
+    bg: "var(--crema-card)",
+    border: "var(--border-airbnb)",
+  },
+  calo: {
+    Icon: TrendDownIcon,
+    label: "In calo",
+    color: "#b91c1c",
+    bg: "rgba(185, 28, 28, 0.08)",
+    border: "1px solid rgba(185, 28, 28, 0.2)",
+  },
 };
 
-const TREND_LABEL: Record<string, string> = {
-  miglioramento: "In miglioramento",
-  stabile: "Stabile",
-  calo: "In calo",
-};
 
 function formatPace(minPerKm: number): string {
   const mins = Math.floor(minPerKm);
@@ -27,8 +44,12 @@ function formatPace(minPerKm: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
-export function AerobicEfficiencyCard({ data, animate = true }: AerobicEfficiencyCardProps) {
+export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }: AerobicEfficiencyCardProps) {
   const { trend, history, findings } = data;
+  const athleteLevelQuery = useAthleteLevel();
+  const athleteLevel = levelProp ?? athleteLevelQuery.data?.level ?? 2;
+  const isLevel1 = athleteLevel === 1;
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(!isLevel1);
 
   // Build sparkline
   const sparkline = useMemo(() => {
@@ -85,16 +106,17 @@ export function AerobicEfficiencyCard({ data, animate = true }: AerobicEfficienc
           background: "var(--crema-card)",
           borderRadius: "var(--radius-card-lg)",
           padding: 18,
-          border: "1px solid rgba(34, 34, 34, 0.06)",
+          border: "var(--border-airbnb)",
+          boxShadow: "var(--shadow-airbnb-subtle)",
         }}
       >
         <p
           style={{
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: 700,
             margin: "0 0 8px",
             textTransform: "uppercase",
-            letterSpacing: ".04em",
+            letterSpacing: ".05em",
             color: "var(--inchiostro-50)",
           }}
         >
@@ -107,7 +129,8 @@ export function AerobicEfficiencyCard({ data, animate = true }: AerobicEfficienc
     );
   }
 
-  const trendStyle = trend ? TREND_STYLE[trend.classification] : TREND_STYLE.stabile;
+  const trendConfig = trend ? TREND_CONFIG[trend.classification] ?? TREND_CONFIG.stabile : TREND_CONFIG.stabile;
+  const TrendIcon = trendConfig.Icon;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -119,17 +142,18 @@ export function AerobicEfficiencyCard({ data, animate = true }: AerobicEfficienc
           background: "var(--crema-card)",
           borderRadius: "var(--radius-card-lg)",
           padding: 18,
-          border: "1px solid rgba(34, 34, 34, 0.06)",
+          border: "var(--border-airbnb)",
+          boxShadow: "var(--shadow-airbnb-subtle)",
         }}
       >
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
           <p
             style={{
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: 700,
               margin: 0,
               textTransform: "uppercase",
-              letterSpacing: ".04em",
+              letterSpacing: ".05em",
               color: "var(--inchiostro-50)",
             }}
           >
@@ -138,39 +162,85 @@ export function AerobicEfficiencyCard({ data, animate = true }: AerobicEfficienc
           {trend && (
             <span
               style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
                 fontSize: 11,
                 fontWeight: 700,
-                padding: "3px 9px",
+                padding: "3px 10px",
                 borderRadius: "var(--radius-pill)",
-                background: trendStyle.bg,
-                color: trendStyle.color,
+                background: trendConfig.bg,
+                color: trendConfig.color,
+                border: trendConfig.border,
               }}
             >
-              {trendStyle.icon} {TREND_LABEL[trend.classification]}
+              <TrendIcon size={12} strokeWidth={2.4} />
+              {trendConfig.label}
             </span>
           )}
         </div>
 
-        {/* Main metrics row */}
-        {trend && (
+        {/* Level 1 Simplified Motivating Cue */}
+        {isLevel1 ? (
+          <div style={{ margin: "10px 0 14px" }}>
+            <p style={{ font: "600 17px/1.25 var(--font-sans)", margin: "0 0 6px" }}>
+              {trend?.classification === "miglioramento"
+                ? "Il tuo motore aerobico sta crescendo bene"
+                : trend?.classification === "calo"
+                ? "Momento di consolidare il ritmo facile"
+                : "Base aerobica stabile e costante"}
+            </p>
+            <p className="font-serif-italic" style={{ fontSize: 13.5, color: "var(--inchiostro-70)", margin: 0, lineHeight: 1.4 }}>
+              {trend?.classification === "miglioramento"
+                ? "A parità di battiti cardiaci stai correndo più velocemente rispetto al mese scorso."
+                : trend?.classification === "calo"
+                ? "I battiti tendono a salire un po' prima: mantieni le corse facili davvero lente e riposa."
+                : "Mantieni la costanza nelle corse tranquille senza forzare il ritmo."}
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowTechnicalDetails((v) => !v)}
+              className="press-soft"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                marginTop: 12,
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--inchiostro-50)",
+                cursor: "pointer",
+              }}
+            >
+              {showTechnicalDetails ? "Nascondi numeri tecnici" : "Mostra parametri tecnici (EF, Decoupling)"}
+              <ChevronRight size={13} style={{ transform: showTechnicalDetails ? "rotate(-90deg)" : "rotate(90deg)", transition: "transform 0.2s" }} />
+            </button>
+          </div>
+        ) : null}
+
+        {/* Main metrics row (Visible for L2/L3 or when expanded in L1) */}
+        {trend && (!isLevel1 || showTechnicalDetails) && (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, margin: "14px 0" }}>
             {/* EF attuale */}
-            <div style={{ background: "rgba(59, 130, 246, 0.08)", padding: 12, borderRadius: "var(--radius-card)" }}>
-              <span style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700, textTransform: "uppercase" }}>
+            <div style={{ background: "rgba(37, 99, 235, 0.06)", padding: 12, borderRadius: "var(--radius-card)", border: "1px solid rgba(37, 99, 235, 0.12)" }}>
+              <span style={{ fontSize: 11, color: "var(--azzurro-scuro)", fontWeight: 700, textTransform: "uppercase" }}>
                 EF attuale
               </span>
-              <p className="font-mono" style={{ fontSize: 22, fontWeight: 700, margin: "4px 0 2px", color: "#1e3a8a" }}>
+              <p className="font-mono" style={{ fontSize: 22, fontWeight: 700, margin: "4px 0 2px", color: "var(--inchiostro)" }}>
                 {(trend.current_ef * 1000).toFixed(1)}
               </p>
-              <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>velocità / FC × 1000</span>
+              <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>m/s per bpm × 10³</span>
             </div>
 
             {/* Variazione 4 settimane */}
-            <div style={{ background: trendStyle.bg, padding: 12, borderRadius: "var(--radius-card)" }}>
-              <span style={{ fontSize: 11, color: trendStyle.color, fontWeight: 700, textTransform: "uppercase" }}>
+            <div style={{ background: trendConfig.bg, padding: 12, borderRadius: "var(--radius-card)", border: trendConfig.border }}>
+              <span style={{ fontSize: 11, color: trendConfig.color, fontWeight: 700, textTransform: "uppercase" }}>
                 Δ 4 settimane
               </span>
-              <p className="font-mono" style={{ fontSize: 22, fontWeight: 700, margin: "4px 0 2px", color: trendStyle.color }}>
+              <p className="font-mono" style={{ fontSize: 22, fontWeight: 700, margin: "4px 0 2px", color: trendConfig.color }}>
                 {trend.change_pct > 0 ? "+" : ""}
                 {trend.change_pct.toFixed(1)}%
               </p>
@@ -182,11 +252,16 @@ export function AerobicEfficiencyCard({ data, animate = true }: AerobicEfficienc
               style={{
                 background: recentDecoupling
                   ? recentDecoupling.decoupling_pct < 5
-                    ? "rgba(16, 185, 129, 0.1)"
-                    : "rgba(249, 115, 22, 0.08)"
-                  : "rgba(34, 34, 34, 0.04)",
+                    ? "rgba(5, 150, 105, 0.08)"
+                    : "rgba(225, 112, 85, 0.1)"
+                  : "rgba(34, 34, 34, 0.03)",
                 padding: 12,
                 borderRadius: "var(--radius-card)",
+                border: recentDecoupling
+                  ? recentDecoupling.decoupling_pct < 5
+                    ? "1px solid rgba(5, 150, 105, 0.18)"
+                    : "1px solid rgba(225, 112, 85, 0.22)"
+                  : "var(--border-airbnb)",
               }}
             >
               <span
@@ -196,8 +271,8 @@ export function AerobicEfficiencyCard({ data, animate = true }: AerobicEfficienc
                   textTransform: "uppercase",
                   color: recentDecoupling
                     ? recentDecoupling.decoupling_pct < 5
-                      ? "#047857"
-                      : "#c2410c"
+                      ? "#059669"
+                      : "var(--corallo)"
                     : "var(--inchiostro-50)",
                 }}
               >
@@ -211,29 +286,30 @@ export function AerobicEfficiencyCard({ data, animate = true }: AerobicEfficienc
                   margin: "4px 0 2px",
                   color: recentDecoupling
                     ? recentDecoupling.decoupling_pct < 5
-                      ? "#064e3b"
-                      : "#7c2d12"
+                      ? "#065f46"
+                      : "var(--corallo-scuro)"
                     : "var(--inchiostro-35)",
                 }}
               >
                 {recentDecoupling ? `${recentDecoupling.decoupling_pct.toFixed(1)}%` : "—"}
               </p>
               <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>
-                {recentDecoupling ? (recentDecoupling.decoupling_pct < 5 ? "buona tenuta" : "deriva alta") : "nessun lungo"}
+                {recentDecoupling ? (recentDecoupling.decoupling_pct < 5 ? "ottima tenuta" : "deriva cardiaca") : "nessun lungo"}
               </span>
             </div>
           </div>
         )}
 
         {/* Explanation */}
-        <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-70)", margin: "8px 0 0", lineHeight: 1.45 }}>
-          L'efficienza aerobica misura quanta velocità il tuo cuore produce per ogni battito. Sale quando la base
-          aerobica migliora.
-        </p>
+        {(!isLevel1 || showTechnicalDetails) && (
+          <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-70)", margin: "8px 0 0", lineHeight: 1.45 }}>
+            L'efficienza aerobica misura quanta velocità produci per ogni battito cardiaco. Cresce quando la base aerobica diventa più solida ed economica.
+          </p>
+        )}
       </SlideUp>
 
       {/* 2. Sparkline Chart */}
-      {sparkline && (
+      {sparkline && (!isLevel1 || showTechnicalDetails) && (
         <SlideUp
           active={animate}
           delayMs={400}
@@ -241,7 +317,8 @@ export function AerobicEfficiencyCard({ data, animate = true }: AerobicEfficienc
             background: "var(--crema-card)",
             borderRadius: "var(--radius-card-lg)",
             padding: 16,
-            border: "1px solid rgba(34, 34, 34, 0.06)",
+            border: "var(--border-airbnb)",
+            boxShadow: "var(--shadow-airbnb-subtle)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
@@ -305,7 +382,8 @@ export function AerobicEfficiencyCard({ data, animate = true }: AerobicEfficienc
             background: "var(--crema-card)",
             borderRadius: "var(--radius-card-lg)",
             padding: 18,
-            border: "1px solid rgba(34, 34, 34, 0.06)",
+            border: "var(--border-airbnb)",
+            boxShadow: "var(--shadow-airbnb-subtle)",
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
