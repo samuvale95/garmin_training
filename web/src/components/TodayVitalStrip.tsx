@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { SlideUp } from "@/components/motion/primitives";
+import { MoonIcon } from "@/components/Icons";
 
 interface TodayVitalStripProps {
   sleepMinutes?: number | null;
@@ -84,7 +85,7 @@ export function TodayVitalStrip({
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ fontSize: 11, fontWeight: 500, color: "var(--inchiostro-50)" }}>Sonno</span>
-              <span style={{ fontSize: 11 }}>💤</span>
+              <MoonIcon size={12} strokeWidth={2} style={{ color: "var(--inchiostro-50)" }} />
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 2, marginTop: 2 }}>
               <span className="font-mono" style={{ fontSize: 18, fontWeight: 600, color: "var(--inchiostro)" }}>

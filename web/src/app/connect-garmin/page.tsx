@@ -6,6 +6,7 @@ import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton, WordIn, SlideUp } from "@/components/motion/primitives";
+import { LockIcon } from "@/components/Icons";
 import { useMountOnce } from "@/lib/motion";
 import { useConnectGarmin } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
@@ -72,8 +73,9 @@ export default function ConnectGarminPage() {
       >
         <Field label="Email Garmin" value={email} onChange={setEmail} type="email" placeholder="luca@example.com" />
         <Field label="Password" value={password} onChange={setPassword} type="password" />
-        <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
-          🔒 Resta sul telefono. Salvo solo il token, mai la password.
+        <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
+          <LockIcon size={13} strokeWidth={2} style={{ color: "var(--inchiostro-50)" }} />
+          <span>Resta sul telefono. Salvo solo il token, mai la password.</span>
         </p>
       </SlideUp>
 

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, type ChangeEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CloseIcon, PlusIcon } from "@/components/Icons";
+import { CloseIcon, PlusIcon, LightningIcon, PencilIcon, CameraIcon, CheckIcon } from "@/components/Icons";
 import { PortionPicker } from "@/components/FuelCorrectionSheet";
 import { useAddManualEntry, useDescribeMeal, useLogPhoto, useAthleteLevel } from "@/lib/queries";
 import { toDateKey } from "@/lib/sessionVisuals";
@@ -208,9 +208,14 @@ export function QuickMealModal({
                 cursor: "pointer",
                 boxShadow: mode === "preset" ? "0 2px 8px rgba(0,0,0,0.06)" : "none",
                 transition: "all 0.15s ease",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
               }}
             >
-              ⚡ Rapidi da Corsa
+              <LightningIcon size={13} strokeWidth={2.2} />
+              <span>Rapidi</span>
             </button>
             <button
               onClick={() => setMode("text")}
@@ -226,9 +231,14 @@ export function QuickMealModal({
                 cursor: "pointer",
                 boxShadow: mode === "text" ? "0 2px 8px rgba(0,0,0,0.06)" : "none",
                 transition: "all 0.15s ease",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
               }}
             >
-              ✍️ Scrivi
+              <PencilIcon size={13} strokeWidth={2} />
+              <span>Scrivi</span>
             </button>
             <button
               onClick={() => {
@@ -247,9 +257,14 @@ export function QuickMealModal({
                 cursor: "pointer",
                 boxShadow: mode === "photo" ? "0 2px 8px rgba(0,0,0,0.06)" : "none",
                 transition: "all 0.15s ease",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
               }}
             >
-              📸 Foto
+              <CameraIcon size={14} strokeWidth={2} />
+              <span>Foto</span>
             </button>
           </div>
 
@@ -452,9 +467,13 @@ export function QuickMealModal({
                   fontWeight: 600,
                   fontSize: 14,
                   cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
                 }}
               >
-                {saving ? "Caricamento foto..." : "📸 Apri Fotocamera / Galleria"}
+                <CameraIcon size={16} strokeWidth={2} />
+                <span>{saving ? "Caricamento foto..." : "Apri Fotocamera / Galleria"}</span>
               </button>
             </div>
           )}

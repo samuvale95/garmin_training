@@ -3,6 +3,7 @@
 import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { SlideUp } from "@/components/motion/primitives";
+import { SunIcon, MoonIcon, RunnerIcon } from "@/components/Icons";
 import { FoodThumb, portionLabel } from "@/components/FuelCorrectionSheet";
 import { capitalize, formatClockTime } from "@/lib/format";
 import type {
@@ -156,7 +157,8 @@ export function SessionTimeSelectorCard({
                   transition: "all 0.15s ease",
                 }}
               >
-                <span>🌅</span> Mattina
+                <SunIcon size={12} strokeWidth={2} />
+                <span>Mattina</span>
               </button>
 
               <button
@@ -180,7 +182,8 @@ export function SessionTimeSelectorCard({
                   transition: "all 0.15s ease",
                 }}
               >
-                <span>☀️</span> Pomeriggio (18:00)
+                <SunIcon size={12} strokeWidth={2.4} />
+                <span>Pomeriggio (18:00)</span>
               </button>
 
               <button
@@ -204,7 +207,8 @@ export function SessionTimeSelectorCard({
                   transition: "all 0.15s ease",
                 }}
               >
-                <span>🌙</span> Sera
+                <MoonIcon size={12} strokeWidth={2} />
+                <span>Sera</span>
               </button>
             </div>
           </div>
@@ -383,7 +387,7 @@ export function DayFuelTimelineBlock({
             borderRadius: 14,
           }}
         >
-          <span style={{ fontSize: 15 }}>🏃‍♂️</span>
+          <RunnerIcon size={15} strokeWidth={2} style={{ color: "var(--corallo-testo)" }} />
           <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--corallo-testo)" }}>
             {runLabel}
           </span>

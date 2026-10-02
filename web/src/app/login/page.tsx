@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { BrandMark } from "@/components/motion/BrandMark";
+import { RunnerIcon } from "@/components/Icons";
 import { signInDev, signInWithGoogle } from "@/lib/auth";
 
 export default function LoginPage() {
@@ -151,7 +152,9 @@ export default function LoginPage() {
               textAlign: "left",
             }}
           >
-            <span style={{ fontSize: 18, lineHeight: 1 }}>🏃</span>
+            <div style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--sabbia-chip)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", color: "var(--inchiostro)" }}>
+              <RunnerIcon size={16} strokeWidth={2} />
+            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>Adattamento reale</p>
               <p style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>Se sei stanco o hai dolore, il piano scala</p>

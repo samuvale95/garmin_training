@@ -16,11 +16,11 @@ function initials(name: string | undefined | null): string {
  * than at random per render, so it stays the same face every time the app opens
  * instead of reshuffling under the user. */
 const PLACEHOLDERS = [
-  { emoji: "🏃", background: "var(--corallo-chiaro)", color: "var(--corallo-testo)" },
-  { emoji: "🥾", background: "var(--verde)", color: "var(--verde-testo)" },
-  { emoji: "⛰️", background: "var(--azzurro)", color: "var(--azzurro-testo)" },
-  { emoji: "🌄", background: "var(--giallo)", color: "var(--giallo-testo)" },
-  { emoji: "🧭", background: "var(--lilla)", color: "var(--lilla-testo)" },
+  { letter: "P", background: "var(--sabbia-chip)", color: "var(--inchiostro)" },
+  { letter: "A", background: "var(--crema-card)", color: "var(--inchiostro-70)" },
+  { letter: "S", background: "var(--verde)", color: "var(--verde-testo)" },
+  { letter: "R", background: "var(--azzurro)", color: "var(--azzurro-testo)" },
+  { letter: "P", background: "var(--sabbia)", color: "var(--inchiostro)" },
 ];
 
 function placeholderFor(seed: string) {
@@ -93,7 +93,7 @@ export function Avatar({ size = 36, withStatusBadge = false }: { size?: number; 
         lineHeight: 1,
       }}
     >
-      {placeholder ? placeholder.emoji : label}
+      {placeholder ? placeholder.letter : label}
     </div>
   );
 

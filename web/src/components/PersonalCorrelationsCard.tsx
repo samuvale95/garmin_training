@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { SlideUp } from "@/components/motion/primitives";
+import { MoonIcon, LightningIcon } from "@/components/Icons";
 import type { PersonalCorrelationsData } from "@/lib/types";
 
 interface PersonalCorrelationsCardProps {
@@ -130,7 +131,7 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
                 </p>
 
                 <p className="font-serif-italic" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0, lineHeight: 1.35 }}>
-                  💡 <strong>Cosa significa:</strong> {ins.action}
+                  <span style={{ fontWeight: 600, color: "var(--inchiostro-70)" }}>Cosa significa:</span> {ins.action}
                 </p>
 
                 <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid rgba(34, 34, 34, 0.04)", fontSize: 10, color: "var(--inchiostro-35)" }}>
@@ -181,9 +182,19 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
                     <span style={{ fontWeight: 600, color: "var(--inchiostro)" }}>{r.title}</span>
                     <span style={{ color: "var(--inchiostro-50)", marginLeft: 6 }}>{r.date}</span>
                   </div>
-                  <div style={{ display: "flex", gap: 12, fontFamily: "monospace" }}>
-                    {r.sleep_hours != null && <span>💤 {r.sleep_hours}h</span>}
-                    {r.hrv_ms != null && <span>⚡ {Math.round(r.hrv_ms)}ms</span>}
+                  <div style={{ display: "flex", gap: 12, alignItems: "center", fontFamily: "monospace" }}>
+                    {r.sleep_hours != null && (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                        <MoonIcon size={11} strokeWidth={2} style={{ color: "var(--inchiostro-50)" }} />
+                        <span>{r.sleep_hours}h</span>
+                      </span>
+                    )}
+                    {r.hrv_ms != null && (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                        <LightningIcon size={11} strokeWidth={2.2} style={{ color: "var(--inchiostro-50)" }} />
+                        <span>{Math.round(r.hrv_ms)}ms</span>
+                      </span>
+                    )}
                     <span style={{ fontWeight: 600 }}>{r.pace_formatted}</span>
                   </div>
                 </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SlideUp } from "@/components/motion/primitives";
+import { BellIcon, DropletIcon, UtensilsIcon, CheckIcon } from "@/components/Icons";
 import {
   calculateHydrationMl,
   calculateSnackGrams,
@@ -132,11 +133,15 @@ export function FuelReminderCard({
               fontWeight: 700,
               padding: "3px 9px",
               borderRadius: "var(--radius-pill)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
               background: "rgba(16, 185, 129, 0.12)",
               color: "#059669",
             }}
           >
-            🔔 Notifiche attive
+            <BellIcon size={12} strokeWidth={2.4} />
+            <span>Notifiche attive</span>
           </span>
         ) : (
           <span
@@ -166,8 +171,9 @@ export function FuelReminderCard({
         {/* Snack block */}
         <div style={{ background: "rgba(245, 158, 11, 0.08)", padding: 12, borderRadius: "var(--radius-card)" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: "#b45309", textTransform: "uppercase" }}>
-              🍌 Merenda (−90&apos;)
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: "#b45309", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <UtensilsIcon size={11} strokeWidth={2.2} />
+              <span>Merenda (−90&apos;)</span>
             </span>
             <span className="font-mono" style={{ fontSize: 13, fontWeight: 700, color: "#78350f" }}>
               ore {snackTime}
@@ -184,8 +190,9 @@ export function FuelReminderCard({
         {/* Hydration block */}
         <div style={{ background: "rgba(14, 165, 233, 0.08)", padding: 12, borderRadius: "var(--radius-card)" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: "#0369a1", textTransform: "uppercase" }}>
-              💧 Acqua (−45&apos;)
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: "#0369a1", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <DropletIcon size={11} strokeWidth={2.2} />
+              <span>Acqua (−45&apos;)</span>
             </span>
             <span className="font-mono" style={{ fontSize: 13, fontWeight: 700, color: "#0c4a6e" }}>
               ore {waterTime}
@@ -216,9 +223,13 @@ export function FuelReminderCard({
               fontSize: 12,
               fontWeight: 600,
               cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
-            {testSent ? "Invio in corso..." : "🔔 Invia notifica di prova"}
+            <BellIcon size={13} strokeWidth={2} />
+            <span>{testSent ? "Invio in corso..." : "Invia notifica di prova"}</span>
           </button>
         ) : notifStatus.permission === "denied" ? (
           <div style={{ background: "rgba(239, 68, 68, 0.08)", padding: "10px 14px", borderRadius: "var(--radius-card)", marginTop: 6 }}>
@@ -244,9 +255,13 @@ export function FuelReminderCard({
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
               }}
             >
-              🔔 Tocca qui per consentire le notifiche
+              <BellIcon size={14} strokeWidth={2.2} />
+              <span>Consenti le notifiche</span>
             </button>
             <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: 0 }}>
               (Se stai usando un iPhone / Safari, aggiungi l&apos;app alla schermata Home con <em>Condividi → Aggiungi alla schermata Home</em> per ricevere le notifiche push).
@@ -256,8 +271,9 @@ export function FuelReminderCard({
       </div>
 
       {schedulingFeedback && (
-        <p className="font-mono" style={{ fontSize: 11.5, color: "#047857", marginTop: 10, margin: "10px 0 0" }}>
-          ✓ {schedulingFeedback}
+        <p className="font-mono" style={{ fontSize: 11.5, color: "#047857", marginTop: 10, margin: "10px 0 0", display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <CheckIcon size={13} strokeWidth={2.4} />
+          <span>{schedulingFeedback}</span>
         </p>
       )}
     </SlideUp>

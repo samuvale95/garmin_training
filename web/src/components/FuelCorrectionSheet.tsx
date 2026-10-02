@@ -5,6 +5,7 @@ import { useMotionEnabled } from "@/lib/motion";
 import { apiUrl } from "@/lib/apiClient";
 import { formatClockTime } from "@/lib/format";
 import { useDeleteEntry, useUpdateEntry } from "@/lib/queries";
+import { UtensilsIcon } from "@/components/Icons";
 import type { FoodEntry } from "@/lib/types";
 
 /** A meal's thumbnail: the stored photo, or a plain swatch for a manual entry (SPEC.md
@@ -26,9 +27,9 @@ export function FoodThumb({ entry, size = 52 }: { entry: FoodEntry; size?: numbe
   return (
     <div
       aria-hidden="true"
-      style={{ width: size, height: size, borderRadius: 14, background: "var(--sabbia-chip)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", fontSize: size * 0.4 }}
+      style={{ width: size, height: size, borderRadius: 14, background: "var(--sabbia-chip)", color: "var(--inchiostro-50)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}
     >
-      🍽️
+      <UtensilsIcon size={Math.round(size * 0.42)} strokeWidth={2} />
     </div>
   );
 }

@@ -14,7 +14,7 @@ import { Mascot, Tokens } from "@/components/ProgressBits";
 import { RaceGoalCard } from "@/components/RaceGoalCard";
 import { TiltCard } from "@/components/motion/TiltCard";
 import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/motion/primitives";
-import { ChevronRight, ArrowRight, ArrowUpRight, PlusIcon } from "@/components/Icons";
+import { ChevronRight, ArrowRight, ArrowUpRight, PlusIcon, TargetIcon, UtensilsIcon } from "@/components/Icons";
 import { TodayHeroUnified } from "@/components/TodayHeroUnified";
 import { TodayVitalStrip } from "@/components/TodayVitalStrip";
 import { PreWorkoutContextCard } from "@/components/PreWorkoutContextCard";
@@ -241,7 +241,9 @@ export default function TodayPage() {
               color: "inherit",
             }}
           >
-            <span style={{ fontSize: 18, flex: "none" }}>🎯</span>
+            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: "50%", background: "var(--sabbia-chip)", color: "var(--inchiostro)", flex: "none" }}>
+              <TargetIcon size={16} strokeWidth={2} />
+            </span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--inchiostro)" }}>
@@ -503,7 +505,7 @@ function TodayHeader({ onOpenQuickLog }: { onOpenQuickLog?: () => void }) {
               fontWeight: 600,
             }}
           >
-            <span style={{ fontSize: 13 }}>🍽️</span>
+            <UtensilsIcon size={14} strokeWidth={2} />
             <span>+ Cibo</span>
           </motion.button>
         )}

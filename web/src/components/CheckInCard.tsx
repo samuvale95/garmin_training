@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { SlideUp } from "@/components/motion/primitives";
+import { ShoeIcon } from "@/components/Icons";
 import { useCheckAdaptation, useSaveCheckIn, useShoes } from "@/lib/queries";
 import type { CheckIn, CheckInBody, CheckInEffort, PainArea } from "@/lib/types";
 
@@ -102,7 +103,7 @@ export function CheckInCard({
         {primaryShoe && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid var(--border-airbnb)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 12 }}>👟</span>
+              <ShoeIcon size={14} strokeWidth={2} style={{ color: "var(--inchiostro-50)" }} />
               <span style={{ fontSize: 12, color: "var(--inchiostro-70)", fontWeight: 500 }}>
                 {primaryShoe.name}
               </span>

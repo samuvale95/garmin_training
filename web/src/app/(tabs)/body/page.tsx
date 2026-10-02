@@ -10,7 +10,7 @@ import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { ProgressRing, SlideUp, Skeleton } from "@/components/motion/primitives";
 import { TiltCard } from "@/components/motion/TiltCard";
-import { ChevronRight } from "@/components/Icons";
+import { ChevronRight, AlertTriangleIcon } from "@/components/Icons";
 import { PersonalCorrelationsCard } from "@/components/PersonalCorrelationsCard";
 import { useMountOnce } from "@/lib/motion";
 import { useBodyToday, useFuelTargets, usePersonalCorrelations, usePlanQuery, usePrefetchFuelNarrative } from "@/lib/queries";
@@ -129,7 +129,8 @@ export default function RecoveryPage() {
                       marginTop: 8,
                     }}
                   >
-                    <span>⚠️ Dato notturno parziale</span>
+                    <AlertTriangleIcon size={12} strokeWidth={2.2} />
+                    <span>Dato notturno parziale</span>
                     {data.overnight_reliability_note && (
                       <span style={{ fontWeight: 400, opacity: 0.85 }}>· {data.overnight_reliability_note}</span>
                     )}

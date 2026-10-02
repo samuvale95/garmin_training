@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { SlideUp } from "@/components/motion/primitives";
+import { LightningIcon } from "@/components/Icons";
 import { calculateHydrationMl, calculateSnackGrams } from "@/lib/notifications";
 import type { DayTarget } from "@/lib/types";
 
@@ -41,7 +42,7 @@ export function PreWorkoutContextCard({
       >
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-            <span style={{ fontSize: 13 }}>⚡</span>
+            <LightningIcon size={13} strokeWidth={2.2} style={{ color: "var(--corallo)" }} />
             <span
               className="font-mono"
               style={{

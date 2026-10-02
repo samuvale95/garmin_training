@@ -4,7 +4,7 @@ import { useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { PulseRing, Skeleton, SlideUp } from "@/components/motion/primitives";
-import { ChevronLeft, ChevronRight, ArrowRight, PencilIcon } from "@/components/Icons";
+import { ChevronLeft, ChevronRight, ArrowRight, PencilIcon, CameraIcon } from "@/components/Icons";
 import { FuelCorrectionSheet, PortionPicker, macroAtPortion } from "@/components/FuelCorrectionSheet";
 import { DayEnergyCard } from "@/components/DayEnergyCard";
 import {
@@ -394,7 +394,8 @@ export default function FuelPage() {
                 boxShadow: "var(--shadow-airbnb-subtle)",
               }}
             >
-              <span aria-hidden="true">📷</span> Fotografa pasto
+              <CameraIcon size={15} strokeWidth={2} />
+              <span>Fotografa pasto</span>
             </button>
             <button
               type="button"

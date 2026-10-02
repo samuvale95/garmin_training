@@ -88,7 +88,7 @@ export function calculateSnackGrams(load?: string): string {
 
 /** Sends an immediate test notification to confirm device delivery. */
 export async function sendTestReminder(): Promise<boolean> {
-  return showNotification("🍌 Passo · Promemoria Merenda & Acqua", {
+  return showNotification("Passo · Promemoria Merenda & Acqua", {
     body: "Ecco come riceverai il promemoria! 30-50g di carboidrati e 400ml d'acqua prima di correre.",
     tag: "passo-test-reminder",
   });

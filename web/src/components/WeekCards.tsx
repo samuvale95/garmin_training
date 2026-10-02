@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion, useDragControls } from "framer-motion";
 import { Illustration } from "@/components/Illustration";
 import { SlideUp } from "@/components/motion/primitives";
+import { LightningIcon } from "@/components/Icons";
 import { useMotionEnabled } from "@/lib/motion";
 import { sessionDetailLine } from "@/lib/format";
 import { classifySession, sessionDistanceKm, type DisplaySession } from "@/lib/sessionVisuals";
@@ -227,10 +228,14 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
               background: "rgba(255, 111, 89, 0.12)",
               color: "var(--corallo)",
               borderRadius: "var(--radius-pill)",
-              padding: "2px 6px",
+              padding: "2px 7px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
             }}
           >
-            ⚡ Carb-up
+            <LightningIcon size={10} strokeWidth={2.2} />
+            <span>Carb-up</span>
           </span>
         )}
       </div>

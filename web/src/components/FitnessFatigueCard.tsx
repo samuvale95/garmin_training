@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { FitnessFatigueData, FitnessFatiguePoint } from "@/lib/types";
 import { SlideUp } from "./motion/primitives";
+import { FlagIcon } from "@/components/Icons";
 
 interface FitnessFatigueCardProps {
   data: FitnessFatigueData;
@@ -318,8 +319,9 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
           }}
         >
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em" }}>
-              🏁 Proiezione Gara · {assessment.race_name}
+            <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em", display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <FlagIcon size={13} strokeWidth={2.2} />
+              <span>Proiezione Gara · {assessment.race_name}</span>
             </span>
             <span className="font-mono" style={{ fontSize: 12, fontWeight: 700 }}>
               tra {assessment.days_to_race} giorni
