@@ -252,6 +252,10 @@ export function WeekPageContent() {
 
   // Same rule as Oggi: while we don't yet know whether there's a plan or a Garmin
   // connection, show this week's frame with empty day cards -- never a blank screen.
+  // Above the early return below: a hook after it would run on some renders and not
+  // others (first render is always "not ready"), which React rejects outright.
+  const refreshMutation = useRefreshServerData();
+
   if (!access.ready || (!access.plan && !access.garminConnected)) {
     return (
       <div>
@@ -296,7 +300,6 @@ export function WeekPageContent() {
 
   const firstRestIndex = days.findIndex((d) => d.cards.length === 0 && d.offPlan.length === 0);
   const weekInClass = reduced || direction === 0 ? undefined : "anim-week-in";
-  const refreshMutation = useRefreshServerData();
 
   return (
     <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
