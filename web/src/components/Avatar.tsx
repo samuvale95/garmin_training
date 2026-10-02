@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAthleteIdentity } from "@/lib/identity";
+import { useGarminStatus, useStravaStatus } from "@/lib/queries";
 
 function initials(name: string | undefined | null): string {
   const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
@@ -40,8 +41,17 @@ function placeholderFor(seed: string) {
  * and this is a 36px circle with nothing to optimize. A URL that fails to load (an
  * expired CDN link) falls through to the initials rather than showing a broken image.
  */
-export function Avatar({ size = 36 }: { size?: number }) {
+export function Avatar({ size = 36, withStatusBadge = false }: { size?: number; withStatusBadge?: boolean }) {
   const { name, imageUrl } = useAthleteIdentity();
+  const garmin = useGarminStatus();
+  const strava = useStravaStatus();
+
+  const hasSyncIssue =
+    withStatusBadge &&
+    ((garmin.data && !garmin.data.connected) ||
+      (strava.data && !strava.data.connected) ||
+      garmin.data?.cooldown_active);
+
   // The URL that failed, not a boolean: a later identity (a freshly connected account,
   // or Garmin's photo arriving after Strava's) must get its own chance to load.
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
@@ -59,23 +69,19 @@ export function Avatar({ size = 36 }: { size?: number }) {
     flex: "none",
   };
 
-  if (imageUrl && imageUrl !== failedUrl) {
-    return (
-      <div aria-hidden="true" style={{ ...frame, background: "var(--sabbia-scura)" }}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- remote CDN host, see above */}
-        <img
-          src={imageUrl}
-          alt=""
-          width={size}
-          height={size}
-          onError={() => setFailedUrl(imageUrl)}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
-      </div>
-    );
-  }
-
-  return (
+  const content = imageUrl && imageUrl !== failedUrl ? (
+    <div aria-hidden="true" style={{ ...frame, background: "var(--sabbia-scura)" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- remote CDN host, see above */}
+      <img
+        src={imageUrl}
+        alt=""
+        width={size}
+        height={size}
+        onError={() => setFailedUrl(imageUrl)}
+        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+      />
+    </div>
+  ) : (
     <div
       aria-hidden="true"
       style={{
@@ -88,6 +94,29 @@ export function Avatar({ size = 36 }: { size?: number }) {
       }}
     >
       {placeholder ? placeholder.emoji : label}
+    </div>
+  );
+
+  if (!withStatusBadge) return content;
+
+  return (
+    <div style={{ position: "relative", display: "inline-flex" }}>
+      {content}
+      {hasSyncIssue && (
+        <span
+          title="Connessione Garmin o Strava da verificare"
+          style={{
+            position: "absolute",
+            top: -1,
+            right: -1,
+            width: 10,
+            height: 10,
+            borderRadius: "50%",
+            background: "var(--corallo)",
+            border: "2px solid var(--crema)",
+          }}
+        />
+      )}
     </div>
   );
 }

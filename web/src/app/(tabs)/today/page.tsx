@@ -509,7 +509,7 @@ function TodayHeader({ onOpenQuickLog }: { onOpenQuickLog?: () => void }) {
         )}
         <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} transition={{ type: "spring", stiffness: 450, damping: 22 }}>
           <Link href="/settings" aria-label="Impostazioni" className="tap-target" style={{ display: "block" }}>
-            <Avatar size={36} />
+            <Avatar size={36} withStatusBadge={true} />
           </Link>
         </motion.div>
       </div>
