@@ -67,6 +67,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
     dehydrateOptions: { shouldDehydrateQuery: isPersistable },
   }));
 
+  // Register Service Worker for offline PWA installation
+  useState(() => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js").catch((err) => {
+          console.debug("ServiceWorker registration note:", err);
+        });
+      });
+    }
+  });
+
   return (
     <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
       {children}
