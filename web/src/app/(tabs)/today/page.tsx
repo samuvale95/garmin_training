@@ -19,6 +19,7 @@ import { TodayHeroUnified } from "@/components/TodayHeroUnified";
 import { TodayVitalStrip } from "@/components/TodayVitalStrip";
 import { PreWorkoutContextCard } from "@/components/PreWorkoutContextCard";
 import { QuickMealModal } from "@/components/QuickMealModal";
+import { WeekStrip } from "@/components/WeekStrip";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import {
@@ -239,14 +240,21 @@ export default function TodayPage() {
         active={animate}
       />
 
-      {/* 6. MODALE QUICK LOG PASTO / SNACK (1-tap da ovunque) */}
+      {/* 6. STRISCIA 7 GIORNI (LUN-DOM): Panoramica settimana in 0 tap */}
+      <WeekStrip
+        currentDateKey={todayKey}
+        sessions={sessions}
+        active={animate}
+      />
+
+      {/* 7. MODALE QUICK LOG PASTO / SNACK (1-tap da ovunque) */}
       <QuickMealModal
         isOpen={quickMealOpen}
         onClose={() => setQuickMealOpen(false)}
         todayDateKey={todayKey}
       />
 
-      {/* 7. PROGRESSO E RECORD SETTIMANALI (Compatto) */}
+      {/* 8. PROGRESSO E RECORD SETTIMANALI (Compatto) */}
       {progress.data && (
         <Link href="/progress" style={{ textDecoration: "none", color: "inherit" }}>
           <SlideUp active={animate} delayMs={160}>

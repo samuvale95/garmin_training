@@ -126,10 +126,9 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
   const suppressClick = useRef(false);
 
   const visual = classifySession(card.session);
-  // A longer session gets a taller card, but over a much narrower band than it used
-  // to: at 78-110px a whole week fits on one phone screen, which is the only reason
-  // this tab exists.
-  const height = 70 + Math.min(26, sessionDistanceKm(card.session) * 1.4);
+  const km = sessionDistanceKm(card.session);
+  const isHeavy = km >= 14 || card.session.title.toLowerCase().includes("lungo") || card.session.title.toLowerCase().includes("ripetute");
+  const height = 62 + Math.min(18, km * 1.0);
   const detail = sessionDetailLine(card.session) || visual.label;
 
   const clearPress = useCallback(() => {
@@ -202,12 +201,12 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
       delayMs={delayMs}
       row
       style={{
-        background: "var(--crema)",
-        border: "var(--border-airbnb)",
+        background: "var(--crema-card)",
+        border: isHeavy ? "1.5px solid rgba(255, 111, 89, 0.3)" : "var(--border-airbnb)",
         boxShadow: "var(--shadow-airbnb-subtle)",
         color: "var(--inchiostro)",
         borderRadius: "var(--radius-card)",
-        padding: "15px 18px",
+        padding: "11px 16px",
         minHeight: height,
         transition: "box-shadow 0.25s var(--ease), border-color 0.2s ease, transform 0.2s var(--ease)",
         position: "relative",
@@ -217,17 +216,34 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
         justifyContent: "center",
       }}
     >
-      <span className="session-kind" style={{ background: visual.background, color: visual.foreground }}>{visual.label}</span>
-      <p style={{ fontSize: 15.5, fontWeight: 600, margin: 0, paddingRight: 64, letterSpacing: "-.01em" }}>{card.session.title}</p>
-      <p className="font-serif-italic" style={{ fontSize: 13.5, margin: "4px 0 0", color: "var(--inchiostro-70)", paddingRight: 64 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span className="session-kind" style={{ background: visual.background, color: visual.foreground }}>{visual.label}</span>
+        {isHeavy && (
+          <span
+            className="font-mono"
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              background: "rgba(255, 111, 89, 0.12)",
+              color: "var(--corallo)",
+              borderRadius: "var(--radius-pill)",
+              padding: "2px 6px",
+            }}
+          >
+            ⚡ Carb-up
+          </span>
+        )}
+      </div>
+      <p style={{ fontSize: 14.5, fontWeight: 600, margin: "2px 0 0", paddingRight: 56, letterSpacing: "-.01em" }}>{card.session.title}</p>
+      <p className="font-serif-italic" style={{ fontSize: 12.5, margin: "2px 0 0", color: "var(--inchiostro-70)", paddingRight: 56 }}>
         {detail}
       </p>
       {matchKm != null && (
-        <p className="font-mono" style={{ fontSize: 11, margin: "6px 0 0", opacity: 0.75, paddingRight: 64 }}>
-          svolto {matchKm.toFixed(1)} km
+        <p className="font-mono" style={{ fontSize: 11, margin: "3px 0 0", color: "var(--verde-tratto-scuro)", fontWeight: 600, paddingRight: 56 }}>
+          ✓ svolto {matchKm.toFixed(1)} km
         </p>
       )}
-      {visual.illustration && <Illustration name={visual.illustration} width={58} height={64} breathe={false} active={animate} delayMs={200 + delayMs} />}
+      {visual.illustration && <Illustration name={visual.illustration} width={48} height={54} breathe={false} active={animate} delayMs={200 + delayMs} />}
     </SlideUp>
   );
 

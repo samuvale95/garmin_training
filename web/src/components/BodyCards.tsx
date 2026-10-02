@@ -57,8 +57,8 @@ export function SleepCard({ sleep, animate, delayMs }: { sleep: SleepPhases; ani
         whileHover={{ y: -3, scale: 1.012 }}
         transition={{ type: "spring", stiffness: 400, damping: 25 }}
         style={{
-          background: "var(--azzurro)",
-          color: "var(--azzurro-testo)",
+          background: "var(--crema-card)",
+          color: "var(--inchiostro)",
           border: "var(--border-airbnb)",
           boxShadow: "var(--shadow-airbnb-subtle)",
           borderRadius: "var(--radius-card)",

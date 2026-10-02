@@ -57,15 +57,83 @@ export default function FuelDiaryPage() {
     return map;
   }, [uniqueDates, targetQueries]);
 
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const filteredDays = useMemo(() => {
+    if (!selectedDate) return days;
+    return days.filter((d) => d.date === selectedDate);
+  }, [days, selectedDate]);
+
   return (
     <div style={{ padding: "22px 20px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/body/fuel" />
         <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Diario pasti</h1>
         <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "6px 12px" }}>
-          ultimi {DIARY_DAYS} giorni
+          {days.length} giorni
         </span>
       </div>
+
+      {/* 1-tap Day Scroller Pills */}
+      {days.length > 1 && (
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            overflowX: "auto",
+            padding: "14px 0 6px",
+            scrollbarWidth: "none",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setSelectedDate(null)}
+            className="press-soft"
+            style={{
+              padding: "6px 12px",
+              borderRadius: "var(--radius-pill)",
+              fontSize: 12,
+              fontWeight: 600,
+              border: "none",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              background: selectedDate === null ? "var(--inchiostro)" : "var(--crema-card)",
+              color: selectedDate === null ? "var(--crema)" : "var(--inchiostro-70)",
+              boxShadow: selectedDate === null ? "none" : "inset 0 0 0 1px var(--biscotto-light)",
+            }}
+          >
+            Tutti ({days.length})
+          </button>
+          {days.map((d) => {
+            const isToday = d.date === todayKey;
+            const isSel = selectedDate === d.date;
+            const label = isToday ? "Oggi" : d.date.slice(5).replace("-", "/");
+            return (
+              <button
+                key={d.date}
+                type="button"
+                onClick={() => setSelectedDate(isSel ? null : d.date)}
+                className="press-soft"
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "var(--radius-pill)",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: "none",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  background: isSel ? "var(--inchiostro)" : "var(--crema-card)",
+                  color: isSel ? "var(--crema)" : "var(--inchiostro-70)",
+                  boxShadow: isSel ? "none" : "inset 0 0 0 1px var(--biscotto-light)",
+                }}
+              >
+                {label} · {d.entries.length}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {entriesQuery.isLoading ? (
         <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -76,7 +144,7 @@ export default function FuelDiaryPage() {
       ) : days.length === 0 ? (
         <EmptyDiary animate={animate} />
       ) : (
-        days.map((day, i) => {
+        filteredDays.map((day, i) => {
           const daySessions = sessions.filter((s) => s.date === day.date);
           const target = targetsByDate.get(day.date);
           return (

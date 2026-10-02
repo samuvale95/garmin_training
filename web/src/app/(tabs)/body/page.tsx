@@ -89,18 +89,19 @@ export default function RecoveryPage() {
             <TiltCard
               maxTilt={4.5}
               style={{
-                background: "var(--verde)",
-                color: "var(--verde-testo)",
-                border: "var(--border-airbnb)",
+                background: "var(--crema-card)",
+                color: "var(--inchiostro)",
+                border: "1.5px solid rgba(16, 185, 129, 0.28)",
+                boxShadow: "var(--shadow-airbnb-subtle)",
                 borderRadius: "var(--radius-card-lg)",
-                padding: 20,
+                padding: "20px 18px",
                 display: "flex",
                 alignItems: "center",
                 gap: 16,
               }}
             >
-              <ProgressRing value={(data.readiness_score ?? 0) / 100} size={104} strokeWidth={10} trackColor="rgba(31,51,16,.15)" color="var(--verde-testo)">
-                <p className="font-mono" style={{ fontSize: 26, fontWeight: 500, margin: 0 }}>{data.readiness_score ?? "—"}</p>
+              <ProgressRing value={(data.readiness_score ?? 0) / 100} size={96} strokeWidth={9} trackColor="var(--sabbia-chip)" color="var(--verde-tratto-scuro)">
+                <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: 0, color: "var(--inchiostro)" }}>{data.readiness_score ?? "—"}</p>
               </ProgressRing>
               <div style={{ minWidth: 0 }}>
                 <p style={{ fontWeight: 700, fontSize: 16, margin: "0 0 4px" }}>
@@ -172,10 +173,10 @@ export default function RecoveryPage() {
               label="Batteria"
               value={data.battery_percent != null ? `${data.battery_percent}%` : "—"}
               caption="energia rimasta ora, su 100"
-              background="var(--giallo)"
+              background="var(--crema-card)"
             >
               {data.battery_percent != null && (
-                <div style={{ height: 3, borderRadius: 100, background: "rgba(31,51,16,.15)", marginTop: 8, overflow: "hidden" }}>
+                <div style={{ height: 4, borderRadius: 100, background: "var(--sabbia-chip)", marginTop: 8, overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${data.battery_percent}%`, background: "var(--giallo-testo)", borderRadius: 100 }} />
                 </div>
               )}
