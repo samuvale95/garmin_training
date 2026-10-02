@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { motion, useMotionValue, useSpring, useTransform, animate } from "framer-motion";
+import { animate, motion, useMotionValue, useTransform } from "framer-motion";
 import { useMotionEnabled } from "@/lib/motion";
 import { TodayView } from "@/components/tabs-views/TodayView";
 import { WeekView } from "@/components/tabs-views/WeekView";
@@ -55,6 +55,16 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
       });
     }
   }, [targetX, xPercent]);
+
+  // A tab change starts the new tab from its top, as a page navigation would; the
+  // neighbour was already showing its top while pinned (see the panels below).
+  const previousIdx = useRef(activeIdx);
+  useEffect(() => {
+    if (previousIdx.current !== activeIdx) {
+      previousIdx.current = activeIdx;
+      window.scrollTo({ top: 0 });
+    }
+  }, [activeIdx]);
 
   // Touch gesture listeners
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -146,11 +156,15 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
     }
   };
 
-  const xTransform = useTransform(xPercent, (val) => `${val}%`);
+  // The track is 300% wide, and a percentage translate is relative to the element itself,
+  // so one tab (100% of the viewport) is a third of the track.
+  const xTransform = useTransform(xPercent, (val) => `${val / 3}%`);
 
   if (!isMainTab) {
     return <>{children}</>;
   }
+
+  const views = [<TodayView key="today" />, <WeekView key="week" />, <BodyView key="body" />];
 
   return (
     <div
@@ -163,57 +177,46 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
         width: "100%",
         flex: 1,
         display: "flex",
-        overflow: "hidden",
+        // `clip`, not `hidden`: hidden makes this a scroll container, which would turn
+        // every `position: sticky` inside the tabs (the week header) into a no-op.
+        overflowX: "clip",
         position: "relative",
       }}
     >
       <motion.div
         style={{
           display: "flex",
+          alignItems: "flex-start",
           width: "300%",
-          flex: 1,
+          // Never `flex: 1` here: a 0 basis plus shrink squeezes the 300% track back to
+          // the viewport width and all three tabs end up side by side on the first.
+          flex: "none",
           x: xTransform,
           willChange: "transform",
         }}
       >
-        {/* Panel 0: Oggi */}
-        <div
-          style={{
-            width: "33.333333%",
-            flexShrink: 0,
-            overflowY: "auto",
-            WebkitOverflowScrolling: "touch",
-            minHeight: "100%",
-          }}
-        >
-          <TodayView />
-        </div>
-
-        {/* Panel 1: Settimana */}
-        <div
-          style={{
-            width: "33.333333%",
-            flexShrink: 0,
-            overflowY: "auto",
-            WebkitOverflowScrolling: "touch",
-            minHeight: "100%",
-          }}
-        >
-          <WeekView />
-        </div>
-
-        {/* Panel 2: Corpo */}
-        <div
-          style={{
-            width: "33.333333%",
-            flexShrink: 0,
-            overflowY: "auto",
-            WebkitOverflowScrolling: "touch",
-            minHeight: "100%",
-          }}
-        >
-          <BodyView />
-        </div>
+        {views.map((view, index) => {
+          const active = index === activeIdx;
+          return (
+            <div
+              key={index}
+              aria-hidden={!active}
+              style={{
+                width: "33.333333%",
+                flexShrink: 0,
+                // The page scrolls with the window, sized by the active tab alone. The
+                // other two are cut to one screen and pinned to the viewport, so the
+                // neighbour peeking in during a swipe shows its top wherever the
+                // current tab is scrolled to.
+                ...(active
+                  ? { minHeight: "100%" }
+                  : { position: "sticky", top: 0, maxHeight: "100dvh", overflow: "hidden" }),
+              }}
+            >
+              {view}
+            </div>
+          );
+        })}
       </motion.div>
     </div>
   );

@@ -142,6 +142,10 @@ export function TodayView() {
   // Until we know whether there's a plan or a live Garmin connection there is nothing
   // real to show -- but "nothing real" used to mean `return null`, i.e. an empty screen
   // for as long as the Garmin status check took. Render the header and the shapes.
+  // Above the early return below: a hook after it would run on some renders and not
+  // others (first render is always "not ready"), which React rejects outright.
+  const refreshMutation = useRefreshServerData();
+
   if (!access.ready || (!access.plan && !access.garminConnected)) {
     return (
       <div style={{ padding: "22px 20px 12px" }}>
@@ -187,7 +191,6 @@ export function TodayView() {
   const pendingChanges = (diffQuery.data?.to_create.length ?? 0) + (diffQuery.data?.changed.length ?? 0);
   const readiness = bodyQuery.data?.readiness_score;
   const sleepMinutes = bodyQuery.data?.sleep?.total_minutes;
-  const refreshMutation = useRefreshServerData();
 
   return (
     <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>

@@ -40,7 +40,10 @@ export function TabBar() {
                   strokeLinejoin="round"
                   aria-hidden="true"
                   animate={active && !reduced ? { scale: [1, 1.15, 1] } : { scale: 1 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                  // A tween, not a spring: springs only take two keyframes, and the error
+                  // three of them throw lands inside framer-motion's shared frame loop --
+                  // freezing every animation in the app, the tab swipe included.
+                  transition={{ duration: 0.35, ease: "easeOut", times: [0, 0.4, 1] }}
                 >
                   <path d={tab.path} />
                 </motion.svg>
