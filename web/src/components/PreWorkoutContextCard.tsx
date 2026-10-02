@@ -42,15 +42,15 @@ export function PreWorkoutContextCard({
       >
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-            <LightningIcon size={13} strokeWidth={2.2} style={{ color: "var(--corallo)" }} />
+            <LightningIcon size={13} strokeWidth={2.2} style={{ color: "var(--corallo-accent)" }} />
             <span
               className="font-mono"
               style={{
                 fontSize: 10.5,
-                fontWeight: 600,
+                fontWeight: 700,
                 textTransform: "uppercase",
                 letterSpacing: ".06em",
-                color: "var(--corallo)",
+                color: "var(--corallo-testo)",
               }}
             >
               Fabbisogno Pre-Corsa

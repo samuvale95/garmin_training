@@ -12,11 +12,13 @@ import { PlanGenerateCard } from "@/components/PlanGenerateCard";
 import { OffPlanCard, offPlanActivities } from "@/components/OffPlanCard";
 import { useMotionEnabled, useMountOnce } from "@/lib/motion";
 import { useMoveSession } from "@/lib/moveWarnings";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { useCalendarAccess } from "@/lib/guards";
 import {
   useActivities,
   usePrefetchWeeks,
   usePrefetchWorkoutSession,
+  useRefreshServerData,
   useRescheduleWorkout,
   useStravaActivityMatches,
   useStravaStatus,
@@ -335,9 +337,11 @@ function WeekPageContent() {
 
   const firstRestIndex = days.findIndex((d) => d.cards.length === 0 && d.offPlan.length === 0);
   const weekInClass = reduced || direction === 0 ? undefined : "anim-week-in";
+  const refreshMutation = useRefreshServerData();
 
   return (
-    <div>
+    <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
+      <div>
       {/* Not sticky: pinned, its opaque crema block (title + the light round buttons)
           scrolled over the day cards and swallowed whatever line was passing under it.
           Oggi's header scrolls away too -- the two tabs now behave the same. */}
@@ -502,6 +506,7 @@ function WeekPageContent() {
         </div>
       </div>
     </div>
+  </PullToRefresh>
   );
 }
 

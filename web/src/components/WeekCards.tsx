@@ -224,9 +224,10 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
             className="font-mono"
             style={{
               fontSize: 10,
-              fontWeight: 600,
-              background: "rgba(255, 111, 89, 0.12)",
-              color: "var(--corallo)",
+              fontWeight: 700,
+              background: "var(--corallo-chiaro)",
+              border: "1px solid rgba(217, 45, 85, 0.2)",
+              color: "var(--corallo-testo)",
               borderRadius: "var(--radius-pill)",
               padding: "2px 7px",
               display: "inline-flex",
@@ -234,7 +235,7 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
               gap: 3,
             }}
           >
-            <LightningIcon size={10} strokeWidth={2.2} />
+            <LightningIcon size={10} strokeWidth={2.2} style={{ color: "var(--corallo-accent)" }} />
             <span>Carb-up</span>
           </span>
         )}

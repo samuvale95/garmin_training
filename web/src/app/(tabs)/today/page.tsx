@@ -20,6 +20,7 @@ import { TodayVitalStrip } from "@/components/TodayVitalStrip";
 import { PreWorkoutContextCard } from "@/components/PreWorkoutContextCard";
 import { QuickMealModal } from "@/components/QuickMealModal";
 import { WeekStrip } from "@/components/WeekStrip";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import {
@@ -31,6 +32,7 @@ import {
   useFuelStatus,
   useFuelTargets,
   useProgress,
+  useRefreshServerData,
   useWeekSummary,
   useDayVerdict,
   useDayVerdictNarrative,
@@ -185,18 +187,20 @@ export default function TodayPage() {
   const pendingChanges = (diffQuery.data?.to_create.length ?? 0) + (diffQuery.data?.changed.length ?? 0);
   const readiness = bodyQuery.data?.readiness_score;
   const sleepMinutes = bodyQuery.data?.sleep?.total_minutes;
+  const refreshMutation = useRefreshServerData();
 
   return (
-    <div style={{ padding: "22px 20px 12px" }}>
-      <TodayHeader onOpenQuickLog={() => setQuickMealOpen(true)} />
+    <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
+      <div style={{ padding: "22px 20px 12px" }}>
+        <TodayHeader onOpenQuickLog={() => setQuickMealOpen(true)} />
 
-      <header className="today-intro">
-        <h1>Il tuo oggi</h1>
-        <p>{capitalize(formatFullDate(todayKey))} · Un passo alla volta.</p>
-      </header>
+        <header className="today-intro">
+          <h1>Il tuo oggi</h1>
+          <p>{capitalize(formatFullDate(todayKey))} · Un passo alla volta.</p>
+        </header>
 
-      {/* 1. HERO ALLENAMENTO + BADGE PRONTEZZA UNIFICATI */}
-      <TodayHeroUnified
+        {/* 1. HERO ALLENAMENTO + BADGE PRONTEZZA UNIFICATI */}
+        <TodayHeroUnified
         heroSession={heroSession}
         heroMainGroup={heroMainGroup}
         heroMatch={heroMatch}
@@ -474,6 +478,7 @@ export default function TodayPage() {
         })}
       </div>
     </div>
+  </PullToRefresh>
   );
 }
 

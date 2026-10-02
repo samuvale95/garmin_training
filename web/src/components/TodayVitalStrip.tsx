@@ -118,7 +118,7 @@ export function TodayVitalStrip({
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ fontSize: 11, fontWeight: 500, color: "var(--inchiostro-50)" }}>Carbo</span>
-              <span style={{ fontSize: 10, fontWeight: 600, color: "var(--corallo)" }}>{carbPercent}%</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--corallo-accent)" }}>{carbPercent}%</span>
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 2, marginTop: 2 }}>
               <span className="font-mono" style={{ fontSize: 18, fontWeight: 600, color: "var(--inchiostro)" }}>

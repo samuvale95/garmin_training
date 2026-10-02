@@ -96,7 +96,7 @@
 - [x] 11.1 Implement all documented empty states (no plan imported → screen 03 as home with no tab bar; no morning data; week without sessions; no diff) — "no plan imported" redirects to `/import` from every plan-requiring screen; "week without sessions" falls back to each day's own Riposo/sabbia treatment rather than a single dedicated whole-week empty card
 - [x] 11.2 Implement the three-tier error treatment (informational row / decision screen / blocking screen) per `MOTION.md` §7.4, with copy following the what-happened/why/what-now rule
 - [x] 11.3 Implement the offline banner (non-modal, top banner, disables network-dependent actions, slides away on reconnect) — implemented with `OfflineBanner`, `CloudOffIcon`, and `useIsOnline` hook in AppShell
-- [ ] 11.4 Implement pull-to-refresh on scrollable screens: brand mark as the pull indicator, changed values re-enter with `mkWordIn`, full cascade not replayed — **not done** (native overscroll only); follow-up
+- [x] 11.4 Implement pull-to-refresh on scrollable screens: brand mark as the pull indicator, changed values re-enter with `mkWordIn`, full cascade not replayed — implemented with `PullToRefresh` component wrapping `/today`, `/week`, and `/body`, touch gesture with damped resistance curve, animated 4-bar BrandMark indicator, haptic feedback, and server/client cache invalidation via `useRefreshServerData`
 
 ## 12. Verification
 

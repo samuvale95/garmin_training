@@ -13,8 +13,9 @@ import { TiltCard } from "@/components/motion/TiltCard";
 import { ChevronRight, AlertTriangleIcon } from "@/components/Icons";
 import { PersonalCorrelationsCard } from "@/components/PersonalCorrelationsCard";
 import { AerobicEfficiencyCard } from "@/components/AerobicEfficiencyCard";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { useMountOnce } from "@/lib/motion";
-import { useAerobicEfficiency, useBodyToday, useFuelTargets, usePersonalCorrelations, usePlanQuery, usePrefetchFuelNarrative } from "@/lib/queries";
+import { useAerobicEfficiency, useBodyToday, useFuelTargets, usePersonalCorrelations, usePlanQuery, usePrefetchFuelNarrative, useRefreshServerData } from "@/lib/queries";
 import { useWatchSyncStatus } from "@/lib/watchSync";
 import { toDateKey } from "@/lib/sessionVisuals";
 import { formatFullDate, stressCaption } from "@/lib/format";
@@ -33,6 +34,7 @@ function fuelSubtitle(tomorrow: DayTarget): string {
 
 export default function RecoveryPage() {
   const router = useRouter();
+  const refreshMutation = useRefreshServerData();
   const animate = useMountOnce("body-recovery");
   const { data, isLoading } = useBodyToday();
   const { data: correlations } = usePersonalCorrelations(90);
@@ -60,7 +62,8 @@ export default function RecoveryPage() {
   const tomorrowSession = plan?.sessions.find((s) => s.date === toDateKey(tomorrow)) ?? null;
 
   return (
-    <div style={{ padding: "22px 20px 12px" }}>
+    <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
+      <div style={{ padding: "22px 20px 12px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <BrandMark height={22} />
         <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} transition={{ type: "spring", stiffness: 450, damping: 22 }}>
@@ -276,6 +279,7 @@ export default function RecoveryPage() {
         </div>
       )}
     </div>
+    </PullToRefresh>
   );
 }
 

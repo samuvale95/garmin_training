@@ -303,7 +303,7 @@ export function QuickMealModal({
                         {snack.name}
                       </span>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span className="font-mono" style={{ fontSize: 11, color: "var(--corallo)", fontWeight: 600 }}>
+                        <span className="font-mono" style={{ fontSize: 11, color: "var(--corallo-accent)", fontWeight: 600 }}>
                           {snack.carbs}g carbo
                         </span>
                         <span className="font-mono" style={{ fontSize: 10.5, color: "var(--inchiostro-50)" }}>
