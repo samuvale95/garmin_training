@@ -67,13 +67,26 @@ export function Providers({ children }: { children: React.ReactNode }) {
     dehydrateOptions: { shouldDehydrateQuery: isPersistable },
   }));
 
-  // Register Service Worker for offline PWA installation
+  // Register and automatically check for Service Worker updates
   useState(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/sw.js").catch((err) => {
-          console.debug("ServiceWorker registration note:", err);
-        });
+        navigator.serviceWorker
+          .register("/sw.js")
+          .then((reg) => {
+            // Check for updates immediately
+            reg.update().catch(() => {});
+
+            // Check for updates whenever user returns to the app
+            document.addEventListener("visibilitychange", () => {
+              if (document.visibilityState === "visible") {
+                reg.update().catch(() => {});
+              }
+            });
+          })
+          .catch((err) => {
+            console.debug("ServiceWorker registration note:", err);
+          });
       });
     }
   });
