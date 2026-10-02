@@ -236,3 +236,13 @@ export function WatchIcon({ size = 16, strokeWidth = 2, ...props }: { size?: num
   );
 }
 
+export function CloudOffIcon({ size = 15, strokeWidth = 2, ...props }: { size?: number; strokeWidth?: number } & SVGProps<SVGSVGElement>) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-7.05-6M5 5a8 8 0 0 0-4 7h1a5 5 0 0 0 4.54 4.95" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}
+
+

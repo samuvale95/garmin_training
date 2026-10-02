@@ -23,11 +23,14 @@ request, not correctness. The store itself is lock-protected.
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 from collections.abc import Callable, Hashable, Iterable
 from datetime import date, timedelta
 from typing import Any, TypeVar
+
+from .. import db
 
 T = TypeVar("T")
 
@@ -142,14 +145,42 @@ class TTLCache:
         pull-to-refresh path: it must actually reach upstream, and everything after it
         should see the new answer.
         """
+        is_narrative_ns = namespace in (
+            "body:readiness-narrative",
+            "nutrition:narrative",
+            "coach:narrative",
+            "goal:fit-narrative",
+            "summary:narrative",
+        )
+
         if not refresh:
             hit = self._lookup(namespace, user_id, key)
             if hit is not None:
                 return hit[0]
 
+            # Cross-process persistent check for expensive AI narratives
+            if is_narrative_ns:
+                cache_key_str = json.dumps(key, default=str, sort_keys=True)
+                persisted = db.get_narrative_cache(namespace, user_id, cache_key_str)
+                if persisted is not None and isinstance(persisted, dict) and "text" in persisted:
+                    from . import schemas
+                    val = schemas.NarrativeResponse(**persisted)  # type: ignore[assignment]
+                    with self._lock:
+                        self._entries[(namespace, user_id, key)] = (time.monotonic() + ttl, val)
+                    return val  # type: ignore[return-value]
+
         value = factory()
         with self._lock:
             self._entries[(namespace, user_id, key)] = (time.monotonic() + ttl, value)
+
+        # Cross-process persistent write for expensive AI narratives
+        if is_narrative_ns and hasattr(value, "model_dump"):
+            try:
+                cache_key_str = json.dumps(key, default=str, sort_keys=True)
+                db.put_narrative_cache(namespace, user_id, cache_key_str, value.model_dump(), ttl)
+            except Exception:
+                pass
+
         return value
 
     def put(self, namespace: str, user_id: str, key: Hashable, ttl: float, value: Any) -> None:
@@ -169,6 +200,9 @@ class TTLCache:
         with self._lock:
             for entry_key in [k for k in self._entries if k[0] in targets and k[1] == user_id]:
                 del self._entries[entry_key]
+        narrative_targets = [ns for ns in targets if "narrative" in ns]
+        if narrative_targets:
+            db.invalidate_narrative_cache(narrative_targets, user_id)
 
     def invalidate_user(self, user_id: str) -> None:
         """Drop every cached entry for one user, across every namespace -- used on
@@ -177,6 +211,16 @@ class TTLCache:
         with self._lock:
             for entry_key in [k for k in self._entries if k[1] == user_id]:
                 del self._entries[entry_key]
+        db.invalidate_narrative_cache(
+            [
+                "body:readiness-narrative",
+                "nutrition:narrative",
+                "coach:narrative",
+                "goal:fit-narrative",
+                "summary:narrative",
+            ],
+            user_id,
+        )
 
     def clear(self) -> None:
         with self._lock:

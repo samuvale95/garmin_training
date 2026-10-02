@@ -111,7 +111,7 @@ function readLegacyPlan(): PlanState | null {
   }
 }
 
-function readPersistedPlan(): PlanState | null {
+export function readPersistedPlan(): PlanState | null {
   if (typeof window === "undefined") return null;
   try {
     const current = JSON.parse(localStorage.getItem(PLAN_STORAGE_KEY) ?? "null");
@@ -198,23 +198,30 @@ function restorePersistedPlanOnce(queryClient: ReturnType<typeof useQueryClient>
  */
 export function usePlanQuery() {
   const queryClient = useQueryClient();
-  // Server snapshot is pinned to false so the hydration render matches the server's HTML
-  // even when another component restored the plan earlier in this same page load; React
-  // re-renders with the real value immediately afterwards (same shape as `useMounted`).
   const isHydrated = useSyncExternalStore(
     subscribePlanHydration,
-    () => planHydrated,
+    () => {
+      if (planHydrated) return true;
+      // If localStorage already holds a plan on this client, treat as hydrated immediately
+      if (typeof window !== "undefined" && readPersistedPlan() != null) return true;
+      return false;
+    },
     () => false
   );
 
   useEffect(() => {
+    // Seed local plan immediately into query cache so first render has real data synchronously
+    const local = readPersistedPlan();
+    if (local && !queryClient.getQueryData(PLAN_KEY)) {
+      queryClient.setQueryData<PlanState | null>(PLAN_KEY, local);
+    }
     restorePersistedPlanOnce(queryClient);
   }, [queryClient]);
 
   const query = useQuery({
     queryKey: PLAN_KEY,
     queryFn: (): PlanState | null => null,
-    initialData: null,
+    initialData: () => (typeof window !== "undefined" ? readPersistedPlan() : null),
     staleTime: Infinity,
     gcTime: Infinity,
   });

@@ -79,6 +79,17 @@ CREATE TABLE IF NOT EXISTS user_goal (
   goal         JSONB NOT NULL,
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS narrative_cache (
+  namespace    TEXT NOT NULL,
+  user_id      TEXT NOT NULL,
+  cache_key    TEXT NOT NULL,
+  narrative    JSONB NOT NULL,
+  expires_at   TIMESTAMPTZ NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (namespace, user_id, cache_key)
+);
+CREATE INDEX IF NOT EXISTS idx_narrative_cache_lookup ON narrative_cache(namespace, user_id, cache_key);
 """
 
 Confidence = Literal["low", "medium", "high"]
@@ -568,3 +579,51 @@ def save_skeleton(user_id: str, skeleton: dict[str, Any]) -> None:
             "UPDATE user_plan SET skeleton = %s, updated_at = now() WHERE user_id = %s",
             (Jsonb(skeleton), user_id),
         )
+
+
+# ---- persistent AI narrative cache -------------------------------------------------------------
+
+
+def get_narrative_cache(namespace: str, user_id: str, cache_key: str) -> dict[str, Any] | None:
+    """Read a cached AI narrative response from Postgres, returning None if expired or missing."""
+    try:
+        with connect() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """SELECT narrative FROM narrative_cache
+                       WHERE namespace = %s AND user_id = %s AND cache_key = %s AND expires_at > now()""",
+                    (namespace, user_id, cache_key),
+                )
+                row = cur.fetchone()
+                return row["narrative"] if row else None
+    except Exception:
+        return None
+
+
+def put_narrative_cache(namespace: str, user_id: str, cache_key: str, narrative: dict[str, Any], ttl_seconds: float) -> None:
+    """Store an AI narrative response in Postgres with an expiration timestamp."""
+    try:
+        with connect() as conn:
+            conn.execute(
+                """INSERT INTO narrative_cache (namespace, user_id, cache_key, narrative, expires_at, created_at)
+                   VALUES (%s, %s, %s, %s, now() + (%s || ' seconds')::interval, now())
+                   ON CONFLICT (namespace, user_id, cache_key) DO UPDATE SET
+                     narrative = EXCLUDED.narrative,
+                     expires_at = EXCLUDED.expires_at,
+                     created_at = now()""",
+                (namespace, user_id, cache_key, Jsonb(narrative), str(int(ttl_seconds))),
+            )
+    except Exception:
+        pass
+
+
+def invalidate_narrative_cache(namespaces: list[str], user_id: str) -> None:
+    """Delete cached AI narratives for the given namespaces and user."""
+    try:
+        with connect() as conn:
+            conn.execute(
+                "DELETE FROM narrative_cache WHERE user_id = %s AND namespace = ANY(%s)",
+                (user_id, namespaces),
+            )
+    except Exception:
+        pass
