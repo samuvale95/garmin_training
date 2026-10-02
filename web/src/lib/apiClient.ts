@@ -152,7 +152,11 @@ export async function apiDelete<T>(path: string, signal?: AbortSignal): Promise<
 }
 
 /** Absolute URL for a server-relative path (e.g. a `FoodEntry.image_url`), for use
- * directly in an `<img src>` -- the API base is the host, not the app's own origin. */
+ * directly in an `<img src>` -- the API base is the host, not the app's own origin.
+ * If path is already a data: URI or an absolute URL, returns it as-is. */
 export function apiUrl(path: string): string {
+  if (path.startsWith("data:") || path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
   return new URL(path, API_BASE_URL).toString();
 }

@@ -32,16 +32,23 @@ export function capitalize(s: string): string {
 
 // ---- dates ------------------------------------------------------------------------------
 
+function parseSafeDate(dateStr: string): Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return new Date(`${dateStr}T00:00:00`);
+  }
+  return new Date(dateStr);
+}
+
 /** "mar 11" -- weekday abbreviation + day number, the format the design uses on
  * every session/date row (screens 04, 05, 09). */
 export function formatShortDate(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = parseSafeDate(dateStr);
   const weekday = d.toLocaleDateString("it-IT", { weekday: "short" }).replace(".", "");
   return `${weekday} ${d.getDate()}`;
 }
 
 export function formatWeekday(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("it-IT", { weekday: "long" });
+  return parseSafeDate(dateStr).toLocaleDateString("it-IT", { weekday: "long" });
 }
 
 /** Minutes since `isoTimestamp`, floored at 0. A plain (non-component) function, so
@@ -337,12 +344,12 @@ export function relativeDayLabel(dateStr: string, today: Date): string {
   const diffDays = Math.round((target.setHours(0, 0, 0, 0) - new Date(today).setHours(0, 0, 0, 0)) / 86_400_000);
   if (diffDays === 0) return "oggi";
   if (diffDays === 1) return "domani";
-  return new Date(dateStr).toLocaleDateString("it-IT", { weekday: "long" });
+  return parseSafeDate(dateStr).toLocaleDateString("it-IT", { weekday: "long" });
 }
 
 /** "mercoledì 11 agosto" -- full weekday + day + month, for hero/preview cards. */
 export function formatFullDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
+  return parseSafeDate(dateStr).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
 }
 
 /** "13:20" -- from an ISO timestamp, the format the fuel screens use for a logged

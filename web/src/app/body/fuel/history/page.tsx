@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMotionEnabled, useMountOnce } from "@/lib/motion";
@@ -123,11 +124,32 @@ export default function FuelHistoryPage() {
             <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-70)", margin: 0 }}>{insightText}</p>
           </SlideUp>
 
-          <SlideUp active={animate} delayMs={280} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 12 }}>
-            <p style={{ fontWeight: 700, fontSize: 15, margin: "0 0 4px" }}>Voci registrate</p>
-            <p style={{ fontSize: 13, color: "var(--inchiostro-50)", margin: 0 }}>
-              {totalEntries} {totalEntries === 1 ? "voce" : "voci"} in sette giorni
-            </p>
+          <SlideUp active={animate} delayMs={280}>
+            <Link
+              href="/body/fuel/diario"
+              className="press-soft"
+              style={{
+                display: "block",
+                background: "var(--crema-card)",
+                borderRadius: "var(--radius-card)",
+                padding: 16,
+                marginTop: 12,
+                textDecoration: "none",
+                color: "inherit",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: 15, margin: "0 0 4px" }}>Voci registrate</p>
+                  <p style={{ fontSize: 13, color: "var(--inchiostro-50)", margin: 0 }}>
+                    {totalEntries} {totalEntries === 1 ? "voce" : "voci"} in sette giorni
+                  </p>
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro-70)" }}>
+                  Apri diario →
+                </span>
+              </div>
+            </Link>
           </SlideUp>
         </>
       )}
