@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { animate, motion, useMotionValue, useTransform } from "framer-motion";
 import { useMotionEnabled } from "@/lib/motion";
@@ -32,7 +32,17 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
     return 0; // Default to /today
   }, []);
 
-  const activeIdx = getIndexFromPath(pathname);
+  // The tab shown, as local state rather than read off the URL: a swipe commits it on
+  // release, in the same frame the snap starts, instead of whenever `router.push`
+  // resolves -- which is hundreds of ms later and would swap the page layout mid-slide.
+  // A URL change from elsewhere (TabBar tap, back button) still wins.
+  const routeIdx = getIndexFromPath(pathname);
+  const [activeIdx, setActiveIdx] = useState(routeIdx);
+  const [syncedRouteIdx, setSyncedRouteIdx] = useState(routeIdx);
+  if (routeIdx !== syncedRouteIdx) {
+    setSyncedRouteIdx(routeIdx);
+    setActiveIdx(routeIdx);
+  }
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Track position in percentage: 0% = Oggi, -100% = Settimana, -200% = Corpo
@@ -56,15 +66,46 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
     }
   }, [targetX, xPercent]);
 
-  // A tab change starts the new tab from its top, as a page navigation would; the
-  // neighbour was already showing its top while pinned (see the panels below).
-  const previousIdx = useRef(activeIdx);
+  // Each tab keeps its own scroll position, like the tabs of a native app. The page
+  // scrolls with the window, which only ever belongs to the active tab, so the other two
+  // are one-screen boxes moved down to wherever the window is scrolled (always at the top
+  // of the viewport) with their content shifted to their own remembered scroll -- which
+  // is exactly what each will show once active, including the neighbour peeking in
+  // during a swipe. Not `position: sticky`: sticky can't pass the end of the track, so
+  // near the bottom of a page the neighbour sat higher than it would land.
+  const scrollByTab = useRef([0, 0, 0]);
+  const shownIdx = useRef(activeIdx);
+  const panelRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const contentRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const placePanels = useCallback(() => {
+    const active = shownIdx.current;
+    panelRefs.current.forEach((el, index) => {
+      if (el) el.style.transform = index === active ? "" : `translateY(${window.scrollY}px)`;
+    });
+    contentRefs.current.forEach((el, index) => {
+      if (el) el.style.transform = index === active ? "" : `translateY(${-scrollByTab.current[index]}px)`;
+    });
+  }, []);
+
   useEffect(() => {
-    if (previousIdx.current !== activeIdx) {
-      previousIdx.current = activeIdx;
-      window.scrollTo({ top: 0 });
-    }
-  }, [activeIdx]);
+    const onScroll = () => {
+      scrollByTab.current[shownIdx.current] = window.scrollY;
+      placePanels();
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [placePanels]);
+
+  // The swap itself, before the browser paints: the incoming tab joins the page flow and
+  // the window jumps to its remembered scroll in the same frame, so it stays exactly
+  // where it was on screen. Doing this a frame later (useEffect) is what made the new
+  // page vanish and reappear mid-transition.
+  useLayoutEffect(() => {
+    shownIdx.current = activeIdx;
+    window.scrollTo(0, scrollByTab.current[activeIdx]);
+    placePanels();
+  }, [activeIdx, placePanels]);
 
   // Touch gesture listeners
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -144,8 +185,10 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
         damping: 34,
         mass: 0.8,
       });
-      // Synchronize URL
-      router.push(TAB_ROUTES[newIdx]);
+      // Commit the tab now, then let the URL catch up -- without Next's scroll-to-top
+      // on navigation, which would land mid-slide and undo the tab's remembered scroll.
+      setActiveIdx(newIdx);
+      router.push(TAB_ROUTES[newIdx], { scroll: false });
     } else {
       // Snap back to current tab
       animate(xPercent, targetX, {
@@ -180,6 +223,11 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
         // `clip`, not `hidden`: hidden makes this a scroll container, which would turn
         // every `position: sticky` inside the tabs (the week header) into a no-op.
         overflowX: "clip",
+        // Horizontal gestures belong to the pager, vertical ones to the page. Without
+        // this the browser may also act on a sideways swipe -- e.g. Chrome's overscroll
+        // back/forward navigation, which then restores its own scroll position on top
+        // of the pager's.
+        touchAction: "pan-y",
         position: "relative",
       }}
     >
@@ -204,16 +252,21 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
               style={{
                 width: "33.333333%",
                 flexShrink: 0,
-                // The page scrolls with the window, sized by the active tab alone. The
-                // other two are cut to one screen and pinned to the viewport, so the
-                // neighbour peeking in during a swipe shows its top wherever the
-                // current tab is scrolled to.
-                ...(active
-                  ? { minHeight: "100%" }
-                  : { position: "sticky", top: 0, maxHeight: "100dvh", overflow: "hidden" }),
+                // Only the active tab sizes the page; the others are one screen tall,
+                // placed by `placePanels` above.
+                ...(active ? { minHeight: "100%" } : { height: "100dvh", overflow: "hidden" }),
+              }}
+              ref={(el) => {
+                panelRefs.current[index] = el;
               }}
             >
-              {view}
+              <div
+                ref={(el) => {
+                  contentRefs.current[index] = el;
+                }}
+              >
+                {view}
+              </div>
             </div>
           );
         })}
