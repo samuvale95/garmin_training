@@ -212,36 +212,50 @@ export default function SessionDetailPage() {
           />
         )
       }
-      footer={
-        <div style={{ width: "100%", marginTop: 28, display: "flex", flexDirection: "column", gap: 10 }}>
-          <PrimaryButton background="var(--verde)" textColor="var(--verde-testo)" fillColor="var(--verde)" successColor="var(--verde)">
-            ✓ Già sul calendario
-          </PrimaryButton>
+      stickyBottom={
+        <div style={{ width: "100%", display: "flex", gap: 8, alignItems: "center" }}>
           <button
             type="button"
             onClick={moveToTomorrow}
             disabled={isMoving}
-            className="tap-target"
+            className="press-soft"
             style={{
-              background: "var(--sabbia-chip)",
+              flex: 1,
+              background: "var(--crema-card)",
               border: "1px solid var(--border-airbnb)",
               borderRadius: "var(--radius-pill)",
-              padding: "10px 16px",
+              padding: "12px 16px",
               color: "var(--inchiostro)",
               fontSize: 13,
-              fontWeight: 500,
+              fontWeight: 600,
               cursor: isMoving ? "default" : "pointer",
-              transition: "all 0.15s ease",
+              boxShadow: "var(--shadow-airbnb-subtle)",
+              textAlign: "center",
             }}
           >
             {isMoving ? "Sposto…" : `Sposta a ${formatWeekday(nextDayKey())}`}
           </button>
-          {displayMoveError && (
-            <p style={{ color: "var(--rosso-avviso)", fontSize: 13, textAlign: "center", margin: "4px 0 0" }} role="alert">
-              {displayMoveError}
-            </p>
-          )}
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--verde-testo)",
+              background: "var(--verde)",
+              borderRadius: "var(--radius-pill)",
+              padding: "12px 14px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            ✓ Nel piano
+          </span>
         </div>
+      }
+      footer={
+        displayMoveError ? (
+          <p style={{ color: "var(--rosso-avviso)", fontSize: 13, textAlign: "center", margin: "14px 0 0" }} role="alert">
+            {displayMoveError}
+          </p>
+        ) : null
       }
     >
       <SessionDetailBody

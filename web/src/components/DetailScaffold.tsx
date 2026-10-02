@@ -20,6 +20,7 @@ export function DetailScaffold({
   error,
   children,
   footer,
+  stickyBottom,
 }: {
   backHref: string;
   /** Small mono line next to the back arrow (e.g. the date, or "dal calendario Garmin"). */
@@ -31,6 +32,8 @@ export function DetailScaffold({
   error?: string | null;
   children: ReactNode;
   footer?: ReactNode;
+  /** Primary action bar pinned to bottom of screen for zero-scroll thumb access */
+  stickyBottom?: ReactNode;
 }) {
   return (
     <div
@@ -38,7 +41,7 @@ export function DetailScaffold({
         minHeight: "100dvh",
         background: "var(--crema)",
         color: "var(--inchiostro)",
-        padding: "24px 20px 40px",
+        padding: stickyBottom ? "24px 20px 96px" : "24px 20px 40px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -69,6 +72,29 @@ export function DetailScaffold({
 
         {footer}
       </div>
+
+      {stickyBottom && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            background: "rgba(247, 244, 238, 0.92)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            borderTop: "1px solid var(--border-airbnb)",
+            padding: "12px 20px calc(12px + env(safe-area-inset-bottom, 0px))",
+            zIndex: 40,
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          <div style={{ width: "100%", maxWidth: 480, display: "flex", gap: 10, alignItems: "center" }}>
+            {stickyBottom}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
