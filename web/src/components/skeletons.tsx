@@ -31,36 +31,50 @@ export function SkeletonBlock({
   return <div aria-hidden="true" style={{ width, height, borderRadius: radius, background: DARK_FILL }} />;
 }
 
-/** A day row on Settimana: the same 7 cards, still empty. */
+/** A day row on Settimana: loading with 3D tactile brand mark. */
 export function SkeletonDayCards({ count = 7 }: { count?: number }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }} aria-hidden="true">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} style={{ display: "flex", gap: 10 }}>
-          <div style={{ width: 30, paddingTop: 14, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-            <SkeletonBlock width={18} height={9} radius={4} />
-            <SkeletonBlock width={14} height={11} radius={4} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <SkeletonBlock height={78} radius={18} />
-          </div>
-        </div>
-      ))}
+    <div
+      style={{
+        background: "var(--crema-card)",
+        borderRadius: 24,
+        border: "var(--border-airbnb)",
+        boxShadow: "var(--shadow-airbnb-subtle)",
+        padding: "24px 16px",
+        marginTop: 12,
+      }}
+    >
+      <LoadingIndicator3D
+        label="Carico la tua settimana..."
+        sublabel="Lettura allenamenti da Garmin"
+        size={84}
+        minHeight={200}
+      />
     </div>
   );
 }
 
-/** Oggi's hero card + the three metric tiles under it. */
+import { LoadingIndicator3D } from "@/components/LoadingIndicator3D";
+
+/** Oggi's hero loading state with tactile 3D clay animation. */
 export function SkeletonTodayHero() {
   return (
-    <div aria-hidden="true">
-      <SkeletonBlock height={210} radius={26} />
-      <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
-        {[0, 1, 2].map((i) => (
-          <div key={i} style={{ flex: 1 }}>
-            <SkeletonBlock height={104} radius={18} />
-          </div>
-        ))}
+    <div style={{ marginTop: 24, marginBottom: 24 }}>
+      <div
+        style={{
+          background: "var(--crema-card)",
+          borderRadius: 24,
+          border: "var(--border-airbnb)",
+          boxShadow: "var(--shadow-airbnb-subtle)",
+          padding: "20px 16px",
+        }}
+      >
+        <LoadingIndicator3D
+          label="Preparo la tua giornata..."
+          sublabel="Sincronizzo sessioni e metriche"
+          size={84}
+          minHeight={180}
+        />
       </div>
     </div>
   );

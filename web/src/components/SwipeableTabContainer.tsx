@@ -34,6 +34,16 @@ export function SwipeableTabContainer({ children }: { children: ReactNode }) {
   const opacity = useTransform(dragX, [-250, 0, 250], [0.94, 1, 0.94]);
   const scale = useTransform(dragX, [-250, 0, 250], [0.985, 1, 0.985]);
 
+  // Prefetch adjacent routes so navigation is 0ms / instantaneous
+  useEffect(() => {
+    if (activeTabIdx > 0) {
+      router.prefetch(TAB_ROUTES[activeTabIdx - 1]);
+    }
+    if (activeTabIdx < TAB_ROUTES.length - 1) {
+      router.prefetch(TAB_ROUTES[activeTabIdx + 1]);
+    }
+  }, [activeTabIdx, router]);
+
   // Reset drag position on route change
   useEffect(() => {
     dragX.set(0);
@@ -76,7 +86,7 @@ export function SwipeableTabContainer({ children }: { children: ReactNode }) {
         (activeTabIdx === 0 && dx > 0) ||
         (activeTabIdx === TAB_ROUTES.length - 1 && dx < 0)
       ) {
-        effectiveDx = dx * 0.3; // Rubber-band effect
+        effectiveDx = dx * 0.25; // Rubber-band effect
       }
       dragX.set(effectiveDx);
     }
@@ -93,7 +103,7 @@ export function SwipeableTabContainer({ children }: { children: ReactNode }) {
 
     const currentX = dragX.get();
     const containerWidth = containerRef.current?.offsetWidth || 390;
-    const threshold = containerWidth * 0.22; // 22% drag threshold to switch
+    const threshold = containerWidth * 0.20; // 20% drag threshold to switch
 
     if (currentX < -threshold && activeTabIdx < TAB_ROUTES.length - 1) {
       // Complete swipe Left -> animate out and navigate to next tab
@@ -131,6 +141,14 @@ export function SwipeableTabContainer({ children }: { children: ReactNode }) {
     }
   };
 
+  const TAB_NAMES = ["Oggi", "Settimana", "Corpo"] as const;
+  const prevTabName = activeTabIdx > 0 ? TAB_NAMES[activeTabIdx - 1] : null;
+  const nextTabName = activeTabIdx < TAB_NAMES.length - 1 ? TAB_NAMES[activeTabIdx + 1] : null;
+
+  // Peek panel transforms
+  const peekLeftOpacity = useTransform(dragX, [0, 80, 200], [0, 0.45, 0.95]);
+  const peekRightOpacity = useTransform(dragX, [-200, -80, 0], [0.95, 0.45, 0]);
+
   if (activeTabIdx === -1) {
     return <>{children}</>;
   }
@@ -151,6 +169,91 @@ export function SwipeableTabContainer({ children }: { children: ReactNode }) {
         overflowX: "clip",
       }}
     >
+      {/* Adjacent peek preview: Left (Previous tab) */}
+      {prevTabName && (
+        <motion.div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: 0,
+            width: "100%",
+            transform: "translateX(-100%)",
+            x: dragX,
+            opacity: peekLeftOpacity,
+            pointerEvents: "none",
+            zIndex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            justifyContent: "flex-start",
+            padding: "24px 20px",
+          }}
+        >
+          <div
+            style={{
+              background: "var(--crema-card)",
+              borderRadius: "var(--radius-card-lg)",
+              padding: "16px 20px",
+              boxShadow: "var(--shadow-airbnb-subtle)",
+              border: "var(--border-airbnb)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 40,
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--inchiostro)" }}>
+              ← {prevTabName}
+            </span>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Adjacent peek preview: Right (Next tab) */}
+      {nextTabName && (
+        <motion.div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            right: 0,
+            width: "100%",
+            transform: "translateX(100%)",
+            x: dragX,
+            opacity: peekRightOpacity,
+            pointerEvents: "none",
+            zIndex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            justifyContent: "flex-start",
+            padding: "24px 20px",
+          }}
+        >
+          <div
+            style={{
+              background: "var(--crema-card)",
+              borderRadius: "var(--radius-card-lg)",
+              padding: "16px 20px",
+              boxShadow: "var(--shadow-airbnb-subtle)",
+              border: "var(--border-airbnb)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 40,
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--inchiostro)" }}>
+              {nextTabName} →
+            </span>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Active Tab Screen */}
       <motion.div
         style={{
           x: dragX,
@@ -162,6 +265,8 @@ export function SwipeableTabContainer({ children }: { children: ReactNode }) {
           flexDirection: "column",
           transformOrigin: "center center",
           willChange: "transform, opacity",
+          position: "relative",
+          zIndex: 2,
         }}
       >
         {children}

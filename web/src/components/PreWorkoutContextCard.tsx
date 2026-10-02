@@ -10,19 +10,31 @@ interface PreWorkoutContextCardProps {
   todayTarget?: DayTarget | null;
   onOpenQuickLog: () => void;
   active?: boolean;
+  trained?: boolean;
+  carbLoggedG?: number;
 }
 
 export function PreWorkoutContextCard({
   todayTarget,
   onOpenQuickLog,
   active = true,
+  trained = false,
+  carbLoggedG = 0,
 }: PreWorkoutContextCardProps) {
-  if (!todayTarget || todayTarget.load === "riposo") {
+  // Hide if no target, rest day, or if workout is already completed for today
+  if (!todayTarget || todayTarget.load === "riposo" || trained) {
     return null;
   }
 
   const isLongOrHard = todayTarget.load === "molto_lungo" || todayTarget.load === "duro";
-  const snackGrams = calculateSnackGrams(todayTarget.load);
+  const snackGramsText = calculateSnackGrams(todayTarget.load);
+  const minTargetCarb = isLongOrHard ? 40 : 30;
+
+  // If user already logged carbs equal or greater than the pre-run snack, hide card
+  if (carbLoggedG >= minTargetCarb) {
+    return null;
+  }
+
   const hydrationMl = calculateHydrationMl(isLongOrHard ? 90 : 45, isLongOrHard);
 
   return (
@@ -57,7 +69,7 @@ export function PreWorkoutContextCard({
             </span>
           </div>
           <p style={{ font: "600 14px/1.2 var(--font-sans)", margin: "2px 0 0", color: "var(--inchiostro)" }}>
-            ~{snackGrams}g carboidrati · {hydrationMl}ml acqua
+            ~{snackGramsText} carboidrati · {hydrationMl}ml acqua
           </p>
           <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>
             Mangia 60–90 min prima per massimizzare la resa

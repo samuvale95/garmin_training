@@ -283,6 +283,8 @@ export default function TodayPage() {
           todayTarget={fuelTargets.data?.today}
           onOpenQuickLog={() => setQuickMealOpen(true)}
           active={animate}
+          trained={trainedOn(todayKey) || heroSession.date > todayKey}
+          carbLoggedG={fuelStatus.data?.totals?.carb_g ?? 0}
         />
       )}
 
