@@ -70,7 +70,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
   // Register and automatically check for Service Worker updates
   useState(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
+      // Hydration often finishes after `load` has already fired, so a bare `load`
+      // listener here would never run -- and an installed app would keep its old
+      // service worker forever. Register now if the page is already loaded.
+      const onLoad = (fn: () => void) =>
+        document.readyState === "complete" ? fn() : window.addEventListener("load", fn, { once: true });
+      onLoad(() => {
         navigator.serviceWorker
           .register("/sw.js")
           .then((reg) => {

@@ -1,5 +1,9 @@
 // Passo Service Worker for Offline PWA Capabilities
-const CACHE_NAME = "passo-pwa-v1";
+// Bumped from v1: v1 cached Next's in-app navigation payloads (`?_rsc=`) cache-first and
+// forever, so after a deploy a tab switch could be answered with another build's page
+// data -- which Next rejects by reloading the whole app (white flash, everything
+// fading back in). Activating v2 deletes that cache.
+const CACHE_NAME = "passo-pwa-v2";
 const STATIC_ASSETS = [
   "/",
   "/manifest.webmanifest",
@@ -42,7 +46,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Network-first with cache fallback for HTML navigation, Cache-first for static assets
+  // Next's client-side navigations and prefetches (the page data behind every tab
+  // switch) must always come from the server that built the running app. Never touch
+  // them: a cached copy from another build makes Next fall back to a full page reload.
+  if (url.searchParams.has("_rsc") || event.request.headers.get("RSC") === "1") {
+    return;
+  }
+
+  // Network-first with cache fallback for HTML navigation
   if (event.request.mode === "navigate") {
     event.respondWith(
       fetch(event.request).catch(async () => {
@@ -54,7 +65,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // For static assets (images, fonts, scripts)
+  // Cache-first only for files that can never change under the same URL: Next's
+  // content-hashed build output, and the icons. Everything else goes to the network.
+  const immutable =
+    url.origin === self.location.origin &&
+    (url.pathname.startsWith("/_next/static/") || STATIC_ASSETS.includes(url.pathname));
+  if (!immutable) return;
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
