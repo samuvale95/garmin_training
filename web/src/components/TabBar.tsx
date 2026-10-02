@@ -25,7 +25,9 @@ export function TabBar() {
             transition={{ type: "spring", stiffness: 500, damping: 25 }}
             style={{ flex: 1, display: "flex", justifyContent: "center" }}
           >
-            <Link href={tab.href} className="tap-target tab-link" aria-current={active ? "page" : undefined}>
+            {/* scroll={false}: the pager restores each tab's own scroll (TabsPager.tsx);
+                Next's scroll-to-top on navigation would land after it and undo it. */}
+            <Link href={tab.href} scroll={false} className="tap-target tab-link" aria-current={active ? "page" : undefined}>
               {active && (reduced ? <span className="tab-indicator" /> :
                 <motion.span className="tab-indicator" layoutId="tab-pill" transition={{ type: "spring", stiffness: 420, damping: 36 }} />)}
               <span className="tab-link-content">
