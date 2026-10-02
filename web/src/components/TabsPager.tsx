@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { animate, motion, useMotionValue, useTransform } from "framer-motion";
+import { animate, useMotionValue, useMotionValueEvent } from "framer-motion";
 import { useMotionEnabled } from "@/lib/motion";
 import { TodayView } from "@/components/tabs-views/TodayView";
 import { WeekView } from "@/components/tabs-views/WeekView";
@@ -199,9 +199,24 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
     }
   };
 
-  // The track is 300% wide, and a percentage translate is relative to the element itself,
-  // so one tab (100% of the viewport) is a third of the track.
-  const xTransform = useTransform(xPercent, (val) => `${val / 3}%`);
+  // Where the track sits. While it moves (drag, snap) it is a GPU translate -- the track
+  // is 300% wide and a % translate is relative to the element itself, so one tab is a
+  // third of it. At rest it is a plain `left` offset with no transform at all: any
+  // transform (or `will-change: transform`) on an ancestor turns `position: fixed`
+  // descendants into children of the track, so sheets opened from a tab (the 1-tap
+  // meal log) landed shifted sideways and under the TabBar. Same position either way,
+  // switched in the same frame.
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const placeTrack = useCallback((val: number) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const atRest = !isDragging.current && val === -shownIdx.current * 100;
+    track.style.transform = atRest ? "none" : `translateX(${val / 3}%)`;
+    track.style.willChange = atRest ? "auto" : "transform";
+    track.style.left = atRest ? `${val}%` : "0";
+  }, []);
+  useMotionValueEvent(xPercent, "change", placeTrack);
+  useLayoutEffect(() => placeTrack(xPercent.get()), [activeIdx, placeTrack, xPercent]);
 
   if (!isMainTab) {
     return <>{children}</>;
@@ -231,7 +246,8 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
         position: "relative",
       }}
     >
-      <motion.div
+      <div
+        ref={trackRef}
         style={{
           display: "flex",
           alignItems: "flex-start",
@@ -239,8 +255,7 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
           // Never `flex: 1` here: a 0 basis plus shrink squeezes the 300% track back to
           // the viewport width and all three tabs end up side by side on the first.
           flex: "none",
-          x: xTransform,
-          willChange: "transform",
+          position: "relative",
         }}
       >
         {views.map((view, index) => {
@@ -270,7 +285,7 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
             </div>
           );
         })}
-      </motion.div>
+      </div>
     </div>
   );
 }
