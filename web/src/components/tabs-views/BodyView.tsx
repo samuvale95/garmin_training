@@ -16,9 +16,10 @@ import { AerobicEfficiencyCard } from "@/components/AerobicEfficiencyCard";
 import { LoadingIndicator3D } from "@/components/LoadingIndicator3D";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { useMountOnce } from "@/lib/motion";
-import { useAerobicEfficiency, useBodyToday, useFuelTargets, usePersonalCorrelations, usePlanQuery, usePrefetchFuelNarrative, useRefreshServerData } from "@/lib/queries";
+import { useCalendarAccess } from "@/lib/guards";
+import { useAerobicEfficiency, useBodyToday, useFuelTargets, usePersonalCorrelations, usePlanQuery, usePrefetchFuelNarrative, useRefreshServerData, useWeekWorkouts } from "@/lib/queries";
 import { useWatchSyncStatus } from "@/lib/watchSync";
-import { toDateKey } from "@/lib/sessionVisuals";
+import { toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
 import { formatFullDate, stressCaption } from "@/lib/format";
 import { usePassoStore } from "@/lib/store";
 import type { DayTarget } from "@/lib/types";
@@ -35,18 +36,25 @@ function fuelSubtitle(tomorrow: DayTarget): string {
 
 export function BodyView() {
   const router = useRouter();
+  const access = useCalendarAccess();
   const refreshMutation = useRefreshServerData();
   const animate = useMountOnce("body-recovery");
   const { data, isLoading } = useBodyToday();
   const { data: correlations } = usePersonalCorrelations(90);
   const { data: aerobicEfficiency } = useAerobicEfficiency(90);
-  const { data: plan, isHydrated } = usePlanQuery();
+  const { data: plan } = usePlanQuery();
   const manualWeight = usePassoStore((s) => s.manualWeight);
-  const sessions = plan?.sessions ?? [];
-  const today = toDateKey(new Date());
-  // Not before the plan is back: asking with an empty plan buys an answer about a day
-  // with nothing scheduled, which is neither true nor the one this card shows.
-  const fuelQuery = useFuelTargets(today, sessions, manualWeight?.weightKg, isHydrated);
+  const today = new Date();
+  const todayKey = toDateKey(today);
+  const liveMode = !access.plan && access.garminConnected;
+  const workoutsQuery = useWeekWorkouts(today, liveMode);
+
+  const sessions = access.plan
+    ? access.plan.sessions
+    : workoutsToSessions(workoutsQuery.data?.workouts ?? []);
+
+  // Targets query starts as soon as access is ready
+  const fuelQuery = useFuelTargets(todayKey, sessions, manualWeight?.weightKg, access.ready);
   const prefetchNarrative = usePrefetchFuelNarrative();
   const fuel = fuelQuery.data;
   const fuelDegraded = fuel?.weight_source === "reference" && sessions.length === 0;
@@ -253,73 +261,90 @@ export function BodyView() {
       )}
 
       {/* SEZIONE 4: NUTRIZIONE & CARBURANTE */}
-      {fuel && (
-        <div style={{ marginTop: 24 }}>
-          <p
-            className="font-mono"
+      <div style={{ marginTop: 24 }}>
+        <p
+          className="font-mono"
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: ".06em",
+            textTransform: "uppercase",
+            color: "var(--inchiostro-50)",
+            margin: "0 0 8px 4px",
+          }}
+        >
+          Nutrizione
+        </p>
+        {fuelQuery.isLoading ? (
+          <div
+            className="anim-clay-shimmer"
             style={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: ".06em",
-              textTransform: "uppercase",
-              color: "var(--inchiostro-50)",
-              margin: "0 0 8px 4px",
+              background: "var(--crema-card)",
+              borderRadius: "var(--radius-card-lg)",
+              border: "var(--border-airbnb)",
+              boxShadow: "var(--shadow-airbnb-subtle)",
+              padding: 20,
+              minHeight: 110,
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
             }}
           >
-            Nutrizione
-          </p>
-          {fuelDegraded ? (
-            <SlideUp active={animate} delayMs={500}>
-              <NavRow href="/body/fuel" label="Carburante & Strategia Nutrizionale" />
-            </SlideUp>
-          ) : (
-            <SlideUp active={animate} delayMs={220}>
-              <TiltCard
-                maxTilt={4}
-                style={{
-                  background: "var(--inchiostro)",
-                  color: "var(--crema)",
-                  borderRadius: "var(--radius-card-lg)",
-                  padding: 18,
-                  position: "relative",
-                  overflow: "hidden",
-                }}
+            <div style={{ width: 100, height: 16, background: "var(--sabbia-chip)", borderRadius: 6 }} />
+            <div style={{ width: "65%", height: 12, background: "var(--sabbia)", borderRadius: 4 }} />
+            <div style={{ width: "40%", height: 22, background: "var(--sabbia-chip)", borderRadius: 6, marginTop: 4 }} />
+          </div>
+        ) : fuelDegraded ? (
+          <SlideUp active={animate} delayMs={500}>
+            <NavRow href="/body/fuel" label="Carburante & Strategia Nutrizionale" />
+          </SlideUp>
+        ) : fuel ? (
+          <SlideUp active={animate} delayMs={220}>
+            <TiltCard
+              maxTilt={4}
+              style={{
+                background: "var(--inchiostro)",
+                color: "var(--crema)",
+                borderRadius: "var(--radius-card-lg)",
+                padding: 18,
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <Link
+                href="/body/fuel"
+                className="tap-target"
+                onPointerDown={() => prefetchNarrative(todayKey, sessions, manualWeight?.weightKg)}
+                style={{ display: "block", color: "inherit", textDecoration: "none", position: "relative", zIndex: 2 }}
               >
-                <Link
-                  href="/body/fuel"
-                  className="tap-target"
-                  onPointerDown={() => prefetchNarrative(today, sessions, manualWeight?.weightKg)}
-                  style={{ display: "block", color: "inherit", textDecoration: "none", position: "relative", zIndex: 2 }}
-                >
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <p style={{ fontWeight: 700, fontSize: 15, margin: 0 }}>Carburante</p>
-                        <ChevronRight size={15} style={{ color: "var(--crema)", opacity: 0.8 }} />
-                      </div>
-                      <p style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: "3px 0 0" }}>{fuelSubtitle(fuel.tomorrow)}</p>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <p style={{ fontWeight: 700, fontSize: 15, margin: 0 }}>Carburante</p>
+                      <ChevronRight size={15} style={{ color: "var(--crema)", opacity: 0.8 }} />
+                    </div>
+                    <p style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: "3px 0 0" }}>{fuelSubtitle(fuel.tomorrow)}</p>
 
-                      {fuel.tomorrow.carb_g && (
-                        <p className="font-mono" style={{ fontSize: 26, fontWeight: 500, color: "var(--corallo)", margin: "8px 0 0" }}>
-                          {fuel.tomorrow.carb_g[0]}–{fuel.tomorrow.carb_g[1]}{" "}
-                          <span style={{ fontSize: 13, fontWeight: 400, color: "var(--crema)" }}>g di carboidrati</span>
-                        </p>
-                      )}
-                      <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-su-scuro)", margin: "6px 0 0", lineHeight: 1.35 }}>
-                        {fuel.advice}
+                    {fuel.tomorrow.carb_g && (
+                      <p className="font-mono" style={{ fontSize: 26, fontWeight: 500, color: "var(--corallo)", margin: "8px 0 0" }}>
+                        {fuel.tomorrow.carb_g[0]}–{fuel.tomorrow.carb_g[1]}{" "}
+                        <span style={{ fontSize: 13, fontWeight: 400, color: "var(--crema)" }}>g di carboidrati</span>
                       </p>
-                    </div>
-
-                    <div style={{ width: 68, height: 68, position: "relative", flexShrink: 0, marginTop: 4 }}>
-                      <Illustration name="fuel" width={68} height={68} position="relative" active={animate} delayMs={260} />
-                    </div>
+                    )}
+                    <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-su-scuro)", margin: "6px 0 0", lineHeight: 1.35 }}>
+                      {fuel.advice}
+                    </p>
                   </div>
-                </Link>
-              </TiltCard>
-            </SlideUp>
-          )}
-        </div>
-      )}
+
+                  <div style={{ width: 68, height: 68, position: "relative", flexShrink: 0, marginTop: 4 }}>
+                    <Illustration name="fuel" width={68} height={68} position="relative" active={animate} delayMs={260} />
+                  </div>
+                </div>
+              </Link>
+            </TiltCard>
+          </SlideUp>
+        ) : null}
+      </div>
 
       {/* SEZIONE 5: FISIOLOGIA AVANZATA & TREND */}
       <div style={{ marginTop: 24 }}>

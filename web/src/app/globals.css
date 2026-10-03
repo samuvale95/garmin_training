@@ -745,14 +745,16 @@ button {
 
 /* Navigation stays visually anchored while the page content changes -- Airbnb floating pill */
 .tab-bar {
-  position: sticky;
-  /* Close to the bottom edge: on iPhones only part of the safe-area inset, enough to
-     clear the home indicator, instead of the whole inset plus a gap. */
-  bottom: calc(4px + env(safe-area-inset-bottom, 0px) * 0.4);
-  z-index: 30;
+  position: fixed;
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px) * 0.5);
+  left: 0;
+  right: 0;
+  max-width: min(calc(100vw - 32px), calc(var(--frame-max-width) - 32px));
+  margin: 0 auto;
+  z-index: 100;
+  pointer-events: auto;
   display: flex;
   gap: 6px;
-  margin: 0 16px;
   padding: 5px 8px;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(0, 0, 0, 0.06);

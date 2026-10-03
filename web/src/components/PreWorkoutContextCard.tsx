@@ -12,6 +12,8 @@ interface PreWorkoutContextCardProps {
   active?: boolean;
   trained?: boolean;
   carbLoggedG?: number;
+  entriesCount?: number;
+  dateKey?: string;
 }
 
 export function PreWorkoutContextCard({
@@ -20,21 +22,25 @@ export function PreWorkoutContextCard({
   active = true,
   trained = false,
   carbLoggedG = 0,
+  entriesCount = 0,
+  dateKey,
 }: PreWorkoutContextCardProps) {
-  // Hide if no target, rest day, or if workout is already completed for today
-  if (!todayTarget || todayTarget.load === "riposo" || trained) {
+  // Check if manually dismissed today in localStorage
+  const storageKey = dateKey ? `passo:preworkout_dismissed:${dateKey}` : null;
+  const isDismissed = typeof window !== "undefined" && storageKey ? localStorage.getItem(storageKey) === "true" : false;
+
+  // Hide if no target, rest day, workout is already completed for today, or manually dismissed
+  if (!todayTarget || todayTarget.load === "riposo" || trained || isDismissed) {
+    return null;
+  }
+
+  // If user already logged ANY meal/snack today or reached carb threshold, hide card
+  if (entriesCount > 0 || carbLoggedG > 0) {
     return null;
   }
 
   const isLongOrHard = todayTarget.load === "molto_lungo" || todayTarget.load === "duro";
   const snackGramsText = calculateSnackGrams(todayTarget.load);
-  const minTargetCarb = isLongOrHard ? 40 : 30;
-
-  // If user already logged carbs equal or greater than the pre-run snack, hide card
-  if (carbLoggedG >= minTargetCarb) {
-    return null;
-  }
-
   const hydrationMl = calculateHydrationMl(isLongOrHard ? 90 : 45, isLongOrHard);
 
   return (

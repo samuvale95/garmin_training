@@ -288,6 +288,8 @@ export function TodayView() {
           active={animate}
           trained={trainedOn(todayKey) || heroSession.date > todayKey}
           carbLoggedG={fuelStatus.data?.totals?.carb_g ?? 0}
+          entriesCount={fuelStatus.data?.totals?.entries ?? 0}
+          dateKey={todayKey}
         />
       )}
 

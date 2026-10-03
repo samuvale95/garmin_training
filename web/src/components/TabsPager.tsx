@@ -286,6 +286,7 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
               }}
             >
               <div
+                style={{ paddingBottom: "calc(84px + env(safe-area-inset-bottom, 0px))" }}
                 ref={(el) => {
                   contentRefs.current[index] = el;
                 }}

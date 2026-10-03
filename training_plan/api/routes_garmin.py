@@ -98,6 +98,29 @@ async def workouts(
             refresh=refresh,
         )
     )
+
+    # Reconcile any moved workouts from Garmin into local plan_session
+    def _reconcile():
+        try:
+            from .. import plan_store
+            stored = plan_store.list_sessions(user_id)
+            if not stored or not result:
+                return
+            for w in result:
+                for s in stored:
+                    # Match by title and sport, within a ±7 days window
+                    if s["title"].strip().lower() == w.title.strip().lower() and s["sport"] == w.sport:
+                        if s["date"] != w.date.isoformat():
+                            # Garmin has a different date for this workout (e.g. moved on Garmin Connect calendar)
+                            s_date = date.fromisoformat(s["date"])
+                            if abs((s_date - w.date).days) <= 7:
+                                plan_store.update_session(user_id, s["id"], {"date": w.date.isoformat()}, by_user=True)
+                                break
+        except Exception:
+            pass
+
+    await run_in_threadpool(_reconcile)
+
     return schemas.WorkoutsResponse(workouts=[schemas.ScheduledWorkoutOut.from_model(w) for w in result])
 
 
@@ -200,7 +223,19 @@ async def reschedule_workout(
             sport=payload.workout.sport,
             title=payload.workout.title,
         )
-        return sync.reschedule_workout(workout, payload.new_date)
+        res = sync.reschedule_workout(workout, payload.new_date)
+        if res.success:
+            # If the user has a stored plan session corresponding to this workout, update its date too
+            try:
+                from .. import plan_store
+                stored = plan_store.list_sessions(user_id)
+                for s in stored:
+                    if s["date"] == payload.workout.date.isoformat() and s["title"].strip().lower() == payload.workout.title.strip().lower():
+                        plan_store.update_session(user_id, s["id"], {"date": payload.new_date.isoformat()}, by_user=True)
+                        break
+            except Exception:
+                pass
+        return res
 
     result = await run_in_threadpool(lambda: garmin_session.run(user_id, _run))
     invalidate_calendar(user_id)
