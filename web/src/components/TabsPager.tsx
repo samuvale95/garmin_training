@@ -80,8 +80,16 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
 
   const placePanels = useCallback(() => {
     const active = shownIdx.current;
+    // Clamped to the active tab's real scroll range: iOS reports scrollY past the end
+    // during the rubber-band bounce, and following it pushed the hidden tabs further
+    // down, which grew the page, which let the next bounce go further -- an ever-longer
+    // blank tail under the content.
+    // (The page's own height is a safe bound: the pager clips, so the hidden tabs never
+    // count towards it.)
+    const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const y = Math.min(Math.max(window.scrollY, 0), maxY);
     panelRefs.current.forEach((el, index) => {
-      if (el) el.style.transform = index === active ? "" : `translateY(${window.scrollY}px)`;
+      if (el) el.style.transform = index === active ? "" : `translateY(${y}px)`;
     });
     contentRefs.current.forEach((el, index) => {
       if (el) el.style.transform = index === active ? "" : `translateY(${-scrollByTab.current[index]}px)`;
@@ -236,8 +244,10 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
         flex: 1,
         display: "flex",
         // `clip`, not `hidden`: hidden makes this a scroll container, which would turn
-        // every `position: sticky` inside the tabs (the week header) into a no-op.
-        overflowX: "clip",
+        // every `position: sticky` inside the tabs (the week header) into a no-op. Both
+        // axes: the hidden tabs are moved down with transforms, and nothing they do may
+        // ever add to the page's scrollable height.
+        overflow: "clip",
         // Horizontal gestures belong to the pager, vertical ones to the page. Without
         // this the browser may also act on a sideways swipe -- e.g. Chrome's overscroll
         // back/forward navigation, which then restores its own scroll position on top

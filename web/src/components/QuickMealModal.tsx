@@ -6,6 +6,7 @@ import { CloseIcon, PlusIcon, LightningIcon, PencilIcon, CameraIcon, CheckIcon }
 import { PortionPicker } from "@/components/FuelCorrectionSheet";
 import { useAddManualEntry, useDescribeMeal, useLogPhoto, useAthleteLevel } from "@/lib/queries";
 import { toDateKey } from "@/lib/sessionVisuals";
+import { LogDayPicker, defaultLogDay, logDateKey, type LogDay } from "@/components/LogDayPicker";
 
 interface QuickMealModalProps {
   isOpen: boolean;
@@ -31,7 +32,10 @@ export function QuickMealModal({
   defaultMealName,
   defaultCarbGrams,
 }: QuickMealModalProps) {
-  const dateKey = todayDateKey ?? toDateKey(new Date());
+  const todayKey = todayDateKey ?? toDateKey(new Date());
+  // Which day the meal goes to: after midnight a late dinner still belongs to yesterday.
+  const [logDay, setLogDay] = useState<LogDay>(() => defaultLogDay());
+  const dateKey = logDateKey(todayKey, logDay);
   const [mode, setMode] = useState<"preset" | "text" | "photo">("preset");
   const [textInput, setTextInput] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<typeof COMMON_RUNNER_SNACKS[0] | null>(null);
@@ -48,6 +52,7 @@ export function QuickMealModal({
   // Reset when opened
   useEffect(() => {
     if (isOpen) {
+      setLogDay(defaultLogDay());
       setMode("preset");
       setTextInput("");
       setSelectedPreset(null);
@@ -190,6 +195,10 @@ export function QuickMealModal({
             >
               <CloseIcon size={14} />
             </button>
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <LogDayPicker todayKey={todayKey} value={logDay} onChange={setLogDay} />
           </div>
 
           {/* Mode Switcher */}

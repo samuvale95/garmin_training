@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { PulseRing, Skeleton, SlideUp } from "@/components/motion/primitives";
 import { ChevronLeft, ChevronRight, ArrowRight, PencilIcon, CameraIcon } from "@/components/Icons";
 import { FuelCorrectionSheet, PortionPicker, macroAtPortion } from "@/components/FuelCorrectionSheet";
+import { LogDayPicker, defaultLogDay, logDateKey, type LogDay } from "@/components/LogDayPicker";
+import { useMounted } from "@/lib/hydration";
 import { DayEnergyCard } from "@/components/DayEnergyCard";
 import {
   SessionTimeSelectorCard,
@@ -130,6 +132,13 @@ export default function FuelPage() {
   const [flow, setFlow] = useState<Flow>({ kind: "idle" });
   const [correcting, setCorrecting] = useState<FoodEntry | null>(null);
   const [runTimeSlot, setRunTimeSlot] = useState<RunTimeSlot>("pomeriggio");
+  // The day a new meal is logged to. Unset until the user picks: the default depends on
+  // the clock (after midnight a late dinner still belongs to yesterday), which is only
+  // known once mounted -- the server render can't know the user's local time.
+  const mounted = useMounted();
+  const [pickedLogDay, setPickedLogDay] = useState<LogDay | null>(null);
+  const logDay: LogDay = pickedLogDay ?? (mounted ? defaultLogDay() : "oggi");
+  const logDate = logDateKey(today, logDay);
 
   function openCamera() {
     fileInputRef.current?.click();
@@ -145,7 +154,7 @@ export default function FuelPage() {
     setFlow({ kind: "estimating", preview });
 
     createThumbnail(file).then((thumbnail) => {
-      logPhoto.mutate({ file, date: today, thumbnail }, estimateHandlers(preview));
+      logPhoto.mutate({ file, date: logDate, thumbnail }, estimateHandlers(preview));
     });
   }
 
@@ -176,7 +185,7 @@ export default function FuelPage() {
     const asNumber = (raw: string) => (raw === "" ? null : Number(raw));
     addManualEntry.mutate(
       {
-        date: today,
+        date: logDate,
         description: fields.description.trim() || null,
         carb_g: asNumber(fields.carb),
         protein_g: asNumber(fields.protein),
@@ -191,7 +200,7 @@ export default function FuelPage() {
     const preview: Preview = { kind: "text", text };
     cancelledRef.current = false;
     setFlow({ kind: "estimating", preview });
-    describeMeal.mutate({ text, date: today }, estimateHandlers(preview));
+    describeMeal.mutate({ text, date: logDate }, estimateHandlers(preview));
   }
 
   function closeFlow() {
@@ -371,6 +380,9 @@ export default function FuelPage() {
             background: "linear-gradient(to top, var(--crema) 75%, rgba(255,255,255,0))",
           }}
         >
+          <div style={{ marginBottom: 10 }}>
+            <LogDayPicker todayKey={today} value={logDay} onChange={setPickedLogDay} />
+          </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button
               type="button"
