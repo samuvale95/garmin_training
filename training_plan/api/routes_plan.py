@@ -389,7 +389,10 @@ async def get_adaptation(user_id: str = Depends(current_user_id)) -> schemas.Ada
 
 @router.post("/plan/adaptation/{adaptation_id}/{action}", response_model=schemas.AdaptationResponse)
 async def answer_adaptation(
-    adaptation_id: UUID, action: str, user_id: str = Depends(current_user_id)
+    adaptation_id: UUID,
+    action: str,
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(current_user_id),
 ) -> schemas.AdaptationResponse | JSONResponse:
     def run() -> schemas.AdaptationResponse | JSONResponse:
         try:
@@ -407,7 +410,32 @@ async def answer_adaptation(
             return _error(409, "validation_failed", "Questo adattamento è già stato gestito.")
         return _adaptation_response(row)
 
-    return await run_in_threadpool(run)
+    result = await run_in_threadpool(run)
+
+    # When adaptation is accepted or undone, immediately sync plan window to Garmin Connect
+    if action in ("accept", "undo") and isinstance(result, schemas.AdaptationResponse):
+        def _sync_adaptation_to_garmin():
+            try:
+                def _push(sync):
+                    from .. import plan_store
+                    from ..garmin_sync import sync_plan
+                    stored = plan_store.list_sessions(user_id)
+                    today = date.today()
+                    sync_sessions = [
+                        schemas.TrainingSessionIn.model_validate(s).to_model()
+                        for s in stored
+                        if today.isoformat() <= s["date"] <= (today + timedelta(days=14)).isoformat()
+                    ]
+                    sync_plan(sync, sync_sessions, user_id=user_id)
+
+                garmin_session.run(user_id, _push)
+                invalidate_calendar(user_id)
+            except Exception:
+                pass
+
+        background_tasks.add_task(_sync_adaptation_to_garmin)
+
+    return result
 
 
 # ---- generation ---------------------------------------------------------------------------------
