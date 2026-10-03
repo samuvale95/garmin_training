@@ -13,7 +13,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.concurrency import run_in_threadpool
 
@@ -22,7 +22,7 @@ from .. import goal_fit, llm
 from ..parser import parse_plan_document, serialize_plan
 from . import garmin_session, schemas
 from .auth import current_user_id
-from .cache import TTL_GOAL_FIT_NARRATIVE, TTL_PLAN_DIFF, cache
+from .cache import TTL_GOAL_FIT_NARRATIVE, TTL_PLAN_DIFF, cache, invalidate_calendar
 from .routes_coach import _zones, coach_state
 from .jobs import job_store
 
@@ -77,20 +77,46 @@ def _not_found(session_id: str) -> HTTPException:
 
 @router.post("/plan/sessions", response_model=schemas.TrainingSessionOut)
 async def create_session(
-    payload: schemas.TrainingSessionIn, user_id: str = Depends(current_user_id)
+    payload: schemas.TrainingSessionIn,
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(current_user_id),
 ) -> schemas.TrainingSessionOut:
     def write() -> schemas.TrainingSessionOut:
         db.ensure_plan(user_id)
         created = plan_store.create_session(user_id, payload.model_dump(mode="json"), origin="manual")
         return schemas.TrainingSessionOut.model_validate(created)
 
-    return await run_in_threadpool(write)
+    result = await run_in_threadpool(write)
+
+    # Immediately push to Garmin if connected
+    def _sync_create_to_garmin():
+        try:
+            from ..models import TrainingSession as ModelTrainingSession
+            model_sess = payload.to_model()
+            garmin_session.run(user_id, lambda sync: sync.create_and_schedule(model_sess))
+            invalidate_calendar(user_id)
+        except Exception:
+            pass
+
+    background_tasks.add_task(_sync_create_to_garmin)
+    return result
 
 
 @router.patch("/plan/sessions/{session_id}", response_model=schemas.TrainingSessionOut)
 async def update_session(
-    session_id: UUID, payload: schemas.SessionPatch, user_id: str = Depends(current_user_id)
+    session_id: UUID,
+    payload: schemas.SessionPatch,
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(current_user_id),
 ) -> schemas.TrainingSessionOut:
+    # Read before-state to know previous date/title
+    previous = None
+    try:
+        stored = plan_store.list_sessions(user_id)
+        previous = next((s for s in stored if s["id"] == str(session_id)), None)
+    except Exception:
+        pass
+
     def write() -> schemas.TrainingSessionOut:
         try:
             updated = plan_store.update_session(user_id, str(session_id), payload.changes(), by_user=True)
@@ -98,11 +124,63 @@ async def update_session(
             raise _not_found(str(session_id))
         return schemas.TrainingSessionOut.model_validate(updated)
 
-    return await run_in_threadpool(write)
+    result = await run_in_threadpool(write)
+
+    # Immediately synchronize update with Garmin Connect
+    def _sync_update_to_garmin():
+        try:
+            if not previous:
+                return
+            prev_date = date.fromisoformat(previous["date"])
+            new_date = result.date
+            title = previous["title"].strip().lower()
+
+            def _push(sync):
+                from ..garmin_sync import session_key, ChangedSession
+                # Find workout on Garmin calendar around prev_date or new_date
+                start = min(prev_date, new_date) - timedelta(days=2)
+                end = max(prev_date, new_date) + timedelta(days=2)
+                workouts = sync.list_scheduled_workouts(start, end)
+                target_w = None
+                for w in workouts:
+                    if w.title.strip().lower() == title:
+                        target_w = w
+                        break
+
+                if target_w:
+                    # If steps or title changed, replace; if only date moved, reschedule
+                    steps_changed = payload.steps is not None or payload.title is not None
+                    if not steps_changed and prev_date != new_date:
+                        sync.reschedule_workout(target_w, new_date)
+                    else:
+                        sync.delete_workout(target_w)
+                        sync.create_and_schedule(result.to_model())
+                else:
+                    # Workout wasn't on Garmin yet, create and schedule it
+                    sync.create_and_schedule(result.to_model())
+
+            garmin_session.run(user_id, _push)
+            invalidate_calendar(user_id)
+        except Exception:
+            pass
+
+    background_tasks.add_task(_sync_update_to_garmin)
+    return result
 
 
 @router.delete("/plan/sessions/{session_id}", response_model=schemas.DeletePlanResponse)
-async def delete_session(session_id: UUID, user_id: str = Depends(current_user_id)) -> schemas.DeletePlanResponse:
+async def delete_session(
+    session_id: UUID,
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(current_user_id),
+) -> schemas.DeletePlanResponse:
+    target_to_delete = None
+    try:
+        stored = plan_store.list_sessions(user_id)
+        target_to_delete = next((s for s in stored if s["id"] == str(session_id)), None)
+    except Exception:
+        pass
+
     def write() -> None:
         try:
             plan_store.delete_session(user_id, str(session_id), by_user=True)
@@ -110,6 +188,28 @@ async def delete_session(session_id: UUID, user_id: str = Depends(current_user_i
             raise _not_found(str(session_id))
 
     await run_in_threadpool(write)
+
+    # Delete from Garmin calendar if present
+    def _sync_delete_to_garmin():
+        try:
+            if not target_to_delete:
+                return
+            sess_date = date.fromisoformat(target_to_delete["date"])
+            title = target_to_delete["title"].strip().lower()
+
+            def _del(sync):
+                workouts = sync.list_scheduled_workouts(sess_date, sess_date)
+                for w in workouts:
+                    if w.title.strip().lower() == title:
+                        sync.delete_workout(w)
+                        break
+
+            garmin_session.run(user_id, _del)
+            invalidate_calendar(user_id)
+        except Exception:
+            pass
+
+    background_tasks.add_task(_sync_delete_to_garmin)
     return schemas.DeletePlanResponse(ok=True)
 
 
