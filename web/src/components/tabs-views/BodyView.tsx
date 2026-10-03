@@ -371,10 +371,10 @@ export function BodyView() {
                 Nutrizione & Carburante
               </p>
               <Link
-                href="/body/fuel"
+                href="/nutrition"
                 style={{ fontSize: 12, fontWeight: 600, color: "var(--rosso-avviso)", textDecoration: "none" }}
               >
-                Apri calcolatore →
+                Vai alla scheda Nutrizione →
               </Link>
             </div>
 
@@ -398,7 +398,7 @@ export function BodyView() {
               </div>
             ) : fuelDegraded ? (
               <SlideUp active={animate} delayMs={380}>
-                <NavRow href="/body/fuel" label="Strategia Nutrizionale Completa" />
+                <NavRow href="/nutrition" label="Strategia Nutrizionale Completa" />
               </SlideUp>
             ) : fuel ? (
               <SlideUp active={animate} delayMs={220}>
@@ -414,7 +414,7 @@ export function BodyView() {
                   }}
                 >
                   <Link
-                    href="/body/fuel"
+                    href="/nutrition"
                     className="tap-target"
                     onPointerDown={() => prefetchNarrative(todayKey, sessions, manualWeight?.weightKg)}
                     style={{ display: "block", color: "inherit", textDecoration: "none", position: "relative", zIndex: 2 }}

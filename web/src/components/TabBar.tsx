@@ -9,6 +9,7 @@ const TABS = [
   { href: "/today", label: "Oggi", path: "M3 11 12 3l9 8M5 10v11h5v-7h4v7h5V10" },
   { href: "/week", label: "Settimana", path: "M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2M7 14h2m6 0h2M7 18h2" },
   { href: "/body", label: "Corpo", path: "M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" },
+  { href: "/nutrition", label: "Nutrizione", path: "M18 2v6a3 3 0 0 1-3 3 3 3 0 0 1-3-3V2M15 11v11M5 2v10a4 4 0 0 0 4 4v6M9 2v6" },
 ] as const;
 
 export function TabBar() {

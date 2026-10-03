@@ -7,13 +7,14 @@ import { useMotionEnabled } from "@/lib/motion";
 import { TodayView } from "@/components/tabs-views/TodayView";
 import { WeekView } from "@/components/tabs-views/WeekView";
 import { BodyView } from "@/components/tabs-views/BodyView";
+import { NutritionView } from "@/components/tabs-views/NutritionView";
 
-const TAB_ROUTES = ["/today", "/week", "/body"] as const;
+const TAB_ROUTES = ["/today", "/week", "/body", "/nutrition"] as const;
 
 /**
- * True 3-Panel Continuous Tabs Pager.
+ * True 4-Panel Continuous Tabs Pager.
  *
- * All three tabs (Oggi, Settimana, Corpo) are mounted side-by-side in a 300% width track.
+ * All four tabs (Oggi, Settimana, Corpo, Nutrizione) are mounted side-by-side in a 400% width track.
  * During swipe gestures, the finger drags the entire track in real-time (1:1 tracking),
  * so the user physically sees the next screen sliding in simultaneously under their finger.
  * Upon release, it snaps with fluid, creamy spring physics (iOS / Airbnb style)
@@ -24,11 +25,12 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
   const router = useRouter();
   const { reduced } = useMotionEnabled();
 
-  const isMainTab = pathname === "/today" || pathname === "/week" || pathname === "/body";
+  const isMainTab = pathname === "/today" || pathname === "/week" || pathname === "/body" || pathname === "/nutrition";
 
   const getIndexFromPath = useCallback((path: string): number => {
     if (path === "/week") return 1;
     if (path === "/body") return 2;
+    if (path === "/nutrition") return 3;
     return 0; // Default to /today
   }, []);
 
@@ -73,7 +75,7 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
   // is exactly what each will show once active, including the neighbour peeking in
   // during a swipe. Not `position: sticky`: sticky can't pass the end of the track, so
   // near the bottom of a page the neighbour sat higher than it would land.
-  const scrollByTab = useRef([0, 0, 0]);
+  const scrollByTab = useRef([0, 0, 0, 0]);
   const shownIdx = useRef(activeIdx);
   const panelRefs = useRef<(HTMLDivElement | null)[]>([]);
   const contentRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -148,8 +150,8 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
       const width = containerRef.current?.offsetWidth || window.innerWidth || 390;
       let dxPercent = (dx / width) * 100;
 
-      // Elastic resistance at the edges (Oggi moving right, or Corpo moving left)
-      if ((activeIdx === 0 && dx > 0) || (activeIdx === 2 && dx < 0)) {
+      // Elastic resistance at the edges (Oggi moving right, or Nutrizione moving left)
+      if ((activeIdx === 0 && dx > 0) || (activeIdx === 3 && dx < 0)) {
         dxPercent *= 0.28;
       }
 
@@ -176,7 +178,7 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
 
     // Threshold to switch page is 18% drag distance
     let newIdx = activeIdx;
-    if (deltaPercent < -18 && activeIdx < 2) {
+    if (deltaPercent < -18 && activeIdx < 3) {
       newIdx = activeIdx + 1;
     } else if (deltaPercent > 18 && activeIdx > 0) {
       newIdx = activeIdx - 1;
@@ -208,18 +210,14 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
   };
 
   // Where the track sits. While it moves (drag, snap) it is a GPU translate -- the track
-  // is 300% wide and a % translate is relative to the element itself, so one tab is a
-  // third of it. At rest it is a plain `left` offset with no transform at all: any
-  // transform (or `will-change: transform`) on an ancestor turns `position: fixed`
-  // descendants into children of the track, so sheets opened from a tab (the 1-tap
-  // meal log) landed shifted sideways and under the TabBar. Same position either way,
-  // switched in the same frame.
+  // is 400% wide and a % translate is relative to the element itself, so one tab is a
+  // fourth of it (val / 4).
   const trackRef = useRef<HTMLDivElement | null>(null);
   const placeTrack = useCallback((val: number) => {
     const track = trackRef.current;
     if (!track) return;
     const atRest = !isDragging.current && val === -shownIdx.current * 100;
-    track.style.transform = atRest ? "none" : `translateX(${val / 3}%)`;
+    track.style.transform = atRest ? "none" : `translateX(${val / 4}%)`;
     track.style.willChange = atRest ? "auto" : "transform";
     track.style.left = atRest ? `${val}%` : "0";
   }, []);
@@ -230,7 +228,12 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  const views = [<TodayView key="today" />, <WeekView key="week" />, <BodyView key="body" />];
+  const views = [
+    <TodayView key="today" />,
+    <WeekView key="week" />,
+    <BodyView key="body" />,
+    <NutritionView key="nutrition" />,
+  ];
 
   return (
     <div
@@ -243,15 +246,7 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
         width: "100%",
         flex: 1,
         display: "flex",
-        // `clip`, not `hidden`: hidden makes this a scroll container, which would turn
-        // every `position: sticky` inside the tabs (the week header) into a no-op. Both
-        // axes: the hidden tabs are moved down with transforms, and nothing they do may
-        // ever add to the page's scrollable height.
         overflow: "clip",
-        // Horizontal gestures belong to the pager, vertical ones to the page. Without
-        // this the browser may also act on a sideways swipe -- e.g. Chrome's overscroll
-        // back/forward navigation, which then restores its own scroll position on top
-        // of the pager's.
         touchAction: "pan-y",
         position: "relative",
       }}
@@ -261,9 +256,7 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
         style={{
           display: "flex",
           alignItems: "flex-start",
-          width: "300%",
-          // Never `flex: 1` here: a 0 basis plus shrink squeezes the 300% track back to
-          // the viewport width and all three tabs end up side by side on the first.
+          width: "400%",
           flex: "none",
           position: "relative",
         }}
@@ -275,10 +268,8 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
               key={index}
               aria-hidden={!active}
               style={{
-                width: "33.333333%",
+                width: "25%",
                 flexShrink: 0,
-                // Only the active tab sizes the page; the others are one screen tall,
-                // placed by `placePanels` above.
                 ...(active ? { minHeight: "100%" } : { height: "100dvh", overflow: "hidden" }),
               }}
               ref={(el) => {
