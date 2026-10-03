@@ -418,15 +418,12 @@ async def answer_adaptation(
             try:
                 def _push(sync):
                     from .. import plan_store
-                    from ..garmin_sync import sync_plan
                     stored = plan_store.list_sessions(user_id)
                     today = date.today()
-                    sync_sessions = [
-                        schemas.TrainingSessionIn.model_validate(s).to_model()
-                        for s in stored
-                        if today.isoformat() <= s["date"] <= (today + timedelta(days=14)).isoformat()
-                    ]
-                    sync_plan(sync, sync_sessions, user_id=user_id)
+                    for s in stored:
+                        if today.isoformat() <= s["date"] <= (today + timedelta(days=14)).isoformat():
+                            model_sess = schemas.TrainingSessionIn.model_validate(s).to_model()
+                            sync.create_and_schedule(model_sess)
 
                 garmin_session.run(user_id, _push)
                 invalidate_calendar(user_id)
