@@ -139,26 +139,29 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
         active={animate}
         delayMs={340}
         style={{
-          background: "var(--crema-card)",
+          background: "linear-gradient(180deg, #f6fbf7 0%, var(--crema-card) 100%)",
           borderRadius: "var(--radius-card-lg)",
           padding: 18,
-          border: "var(--border-airbnb)",
+          border: "1px solid rgba(16, 185, 129, 0.22)",
           boxShadow: "var(--shadow-airbnb-subtle)",
         }}
       >
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-          <p
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              margin: 0,
-              textTransform: "uppercase",
-              letterSpacing: ".05em",
-              color: "var(--inchiostro-50)",
-            }}
-          >
-            Efficienza Aerobica
-          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 14 }}>⚡</span>
+            <p
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                margin: 0,
+                textTransform: "uppercase",
+                letterSpacing: ".05em",
+                color: "#047857",
+              }}
+            >
+              Efficienza & Deriva Cardiaca
+            </p>
+          </div>
           {trend && (
             <span
               style={{
@@ -276,7 +279,7 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
                     : "var(--inchiostro-50)",
                 }}
               >
-                Decoupling
+                Deriva (Decoupling)
               </span>
               <p
                 className="font-mono"
@@ -294,7 +297,7 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
                 {recentDecoupling ? `${recentDecoupling.decoupling_pct.toFixed(1)}%` : "—"}
               </p>
               <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>
-                {recentDecoupling ? (recentDecoupling.decoupling_pct < 5 ? "ottima tenuta" : "deriva cardiaca") : "nessun lungo"}
+                {recentDecoupling ? (recentDecoupling.decoupling_pct < 5 ? "cuore stabile (<5%)" : "deriva alta (>5%)") : "nessun lungo"}
               </span>
             </div>
           </div>
@@ -303,7 +306,7 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
         {/* Explanation */}
         {(!isLevel1 || showTechnicalDetails) && (
           <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-70)", margin: "8px 0 0", lineHeight: 1.45 }}>
-            L'efficienza aerobica misura quanta velocità produci per ogni battito cardiaco. Cresce quando la base aerobica diventa più solida ed economica.
+            Misura se il cuore accelera nella seconda metà dei lunghi a parità di passo. Meno del 5% di deriva indica che il motore aerobico tiene senza affanno.
           </p>
         )}
       </SlideUp>

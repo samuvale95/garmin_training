@@ -12,10 +12,10 @@ interface PersonalCorrelationsCardProps {
 }
 
 const SIGNIFICANCE_STYLE: Record<string, { label: string; color: string; bg: string }> = {
-  forte: { label: "Forte correlazione", color: "#059669", bg: "rgba(5, 150, 105, 0.1)" },
-  moderata: { label: "Correlazione moderata", color: "var(--azzurro-scuro)", bg: "rgba(37, 99, 235, 0.08)" },
-  preliminare: { label: "Tendenza preliminare", color: "var(--inchiostro-70)", bg: "rgba(34, 34, 34, 0.05)" },
-  insufficiente: { label: "Dati insufficienti", color: "var(--inchiostro-50)", bg: "rgba(34, 34, 34, 0.04)" },
+  forte: { label: "Forte impatto", color: "#4f46e5", bg: "rgba(79, 70, 229, 0.1)" },
+  moderata: { label: "Impatto evidente", color: "#6366f1", bg: "rgba(99, 102, 241, 0.1)" },
+  preliminare: { label: "Tendenza iniziale", color: "var(--inchiostro-70)", bg: "rgba(34, 34, 34, 0.05)" },
+  insufficiente: { label: "Pochi dati registrati", color: "var(--inchiostro-50)", bg: "rgba(34, 34, 34, 0.04)" },
 };
 
 export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: PersonalCorrelationsCardProps) {
@@ -29,41 +29,44 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
         active={animate}
         delayMs={delayMs}
         style={{
-          background: "var(--crema-card)",
+          background: "linear-gradient(180deg, #fbfaff 0%, var(--crema-card) 100%)",
           borderRadius: "var(--radius-card-lg)",
           padding: 20,
-          border: "var(--border-airbnb)",
+          border: "1px solid rgba(129, 140, 248, 0.22)",
           boxShadow: "var(--shadow-airbnb-subtle)",
         }}
       >
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
-          <p
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              margin: 0,
-              textTransform: "uppercase",
-              letterSpacing: ".05em",
-              color: "var(--inchiostro-50)",
-            }}
-          >
-            Correlazioni Personali
-          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 14 }}>🧬</span>
+            <p
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                margin: 0,
+                textTransform: "uppercase",
+                letterSpacing: ".05em",
+                color: "#4338ca",
+              }}
+            >
+              Impatto Sonno & HRV
+            </p>
+          </div>
           <span
             style={{
               fontSize: 11,
               fontWeight: 700,
               padding: "3px 10px",
               borderRadius: "var(--radius-pill)",
-              background: data.status_color.startsWith("var") ? data.status_color : data.status_color,
-              color: data.status_color === "var(--azzurro)" ? "var(--inchiostro)" : "#ffffff",
+              background: "rgba(99, 102, 241, 0.12)",
+              color: "#4338ca",
             }}
           >
-            {data.status_label}
+            {data.status === "dati_insufficienti" ? "Raccolta dati" : "90 giorni"}
           </span>
         </div>
 
-        <p style={{ font: "600 20px/1.2 var(--font-sans)", letterSpacing: "-.01em", margin: "10px 0 6px" }}>
+        <p style={{ font: "600 19px/1.25 var(--font-sans)", letterSpacing: "-.01em", margin: "10px 0 6px", color: "var(--inchiostro)" }}>
           {data.headline}
         </p>
         <p className="font-serif-italic" style={{ fontSize: 13.5, color: "var(--inchiostro-70)", margin: 0, lineHeight: 1.45 }}>
@@ -72,7 +75,7 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
 
         {isAccumulating && (
           <p className="font-serif-italic" style={{ fontSize: 12.5, color: "var(--inchiostro-50)", marginTop: 12 }}>
-            Continua ad indossare l&apos;orologio di notte e a correre: ogni notte registrata arricchisce il quadro statistico.
+            Indossa l&apos;orologio di notte: bastano poche settimane per capire come il sonno influenza i tuoi ritmi.
           </p>
         )}
       </SlideUp>
@@ -91,12 +94,12 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
                   background: "var(--crema-card)",
                   borderRadius: "var(--radius-card-lg)",
                   padding: 18,
-                  border: "var(--border-airbnb)",
+                  border: "1px solid rgba(129, 140, 248, 0.18)",
                   boxShadow: "var(--shadow-airbnb-subtle)",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#4338ca" }}>
                     {ins.title}
                   </span>
                   <span
@@ -119,19 +122,19 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
 
                 {/* Comparison chips */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, margin: "10px 0" }}>
-                  <div style={{ background: "rgba(16, 185, 129, 0.08)", padding: "8px 12px", borderRadius: "var(--radius-card)" }}>
+                  <div style={{ background: "rgba(16, 185, 129, 0.08)", padding: "10px 12px", borderRadius: "var(--radius-card)", border: "1px solid rgba(16, 185, 129, 0.2)" }}>
                     <span style={{ fontSize: 10.5, fontWeight: 700, color: "#047857", textTransform: "uppercase" }}>
                       {ins.good_band_label}
                     </span>
-                    <p className="font-mono" style={{ fontSize: 13, fontWeight: 700, margin: "3px 0 0", color: "#064e3b" }}>
+                    <p className="font-mono" style={{ fontSize: 14, fontWeight: 700, margin: "3px 0 0", color: "#064e3b" }}>
                       {ins.good_band_avg}
                     </p>
                   </div>
-                  <div style={{ background: "rgba(34, 34, 34, 0.04)", padding: "8px 12px", borderRadius: "var(--radius-card)" }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--inchiostro-50)", textTransform: "uppercase" }}>
+                  <div style={{ background: "rgba(239, 68, 68, 0.06)", padding: "10px 12px", borderRadius: "var(--radius-card)", border: "1px solid rgba(239, 68, 68, 0.18)" }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: "#b91c1c", textTransform: "uppercase" }}>
                       {ins.bad_band_label}
                     </span>
-                    <p className="font-mono" style={{ fontSize: 13, fontWeight: 700, margin: "3px 0 0", color: "var(--inchiostro-70)" }}>
+                    <p className="font-mono" style={{ fontSize: 14, fontWeight: 700, margin: "3px 0 0", color: "#7f1d1d" }}>
                       {ins.bad_band_avg}
                     </p>
                   </div>
@@ -142,11 +145,11 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
                 </p>
 
                 <p className="font-serif-italic" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0, lineHeight: 1.35 }}>
-                  <span style={{ fontWeight: 600, color: "var(--inchiostro-70)" }}>Cosa significa:</span> {ins.action}
+                  <span style={{ fontWeight: 600, color: "var(--inchiostro-70)" }}>Consiglio:</span> {ins.action}
                 </p>
 
-                <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid rgba(34, 34, 34, 0.04)", fontSize: 10, color: "var(--inchiostro-35)" }}>
-                  Basato su {ins.sample_size} sedute {ins.correlation_r != null ? `· r = ${ins.correlation_r}` : ""}
+                <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid rgba(34, 34, 34, 0.05)", fontSize: 10, color: "var(--inchiostro-35)" }}>
+                  Confronto su {ins.sample_size} corse analizzate con la notte precedente
                 </div>
               </SlideUp>
             );
@@ -163,15 +166,17 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
             style={{
               background: "none",
               border: "none",
-              padding: 0,
-              fontSize: 12,
+              padding: "4px 0",
+              fontSize: 12.5,
               fontWeight: 600,
-              color: "var(--inchiostro-50)",
+              color: "#4f46e5",
               cursor: "pointer",
-              textDecoration: "underline",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
             }}
           >
-            {showRuns ? "Nascondi storico sedute abbinate" : `Vedi le ultime ${data.paired_runs.length} sedute incrociate`}
+            <span>{showRuns ? "Nascondi storico corse & sonno" : `Vedi le ultime ${data.paired_runs.length} corse messe a confronto con la notte prima`}</span>
           </button>
 
           {showRuns && (
@@ -197,13 +202,13 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
                   <div style={{ display: "flex", gap: 12, alignItems: "center", fontFamily: "monospace" }}>
                     {r.sleep_hours != null && (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                        <MoonIcon size={11} strokeWidth={2} style={{ color: "var(--inchiostro-50)" }} />
+                        <MoonIcon size={11} strokeWidth={2} style={{ color: "#4f46e5" }} />
                         <span>{r.sleep_hours}h</span>
                       </span>
                     )}
                     {r.hrv_ms != null && (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                        <LightningIcon size={11} strokeWidth={2.2} style={{ color: "var(--inchiostro-50)" }} />
+                        <LightningIcon size={11} strokeWidth={2.2} style={{ color: "#059669" }} />
                         <span>{Math.round(r.hrv_ms)}ms</span>
                       </span>
                     )}
