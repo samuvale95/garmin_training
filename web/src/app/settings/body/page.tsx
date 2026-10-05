@@ -8,6 +8,7 @@ import { PencilIcon } from "@/components/Icons";
 import { useMountOnce } from "@/lib/motion";
 import { useBodyMetrics } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 function ageFromBirthDate(birthDate: string): number {
   const birth = new Date(birthDate);
@@ -34,6 +35,7 @@ interface EffectiveWeight {
 export default function BodySettingsPage() {
   const animate = useMountOnce("settings-body");
   const { data: metrics, isLoading } = useBodyMetrics();
+  useScreenReady(!isLoading);
   const manualWeight = usePassoStore((s) => s.manualWeight);
   const setManualWeight = usePassoStore((s) => s.setManualWeight);
   const [editing, setEditing] = useState(false);

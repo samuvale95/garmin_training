@@ -48,6 +48,7 @@ import { SkeletonTodayHero } from "@/components/skeletons";
 import { usePassoStore } from "@/lib/store";
 import { classifySession, sessionDistanceKm, shiftDateKey, toDateKey, weekBounds, workoutsToSessions, type DisplaySession } from "@/lib/sessionVisuals";
 import { capitalize, formatFullDate, groupSteps, numberToItalianWords, relativeDayLabel, stepGroupLine } from "@/lib/format";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 export function TodayView() {
   const router = useRouter();
@@ -145,6 +146,8 @@ export function TodayView() {
   // Above the early return below: a hook after it would run on some renders and not
   // others (first render is always "not ready"), which React rejects outright.
   const refreshMutation = useRefreshServerData();
+  // Ready also with neither plan nor Garmin: the guard is sending the user to /import.
+  useScreenReady(access.ready && !(liveMode && workoutsQuery.isPending), "/today");
 
   if (!access.ready || (!access.plan && !access.garminConnected)) {
     return (

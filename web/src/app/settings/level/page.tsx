@@ -7,6 +7,7 @@ import { Skeleton, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useAthleteLevel, useSetAdaptationMode } from "@/lib/queries";
 import type { AthleteLevel, LevelCriterion } from "@/lib/types";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** Screen "Livello": where you are from a first run to athlete level, and what the next
  * step asks for.
@@ -18,6 +19,7 @@ import type { AthleteLevel, LevelCriterion } from "@/lib/types";
 export default function LevelSettingsPage() {
   const animate = useMountOnce("settings-level");
   const { data, isPending, isError } = useAthleteLevel();
+  useScreenReady(!isPending);
 
   return (
     <div style={{ padding: "24px 22px 40px" }}>

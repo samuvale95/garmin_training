@@ -11,6 +11,7 @@ import { useWeekSummary, useWeekSummaryNarrative } from "@/lib/queries";
 import { shiftDateKey, toDateKey } from "@/lib/sessionVisuals";
 import { formatWeekday } from "@/lib/format";
 import type { CheckInEffort, WeekSummary } from "@/lib/types";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 const EFFORT_LABELS: [CheckInEffort, string][] = [
   ["facile", "facili"],
@@ -40,6 +41,7 @@ function SummaryContent() {
   const animate = useMountOnce("summary");
   const [monday, setMonday] = useState<string | null>(useSearchParams().get("monday"));
   const summary = useWeekSummary(monday);
+  useScreenReady(!summary.isPending);
   const shown = summary.data?.monday ?? monday;
   const narrative = useWeekSummaryNarrative(shown, !!shown);
   const canGoForward = !!shown && shown < thisMonday();

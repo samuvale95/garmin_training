@@ -13,6 +13,7 @@ import { useFoodEntries, useFuelTargetsForDates, useWeekWorkouts } from "@/lib/q
 import { usePassoStore } from "@/lib/store";
 import { classifySession, toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
 import type { FoodEntry, FuelTargets, TrainingSession } from "@/lib/types";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** How far back the diary reads. Two weeks is the window someone actually revisits. */
 const DIARY_DAYS = 14;
@@ -26,6 +27,7 @@ export default function FuelDiaryPage() {
   const sessions = access.plan ? access.plan.sessions : workoutsToSessions(workoutsQuery.data?.workouts ?? []);
 
   const entriesQuery = useFoodEntries(DIARY_DAYS);
+  useScreenReady(!entriesQuery.isLoading);
   const [correcting, setCorrecting] = useState<FoodEntry | null>(null);
 
   const entries = entriesQuery.data?.entries ?? [];

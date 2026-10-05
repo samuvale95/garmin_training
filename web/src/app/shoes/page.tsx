@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useRetireShoe, useShoes } from "@/lib/queries";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 export default function ShoesPage() {
   return (
@@ -21,6 +22,7 @@ function ShoesScreen() {
   const searchParams = useSearchParams();
   const from = searchParams.get("from") ?? "/settings";
   const shoesQuery = useShoes();
+  useScreenReady(!shoesQuery.isLoading);
   const retire = useRetireShoe();
 
   const shoes = shoesQuery.data?.shoes ?? [];

@@ -10,6 +10,7 @@ import { useMountOnce } from "@/lib/motion";
 import { useExecutionBlock, usePlanQuery } from "@/lib/queries";
 import { shiftDateKey, toDateKey } from "@/lib/sessionVisuals";
 import { formatShortDate } from "@/lib/format";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** Screen "Come ti alleni davvero": the plan's intention against the stream's verdict.
  *
@@ -43,6 +44,7 @@ export default function ExecutionPage() {
   }, [plan, today]);
 
   const query = useExecutionBlock(sessions, isHydrated);
+  useScreenReady(isHydrated && !query.isPending);
   const data = query.data;
 
   return (

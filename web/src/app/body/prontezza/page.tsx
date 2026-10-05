@@ -8,6 +8,7 @@ import { READINESS_BANDS, ReadinessFactorList, SleepPhaseLegend, readinessBand }
 import { useMountOnce } from "@/lib/motion";
 import { useBodyToday } from "@/lib/queries";
 import { formatMinutes } from "@/lib/format";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** Screen "Prontezza": what the number on the Corpo card actually is.
  *
@@ -23,6 +24,7 @@ import { formatMinutes } from "@/lib/format";
 export default function ReadinessPage() {
   const animate = useMountOnce("body-prontezza");
   const { data, isPending } = useBodyToday();
+  useScreenReady(!isPending);
 
   const score = data?.readiness_score ?? null;
   const band = score != null ? readinessBand(score) : null;

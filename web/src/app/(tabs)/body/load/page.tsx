@@ -10,6 +10,7 @@ import { AerobicEfficiencyCard } from "@/components/AerobicEfficiencyCard";
 import { useAerobicEfficiency, useBodyLoad, useFitnessFatigue, usePlanQuery } from "@/lib/queries";
 import { isoWeekNumber, sessionDistanceKm, toDateKey } from "@/lib/sessionVisuals";
 import { countdownLabel, goalTitle } from "@/lib/raceGoal";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 const ROW_HEIGHT = 100;
 
@@ -120,6 +121,7 @@ export default function LoadPage() {
   // a plan-less "ancora poco da leggere" for a beat, to someone who has a plan.
   const { data: plan, isHydrated } = usePlanQuery();
   const isPending = isLoading || !isHydrated;
+  useScreenReady(!isPending);
 
   function plannedKmForWeek(start: Date): number {
     const end = new Date(start);

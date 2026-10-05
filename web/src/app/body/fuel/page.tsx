@@ -39,6 +39,7 @@ import {
 import { usePassoStore } from "@/lib/store";
 import { shiftDateKey, toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
 import type { FoodEntry } from "@/lib/types";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 // ---- flow state: idle screen (C), or one of the photo-estimate states (D) ------------------
 
@@ -117,6 +118,7 @@ export default function FuelPage() {
   // the model calls this screen pays for.
   const sessionsReady = access.ready && (!liveMode || !workoutsQuery.isPending);
   const fuelQuery = useFuelTargets(today, sessions, manualWeight?.weightKg, sessionsReady);
+  useScreenReady(sessionsReady && (fuelQuery.isError || !!fuelQuery.data));
   const statusQuery = useFuelStatus(today, manualWeight?.weightKg, sessionsReady);
   // Level 1 builds the habit: no calorie figures while it does.
   const level = useAthleteLevel();

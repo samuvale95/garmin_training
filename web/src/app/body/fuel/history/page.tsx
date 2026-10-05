@@ -8,6 +8,7 @@ import { useCalendarAccess } from "@/lib/guards";
 import { useFoodHistory, useFuelTargetsForDates, useWeekWorkouts } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
 import { isoWeekNumber, toDateKey, weekBounds, workoutsToSessions } from "@/lib/sessionVisuals";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 const DOW_LABELS = ["lun", "mar", "mer", "gio", "ven", "sab", "dom"];
 const CHART_HEIGHT = 140;
@@ -40,6 +41,7 @@ export default function FuelHistoryPage() {
   const targetQueries = useFuelTargetsForDates(dates, sessions, manualWeight?.weightKg, sessionsReady);
 
   const isLoading = historyQuery.isLoading || targetQueries.some((q) => q.isLoading);
+  useScreenReady(sessionsReady && !isLoading);
   const historyByDate = new Map((historyQuery.data?.days ?? []).map((d) => [d.date, d]));
   const todayKey = toDateKey(new Date());
 

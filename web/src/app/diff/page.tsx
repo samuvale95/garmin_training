@@ -9,6 +9,7 @@ import { usePlanDiff, useStartSync } from "@/lib/queries";
 import { useSyncFlowStore } from "@/lib/syncFlowStore";
 import { capitalize, formatShortDate, numberToItalianWords, planStepsSummary } from "@/lib/format";
 import type { TrainingSession } from "@/lib/types";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 export default function DiffPage() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function DiffPage() {
   const markStarted = useSyncFlowStore((s) => s.markStarted);
 
   const diff = plan ? diffQuery.data : undefined;
+  useScreenReady(!!diff || diffQuery.isError);
 
   async function writeNewOnly() {
     if (!diff) return;

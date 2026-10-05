@@ -30,6 +30,7 @@ import { SkeletonDayCards } from "@/components/skeletons";
 import { sessionDistanceKm, toDateKey, weekBounds, weekOffsetFromToday } from "@/lib/sessionVisuals";
 import type { TrainingSession } from "@/lib/types";
 import { formatShortDate } from "@/lib/format";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 function formatWeekRange(start: Date, end: Date): string {
   const startMonth = start.toLocaleDateString("it-IT", { month: "short" });
@@ -255,6 +256,8 @@ export function WeekPageContent() {
   // Above the early return below: a hook after it would run on some renders and not
   // others (first render is always "not ready"), which React rejects outright.
   const refreshMutation = useRefreshServerData();
+  // Ready also with neither plan nor Garmin: the guard is sending the user to /import.
+  useScreenReady(access.ready && !(liveMode && workoutsQuery.isPending), "/week");
 
   if (!access.ready || (!access.plan && !access.garminConnected)) {
     return (

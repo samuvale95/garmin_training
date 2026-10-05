@@ -4,10 +4,12 @@ import { useParams } from "next/navigation";
 import { WorkoutEditor } from "@/components/WorkoutEditor";
 import { SkeletonEditorForm } from "@/components/skeletons";
 import { usePlanQuery } from "@/lib/queries";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 export default function EditSessionPage() {
   const params = useParams<{ id: string }>();
   const { isHydrated } = usePlanQuery();
+  useScreenReady(isHydrated);
 
   // The editor seeds its whole form -- day, title, steps -- from the plan at mount and
   // never re-reads it, so it must not be mounted before the plan has been restored from

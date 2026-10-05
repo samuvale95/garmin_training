@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { WorkoutEditor } from "@/components/WorkoutEditor";
 import { SkeletonEditorForm } from "@/components/skeletons";
 import { useWorkoutSession, useWorkoutsForDate } from "@/lib/queries";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** Editing a workout that lives only on the Garmin calendar -- the twin of
  * `session/[id]/edit`, for the case where nothing was ever imported (see
@@ -25,6 +26,7 @@ function WorkoutEditContent() {
   const workout = workoutsQuery.workouts.find((w) => String(w.scheduled_workout_id) === params.id) ?? null;
   const sessionQuery = useWorkoutSession(workout);
   const session = sessionQuery.data ?? null;
+  useScreenReady(!!(workout && session) || (!workout && !!date && workoutsQuery.isSuccess) || sessionQuery.isError);
 
   if (workout && session) {
     return <WorkoutEditor mode="garmin" workout={workout} session={session} />;

@@ -7,6 +7,7 @@ import { formatFullDate } from "@/lib/format";
 import { useMountOnce } from "@/lib/motion";
 import { useProgress } from "@/lib/queries";
 import type { Badge } from "@/lib/types";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** "Progressi": the streak, this week's Disciplina points with every reason, the badges.
  * Nothing here rewards volume (see `training_plan/progress.py`): points come from
@@ -14,6 +15,7 @@ import type { Badge } from "@/lib/types";
 export default function ProgressPage() {
   const animate = useMountOnce("progress");
   const { data, isPending, isError } = useProgress();
+  useScreenReady(!isPending);
 
   return (
     <div style={{ padding: "24px 22px 40px" }}>

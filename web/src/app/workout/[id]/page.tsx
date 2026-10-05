@@ -17,6 +17,7 @@ import {
 } from "@/lib/queries";
 import { ApiError } from "@/lib/apiClient";
 import { formatFullDate } from "@/lib/format";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** Detail view for a workout that comes straight from the Garmin calendar (no plan
  * imported -- see `web/src/app/(tabs)/week/page.tsx`'s `liveMode`). Unlike
@@ -40,6 +41,7 @@ function WorkoutDetailContent() {
 
   const sessionQuery = useWorkoutSession(workout);
   const session = sessionQuery.data ?? null;
+  useScreenReady(!!session || sessionQuery.isError || (!workout && !!date && !workoutsQuery.isPending && !workoutsQuery.isFetching));
 
   const stravaStatus = useStravaStatus();
   const matchQuery = useStravaActivityMatch(session, !!stravaStatus.data?.connected);

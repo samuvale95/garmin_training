@@ -23,6 +23,7 @@ import { toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
 import { formatFullDate, stressCaption } from "@/lib/format";
 import { usePassoStore } from "@/lib/store";
 import type { DayTarget } from "@/lib/types";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** Short teaser line for the fuel-preview card ("domani il lungo · stasera
  * carboidrati") -- the full sentence (`advice`/`narrative`) belongs to /body/fuel;
@@ -41,6 +42,7 @@ export function BodyView() {
   const refreshMutation = useRefreshServerData();
   const animate = useMountOnce("body-recovery");
   const { data, isLoading } = useBodyToday();
+  useScreenReady(!isLoading, "/body");
   const { data: correlations } = usePersonalCorrelations(90);
   const { data: aerobicEfficiency } = useAerobicEfficiency(90);
   const { data: plan } = usePlanQuery();

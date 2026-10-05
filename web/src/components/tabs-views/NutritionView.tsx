@@ -44,6 +44,7 @@ import { shiftDateKey, toDateKey, workoutsToSessions } from "@/lib/sessionVisual
 import { PullToRefresh } from "@/components/PullToRefresh";
 import type { FoodEntry } from "@/lib/types";
 import { motion } from "framer-motion";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 type Preview = { kind: "photo"; url: string } | { kind: "text"; text: string };
 
@@ -103,6 +104,7 @@ export function NutritionView() {
 
   const sessionsReady = access.ready && (!liveMode || !workoutsQuery.isPending);
   const fuelQuery = useFuelTargets(today, sessions, manualWeight?.weightKg, sessionsReady);
+  useScreenReady(sessionsReady && (fuelQuery.isError || !!fuelQuery.data), "/nutrition");
   const statusQuery = useFuelStatus(today, manualWeight?.weightKg, sessionsReady);
   const level = useAthleteLevel();
   const showEnergy = (level.data?.level ?? 2) > 1;

@@ -27,11 +27,13 @@ import {
 import { normalizeTitle } from "@/lib/sessionVisuals";
 import { formatWeekday } from "@/lib/format";
 import type { TrainingSession } from "@/lib/types";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 export default function SessionDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { plan, isHydrated } = useRequirePlan();
+  useScreenReady(isHydrated);
   const animate = useMountOnce(`session-${params.id}`);
   const updateSession = useUpdateSession();
   const removeSession = useRemoveSession();

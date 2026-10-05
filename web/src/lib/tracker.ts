@@ -55,6 +55,9 @@ let serverDisabled = false;
 let flushing = false;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let installed = false;
+/** The last token a flush got. Leaving the app has to send *now*: awaiting a fresh token
+ * first gives a phone time to freeze the page before the request ever leaves. */
+let lastToken: string | null = null;
 
 function storage(): Storage | null {
   try {
@@ -119,14 +122,16 @@ function scheduleFlush(): void {
 /** Sends the queue. Events leave the queue only once the server has acknowledged them, so
  * a failed or offline send just keeps them for the next attempt. `keepalive` lets the
  * request outlive a closing page -- `sendBeacon` cannot carry the auth header. */
-export async function flush(): Promise<void> {
+export async function flush(urgent = false): Promise<void> {
   if (flushing || queue.length === 0 || !isTrackingEnabled()) return;
   if (typeof navigator !== "undefined" && navigator.onLine === false) return;
   flushing = true;
   const batch = queue.slice(0, MAX_BATCH);
   try {
-    const token = await getAccessToken();
+    // An expired cached token only costs a 401, which keeps the queue (below).
+    const token = urgent && lastToken ? lastToken : await getAccessToken();
     if (!token) return;
+    lastToken = token;
     const response = await fetch(new URL("/events/batch", API_BASE_URL), {
       method: "POST",
       keepalive: true,
@@ -139,10 +144,11 @@ export async function flush(): Promise<void> {
         user_agent: typeof navigator === "undefined" ? undefined : navigator.userAgent.slice(0, 120),
       }),
     });
+    if (response.status === 401) lastToken = null;
     if (response.headers.get("x-tracking-disabled")) {
       serverDisabled = true;
       queue = [];
-    } else if (response.ok || (response.status >= 400 && response.status < 500 && response.status !== 429)) {
+    } else if (response.ok || (response.status >= 400 && response.status < 500 && response.status !== 429 && response.status !== 401)) {
       // A 4xx other than rate limiting will never succeed on retry: drop rather than loop.
       queue = queue.slice(batch.length);
     }
@@ -272,6 +278,28 @@ const ALERT_SELECTOR = '[role="alert"]';
 
 /** The screen being loaded: from its `screen_view` until its last skeleton goes away. */
 let screenLoad: { path: string; startedAt: number; sawLoading: boolean; clearSince: number | null; done: boolean } | null = null;
+/** Screens that say for themselves when their content is up (`useScreenReady`): path ->
+ * the moment it became ready, or null while it is still loading. Wins over the DOM
+ * heuristic, which cannot tell a blank screen from a loaded one. */
+const declaredScreens = new Map<string, number | null>();
+
+export function declareScreen(path: string): void {
+  if (!declaredScreens.has(path)) declaredScreens.set(path, null);
+}
+
+export function undeclareScreen(path: string): void {
+  declaredScreens.delete(path);
+}
+
+export function setScreenReady(path: string, ready: boolean): void {
+  if (!ready) declaredScreens.set(path, null);
+  else if (declaredScreens.get(path) == null) declaredScreens.set(path, Date.now());
+}
+
+/** Whether the current screen is still waiting on its content. */
+function stillLoading(load: NonNullable<typeof screenLoad>): boolean {
+  return declaredScreens.has(load.path) ? declaredScreens.get(load.path) == null : load.sawLoading;
+}
 const busySince = new Map<Element, { since: number; target: string }>();
 const shownAlerts = new WeakMap<Element, string>();
 let watchTimer: ReturnType<typeof setInterval> | null = null;
@@ -293,7 +321,7 @@ export function startScreenLoad(path: string): void {
 }
 
 function endScreenLoad(reason: "navigate" | "background"): void {
-  if (screenLoad && !screenLoad.done && screenLoad.sawLoading) {
+  if (screenLoad && !screenLoad.done && stillLoading(screenLoad)) {
     track("load_abandon", screenLoad.path, { ms: Date.now() - screenLoad.startedAt, reason });
   }
   screenLoad = null;
@@ -308,7 +336,15 @@ function watch(): void {
   if (!isTrackingEnabled() || document.visibilityState === "hidden") return;
   const now = Date.now();
 
-  if (screenLoad && !screenLoad.done) {
+  if (screenLoad && !screenLoad.done && declaredScreens.has(screenLoad.path)) {
+    const readyAt = declaredScreens.get(screenLoad.path);
+    if (readyAt != null) {
+      screenLoad.done = true;
+      // Ready before the route change finished (a tab kept mounted, data from cache): 0.
+      const ms = Math.max(0, readyAt - screenLoad.startedAt);
+      track("screen_ready", screenLoad.path, { ms, skeleton: ms > 0, method: "explicit" });
+    }
+  } else if (screenLoad && !screenLoad.done) {
     if (document.querySelector(LOADING_SELECTOR)) {
       screenLoad.sawLoading = true;
       screenLoad.clearSince = null;
@@ -321,6 +357,7 @@ function watch(): void {
       track("screen_ready", screenLoad.path, {
         ms: screenLoad.clearSince - screenLoad.startedAt,
         skeleton: screenLoad.sawLoading,
+        method: "heuristic",
       });
     }
   }
@@ -407,7 +444,7 @@ function onVisibility(): void {
     stopWatching();
     track("app_background", undefined, { duration_ms: Date.now() - foregroundSince });
     persist();
-    void flush();
+    void flush(true);
   } else {
     foregroundSince = Date.now();
     startWatching();

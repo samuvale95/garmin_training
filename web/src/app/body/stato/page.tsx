@@ -12,6 +12,7 @@ import { useBodyToday, useDayVerdict, useDayVerdictNarrative, useRaceGoal, useUp
 import { shiftDateKey, toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
 import { countdownLabel, goalTitle } from "@/lib/raceGoal";
 import { isRepeatBlock, type DayVerdict, type DaySignal, type SessionStep, type TrainingSession } from "@/lib/types";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 const SEVERITY_STYLE: Record<string, { background: string; color: string; label: string }> = {
   forte: { background: "var(--rosa-avviso)", color: "var(--rosso-testo)", label: "forte" },
@@ -108,6 +109,7 @@ export default function DayStatePage() {
   const updateSession = useUpdateSession();
 
   const verdict = verdictQuery.data;
+  useScreenReady(!!verdict || verdictQuery.isError);
 
   /** The three edits the alternatives can ask for. Only a plan session can be rewritten
    * -- a live Garmin calendar entry has no steps here to soften, so that case offers

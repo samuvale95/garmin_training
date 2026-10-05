@@ -11,6 +11,7 @@ import { ZoneRecalibrationCard } from "@/components/ZoneRecalibrationCard";
 import { useMountOnce } from "@/lib/motion";
 import { useCoachPlan, useZoneRecalibration } from "@/lib/queries";
 import { formatShortDate } from "@/lib/format";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** Screen "Come ti alleni": the diagnosis, and the sessions that change it.
  *
@@ -25,6 +26,7 @@ import { formatShortDate } from "@/lib/format";
 export default function CoachTrainingPage() {
   const animate = useMountOnce("coach-allenarsi");
   const { data, isPending, isError, refetch, isFetching } = useCoachPlan();
+  useScreenReady(!isPending);
   const { data: recalibration } = useZoneRecalibration(70);
 
   return (

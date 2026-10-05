@@ -11,6 +11,7 @@ import { useActivities, useActivityForm, useCoachNarrative, useSportTrend } from
 import { shiftDateKey, toDateKey } from "@/lib/sessionVisuals";
 import { formatPaceOrDash, formatShortDate } from "@/lib/format";
 import type { CompletedActivity } from "@/lib/types";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** Screen "Tecnica": how the last sessions were actually *done*, not how much of them
  * there was.
@@ -59,6 +60,7 @@ export default function CoachPage() {
   const formQuery = useActivityForm(activityId);
   const narrativeQuery = useCoachNarrative(activityId, !!formQuery.data?.has_metrics);
   const form = formQuery.data;
+  useScreenReady(!activitiesQuery.isPending && (readable.length === 0 || !formQuery.isPending));
 
   // The trend follows the *selected session's own sport*, not whatever sport the last
   // activity happened to be: comparing a run's cadence against a ride's would be
