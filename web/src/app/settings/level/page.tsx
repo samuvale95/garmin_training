@@ -33,7 +33,7 @@ export default function LevelSettingsPage() {
       {isPending ? (
         <Skeleton height={160} radius={27} />
       ) : isError || !data ? (
-        <p className="font-serif-italic" style={{ fontSize: 14.5, color: "var(--inchiostro-70)" }}>
+        <p role="alert" className="font-serif-italic" style={{ fontSize: 14.5, color: "var(--inchiostro-70)" }}>
           Non sono riuscito a calcolare il tuo livello. Riprova fra un momento.
         </p>
       ) : (

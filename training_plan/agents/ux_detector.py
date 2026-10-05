@@ -23,10 +23,12 @@ MIN_VIEWS = 5
 SLOW_HESITATION_MS = 8000
 MIN_API_PROBLEMS = 5
 MAX_FALLBACK_SHARE = 0.10
+MIN_LOAD_ABANDONS = 3
+SLOW_SCREEN_P95_MS = 8000
 MAX_ANOMALIES = 10
 
 # How bad each kind is, for ordering only: a broken endpoint beats a slow decision.
-WEIGHT = {"api": 4, "rage_tap": 3, "tap_disabled": 3, "flow_abandon": 3, "dead_tap": 2, "hesitation": 1, "coverage": 1}
+WEIGHT = {"slow_screen": 4, "api": 4, "rage_tap": 3, "tap_disabled": 3, "flow_abandon": 3, "dead_tap": 2, "hesitation": 1, "coverage": 1}
 
 
 def _num(value: Any) -> float:
@@ -102,6 +104,25 @@ def find_anomalies(views: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any
                 }
             )
 
+    for row in views.get("ux_screen_load", []):
+        abandoned = row["abandoned"] or 0
+        p95 = row.get("p95_ms")
+        slow = (row["loads"] or 0) >= MIN_VIEWS and p95 is not None and _num(p95) >= SLOW_SCREEN_P95_MS
+        if abandoned >= MIN_LOAD_ABANDONS or slow:
+            found.append(
+                {
+                    "kind": "slow_screen",
+                    "key": f"slow_screen:{row['screen']}",
+                    "week": row["week"],
+                    "target": row["screen"],
+                    "loads": row["loads"],
+                    "abandoned": abandoned,
+                    "median_ms": round(_num(row.get("median_ms"))),
+                    "p95_ms": round(_num(p95)),
+                    "score": WEIGHT["slow_screen"] * (abandoned + (row["loads"] or 0) * slow),
+                }
+            )
+
     for row in views.get("ux_tracking_coverage", []):
         if row["taps"] >= MIN_EVENTS and _num(row["fallback_share"]) > MAX_FALLBACK_SHARE:
             found.append(
@@ -122,7 +143,14 @@ def find_anomalies(views: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any
 def run(ctx: AgentContext) -> dict:
     views = {
         name: ctx.read_view(name, since_weeks=2)
-        for name in ("ux_weekly_frustration", "ux_flow_funnel", "ux_screen_hesitation", "ux_api_health", "ux_tracking_coverage")
+        for name in (
+            "ux_weekly_frustration",
+            "ux_flow_funnel",
+            "ux_screen_hesitation",
+            "ux_api_health",
+            "ux_tracking_coverage",
+            "ux_screen_load",
+        )
     }
     anomalies = find_anomalies(views)
     return {

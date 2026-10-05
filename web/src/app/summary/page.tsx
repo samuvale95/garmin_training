@@ -69,7 +69,7 @@ function SummaryContent() {
       {summary.isPending ? (
         <Skeleton height={180} radius={27} />
       ) : summary.isError || !summary.data ? (
-        <p className="font-serif-italic" style={{ fontSize: 14.5, color: "var(--inchiostro-70)" }}>
+        <p role="alert" className="font-serif-italic" style={{ fontSize: 14.5, color: "var(--inchiostro-70)" }}>
           Non sono riuscito a leggere la settimana. Riprova fra un momento.
         </p>
       ) : (

@@ -14,7 +14,8 @@ export type EventType =
   | "tab_change" | "screen_view" | "modal_open" | "modal_close"
   | "flow_start" | "flow_step" | "flow_complete" | "flow_abandon"
   | "scroll_depth" | "api_error" | "slow_response" | "ui_error"
-  | "app_foreground" | "app_background";
+  | "app_foreground" | "app_background"
+  | "screen_ready" | "load_abandon" | "long_loading" | "error_shown";
 
 interface TrackedEvent {
   event_type: EventType;
@@ -36,6 +37,12 @@ const RAGE_TAPS = 3;
 const RAGE_WINDOW_MS = 1000;
 const TAP_SLOP_PX = 10;
 const SLOW_RESPONSE_MS = 3000;
+const WATCH_EVERY_MS = 250;
+/** A loading button worth reporting: past this it is a wait, not a blink. */
+const LONG_LOADING_MS = 5000;
+/** How long a screen must stay free of loading states to count as ready: a screen often
+ * renders blank for a moment before its skeleton, and that blank is not "loaded". */
+const READY_STABLE_MS = 500;
 
 /** Build-time kill switch: `NEXT_PUBLIC_TRACKING=off`. The server has its own (it answers
  * with `x-tracking-disabled`), which needs a restart but no rebuild. */
@@ -253,6 +260,100 @@ function onClickGuard(event: MouseEvent): void {
   }
 }
 
+// ---- what the user waits on and what they are told ------------------------------------
+//
+// Read off the DOM, not wired into each screen: every loading state in the app draws one
+// of the two shimmer primitives, and every busy button carries `dis(..., "in_caricamento")`,
+// so one poll sees them all -- including on screens written after this.
+
+const LOADING_SELECTOR = ".anim-clay-shimmer, .anim-sheen";
+const BUSY_BUTTON_SELECTOR = '[data-disabled-reason="in_caricamento"]';
+const ALERT_SELECTOR = '[role="alert"]';
+
+/** The screen being loaded: from its `screen_view` until its last skeleton goes away. */
+let screenLoad: { path: string; startedAt: number; sawLoading: boolean; clearSince: number | null; done: boolean } | null = null;
+const busySince = new Map<Element, { since: number; target: string }>();
+const shownAlerts = new WeakMap<Element, string>();
+let watchTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Error copy as the user read it. Digits masked, like tap labels: a message can quote a
+ * weight or a pace. */
+function alertText(el: Element): string {
+  return (el.textContent ?? "").replace(/\s+/g, " ").trim().replace(/\d+/g, "#").slice(0, 160);
+}
+
+/** A new screen: closes the previous one's load (abandoned if it never finished) and
+ * starts timing this one. Called on every route change. */
+export function startScreenLoad(path: string): void {
+  endScreenLoad("navigate");
+  for (const [, busy] of busySince) reportBusy(busy, false);
+  busySince.clear();
+  screenLoad = { path, startedAt: Date.now(), sawLoading: false, clearSince: null, done: false };
+  watch();
+}
+
+function endScreenLoad(reason: "navigate" | "background"): void {
+  if (screenLoad && !screenLoad.done && screenLoad.sawLoading) {
+    track("load_abandon", screenLoad.path, { ms: Date.now() - screenLoad.startedAt, reason });
+  }
+  screenLoad = null;
+}
+
+function reportBusy(busy: { since: number; target: string }, resolved: boolean): void {
+  const ms = Date.now() - busy.since;
+  if (ms >= LONG_LOADING_MS) track("long_loading", busy.target, { ms, resolved });
+}
+
+function watch(): void {
+  if (!isTrackingEnabled() || document.visibilityState === "hidden") return;
+  const now = Date.now();
+
+  if (screenLoad && !screenLoad.done) {
+    if (document.querySelector(LOADING_SELECTOR)) {
+      screenLoad.sawLoading = true;
+      screenLoad.clearSince = null;
+    } else if (screenLoad.clearSince === null) {
+      screenLoad.clearSince = now;
+    } else if (now - screenLoad.clearSince >= READY_STABLE_MS) {
+      screenLoad.done = true;
+      // Ready from the moment the loading states went away, not from when that was
+      // confirmed. `skeleton: false` is a screen that painted straight from cache.
+      track("screen_ready", screenLoad.path, {
+        ms: screenLoad.clearSince - screenLoad.startedAt,
+        skeleton: screenLoad.sawLoading,
+      });
+    }
+  }
+
+  const busyNow = new Set(document.querySelectorAll(BUSY_BUTTON_SELECTOR));
+  for (const el of busyNow) {
+    if (!busySince.has(el)) busySince.set(el, { since: now, target: trackName(el, el) });
+  }
+  for (const [el, busy] of busySince) {
+    if (!busyNow.has(el)) {
+      reportBusy(busy, true);
+      busySince.delete(el);
+    }
+  }
+
+  for (const el of document.querySelectorAll(ALERT_SELECTOR)) {
+    const text = alertText(el);
+    if (text && shownAlerts.get(el) !== text) {
+      shownAlerts.set(el, text);
+      track("error_shown", trackName(el, el), { message: text });
+    }
+  }
+}
+
+function startWatching(): void {
+  if (!watchTimer) watchTimer = setInterval(watch, WATCH_EVERY_MS);
+}
+
+function stopWatching(): void {
+  if (watchTimer) clearInterval(watchTimer);
+  watchTimer = null;
+}
+
 // ---- tabs, scroll, app lifecycle ----------------------------------------------------
 
 let tabMethod: "tap" | "swipe" | null = null;
@@ -298,11 +399,18 @@ let foregroundSince = 0;
 
 function onVisibility(): void {
   if (document.visibilityState === "hidden") {
+    // Leaving while a screen still loads is the "it never loads" signal; a busy button
+    // still spinning is reported unresolved. Both restart on the next screen.
+    endScreenLoad("background");
+    for (const [, busy] of busySince) reportBusy(busy, false);
+    busySince.clear();
+    stopWatching();
     track("app_background", undefined, { duration_ms: Date.now() - foregroundSince });
     persist();
     void flush();
   } else {
     foregroundSince = Date.now();
+    startWatching();
     track("app_foreground");
     void flush();
   }
@@ -362,10 +470,12 @@ export function installTracker(): () => void {
   window.addEventListener("unhandledrejection", onRejection);
 
   track("app_foreground");
+  startWatching();
   void flush();
 
   return () => {
     installed = false;
+    stopWatching();
     document.removeEventListener("pointerdown", onPointerDown, { capture: true });
     document.removeEventListener("pointerup", onPointerUp, { capture: true });
     document.removeEventListener("click", onClickGuard, { capture: true });

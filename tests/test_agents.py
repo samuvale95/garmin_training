@@ -206,6 +206,18 @@ def test_detector_ignores_noise_and_keeps_spread_patterns():
     assert not any("div:Ritmo" in k or "x.save" in k for k in keys)
 
 
+def test_detector_flags_screens_users_give_up_on():
+    views = {
+        "ux_screen_load": [
+            {"week": WEEK, "screen": "/body/fuel", "loads": 2, "abandoned": 4, "median_ms": 9000, "p95_ms": 24000, "from_cache": 0},
+            {"week": WEEK, "screen": "/week", "loads": 20, "abandoned": 0, "median_ms": 1200, "p95_ms": 9500, "from_cache": 10},
+            {"week": WEEK, "screen": "/today", "loads": 20, "abandoned": 1, "median_ms": 800, "p95_ms": 2000, "from_cache": 15},
+        ],
+    }
+    keys = [a["key"] for a in ux_detector.find_anomalies(views)]
+    assert keys == ["slow_screen:/week", "slow_screen:/body/fuel"]
+
+
 def test_detector_runs_without_a_model(fake, monkeypatch):
     called = []
     monkeypatch.setattr(llm, "chat_with_usage", lambda *a, **k: called.append(1))

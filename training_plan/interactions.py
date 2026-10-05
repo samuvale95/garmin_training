@@ -44,6 +44,10 @@ EVENT_TYPES: frozenset[str] = frozenset(
         "ui_error",
         "app_foreground",
         "app_background",
+        "screen_ready",
+        "load_abandon",
+        "long_loading",
+        "error_shown",
     }
 )
 
@@ -177,6 +181,24 @@ SELECT
     mode() WITHIN GROUP (ORDER BY metadata->>'status') AS top_status
 FROM interaction_events
 WHERE event_type IN ('api_error', 'slow_response')
+GROUP BY 1, 2;
+
+-- How long each screen takes to show its content, and how often the user gives up
+-- first. `screen_ready` with `skeleton = false` painted from cache; a `load_abandon` is
+-- a screen left (or the app backgrounded) while its skeleton was still up.
+CREATE OR REPLACE VIEW ux_screen_load AS
+SELECT
+    date_trunc('week', occurred_at)::date AS week,
+    target AS screen,
+    count(*) FILTER (WHERE event_type = 'screen_ready') AS loads,
+    count(*) FILTER (WHERE event_type = 'load_abandon') AS abandoned,
+    percentile_cont(0.5) WITHIN GROUP (ORDER BY (metadata->>'ms')::numeric)
+        FILTER (WHERE event_type = 'screen_ready' AND metadata->>'skeleton' = 'true') AS median_ms,
+    percentile_cont(0.95) WITHIN GROUP (ORDER BY (metadata->>'ms')::numeric)
+        FILTER (WHERE event_type = 'screen_ready' AND metadata->>'skeleton' = 'true') AS p95_ms,
+    count(*) FILTER (WHERE event_type = 'screen_ready' AND metadata->>'skeleton' = 'false') AS from_cache
+FROM interaction_events
+WHERE event_type IN ('screen_ready', 'load_abandon')
 GROUP BY 1, 2;
 
 -- Share of taps whose target is a fallback (`tag` or `tag:text`) rather than a

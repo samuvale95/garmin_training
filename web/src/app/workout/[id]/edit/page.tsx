@@ -36,7 +36,7 @@ function WorkoutEditContent() {
     return (
       <div style={{ minHeight: "100dvh", background: "var(--crema)", padding: 22 }}>
         <PageHeader backHref="/week" />
-        <p style={{ marginTop: 16 }}>
+        <p role="alert" style={{ marginTop: 16 }}>
           {notFound ? "Allenamento non trovato." : "Non sono riuscito a leggere questo allenamento."}
         </p>
       </div>

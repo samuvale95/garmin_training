@@ -37,6 +37,7 @@ READABLE_VIEWS: frozenset[str] = frozenset(
         "ux_screen_usage",
         "ux_api_health",
         "ux_tracking_coverage",
+        "ux_screen_load",
     }
 )
 CATEGORIES = ("ui_config", "code", "training_algorithm")

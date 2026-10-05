@@ -29,7 +29,7 @@ export default function ProgressPage() {
       {isPending ? (
         <Skeleton height={200} radius={27} />
       ) : isError || !data ? (
-        <p className="font-serif-italic" style={{ fontSize: 14.5, color: "var(--inchiostro-70)" }}>
+        <p role="alert" className="font-serif-italic" style={{ fontSize: 14.5, color: "var(--inchiostro-70)" }}>
           Non sono riuscito a calcolare i progressi. Riprova fra un momento.
         </p>
       ) : (

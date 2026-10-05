@@ -174,7 +174,7 @@ function Empty({ title, body, href, cta }: { title: string; body: string; href: 
  * send the athlete off to fix a Garmin connection that is fine. */
 function Failed({ onRetry, retrying }: { onRetry: () => void; retrying: boolean }) {
   return (
-    <div style={{ marginTop: 18 }}>
+    <div style={{ marginTop: 18 }} role="alert">
       <div style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card-lg)", padding: 20 }}>
         <p style={{ fontWeight: 600, fontSize: 15.5, margin: 0 }}>Non sono riuscito a leggere il tuo storico</p>
         <p className="font-serif-italic" style={{ fontSize: 14.5, color: "var(--inchiostro-70)", margin: "8px 0 0", lineHeight: 1.4 }}>

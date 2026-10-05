@@ -255,7 +255,7 @@ export function NutritionView() {
         </header>
 
         {fuelQuery.isError ? (
-          <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 20, marginTop: 18, border: "var(--border-airbnb)", textAlign: "center" }}>
+          <div role="alert" style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 20, marginTop: 18, border: "var(--border-airbnb)", textAlign: "center" }}>
             <p style={{ fontWeight: 700, fontSize: 16, margin: "0 0 6px" }}>Non riusciamo a caricare il carburante</p>
             <p className="font-serif-italic" style={{ fontSize: 13.5, color: "var(--inchiostro-70)", margin: "0 0 16px" }}>
               Si è verificato un problema di connessione con i dati di alimentazione.

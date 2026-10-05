@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { consumeTabMethod, installTracker, resetScrollDepth, track } from "@/lib/tracker";
+import { consumeTabMethod, installTracker, resetScrollDepth, startScreenLoad, track } from "@/lib/tracker";
 
 const TAB_PATHS = ["/today", "/week", "/body", "/nutrition"];
 
@@ -23,6 +23,7 @@ export function TrackerProvider() {
     previous.current = pathname;
     resetScrollDepth();
     track("screen_view", pathname, from ? { referrer: from } : undefined);
+    startScreenLoad(pathname);
     const fromTab = from && tabOf(from);
     const toTab = tabOf(pathname);
     if (fromTab && toTab && fromTab !== toTab) {
