@@ -241,3 +241,49 @@ def test_cron_needs_the_secret(client, monkeypatch):
     assert client.post("/agents/cron", headers={"x-cron-secret": "nope"}).status_code == 401
     response = client.post("/agents/cron", headers={"x-cron-secret": "s3cret"})
     assert response.status_code == 202 and response.json() == {"started": ["ux_detector"]}
+
+
+# ---- admins by email ------------------------------------------------------------------
+
+from training_plan import admins  # noqa: E402
+
+
+def test_admin_by_email_from_token(client, monkeypatch):
+    monkeypatch.setenv("PASSO_ADMIN_USER_IDS", "")
+    monkeypatch.setenv("DEV_AUTH_BYPASS_EMAIL", "Friend@Example.com")
+    seen = []
+    monkeypatch.setattr(admins, "is_admin", lambda user_id, email: seen.append(email) or email == "friend@example.com")
+    assert client.get("/admin/me").json() == {"is_admin": True}
+    assert seen == ["friend@example.com"]
+
+
+def test_add_and_remove_admin(client, monkeypatch):
+    monkeypatch.setenv("PASSO_ADMIN_USER_IDS", "me")
+    monkeypatch.setenv("DEV_AUTH_BYPASS_EMAIL", "me@example.com")
+    table: dict[str, dict] = {}
+    monkeypatch.setattr(
+        admins, "add",
+        lambda email, added_by: table.setdefault(
+            admins.normalize(email), {"email": admins.normalize(email), "added_by": added_by, "added_at": datetime(2026, 10, 5, tzinfo=timezone.utc)}
+        ),
+    )
+    monkeypatch.setattr(admins, "remove", lambda email: table.pop(email.strip().lower(), None) is not None)
+    monkeypatch.setattr(admins, "list_admins", lambda: list(table.values()))
+
+    added = client.post("/admin/admins", json={"email": " Coach@Example.com "})
+    assert added.status_code == 200 and added.json()["email"] == "coach@example.com"
+    assert added.json()["added_by"] == "me@example.com"
+    listed = client.get("/admin/admins").json()
+    assert listed["bootstrap_count"] == 1 and [a["email"] for a in listed["admins"]] == ["coach@example.com"]
+
+    assert client.post("/admin/admins", json={"email": "not-an-email"}).status_code == 422
+    assert client.delete("/admin/admins/me@example.com").status_code == 422
+    assert client.delete("/admin/admins/coach@example.com").status_code == 200
+    assert client.delete("/admin/admins/coach@example.com").status_code == 404
+
+
+def test_non_admin_cannot_manage_admins(client, monkeypatch):
+    monkeypatch.setenv("PASSO_ADMIN_USER_IDS", "someone-else")
+    monkeypatch.delenv("DEV_AUTH_BYPASS_EMAIL", raising=False)
+    assert client.post("/admin/admins", json={"email": "me@example.com"}).status_code == 403
+    assert client.get("/admin/admins").status_code == 403

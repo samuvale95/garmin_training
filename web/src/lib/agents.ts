@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost, apiPut } from "./apiClient";
+import { apiDelete, apiGet, apiPost, apiPut } from "./apiClient";
 
 /** Admin-only: the agents' settings, runs and proposals (see `api/routes_agents.py`). */
 
@@ -125,6 +125,36 @@ export function useDecideProposal() {
   return useMutation({
     mutationFn: ({ id, status, note }: { id: number; status: ProposalStatus; note?: string }) =>
       apiPost<{ id: number; status: ProposalStatus }>(`/admin/agents/proposals/${id}/decision`, { status, note }),
+    onSuccess: invalidate,
+  });
+}
+
+export interface AdminEntry {
+  email: string;
+  added_by: string | null;
+  added_at: string;
+}
+
+export function useAdmins() {
+  return useQuery({
+    queryKey: ["admin-agents", "admins"],
+    queryFn: ({ signal }) => apiGet<{ bootstrap_count: number; admins: AdminEntry[] }>("/admin/admins", undefined, signal),
+    ...live,
+  });
+}
+
+export function useAddAdmin() {
+  const invalidate = useInvalidateAgents();
+  return useMutation({
+    mutationFn: (email: string) => apiPost<AdminEntry>("/admin/admins", { email }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRemoveAdmin() {
+  const invalidate = useInvalidateAgents();
+  return useMutation({
+    mutationFn: (email: string) => apiDelete<{ removed: string }>(`/admin/admins/${encodeURIComponent(email)}`),
     onSuccess: invalidate,
   });
 }

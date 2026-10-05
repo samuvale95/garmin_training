@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 
 import jwt
-from fastapi import Header
+from fastapi import Depends, Header
 
 # Supabase's default audience for access tokens; rejecting anything else keeps a token
 # minted for a different purpose (e.g. a Supabase service-role key) from passing here.
@@ -44,11 +44,11 @@ def _jwks_client_instance() -> jwt.PyJWKClient:
     return _jwks_client
 
 
-def current_user_id(authorization: str | None = Header(default=None)) -> str:
-    """The Supabase user id (`sub`) behind this request's bearer token.
+def current_claims(authorization: str | None = Header(default=None)) -> dict:
+    """The verified identity behind this request's bearer token: `sub` and `email`.
 
-    Every gated route depends on this, so an anonymous or forged request never reaches
-    a handler at all -- there is no per-route auth check to forget.
+    FastAPI caches a dependency per request, so `current_user_id` and
+    `current_user_email` below share one verification.
     """
     # Local-dev escape hatch: skips Google sign-in entirely when there's no Supabase
     # project configured yet. Only kicks in when someone deliberately sets this var --
@@ -56,13 +56,13 @@ def current_user_id(authorization: str | None = Header(default=None)) -> str:
     # unauthenticated as the same fixed user.
     dev_bypass_user_id = os.getenv("DEV_AUTH_BYPASS_USER_ID")
     if dev_bypass_user_id:
-        return dev_bypass_user_id
+        return {"sub": dev_bypass_user_id, "email": os.getenv("DEV_AUTH_BYPASS_EMAIL")}
 
     if not authorization or not authorization.startswith("Bearer "):
         raise AuthError("Missing or malformed Authorization header")
     token = authorization.removeprefix("Bearer ").strip()
     if token == "dev-athlete":
-        return "dev-athlete"
+        return {"sub": "dev-athlete", "email": None}
 
     try:
         signing_key = _jwks_client_instance().get_signing_key_from_jwt(token)
@@ -75,4 +75,21 @@ def current_user_id(authorization: str | None = Header(default=None)) -> str:
     user_id = payload.get("sub")
     if not isinstance(user_id, str) or not user_id:
         raise AuthError("Token has no subject")
-    return user_id
+    email = payload.get("email")
+    return {"sub": user_id, "email": email if isinstance(email, str) and email else None}
+
+
+def current_user_id(claims: dict = Depends(current_claims)) -> str:
+    """The Supabase user id (`sub`) behind this request's bearer token.
+
+    Every gated route depends on this, so an anonymous or forged request never reaches
+    a handler at all -- there is no per-route auth check to forget.
+    """
+    return claims["sub"]
+
+
+def current_user_email(claims: dict = Depends(current_claims)) -> str | None:
+    """The signed-in user's email, lowercased, as Supabase signed it into the token --
+    never as the client claims it. None for the dev identities."""
+    email = claims.get("email")
+    return email.strip().lower() if email else None

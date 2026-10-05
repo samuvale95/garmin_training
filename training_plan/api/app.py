@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .. import checkin, db, history, interactions, move_check, plan_adaptation, plan_store
+from .. import admins, checkin, db, history, interactions, move_check, plan_adaptation, plan_store
 from ..agents import store as agent_store
 from ..garmin_sync import GarminRateLimitError, GarminSyncError
 from ..parser import TrainingPlanValidationError
@@ -74,6 +74,7 @@ def _ensure_schema() -> None:
     plan_adaptation.ensure_schema()
     interactions.ensure_schema()
     agent_store.ensure_schema()
+    admins.ensure_schema()
     # Raw interaction events live 60 days; trimming at startup is enough for a one-person app.
     try:
         interactions.purge_old()

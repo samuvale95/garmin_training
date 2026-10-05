@@ -1,7 +1,7 @@
 """Agents: the admin page's endpoints, and the scheduler's.
 
-Admin endpoints need a signed-in caller listed in `PASSO_ADMIN_USER_IDS` (comma-separated
-Supabase user ids): proposals are about the app, not about one athlete, so they are not
+Admin endpoints need a signed-in admin (see `admins.py`: bootstrap ids from
+`PASSO_ADMIN_USER_IDS`, plus emails added from the admin page): proposals are about the app, not about one athlete, so they are not
 scoped per user. The scheduler endpoint (`/agents/cron`) is not behind the JWT gate --
 an external cron has no user session -- and takes a shared secret instead.
 """
@@ -14,31 +14,53 @@ import os
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 
+from .. import admins
 from ..agents import runtime, store
 from . import schemas
-from .auth import current_user_id
+from .auth import current_user_email, current_user_id
 
 router = APIRouter()
 cron_router = APIRouter()
 
 
-def _admin_ids() -> set[str]:
-    return {item.strip() for item in os.getenv("PASSO_ADMIN_USER_IDS", "").split(",") if item.strip()}
-
-
-def is_admin(user_id: str) -> bool:
-    return user_id in _admin_ids()
-
-
-def require_admin(user_id: str = Depends(current_user_id)) -> str:
-    if not is_admin(user_id):
+async def require_admin(
+    user_id: str = Depends(current_user_id), email: str | None = Depends(current_user_email)
+) -> str:
+    if not await run_in_threadpool(admins.is_admin, user_id, email):
         raise HTTPException(status_code=403, detail="Solo per l'amministratore")
     return user_id
 
 
 @router.get("/admin/me", response_model=schemas.AdminMe)
-async def admin_me(user_id: str = Depends(current_user_id)) -> schemas.AdminMe:
-    return schemas.AdminMe(is_admin=is_admin(user_id))
+async def admin_me(
+    user_id: str = Depends(current_user_id), email: str | None = Depends(current_user_email)
+) -> schemas.AdminMe:
+    return schemas.AdminMe(is_admin=await run_in_threadpool(admins.is_admin, user_id, email))
+
+
+@router.get("/admin/admins", response_model=schemas.AdminsOut, dependencies=[Depends(require_admin)])
+async def list_admins() -> schemas.AdminsOut:
+    rows = await run_in_threadpool(admins.list_admins)
+    return schemas.AdminsOut(bootstrap_count=len(admins.bootstrap_ids()), admins=[schemas.AdminOut(**row) for row in rows])
+
+
+@router.post("/admin/admins", response_model=schemas.AdminOut, dependencies=[Depends(require_admin)])
+async def add_admin(payload: schemas.AdminIn, email: str | None = Depends(current_user_email)) -> schemas.AdminOut:
+    try:
+        row = await run_in_threadpool(admins.add, payload.email, email)
+    except admins.InvalidEmail as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return schemas.AdminOut(**row)
+
+
+@router.delete("/admin/admins/{target}", dependencies=[Depends(require_admin)])
+async def remove_admin(target: str, email: str | None = Depends(current_user_email)) -> dict:
+    # Removing yourself is how an admin locks themselves out by mistake; ask another admin.
+    if email and target.strip().lower() == email:
+        raise HTTPException(status_code=422, detail="Non puoi rimuovere te stesso")
+    if not await run_in_threadpool(admins.remove, target):
+        raise HTTPException(status_code=404, detail="Non è un amministratore")
+    return {"removed": target.strip().lower()}
 
 
 def _settings_out() -> schemas.AgentSettingsOut:

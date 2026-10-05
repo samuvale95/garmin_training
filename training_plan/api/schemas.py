@@ -388,6 +388,22 @@ class AdminMe(BaseModel):
     is_admin: bool
 
 
+class AdminIn(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+
+
+class AdminOut(BaseModel):
+    email: str
+    added_by: str | None
+    added_at: datetime
+
+
+class AdminsOut(BaseModel):
+    # Admins from the PASSO_ADMIN_USER_IDS env var: not listed by id, not removable here.
+    bootstrap_count: int
+    admins: list[AdminOut]
+
+
 # ---- diff -----------------------------------------------------------------------------------
 
 

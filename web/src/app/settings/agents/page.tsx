@@ -4,7 +4,12 @@ import { useState } from "react";
 import { dis } from "@/lib/disabled";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/motion/primitives";
+import { ApiError } from "@/lib/apiClient";
+import { useSession } from "@/lib/auth";
 import {
+  useAddAdmin,
+  useAdmins,
+  useRemoveAdmin,
   useAgentProposals,
   useAgentRuns,
   useAgentsOverview,
@@ -40,6 +45,7 @@ export default function AgentsAdminPage() {
           <ControlCard />
           <Proposals />
           <Runs />
+          <Admins />
         </>
       )}
     </div>
@@ -312,6 +318,112 @@ function RunRow({ run }: { run: AgentRun }) {
           <Json value={run.output} />
         </div>
       )}
+    </div>
+  );
+}
+
+function Admins() {
+  const { data, isPending } = useAdmins();
+  const add = useAddAdmin();
+  const remove = useRemoveAdmin();
+  const { session } = useSession();
+  const myEmail = session?.user?.email?.toLowerCase();
+  const [email, setEmail] = useState("");
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const valid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
+  const error = add.error ?? remove.error;
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!valid) return;
+    add.mutate(email.trim(), { onSuccess: () => setEmail("") });
+  }
+
+  return (
+    <div style={{ marginTop: 26 }}>
+      <span style={label}>Amministratori</span>
+      <div style={card} data-track="agents.admins" data-interactive="false">
+        <p style={{ fontSize: 13, color: "var(--inchiostro-50)", margin: "0 0 12px", lineHeight: 1.4 }}>
+          Chi è qui vede questa pagina e decide sulle proposte. Basta l&apos;email del suo account: vale dal primo accesso.
+        </p>
+        <form onSubmit={submit} style={{ display: "flex", gap: 8 }}>
+          <input
+            type="email"
+            inputMode="email"
+            autoComplete="off"
+            placeholder="nome@esempio.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            data-track="agents.admin-email"
+            style={{ flex: 1, minWidth: 0, border: "1px solid var(--border-airbnb)", borderRadius: 12, padding: "10px 12px", fontSize: 16, background: "transparent", color: "inherit" }}
+          />
+          <button
+            type="submit"
+            data-track="agents.admin-add"
+            className="tap-target"
+            {...dis(!valid || add.isPending, add.isPending ? "in_caricamento" : "email_non_valida")}
+            style={{ ...pill(true), opacity: valid ? 1 : 0.45 }}
+          >
+            Aggiungi
+          </button>
+        </form>
+        {error && (
+          <p style={{ fontSize: 13, color: "var(--corallo-testo)", margin: "8px 0 0" }}>
+            {error instanceof ApiError ? error.message : "Non è andata, riprova."}
+          </p>
+        )}
+
+        {isPending ? (
+          <Skeleton height={60} radius={12} />
+        ) : (
+          <div style={{ marginTop: 12 }}>
+            {data && data.bootstrap_count > 0 && (
+              <p style={{ fontSize: 12.5, color: "var(--inchiostro-35)", margin: "0 0 6px" }}>
+                {data.bootstrap_count === 1 ? "1 amministratore fisso" : `${data.bootstrap_count} amministratori fissi`} dal server, non
+                rimovibili da qui.
+              </p>
+            )}
+            {data?.admins.map((admin) => {
+              const isMe = admin.email === myEmail;
+              const asking = confirming === admin.email;
+              return (
+                <div key={admin.email} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderTop: "1px solid var(--border-airbnb)" }}>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, display: "block", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {admin.email}
+                      {isMe ? " (tu)" : ""}
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
+                      aggiunto {formatWhen(admin.added_at)}
+                      {admin.added_by ? ` da ${admin.added_by}` : ""}
+                    </span>
+                  </span>
+                  {!isMe && (
+                    <button
+                      type="button"
+                      data-track={asking ? "agents.admin-remove-confirm" : "agents.admin-remove"}
+                      className="tap-target"
+                      {...dis(remove.isPending, "in_caricamento")}
+                      onClick={() => {
+                        if (!asking) return setConfirming(admin.email);
+                        remove.mutate(admin.email, { onSettled: () => setConfirming(null) });
+                      }}
+                      style={{ ...pill(false), color: asking ? "var(--corallo-testo)" : "var(--inchiostro)" }}
+                    >
+                      {asking ? "Conferma" : "Rimuovi"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            {data && data.admins.length === 0 && (
+              <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-50)", margin: 0 }}>
+                Nessun altro amministratore.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
