@@ -183,7 +183,13 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
    * "create a new one" from `originalWorkout`, so saving before the lookup resolved took
    * the create branch and left a *duplicate* workout on the calendar. Never in doubt in
    * `garmin` mode, where the calendar entry is what the editor was opened on. */
-  const calendarIdentityKnown = mode !== "edit" || !originalKey || workoutsQuery.isSuccess;
+  // Not on placeholder data either: that is the *previous* week's answer, kept on screen
+  // while this one loads, and a session looked up in it would never be found.
+  const calendarIdentityKnown =
+    mode !== "edit" || !originalKey || (workoutsQuery.isSuccess && !workoutsQuery.isPlaceholderData);
+  // The lookup failed (timeout, Garmin down): without this the button sat on "Leggo il
+  // calendario…" for good -- queries don't retry on their own -- and saving was impossible.
+  const calendarLookupFailed = !calendarIdentityKnown && workoutsQuery.isError && !workoutsQuery.isFetching;
 
   const startSync = useStartSync();
   const syncStatus = useSyncJobStatus(jobId);
@@ -609,12 +615,16 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
 
       <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 10 }}>
         <PrimaryButton data-track="workout-editor.handlesave"
-          state={!dayIsValid ? "disabled" : isSaving || !calendarIdentityKnown ? "loading" : "idle"}
-          onClick={handleSave}
+          state={
+            !dayIsValid ? "disabled" : calendarLookupFailed ? "idle" : isSaving || !calendarIdentityKnown ? "loading" : "idle"
+          }
+          onClick={calendarLookupFailed ? () => void workoutsQuery.refetch() : handleSave}
         >
           {!dayIsValid
             ? "Scegli un giorno"
-            : !calendarIdentityKnown
+            : calendarLookupFailed
+              ? "Calendario non raggiungibile · Riprova"
+              : !calendarIdentityKnown
               ? "Leggo il calendario…"
               : movedFrom
                 ? "Sposta sul calendario"
