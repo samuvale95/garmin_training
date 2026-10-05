@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
@@ -204,10 +205,10 @@ function Figure({ label, value, accent = false }: { label: string; value: string
 
 function NavButton({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
+    <button data-track="summary.onclick"
       type="button"
       aria-label={label}
-      disabled={disabled}
+      {...dis(disabled, "limite_raggiunto")}
       onClick={onClick}
       className="tap-target press-soft"
       style={{ width: 32, height: 32, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", border: "none", background: "var(--sabbia-chip)", color: "var(--inchiostro)", opacity: disabled ? 0.35 : 1, cursor: disabled ? "default" : "pointer", fontSize: 15 }}

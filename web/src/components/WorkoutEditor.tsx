@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Reorder } from "framer-motion";
@@ -377,7 +378,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   return (
     <div style={{ minHeight: "100dvh", background: "var(--crema)", padding: "22px 20px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <button
+        <button data-track="workout-editor.chiudi"
           type="button"
           onClick={() => router.push(originHref)}
           className="tap-target"
@@ -402,7 +403,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
           </svg>
         </button>
         {mode !== "create" ? (
-          <button
+          <button data-track="workout-editor.elimina-allenamento"
             type="button"
             onClick={handleDelete}
             className="tap-target"
@@ -440,10 +441,10 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
               ? "Eliminare questo allenamento dal calendario Garmin?"
               : "Eliminare questo allenamento dal piano e dal calendario Garmin?"}
           </p>
-          <button type="button" onClick={handleDelete} className="tap-target" style={{ background: "var(--rosso-forte)", color: "#fff", border: "none", borderRadius: "var(--radius-pill)", padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+          <button data-track="workout-editor.handledelete" type="button" onClick={handleDelete} className="tap-target" style={{ background: "var(--rosso-forte)", color: "#fff", border: "none", borderRadius: "var(--radius-pill)", padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
             Elimina
           </button>
-          <button type="button" onClick={() => setConfirmDelete(false)} className="tap-target" style={{ background: "none", border: "none", fontSize: 12, color: "var(--inchiostro-50)", cursor: "pointer" }}>
+          <button data-track="workout-editor.setconfirmdelete" type="button" onClick={() => setConfirmDelete(false)} className="tap-target" style={{ background: "none", border: "none", fontSize: 12, color: "var(--inchiostro-50)", cursor: "pointer" }}>
             Annulla
           </button>
         </div>
@@ -457,7 +458,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
         {SPORT_CHIPS.map((chip) => {
           const selected = sport === chip.value;
           return (
-            <button
+            <button data-track="workout-editor.setsport"
               key={chip.value}
               type="button"
               onClick={() => setSport(chip.value)}
@@ -505,10 +506,10 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 20 }}>
         <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>Struttura</span>
         <span style={{ display: "flex", gap: 14 }}>
-          <button type="button" onClick={addBlock} className="tap-target" style={{ background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          <button data-track="workout-editor.addblock" type="button" onClick={addBlock} className="tap-target" style={{ background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             + blocco
           </button>
-          <button type="button" onClick={addStep} className="tap-target" style={{ background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          <button data-track="workout-editor.addstep" type="button" onClick={addStep} className="tap-target" style={{ background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             + step
           </button>
         </span>
@@ -534,7 +535,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
                 <span aria-hidden="true" style={{ opacity: 0.5, fontSize: 14 }}>⠿</span>
                 <span style={{ fontSize: 13.5, fontWeight: 600, flex: 1 }}>Ripeti</span>
                 <RepsStepper reps={item.reps} onChange={(reps) => setBlockReps(item._id, reps)} />
-                <button
+                <button data-track="workout-editor.elimina-blocco"
                   type="button"
                   onClick={() => removeBlock(item._id)}
                   className="tap-target"
@@ -563,7 +564,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
                 {item.steps.map((step) => (
                   <StepRow key={step._id} step={step} onEdit={() => setEditingStep(step)} onRemove={() => removeStep(step._id)} />
                 ))}
-                <button
+                <button data-track="workout-editor.addsteptoblock"
                   type="button"
                   onClick={() => addStepToBlock(item._id)}
                   className="tap-target"
@@ -607,7 +608,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       )}
 
       <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 10 }}>
-        <PrimaryButton
+        <PrimaryButton data-track="workout-editor.handlesave"
           state={!dayIsValid ? "disabled" : isSaving || !calendarIdentityKnown ? "loading" : "idle"}
           onClick={handleSave}
         >
@@ -619,7 +620,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
                 ? "Sposta sul calendario"
                 : "Salva sul calendario"}
         </PrimaryButton>
-        <button
+        <button data-track="workout-editor.router-push"
           type="button"
           onClick={() => router.push(originHref)}
           className="tap-target"
@@ -670,10 +671,10 @@ function DayField({
   onlyOnGarmin: boolean;
 }) {
   const nudge = (delta: number, label: string) => (
-    <button
+    <button data-track="workout-editor.onchange"
       type="button"
       onClick={() => onChange(shiftDateKey(value, delta))}
-      disabled={!isValid}
+      {...dis(!isValid, "form_non_valido")}
       className="tap-target"
       aria-label={label}
       style={{
@@ -779,7 +780,7 @@ function StepRow({
         <span style={{ display: "block", fontSize: 13.5, fontWeight: 600 }}>{stepTypeLabel(step.type)}</span>
         <span className="font-mono" style={{ display: "block", fontSize: 11.5, opacity: 0.8, marginTop: 2 }}>{stepSummary(step)}</span>
       </span>
-      <button
+      <button data-track="workout-editor.onedit"
         type="button"
         onClick={onEdit}
         className="tap-target"
@@ -802,7 +803,7 @@ function StepRow({
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
         </svg>
       </button>
-      <button
+      <button data-track="workout-editor.onremove"
         type="button"
         onClick={onRemove}
         className="tap-target"
@@ -833,10 +834,10 @@ function StepRow({
  * practice, and this is the one control on the row that has to work one-handed. */
 function RepsStepper({ reps, onChange }: { reps: number; onChange: (reps: number) => void }) {
   const button = (delta: number, label: string, disabled: boolean) => (
-    <button
+    <button data-track="workout-editor.onchange-2"
       type="button"
       onClick={() => onChange(reps + delta)}
-      disabled={disabled}
+      {...dis(disabled, "limite_raggiunto")}
       className="tap-target"
       aria-label={label}
       style={{
@@ -1016,16 +1017,16 @@ function StepEditorModal({ step, onSave, onCancel }: { step: EditableStep; onSav
         )}
 
         <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
-          <button
+          <button data-track="workout-editor.handledone"
             type="button"
             onClick={handleDone}
-            disabled={!!paceError}
+            {...dis(!!paceError, "ritmo_non_valido")}
             className="tap-target"
             style={{ flex: 1, background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: paceError ? "not-allowed" : "pointer", opacity: paceError ? 0.45 : 1 }}
           >
             Fatto
           </button>
-          <button type="button" onClick={onCancel} className="tap-target" style={{ flex: 1, background: "var(--sabbia-chip)", border: "none", borderRadius: "var(--radius-pill)", padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          <button data-track="workout-editor.oncancel" type="button" onClick={onCancel} className="tap-target" style={{ flex: 1, background: "var(--sabbia-chip)", border: "none", borderRadius: "var(--radius-pill)", padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             Annulla
           </button>
         </div>

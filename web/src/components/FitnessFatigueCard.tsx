@@ -163,7 +163,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
           {/* Chart Header & Legend */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
             <div style={{ display: "flex", gap: 6 }}>
-              <button
+              <button data-track="fitness-fatigue-card.setactivetab"
                 type="button"
                 onClick={() => setActiveTab("all")}
                 style={{
@@ -179,7 +179,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
               >
                 Tutto
               </button>
-              <button
+              <button data-track="fitness-fatigue-card.setactivetab-2"
                 type="button"
                 onClick={() => setActiveTab("tsb")}
                 style={{

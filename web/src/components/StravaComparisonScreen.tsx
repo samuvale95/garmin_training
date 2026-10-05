@@ -59,7 +59,7 @@ export function StravaComparisonScreen({
             <p style={{ fontSize: 14, color: "var(--inchiostro-70)", margin: 0, lineHeight: 1.5 }}>
               Strava non è collegato, quindi non posso confrontare il pianificato con lo svolto.
             </p>
-            <Link
+            <Link data-track="strava-comparison-screen.connect-strava"
               href="/connect-strava"
               className="tap-target"
               style={{
@@ -84,7 +84,7 @@ export function StravaComparisonScreen({
         )}
 
         <div style={{ marginTop: 32, textAlign: "center" }}>
-          <Link
+          <Link data-track="strava-comparison-screen.backhref"
             href={backHref}
             className="tap-target"
             style={{

@@ -29,7 +29,7 @@ export function LogDayPicker({ todayKey, value, onChange }: { todayKey: string; 
       {options.map(({ day, label }) => {
         const selected = day === value;
         return (
-          <button
+          <button data-track="log-day-picker.onchange"
             key={day}
             type="button"
             role="radio"

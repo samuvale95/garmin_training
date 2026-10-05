@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton, SlideUp } from "@/components/motion/primitives";
@@ -157,7 +158,7 @@ function Empty({ title, body, href, cta }: { title: string; body: string; href: 
           {body}
         </p>
       </div>
-      <Link
+      <Link data-track="coach.allenarsi.href"
         href={href}
         className="press-soft"
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: "15px 18px", marginTop: 10, textDecoration: "none", color: "inherit" }}
@@ -180,10 +181,10 @@ function Failed({ onRetry, retrying }: { onRetry: () => void; retrying: boolean 
           È un problema di connessione, non dei tuoi dati. Riprova fra un momento.
         </p>
       </div>
-      <button
+      <button data-track="coach.allenarsi.onretry"
         type="button"
         onClick={onRetry}
-        disabled={retrying}
+        {...dis(retrying, "in_caricamento")}
         className="press-soft"
         style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: "15px 18px", marginTop: 10, border: "none", color: "inherit", font: "inherit", cursor: "pointer" }}
       >

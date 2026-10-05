@@ -136,7 +136,7 @@ export function SessionTimeSelectorCard({
                 borderRadius: 13,
               }}
             >
-              <button
+              <button data-track="fuel-blocks.onselecttimeslot"
                 type="button"
                 onClick={() => onSelectTimeSlot("mattina")}
                 style={{
@@ -161,7 +161,7 @@ export function SessionTimeSelectorCard({
                 <span>Mattina</span>
               </button>
 
-              <button
+              <button data-track="fuel-blocks.onselecttimeslot-2"
                 type="button"
                 onClick={() => onSelectTimeSlot("pomeriggio")}
                 style={{
@@ -186,7 +186,7 @@ export function SessionTimeSelectorCard({
                 <span>Pomeriggio (18:00)</span>
               </button>
 
-              <button
+              <button data-track="fuel-blocks.onselecttimeslot-3"
                 type="button"
                 onClick={() => onSelectTimeSlot("sera")}
                 style={{
@@ -560,7 +560,7 @@ export function MealList({ entries, animate, onSelect }: { entries: FoodEntry[];
 export function MealRow({ entry, onSelect }: { entry: FoodEntry; onSelect: (e: FoodEntry) => void }) {
   const low = entry.confidence === "low";
   return (
-    <button
+    <button data-track="fuel-blocks.onselect"
       type="button"
       onClick={() => onSelect(entry)}
       className="tap-target press-soft"

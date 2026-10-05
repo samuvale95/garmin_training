@@ -62,7 +62,7 @@ export function PlanGenerateCard({ animate, delayMs = 0 }: { animate: boolean; d
           </ul>
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <button type="button" className="press-soft" style={pill(false)} onClick={generation.dismiss}>
+          <button data-track="plan-generate-card.generation-dismiss" type="button" className="press-soft" style={pill(false)} onClick={generation.dismiss}>
             Chiudi
           </button>
         </div>
@@ -79,7 +79,7 @@ export function PlanGenerateCard({ animate, delayMs = 0 }: { animate: boolean; d
           le sedute di quei giorni; quelle che hai modificato a mano restano come sono.
         </p>
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <button
+          <button data-track="plan-generate-card.button"
             type="button"
             className="press-soft"
             style={pill(true)}
@@ -90,7 +90,7 @@ export function PlanGenerateCard({ animate, delayMs = 0 }: { animate: boolean; d
           >
             Genera
           </button>
-          <button type="button" className="press-soft" style={pill(false)} onClick={() => setConfirming(false)}>
+          <button data-track="plan-generate-card.setconfirming" type="button" className="press-soft" style={pill(false)} onClick={() => setConfirming(false)}>
             Annulla
           </button>
         </div>
@@ -103,7 +103,7 @@ export function PlanGenerateCard({ animate, delayMs = 0 }: { animate: boolean; d
       <p className="font-serif-italic" style={{ fontSize: 14, margin: 0, flex: 1 }}>
         Fatti scrivere le prossime settimane dai tuoi dati.
       </p>
-      <button type="button" className="press-soft" style={pill(true)} onClick={() => setConfirming(true)}>
+      <button data-track="plan-generate-card.setconfirming-2" type="button" className="press-soft" style={pill(true)} onClick={() => setConfirming(true)}>
         Genera
       </button>
     </SlideUp>
@@ -139,7 +139,7 @@ function GenerateSummary({ result, onClose }: { result: GeneratePlanResult; onCl
         </p>
       )}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <button type="button" className="press-soft" style={pill(false)} onClick={onClose}>
+        <button data-track="plan-generate-card.onclose" type="button" className="press-soft" style={pill(false)} onClick={onClose}>
           Chiudi
         </button>
       </div>

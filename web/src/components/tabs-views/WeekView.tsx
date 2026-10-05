@@ -338,7 +338,7 @@ export function WeekPageContent() {
         )}
 
         {liveMode && (
-          <Link href="/import" style={{ textDecoration: "none", color: "inherit" }}>
+          <Link data-track="week.import" href="/import" style={{ textDecoration: "none", color: "inherit" }}>
             <SlideUp active={animate} delayMs={140} className="press-soft" style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
               <p className="font-serif-italic" style={{ fontSize: 14, margin: 0, flex: 1 }}>
                 Importa un piano per vedere step e passi di ogni seduta.
@@ -353,7 +353,7 @@ export function WeekPageContent() {
         {offset === 0 && <PlanGenerateCard animate={animate} delayMs={160} />}
 
         {offset <= 0 && (
-          <Link href={`/summary?monday=${startKey}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12.5, fontWeight: 600, color: "var(--inchiostro-70)", marginTop: 10 }}>
+          <Link data-track="week.summary-monday-startkey" href={`/summary?monday=${startKey}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12.5, fontWeight: 600, color: "var(--inchiostro-70)", marginTop: 10 }}>
             <span>Resoconto della settimana</span>
             <ArrowRight size={13} />
           </Link>
@@ -513,7 +513,7 @@ function WeekHeaderRow({ start, end, offset, onPrev, onNext, onToday }: WeekHead
       <div className="screen-brand-row">
         <BrandMark height={22} />
         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.94 }}>
-          <Link href="/week/new" className="tap-target add-workout-link" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <Link data-track="week.week-new" href="/week/new" className="tap-target add-workout-link" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
             <PlusIcon size={13} strokeWidth={2.5} />
             <span>Allenamento</span>
           </Link>
@@ -536,7 +536,7 @@ function WeekHeaderRow({ start, end, offset, onPrev, onNext, onToday }: WeekHead
         </NavButton>
       </div>
       {offset !== 0 && (
-        <motion.button
+        <motion.button data-track="week.ontoday"
           type="button"
           onClick={onToday}
           whileTap={{ scale: 0.95 }}
@@ -562,7 +562,7 @@ function WeekHeader(props: WeekHeaderProps) {
 
 function NavButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
   return (
-    <motion.button
+    <motion.button data-track="week.onclick"
       className="tap-target"
       aria-label={label}
       onClick={onClick}

@@ -1,5 +1,7 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
+import { markFlowComplete, useFlowTracking } from "@/lib/useTracking";
 import { useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
@@ -130,6 +132,7 @@ export default function FuelPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cancelledRef = useRef(false);
   const [flow, setFlow] = useState<Flow>({ kind: "idle" });
+  useFlowTracking("meal", flow.kind);
   const [correcting, setCorrecting] = useState<FoodEntry | null>(null);
   const [runTimeSlot, setRunTimeSlot] = useState<RunTimeSlot>("pomeriggio");
   // The day a new meal is logged to. Unset until the user picks: the default depends on
@@ -192,7 +195,7 @@ export default function FuelPage() {
         fat_g: asNumber(fields.fat),
         kcal: asNumber(fields.kcal),
       },
-      { onSuccess: () => setFlow({ kind: "idle" }) }
+      { onSuccess: () => { markFlowComplete("meal"); setFlow({ kind: "idle" }); } }
     );
   }
 
@@ -243,14 +246,14 @@ export default function FuelPage() {
     return <EstimatingScreen preview={flow.preview} onCancel={cancelEstimating} />;
   }
   if (flow.kind === "review") {
-    return <ReviewScreen entry={flow.entry} preview={flow.preview} onDiscard={() => discardReview(flow.entry)} onSaved={closeFlow} />;
+    return <ReviewScreen entry={flow.entry} preview={flow.preview} onDiscard={() => discardReview(flow.entry)} onSaved={() => { markFlowComplete("meal"); closeFlow(); }} />;
   }
   if (flow.kind === "failed") {
     return (
       <FailedScreen
         preview={flow.preview}
         onRetake={() => retry(flow.entry, flow.preview)}
-        onSaved={closeFlow}
+        onSaved={() => { markFlowComplete("meal"); closeFlow(); }}
         entryId={flow.entry.id}
       />
     );
@@ -292,7 +295,7 @@ export default function FuelPage() {
           <p className="font-serif-italic" style={{ fontSize: 13.5, color: "var(--inchiostro-70)", margin: "0 0 16px" }}>
             Si è verificato un problema di connessione con i dati di alimentazione.
           </p>
-          <button
+          <button data-track="body.fuel.fuelquery-refetch"
             type="button"
             onClick={() => fuelQuery.refetch()}
             className="tap-target"
@@ -348,7 +351,7 @@ export default function FuelPage() {
 
           {/* 6. NAVIGATION: Diary & 7-Day History */}
           <SlideUp active={animate} delayMs={340} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
-            <Link
+            <Link data-track="body.fuel.body-fuel-diario"
               href="/body/fuel/diario"
               className="press-soft"
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "13px 15px", textDecoration: "none", color: "inherit" }}
@@ -356,7 +359,7 @@ export default function FuelPage() {
               <span style={{ fontSize: 13, fontWeight: 600 }}>Diario pasti</span>
               <ChevronRight size={15} style={{ color: "var(--inchiostro-50)" }} />
             </Link>
-            <Link
+            <Link data-track="body.fuel.body-fuel-history"
               href="/body/fuel/history"
               className="press-soft"
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "13px 15px", textDecoration: "none", color: "inherit" }}
@@ -384,10 +387,10 @@ export default function FuelPage() {
             <LogDayPicker todayKey={today} value={logDay} onChange={setPickedLogDay} />
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <button
+            <button data-track="body.fuel.opencamera"
               type="button"
               onClick={openCamera}
-              disabled={logPhoto.isPending}
+              {...dis(logPhoto.isPending, "in_caricamento")}
               className="tap-target press-soft"
               style={{
                 flex: 1,
@@ -409,10 +412,10 @@ export default function FuelPage() {
               <CameraIcon size={15} strokeWidth={2} />
               <span>Fotografa pasto</span>
             </button>
-            <button
+            <button data-track="body.fuel.setflow"
               type="button"
               onClick={() => setFlow({ kind: "compose" })}
-              disabled={describeMeal.isPending}
+              {...dis(describeMeal.isPending, "in_caricamento")}
               className="tap-target press-soft"
               style={{
                 flex: 1,
@@ -466,7 +469,7 @@ type ComposeMode = "stima" | "manuale";
 
 function ModeTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: string }) {
   return (
-    <button
+    <button data-track="body.fuel.onclick"
       type="button"
       onClick={onClick}
       className="press-soft"
@@ -529,7 +532,7 @@ function ComposeScreen({
   return (
     <div style={{ minHeight: "100dvh", background: "var(--crema)", padding: "22px 20px 28px", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <button
+        <button data-track="body.fuel.indietro"
           type="button"
           onClick={onCancel}
           aria-label="Indietro"
@@ -631,10 +634,10 @@ function ComposeScreen({
         </>
       )}
 
-      <button
+      <button data-track="body.fuel.submit"
         type="button"
         onClick={submit}
-        disabled={!ready || saving}
+        {...dis(!ready || saving, "form_incompleto_o_in_caricamento")}
         className="tap-target press-soft"
         style={{
           marginTop: "auto",
@@ -715,7 +718,7 @@ function EstimatingScreen({ preview, onCancel }: { preview: Preview; onCancel: (
         Porzioni e condimenti sono la parte difficile: quello che esce è una stima, e la potrai correggere.
       </p>
 
-      <button type="button" onClick={onCancel} className="tap-target" style={{ marginTop: "auto", alignSelf: "center", background: "none", border: "none", color: "var(--inchiostro-su-scuro)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+      <button data-track="body.fuel.oncancel" type="button" onClick={onCancel} className="tap-target" style={{ marginTop: "auto", alignSelf: "center", background: "none", border: "none", color: "var(--inchiostro-su-scuro)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
         Annulla
       </button>
     </div>
@@ -868,10 +871,10 @@ function ReviewScreen({ entry, preview, onDiscard, onSaved }: { entry: FoodEntry
       )}
 
       <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-        <button type="button" onClick={onDiscard} className="tap-target" style={{ background: "var(--sabbia)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+        <button data-track="body.fuel.ondiscard" type="button" onClick={onDiscard} className="tap-target" style={{ background: "var(--sabbia)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
           Scarta
         </button>
-        <button type="button" onClick={save} disabled={updateEntry.isPending} className="tap-target" style={{ flex: 1, background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+        <button data-track="body.fuel.save" type="button" onClick={save} {...dis(updateEntry.isPending, "in_caricamento")} className="tap-target" style={{ flex: 1, background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
           Salva
         </button>
       </div>
@@ -935,16 +938,16 @@ function FailedScreen({ entryId, preview, onRetake, onSaved }: { entryId: number
         <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", marginTop: 12 }}>Anche uno solo dei tre va bene. Meglio un dato tuo che una foto buttata.</p>
       </div>
 
-      <button
+      <button data-track="body.fuel.save-2"
         type="button"
         onClick={save}
-        disabled={updateEntry.isPending}
+        {...dis(updateEntry.isPending, "in_caricamento")}
         className="tap-target"
         style={{ marginTop: "auto", background: "var(--rosso-forte)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}
       >
         Salva quello che ho scritto
       </button>
-      <button type="button" onClick={onRetake} className="tap-target" style={{ marginTop: 12, alignSelf: "center", background: "none", border: "none", color: "var(--rosso-testo)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+      <button data-track="body.fuel.onretake" type="button" onClick={onRetake} className="tap-target" style={{ marginTop: 12, alignSelf: "center", background: "none", border: "none", color: "var(--rosso-testo)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
         {preview.kind === "photo" ? "Rifai la foto" : "Riscrivilo"}
       </button>
     </div>

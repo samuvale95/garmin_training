@@ -1,4 +1,5 @@
 import { getAccessToken } from "./auth";
+import { trackApi } from "./tracker";
 import type { ApiErrorBody } from "./types";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -64,6 +65,20 @@ function requestSignal(signal?: AbortSignal, timeoutMs: number = REQUEST_TIMEOUT
   return controller.signal;
 }
 
+/** `fetch` that tells the interaction log about failures and slow answers. A network
+ * error or timeout has no response, so it is recorded here with status 0. */
+async function timedFetch(input: URL, init: RequestInit): Promise<Response> {
+  const startedAt = performance.now();
+  try {
+    const response = await fetch(input, init);
+    trackApi(response.url || input.toString(), response.status, startedAt);
+    return response;
+  } catch (error) {
+    trackApi(input.toString(), 0, startedAt);
+    throw error;
+  }
+}
+
 async function handle<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let body: ApiErrorBody;
@@ -91,14 +106,14 @@ export async function apiGet<T>(
       if (value !== undefined) url.searchParams.set(key, value);
     }
   }
-  const response = await fetch(url, { cache: "no-store", signal: requestSignal(signal), headers: await authHeaders() });
+  const response = await timedFetch(url, { cache: "no-store", signal: requestSignal(signal), headers: await authHeaders() });
   return handle<T>(response);
 }
 
 /** `timeoutMs` for the few calls that are slow by design (plan generation waits on a
  * model); everything else keeps the default above. */
 export async function apiPost<T>(path: string, body?: unknown, signal?: AbortSignal, timeoutMs?: number): Promise<T> {
-  const response = await fetch(new URL(path, API_BASE_URL), {
+  const response = await timedFetch(new URL(path, API_BASE_URL), {
     method: "POST",
     headers: { ...(await authHeaders()), ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -109,7 +124,7 @@ export async function apiPost<T>(path: string, body?: unknown, signal?: AbortSig
 }
 
 export async function apiPut<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(new URL(path, API_BASE_URL), {
+  const response = await timedFetch(new URL(path, API_BASE_URL), {
     method: "PUT",
     headers: { ...(await authHeaders()), ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -120,7 +135,7 @@ export async function apiPut<T>(path: string, body?: unknown, signal?: AbortSign
 }
 
 export async function apiPostForm<T>(path: string, form: FormData): Promise<T> {
-  const response = await fetch(new URL(path, API_BASE_URL), {
+  const response = await timedFetch(new URL(path, API_BASE_URL), {
     method: "POST",
     headers: await authHeaders(),
     body: form,
@@ -131,7 +146,7 @@ export async function apiPostForm<T>(path: string, form: FormData): Promise<T> {
 }
 
 export async function apiPatch<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(new URL(path, API_BASE_URL), {
+  const response = await timedFetch(new URL(path, API_BASE_URL), {
     method: "PATCH",
     headers: { ...(await authHeaders()), ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -142,7 +157,7 @@ export async function apiPatch<T>(path: string, body?: unknown, signal?: AbortSi
 }
 
 export async function apiDelete<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(new URL(path, API_BASE_URL), {
+  const response = await timedFetch(new URL(path, API_BASE_URL), {
     method: "DELETE",
     headers: await authHeaders(),
     cache: "no-store",

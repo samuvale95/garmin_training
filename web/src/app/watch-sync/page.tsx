@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Illustration } from "@/components/Illustration";
@@ -140,7 +141,7 @@ export default function WatchSyncPage() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 11, paddingBottom: 20 }}>
         <SlideUp active={animate} delayMs={400}>
-          <PrimaryButton
+          <PrimaryButton data-track="watch-sync.opengarminconnect"
             onClick={openGarminConnect}
             background="color-mix(in srgb, var(--azzurro-testo) 72%, var(--azzurro))"
             fillColor="var(--azzurro-testo)"
@@ -151,10 +152,10 @@ export default function WatchSyncPage() {
         </SlideUp>
         {/* No toast when the answer is still "nothing": the screen simply stays, and the
             "ultimo sync" value updates only if it actually changed. */}
-        <button
+        <button data-track="watch-sync.recheck"
           type="button"
           onClick={() => recheck()}
-          disabled={rechecking}
+          {...dis(rechecking, "in_caricamento")}
           className="tap-target"
           style={{
             background: "none",

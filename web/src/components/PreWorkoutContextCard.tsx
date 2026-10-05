@@ -82,7 +82,7 @@ export function PreWorkoutContextCard({
           </p>
         </div>
 
-        <motion.button
+        <motion.button data-track="pre-workout-context-card.onopenquicklog"
           whileHover={{ scale: 1.04 }}
           whileTap={{ scale: 0.94 }}
           onClick={onOpenQuickLog}

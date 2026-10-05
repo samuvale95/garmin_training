@@ -66,7 +66,7 @@ export function TodayHeroUnified({
           </p>
 
           {badge && (
-            <Link href="/body/stato" style={{ textDecoration: "none" }}>
+            <Link data-track="today-hero-unified.body-stato" href="/body/stato" style={{ textDecoration: "none" }}>
               <div
                 style={{
                   display: "inline-flex",
@@ -138,7 +138,7 @@ export function TodayHeroUnified({
         </div>
 
         {/* Bottom Action Row */}
-        <Link
+        <Link data-track="today-hero-unified.herohref"
           href={heroHref}
           className="tap-target"
           style={{

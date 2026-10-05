@@ -30,7 +30,7 @@ export default function SessionError({ error, reset }: { error: Error & { digest
         {error.message || "Errore imprevisto."}
       </p>
       <div style={{ display: "flex", gap: 10 }}>
-        <button
+        <button data-track="session.id.error.tsx.reset"
           type="button"
           onClick={() => reset()}
           className="tap-target"
@@ -47,7 +47,7 @@ export default function SessionError({ error, reset }: { error: Error & { digest
         >
           Riprova
         </button>
-        <button
+        <button data-track="session.id.error.tsx.router-push"
           type="button"
           onClick={() => router.push("/week")}
           className="tap-target"

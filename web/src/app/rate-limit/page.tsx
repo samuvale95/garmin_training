@@ -114,7 +114,7 @@ export default function RateLimitPage() {
             )}
           </div>
         ) : (
-          <button
+          <button data-track="rate-limit.setshowpasswordfield"
             type="button"
             onClick={() => setShowPasswordField(true)}
             className="tap-target"
@@ -136,7 +136,7 @@ export default function RateLimitPage() {
 
       <div style={{ flex: 1 }} />
 
-      <PrimaryButton
+      <PrimaryButton data-track="rate-limit.retrynow"
         state={remaining && remaining > 0 ? "disabled" : connect.isPending ? "loading" : "idle"}
         onClick={retryNow}
         background="var(--rosso-forte)"

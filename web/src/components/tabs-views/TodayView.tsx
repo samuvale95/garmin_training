@@ -232,7 +232,7 @@ export function TodayView() {
       {/* 3b. INSIGHT COACH POST-CORSA: 1-tap all'analisi della tecnica */}
       {trainedOn(todayKey) && (
         <SlideUp active={animate} delayMs={140} style={{ marginTop: 10 }}>
-          <Link
+          <Link data-track="today.coach"
             href="/coach"
             className="press-soft"
             style={{
@@ -318,7 +318,7 @@ export function TodayView() {
 
       {/* 8. PROGRESSO E RECORD SETTIMANALI (Compatto) */}
       {progress.data && (
-        <Link href="/progress" style={{ textDecoration: "none", color: "inherit" }}>
+        <Link data-track="today.progress" href="/progress" style={{ textDecoration: "none", color: "inherit" }}>
           <SlideUp active={animate} delayMs={160}>
             <motion.div
               whileHover={{ y: -2, scale: 1.01 }}
@@ -355,7 +355,7 @@ export function TodayView() {
       )}
 
       {earlyInWeek && lastWeek.data && lastWeek.data.done_sessions + lastWeek.data.planned_sessions > 0 && (
-        <Link href="/summary" style={{ textDecoration: "none", color: "inherit" }}>
+        <Link data-track="today.summary" href="/summary" style={{ textDecoration: "none", color: "inherit" }}>
           <SlideUp active={animate} delayMs={170}>
             <motion.div
               whileHover={{ y: -2, scale: 1.01 }}
@@ -394,7 +394,7 @@ export function TodayView() {
       />
 
       {liveMode ? (
-        <Link href="/import" style={{ textDecoration: "none", color: "inherit" }}>
+        <Link data-track="today.import" href="/import" style={{ textDecoration: "none", color: "inherit" }}>
           <SlideUp active={animate} delayMs={200} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
             <p className="font-serif-italic" style={{ fontSize: 15, margin: 0, flex: 1 }}>
               Questo è il calendario Garmin. Importa un piano per i dettagli di ogni seduta.
@@ -403,7 +403,7 @@ export function TodayView() {
           </SlideUp>
         </Link>
       ) : pendingChanges > 0 ? (
-        <Link href="/diff" style={{ textDecoration: "none", color: "inherit" }}>
+        <Link data-track="today.diff" href="/diff" style={{ textDecoration: "none", color: "inherit" }}>
           <SlideUp active={animate} delayMs={200} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
             <PulseRing size={8} />
             <div style={{ flex: 1 }}>
@@ -496,7 +496,7 @@ function TodayHeader({ onOpenQuickLog }: { onOpenQuickLog?: () => void }) {
       <BrandMark height={22} />
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {onOpenQuickLog && (
-          <motion.button
+          <motion.button data-track="today.registra-cibo-o-snack"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.94 }}
             onClick={onOpenQuickLog}
@@ -522,7 +522,7 @@ function TodayHeader({ onOpenQuickLog }: { onOpenQuickLog?: () => void }) {
           </motion.button>
         )}
         <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} transition={{ type: "spring", stiffness: 450, damping: 22 }}>
-          <Link href="/settings" aria-label="Impostazioni" className="tap-target" style={{ display: "block" }}>
+          <Link data-track="today.impostazioni" href="/settings" aria-label="Impostazioni" className="tap-target" style={{ display: "block" }}>
             <Avatar size={36} withStatusBadge={true} />
           </Link>
         </motion.div>

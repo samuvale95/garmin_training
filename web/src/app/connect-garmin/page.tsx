@@ -93,13 +93,13 @@ export default function ConnectGarminPage() {
       <div style={{ flex: 1 }} />
 
       <SlideUp active={animate} delayMs={500} style={{ paddingBottom: 20, display: "flex", flexDirection: "column", gap: 12 }}>
-        <PrimaryButton
+        <PrimaryButton data-track="connect-garmin.handleconnect"
           state={connect.isPending ? "loading" : "idle"}
           onClick={handleConnect}
         >
           Collega
         </PrimaryButton>
-        <button
+        <button data-track="connect-garmin.router-push"
           type="button"
           onClick={() => router.push("/today")}
           className="tap-target"

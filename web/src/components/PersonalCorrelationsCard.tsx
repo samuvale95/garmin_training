@@ -160,7 +160,7 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
       {/* 3. Toggle recent paired days */}
       {data.paired_runs.length > 0 && (
         <SlideUp active={animate} delayMs={delayMs + 180}>
-          <button
+          <button data-track="personal-correlations-card.setshowruns"
             type="button"
             onClick={() => setShowRuns(!showRuns)}
             style={{

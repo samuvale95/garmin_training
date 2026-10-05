@@ -149,7 +149,7 @@ export default function ReadinessPage() {
           )}
 
           <SlideUp active={animate} delayMs={340} style={{ marginTop: 18 }}>
-            <Link
+            <Link data-track="body.prontezza.body-stato"
               href="/body/stato"
               className="press-soft"
               style={{

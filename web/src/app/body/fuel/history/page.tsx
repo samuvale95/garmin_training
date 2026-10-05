@@ -125,7 +125,7 @@ export default function FuelHistoryPage() {
           </SlideUp>
 
           <SlideUp active={animate} delayMs={280}>
-            <Link
+            <Link data-track="body.fuel.history.body-fuel-diario"
               href="/body/fuel/diario"
               className="press-soft"
               style={{

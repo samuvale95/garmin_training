@@ -54,7 +54,7 @@ export function WeekStrip({ currentDateKey, sessions, active = true }: WeekStrip
           <span style={{ fontSize: 11, fontWeight: 600, color: "var(--inchiostro-50)", letterSpacing: ".04em", textTransform: "uppercase" }}>
             Questa Settimana
           </span>
-          <Link
+          <Link data-track="week-strip.week"
             href="/week"
             style={{
               fontSize: 12,
@@ -71,7 +71,7 @@ export function WeekStrip({ currentDateKey, sessions, active = true }: WeekStrip
           {days.map((item) => {
             const visual = classifySession(item.session);
             return (
-              <Link
+              <Link data-track="week-strip.week-date-item-key"
                 key={item.key}
                 href={`/week?date=${item.key}`}
                 style={{ textDecoration: "none", color: "inherit" }}

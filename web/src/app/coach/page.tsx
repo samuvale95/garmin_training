@@ -92,7 +92,7 @@ export default function CoachPage() {
               goes from a measurement to a session in the plan, and it needs no imported
               plan to work. */}
           <SlideUp active={animate} delayMs={30} style={{ marginTop: 18 }}>
-            <Link
+            <Link data-track="coach.coach-allenarsi"
               href="/coach/allenarsi"
               className="press-soft"
               style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card)", padding: "16px 18px", textDecoration: "none" }}
@@ -109,7 +109,7 @@ export default function CoachPage() {
           </SlideUp>
 
           <SlideUp active={animate} delayMs={40} style={{ marginTop: 10 }}>
-            <Link
+            <Link data-track="coach.coach-esecuzione"
               href="/coach/esecuzione"
               className="press-soft"
               style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "15px 18px", textDecoration: "none", color: "inherit" }}
@@ -209,7 +209,7 @@ function ActivityPicker({
         {activities.slice(0, 12).map((activity) => {
           const active = activity.activity_id === selectedId;
           return (
-            <button
+            <button data-track="coach.onselect"
               key={activity.activity_id}
               type="button"
               onClick={() => onSelect(activity.activity_id)}
@@ -264,7 +264,7 @@ function EmptyState() {
           lette per come le hai fatte. Al momento non ne vedo nessuna.
         </p>
       </div>
-      <Link
+      <Link data-track="coach.settings"
         href="/settings"
         className="press-soft"
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: "15px 18px", marginTop: 10, textDecoration: "none", color: "inherit" }}

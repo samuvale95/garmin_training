@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import type { ReactNode } from "react";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -126,10 +127,10 @@ export function DeleteConfirmStrip({
       }}
     >
       <p style={{ fontSize: 13, color: "var(--rosso-testo)", fontWeight: 500, margin: 0, flex: 1 }}>{message}</p>
-      <button
+      <button data-track="detail-scaffold.onconfirm"
         type="button"
         onClick={onConfirm}
-        disabled={isDeleting}
+        {...dis(isDeleting, "in_caricamento")}
         className="tap-target"
         style={{
           background: "var(--rosso-forte)",
@@ -144,10 +145,10 @@ export function DeleteConfirmStrip({
       >
         {isDeleting ? "..." : "Elimina"}
       </button>
-      <button
+      <button data-track="detail-scaffold.oncancel"
         type="button"
         onClick={onCancel}
-        disabled={isDeleting}
+        {...dis(isDeleting, "in_caricamento")}
         className="tap-target"
         style={{ background: "none", border: "none", fontSize: 12, color: "var(--inchiostro-50)", cursor: "pointer" }}
       >
@@ -160,10 +161,10 @@ export function DeleteConfirmStrip({
 /** The trash icon in a detail screen's header row. */
 export function DeleteIconButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
   return (
-    <button
+    <button data-track="detail-scaffold.elimina-allenamento"
       type="button"
       onClick={onClick}
-      disabled={disabled}
+      {...dis(disabled, "non_disponibile")}
       className="tap-target"
       aria-label="Elimina allenamento"
       style={{

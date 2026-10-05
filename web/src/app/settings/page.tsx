@@ -1,6 +1,9 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { useState } from "react";
+import { useMounted } from "@/lib/hydration";
+import { isTrackingEnabled, setTrackingEnabled } from "@/lib/tracker";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
@@ -34,6 +37,14 @@ export default function SettingsPage() {
   const clearPlan = useClearPlan();
   const resetAllLocalData = useResetAllLocalData();
   const [confirmReset, setConfirmReset] = useState(false);
+  // Read after mount: localStorage is not there during the server render.
+  const mounted = useMounted();
+  const [trackingChoice, setTrackingChoice] = useState<boolean | null>(null);
+  const tracking = trackingChoice ?? (mounted ? isTrackingEnabled() : true);
+  function changeTracking(enabled: boolean) {
+    setTrackingEnabled(enabled);
+    setTrackingChoice(enabled);
+  }
 
   function handleReset() {
     if (!confirmReset) {
@@ -103,17 +114,17 @@ export default function SettingsPage() {
             </span>
           </div>
           {garminStatus?.connected ? (
-            <button
+            <button data-track="settings.disconnect-mutate"
               type="button"
               onClick={() => disconnect.mutate(undefined, { onSuccess: () => router.push("/connect-garmin") })}
-              disabled={disconnect.isPending}
+              {...dis(disconnect.isPending, "in_caricamento")}
               className="tap-target"
               style={{ marginTop: 10, background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}
             >
               scollega
             </button>
           ) : (
-            <Link
+            <Link data-track="settings.connect-garmin"
               href="/connect-garmin"
               className="tap-target"
               style={{ display: "inline-block", marginTop: 10, color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
@@ -137,17 +148,17 @@ export default function SettingsPage() {
             <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{stravaStatus?.connected ? "collegato" : "non collegato"}</span>
           </div>
           {stravaStatus?.connected ? (
-            <button
+            <button data-track="settings.disconnectstrava-mutate"
               type="button"
               onClick={() => disconnectStrava.mutate()}
-              disabled={disconnectStrava.isPending}
+              {...dis(disconnectStrava.isPending, "in_caricamento")}
               className="tap-target"
               style={{ marginTop: 10, background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}
             >
               scollega Strava
             </button>
           ) : (
-            <Link
+            <Link data-track="settings.connect-strava"
               href="/connect-strava"
               className="tap-target"
               style={{ display: "inline-block", marginTop: 10, color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
@@ -160,7 +171,7 @@ export default function SettingsPage() {
 
       <SlideUp delayMs={90}>
         <Card>
-          <Link href="/shoes?from=/settings" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+          <Link data-track="settings.shoes-from-settings" href="/shoes?from=/settings" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ flex: 1 }}>
               <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Scarpe</span>
               <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>usura, da Strava</span>
@@ -172,7 +183,7 @@ export default function SettingsPage() {
 
       <SlideUp delayMs={110}>
         <Card>
-          <Link href="/settings/goal" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+          <Link data-track="settings.settings-goal" href="/settings/goal" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ flex: 1 }}>
               <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Obiettivo</span>
               <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
@@ -186,7 +197,7 @@ export default function SettingsPage() {
 
       <SlideUp delayMs={130}>
         <Card>
-          <Link href="/settings/level" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+          <Link data-track="settings.settings-level" href="/settings/level" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ flex: 1 }}>
               <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Livello</span>
               <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
@@ -200,7 +211,7 @@ export default function SettingsPage() {
 
       <SlideUp delayMs={150}>
         <Card>
-          <Link href="/settings/body" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+          <Link data-track="settings.settings-body" href="/settings/body" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ flex: 1 }}>
               <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Il tuo corpo</span>
               <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>peso, altezza, età</span>
@@ -216,6 +227,10 @@ export default function SettingsPage() {
           <Toggle label="Avvisami se il corpo non regge" checked={prefs.avvisamiSeIlCorpoNonRegge} onChange={(v) => setPref("avvisamiSeIlCorpoNonRegge", v)} />
           <Toggle label="Chiedi prima di cancellare" checked={prefs.chiediPrimaDiCancellare} onChange={(v) => setPref("chiediPrimaDiCancellare", v)} />
           <Toggle label="Meno movimento" checked={prefs.menoMovimento} onChange={(v) => setPref("menoMovimento", v)} />
+          <Toggle label="Aiutaci a migliorare l'app" checked={tracking} onChange={changeTracking} />
+          <p className="font-serif-italic" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>
+            Registro dove tocchi e dove l&apos;app è lenta o sbaglia, mai quello che scrivi.
+          </p>
         </Card>
       </SlideUp>
 
@@ -225,9 +240,9 @@ export default function SettingsPage() {
           <p className="font-serif-italic" style={{ fontSize: 13, margin: "0 0 12px" }}>
             Ogni modifica fatta dall&apos;app te la riscrivo dentro, e puoi riscaricarlo quando vuoi.
           </p>
-          <button
+          <button data-track="settings.plan"
             type="button"
-            disabled={!plan}
+            {...dis(!plan, "dati_non_caricati")}
             onClick={() => plan && downloadPlanYaml(plan.sessions, plan.filename ?? "piano.yaml", plan.goal)}
             className="tap-target"
             style={{
@@ -265,7 +280,7 @@ export default function SettingsPage() {
             l&apos;app riparte dal calendario Garmin, senza nulla di locale che possa essere disallineato.
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button
+            <button data-track="settings.handlereset"
               type="button"
               onClick={handleReset}
               className="tap-target"
@@ -283,7 +298,7 @@ export default function SettingsPage() {
               {confirmReset ? "Conferma: cancella tutto" : "Ripristina tutto"}
             </button>
             {confirmReset && (
-              <button
+              <button data-track="settings.setconfirmreset"
                 type="button"
                 onClick={() => setConfirmReset(false)}
                 className="tap-target"
@@ -297,7 +312,7 @@ export default function SettingsPage() {
       </SlideUp>
 
       <SlideUp delayMs={250}>
-        <button
+        <button data-track="settings.async"
           type="button"
           onClick={async () => {
             clearPlan();
@@ -317,6 +332,8 @@ export default function SettingsPage() {
 function Card({ children }: { children: React.ReactNode }) {
   return (
     <div
+      data-track="settings.card"
+      data-interactive="false"
       style={{
         background: "var(--crema-card)",
         border: "1px solid var(--border-airbnb)",

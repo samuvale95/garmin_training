@@ -227,7 +227,7 @@ export default function DayStatePage() {
                   Fatto, il piano è aggiornato.
                 </p>
               ) : todayId ? (
-                <button
+                <button data-track="body.stato.applyalternative"
                   type="button"
                   onClick={() => applyAlternative(verdict)}
                   className="press-soft"
@@ -249,7 +249,7 @@ export default function DayStatePage() {
               so where the weaker proposal is, rather than as a banner somewhere else. */}
           {!goal && (access.plan || access.garminConnected) && (
             <SlideUp active={animate} delayMs={300} style={{ marginTop: 12 }}>
-              <Link
+              <Link data-track="body.stato.settings-goal"
                 href="/settings/goal"
                 className="press-soft"
                 style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--sabbia)", border: "1px dashed var(--inchiostro-35)", borderRadius: "var(--radius-card)", padding: "15px 18px", textDecoration: "none", color: "inherit" }}
@@ -272,7 +272,7 @@ export default function DayStatePage() {
           </p>
 
           {bodyQuery.data && (
-            <button
+            <button data-track="body.stato.router-push"
               type="button"
               onClick={() => router.push("/body")}
               className="press-soft"

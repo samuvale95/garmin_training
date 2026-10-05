@@ -6,6 +6,7 @@ import { MoveWarningSheet } from "@/components/MoveWarningSheet";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { RouteTransition } from "@/components/motion/RouteTransition";
+import { TrackerProvider } from "@/components/TrackerProvider";
 import { SmoothScroll } from "@/components/SmoothScroll";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -13,6 +14,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell" data-motion={reduced ? "reduced" : undefined}>
       <OfflineBanner />
+      <TrackerProvider />
       <SmoothScroll />
       <RouteTransition>{children}</RouteTransition>
       <MoveWarningSheet />

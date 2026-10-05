@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { PlanWaiting } from "@/components/PlanWaiting";
@@ -74,37 +75,37 @@ export function AdaptationCard({ animate, delayMs = 0 }: { animate: boolean; del
       <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
         {pending ? (
           <>
-            <motion.button
+            <motion.button data-track="adaptation-card.answer-mutate"
               type="button"
               whileTap={{ scale: 0.94 }}
               whileHover={{ scale: 1.03, y: -1 }}
               transition={{ type: "spring", stiffness: 450, damping: 25 }}
               style={pill(true)}
-              disabled={answer.isPending}
+              {...dis(answer.isPending, "in_caricamento")}
               onClick={() => answer.mutate({ id: adaptation.id, action: "accept" })}
             >
               Accetta
             </motion.button>
-            <motion.button
+            <motion.button data-track="adaptation-card.answer-mutate-2"
               type="button"
               whileTap={{ scale: 0.94 }}
               whileHover={{ scale: 1.03, y: -1 }}
               transition={{ type: "spring", stiffness: 450, damping: 25 }}
               style={pill(false)}
-              disabled={answer.isPending}
+              {...dis(answer.isPending, "in_caricamento")}
               onClick={() => answer.mutate({ id: adaptation.id, action: "reject" })}
             >
               Rifiuta
             </motion.button>
           </>
         ) : (
-          <motion.button
+          <motion.button data-track="adaptation-card.answer-mutate-3"
             type="button"
             whileTap={{ scale: 0.94 }}
             whileHover={{ scale: 1.03, y: -1 }}
             transition={{ type: "spring", stiffness: 450, damping: 25 }}
             style={pill(false)}
-            disabled={answer.isPending}
+            {...dis(answer.isPending, "in_caricamento")}
             onClick={() => answer.mutate({ id: adaptation.id, action: "undo" })}
           >
             Annulla le modifiche

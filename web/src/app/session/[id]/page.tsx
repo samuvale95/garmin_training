@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -177,7 +178,7 @@ export default function SessionDetailPage() {
       error={deleteError}
       actions={
         <>
-          <Link
+          <Link data-track="session.id.modifica-allenamento"
             href={`/session/${sessionId}/edit`}
             className="tap-target"
             aria-label="Modifica allenamento"
@@ -215,10 +216,10 @@ export default function SessionDetailPage() {
       }
       stickyBottom={
         <div style={{ width: "100%", display: "flex", gap: 8, alignItems: "center" }}>
-          <button
+          <button data-track="session.id.movetotomorrow"
             type="button"
             onClick={moveToTomorrow}
-            disabled={isMoving}
+            {...dis(isMoving, "in_caricamento")}
             className="press-soft"
             style={{
               flex: 1,

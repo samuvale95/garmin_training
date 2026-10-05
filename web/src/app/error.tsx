@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
+import { trackUiError } from "@/lib/tracker";
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error(error);
+    trackUiError(error);
   }, [error]);
 
   return (
@@ -26,7 +28,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
       <p className="font-serif-italic" style={{ fontSize: 14, opacity: 0.75, margin: 0, maxWidth: 320 }}>
         {error.message || "Errore imprevisto."}
       </p>
-      <button
+      <button data-track="error.tsx.reset"
         type="button"
         onClick={() => reset()}
         className="tap-target"

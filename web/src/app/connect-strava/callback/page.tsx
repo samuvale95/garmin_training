@@ -58,7 +58,7 @@ function StravaCallback() {
             {error}
           </p>
           <div style={{ width: 200 }}>
-            <PrimaryButton onClick={() => router.replace("/settings")}>Torna alle impostazioni</PrimaryButton>
+            <PrimaryButton data-track="connect-strava.callback.router-replace" onClick={() => router.replace("/settings")}>Torna alle impostazioni</PrimaryButton>
           </div>
         </>
       ) : (

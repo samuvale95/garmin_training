@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { useRefreshServerData } from "@/lib/queries";
 
 /** "Ask Garmin and Strava again, now."
@@ -17,10 +18,10 @@ export function RefreshButton({ color = "var(--inchiostro)" }: { color?: string 
   const refresh = useRefreshServerData();
 
   return (
-    <button
+    <button data-track="refresh-button.refresh-mutate"
       type="button"
       onClick={() => refresh.mutate()}
-      disabled={refresh.isPending}
+      {...dis(refresh.isPending, "in_caricamento")}
       className="tap-target"
       style={{
         background: "none",

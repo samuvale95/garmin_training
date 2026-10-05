@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { PageHeader } from "@/components/PageHeader";
 import { CheckIcon } from "@/components/Icons";
 import { Skeleton, SlideUp, WordIn } from "@/components/motion/primitives";
@@ -138,13 +139,13 @@ function AdaptationModeSwitch({ level }: { level: AthleteLevel }) {
         {options.map(([value, label, hint]) => {
           const selected = current === value;
           return (
-            <button
+            <button data-track="settings.level.setmode-mutate"
               key={label}
               type="button"
               role="radio"
               aria-checked={selected}
               className="press-soft"
-              disabled={setMode.isPending}
+              {...dis(setMode.isPending, "in_caricamento")}
               onClick={() => setMode.mutate(value)}
               style={{
                 display: "flex",

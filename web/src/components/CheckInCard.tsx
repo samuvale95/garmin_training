@@ -88,7 +88,7 @@ export function CheckInCard({
           <p style={{ fontSize: 13, margin: 0, flex: 1, color: "var(--inchiostro-70)" }}>
             <span style={{ fontWeight: 600, color: "var(--inchiostro)" }}>Check-in {dayLabel}:</span> {parts.filter(Boolean).join(" · ")}
           </p>
-          <motion.button
+          <motion.button data-track="check-in-card.setediting"
             type="button"
             whileTap={{ scale: 0.92 }}
             whileHover={{ scale: 1.05 }}
@@ -111,7 +111,7 @@ export function CheckInCard({
                 ({Math.round(primaryShoe.distance_km)} km)
               </span>
             </div>
-            <Link
+            <Link data-track="check-in-card.shoes-from-today"
               href="/shoes?from=/today"
               style={{
                 fontSize: 11.5,
@@ -199,7 +199,7 @@ function ChipRow<T extends string>({
         {options.map(([key, text]) => {
           const selected = value === key;
           return (
-            <motion.button
+            <motion.button data-track="check-in-card.onchange"
               key={key}
               type="button"
               role="radio"

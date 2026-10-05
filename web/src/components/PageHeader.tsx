@@ -22,7 +22,7 @@ export function PageHeader({ backHref, color = "var(--inchiostro)" }: PageHeader
       transition={{ type: "spring", stiffness: 450, damping: 22 }}
       style={{ display: "inline-flex" }}
     >
-      <Link
+      <Link data-track="page-header.href"
         href={href}
         className="tap-target page-back"
         aria-label={label}

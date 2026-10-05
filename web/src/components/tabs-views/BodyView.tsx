@@ -77,7 +77,7 @@ export function BodyView() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <BrandMark height={22} />
         <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} transition={{ type: "spring", stiffness: 450, damping: 22 }}>
-          <Link href="/settings" className="tap-target" aria-label="Impostazioni"><Avatar size={32} /></Link>
+          <Link data-track="body.impostazioni" href="/settings" className="tap-target" aria-label="Impostazioni"><Avatar size={32} /></Link>
         </motion.div>
       </div>
 
@@ -98,7 +98,7 @@ export function BodyView() {
             border: "var(--border-airbnb)",
           }}
         >
-          <button
+          <button data-track="body.setactivesubtab"
             type="button"
             onClick={() => setActiveSubTab("oggi")}
             style={{
@@ -137,7 +137,7 @@ export function BodyView() {
             )}
           </button>
 
-          <button
+          <button data-track="body.setactivesubtab-2"
             type="button"
             onClick={() => setActiveSubTab("trend")}
             style={{
@@ -370,7 +370,7 @@ export function BodyView() {
               >
                 Nutrizione & Carburante
               </p>
-              <Link
+              <Link data-track="body.nutrition"
                 href="/nutrition"
                 style={{ fontSize: 12, fontWeight: 600, color: "var(--rosso-avviso)", textDecoration: "none" }}
               >
@@ -413,7 +413,7 @@ export function BodyView() {
                     overflow: "hidden",
                   }}
                 >
-                  <Link
+                  <Link data-track="body.nutrition-2"
                     href="/nutrition"
                     className="tap-target"
                     onPointerDown={() => prefetchNarrative(todayKey, sessions, manualWeight?.weightKg)}
@@ -569,7 +569,7 @@ function SmallMetric({
 function NavRow({ href, label }: { href: string; label: string }) {
   return (
     <motion.div whileHover={{ x: 4, scale: 1.01 }} whileTap={{ scale: 0.98 }} transition={{ type: "spring", stiffness: 450, damping: 26 }}>
-      <Link href={href} className="body-nav-row tap-target">
+      <Link data-track="body.href" href={href} className="body-nav-row tap-target">
         <span style={{ fontSize: 14, fontWeight: 600 }}>{label}</span>
         <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
       </Link>

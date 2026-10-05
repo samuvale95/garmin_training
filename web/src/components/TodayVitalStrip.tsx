@@ -27,7 +27,7 @@ export function TodayVitalStrip({
     <SlideUp active={active} delayMs={140} style={{ marginTop: 14 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 9 }}>
         {/* 1. Prontezza */}
-        <Link href="/body" style={{ textDecoration: "none", color: "inherit" }}>
+        <Link data-track="today-vital-strip.body" href="/body" style={{ textDecoration: "none", color: "inherit" }}>
           <motion.div
             whileTap={{ scale: 0.96 }}
             style={{
@@ -69,7 +69,7 @@ export function TodayVitalStrip({
         </Link>
 
         {/* 2. Sonno */}
-        <Link href="/body" style={{ textDecoration: "none", color: "inherit" }}>
+        <Link data-track="today-vital-strip.body-2" href="/body" style={{ textDecoration: "none", color: "inherit" }}>
           <motion.div
             whileTap={{ scale: 0.96 }}
             style={{
@@ -102,7 +102,7 @@ export function TodayVitalStrip({
         </Link>
 
         {/* 3. Carbo / Carburante */}
-        <Link href="/body/fuel" style={{ textDecoration: "none", color: "inherit" }}>
+        <Link data-track="today-vital-strip.body-fuel" href="/body/fuel" style={{ textDecoration: "none", color: "inherit" }}>
           <motion.div
             whileTap={{ scale: 0.96 }}
             style={{

@@ -348,7 +348,7 @@ export function SessionDetailBody({
       {/* Strava Match Card */}
       {hasStravaMatch && matchData && (
         <SlideUp delayMs={150}>
-          <Link href={stravaHref} style={{ textDecoration: "none", color: "inherit", width: "100%", marginTop: 22, display: "block" }}>
+          <Link data-track="session-detail-body.stravahref" href={stravaHref} style={{ textDecoration: "none", color: "inherit", width: "100%", marginTop: 22, display: "block" }}>
           <div
             style={{
               width: "100%",

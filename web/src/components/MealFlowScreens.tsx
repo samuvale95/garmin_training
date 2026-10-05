@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { useState } from "react";
 import { ChevronLeft } from "@/components/Icons";
 import { PulseRing } from "@/components/motion/primitives";
@@ -12,7 +13,7 @@ export type ComposeMode = "stima" | "manuale";
 
 function ModeTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
+    <button data-track="meal-flow-screens.onclick"
       type="button"
       onClick={onClick}
       style={{
@@ -86,7 +87,7 @@ export function ComposeScreen({
   return (
     <div style={{ minHeight: "100dvh", background: "var(--crema)", padding: "22px 20px 28px", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <button
+        <button data-track="meal-flow-screens.indietro"
           type="button"
           onClick={onCancel}
           aria-label="Indietro"
@@ -188,10 +189,10 @@ export function ComposeScreen({
         </>
       )}
 
-      <button
+      <button data-track="meal-flow-screens.submit"
         type="button"
         onClick={submit}
-        disabled={!ready || saving}
+        {...dis(!ready || saving, "form_incompleto_o_in_caricamento")}
         className="tap-target press-soft"
         style={{
           marginTop: "auto",
@@ -270,7 +271,7 @@ export function EstimatingScreen({ preview, onCancel }: { preview: Preview; onCa
         Porzioni e condimenti sono la parte difficile: quello che esce è una stima, e la potrai correggere.
       </p>
 
-      <button type="button" onClick={onCancel} className="tap-target" style={{ marginTop: "auto", alignSelf: "center", background: "none", border: "none", color: "var(--inchiostro-su-scuro)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+      <button data-track="meal-flow-screens.oncancel" type="button" onClick={onCancel} className="tap-target" style={{ marginTop: "auto", alignSelf: "center", background: "none", border: "none", color: "var(--inchiostro-su-scuro)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
         Annulla
       </button>
     </div>
@@ -398,10 +399,10 @@ export function ReviewScreen({ entry, preview, onDiscard, onSaved }: { entry: Fo
       )}
 
       <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-        <button type="button" onClick={onDiscard} className="tap-target" style={{ background: "var(--sabbia)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+        <button data-track="meal-flow-screens.ondiscard" type="button" onClick={onDiscard} className="tap-target" style={{ background: "var(--sabbia)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
           Scarta
         </button>
-        <button type="button" onClick={save} disabled={updateEntry.isPending} className="tap-target" style={{ flex: 1, background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+        <button data-track="meal-flow-screens.save" type="button" onClick={save} {...dis(updateEntry.isPending, "in_caricamento")} className="tap-target" style={{ flex: 1, background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
           Salva
         </button>
       </div>
@@ -461,16 +462,16 @@ export function FailedScreen({ entryId, preview, onRetake, onSaved }: { entryId:
         <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", marginTop: 12 }}>Anche uno solo dei tre va bene. Meglio un dato tuo che una foto buttata.</p>
       </div>
 
-      <button
+      <button data-track="meal-flow-screens.save-2"
         type="button"
         onClick={save}
-        disabled={updateEntry.isPending}
+        {...dis(updateEntry.isPending, "in_caricamento")}
         className="tap-target"
         style={{ marginTop: "auto", background: "var(--rosso-forte)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}
       >
         Salva quello che ho scritto
       </button>
-      <button type="button" onClick={onRetake} className="tap-target" style={{ marginTop: 12, alignSelf: "center", background: "none", border: "none", color: "var(--rosso-testo)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+      <button data-track="meal-flow-screens.onretake" type="button" onClick={onRetake} className="tap-target" style={{ marginTop: 12, alignSelf: "center", background: "none", border: "none", color: "var(--rosso-testo)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
         {preview.kind === "photo" ? "Rifai la foto" : "Riscrivilo"}
       </button>
     </div>

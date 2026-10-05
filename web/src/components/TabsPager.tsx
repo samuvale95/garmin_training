@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { usePathname, useRouter } from "next/navigation";
 import { animate, useMotionValue, useMotionValueEvent } from "framer-motion";
 import { useMotionEnabled } from "@/lib/motion";
+import { markTabMethod } from "@/lib/tracker";
 import { TodayView } from "@/components/tabs-views/TodayView";
 import { WeekView } from "@/components/tabs-views/WeekView";
 import { BodyView } from "@/components/tabs-views/BodyView";
@@ -198,6 +199,7 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
       // Commit the tab now, then let the URL catch up -- without Next's scroll-to-top
       // on navigation, which would land mid-slide and undo the tab's remembered scroll.
       setActiveIdx(newIdx);
+      markTabMethod("swipe");
       router.push(TAB_ROUTES[newIdx], { scroll: false });
     } else {
       // Snap back to current tab

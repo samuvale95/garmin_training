@@ -75,7 +75,7 @@ export default function ConfirmDeletionsPage() {
           <div style={{ flex: 1 }} />
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 16 }}>
-            <PrimaryButton
+            <PrimaryButton data-track="confirm-deletions.confirmrewrite"
               state={startSync.isPending ? "loading" : "idle"}
               onClick={confirmRewrite}
               background="var(--rosso-forte)"
@@ -84,7 +84,7 @@ export default function ConfirmDeletionsPage() {
             >
               Cancella e ricrea
             </PrimaryButton>
-            <button
+            <button data-track="confirm-deletions.router-push"
               type="button"
               onClick={() => router.push("/diff")}
               className="tap-target"

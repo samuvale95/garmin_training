@@ -116,11 +116,11 @@ function ResultScreenInner() {
 
       <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
         {failed.length > 0 && (
-          <PrimaryButton state={startSync.isPending ? "loading" : "idle"} onClick={retryFailed}>
+          <PrimaryButton data-track="sync.result.retryfailed" state={startSync.isPending ? "loading" : "idle"} onClick={retryFailed}>
             Riprova solo queste {numberToItalianWords(failed.length)}
           </PrimaryButton>
         )}
-        <button
+        <button data-track="sync.result.router-push"
           type="button"
           onClick={() => router.push("/week")}
           className="tap-target"

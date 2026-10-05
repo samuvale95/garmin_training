@@ -1,5 +1,7 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
+import { markFlowComplete, useFlowTracking } from "@/lib/useTracking";
 import { useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
@@ -115,6 +117,7 @@ export function NutritionView() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cancelledRef = useRef(false);
   const [flow, setFlow] = useState<Flow>({ kind: "idle" });
+  useFlowTracking("meal", flow.kind);
   const [correcting, setCorrecting] = useState<FoodEntry | null>(null);
   const [runTimeSlot, setRunTimeSlot] = useState<RunTimeSlot>("pomeriggio");
 
@@ -167,7 +170,7 @@ export function NutritionView() {
         fat_g: asNumber(fields.fat),
         kcal: asNumber(fields.kcal),
       },
-      { onSuccess: () => setFlow({ kind: "idle" }) }
+      { onSuccess: () => { markFlowComplete("meal"); setFlow({ kind: "idle" }); } }
     );
   }
 
@@ -216,14 +219,14 @@ export function NutritionView() {
     return <EstimatingScreen preview={flow.preview} onCancel={cancelEstimating} />;
   }
   if (flow.kind === "review") {
-    return <ReviewScreen entry={flow.entry} preview={flow.preview} onDiscard={() => discardReview(flow.entry)} onSaved={closeFlow} />;
+    return <ReviewScreen entry={flow.entry} preview={flow.preview} onDiscard={() => discardReview(flow.entry)} onSaved={() => { markFlowComplete("meal"); closeFlow(); }} />;
   }
   if (flow.kind === "failed") {
     return (
       <FailedScreen
         preview={flow.preview}
         onRetake={() => retry(flow.entry, flow.preview)}
-        onSaved={closeFlow}
+        onSaved={() => { markFlowComplete("meal"); closeFlow(); }}
         entryId={flow.entry.id}
       />
     );
@@ -242,7 +245,7 @@ export function NutritionView() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <BrandMark height={22} />
           <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} transition={{ type: "spring", stiffness: 450, damping: 22 }}>
-            <Link href="/settings" className="tap-target" aria-label="Impostazioni"><Avatar size={32} /></Link>
+            <Link data-track="nutrition.impostazioni" href="/settings" className="tap-target" aria-label="Impostazioni"><Avatar size={32} /></Link>
           </motion.div>
         </div>
 
@@ -257,7 +260,7 @@ export function NutritionView() {
             <p className="font-serif-italic" style={{ fontSize: 13.5, color: "var(--inchiostro-70)", margin: "0 0 16px" }}>
               Si è verificato un problema di connessione con i dati di alimentazione.
             </p>
-            <button
+            <button data-track="nutrition.fuelquery-refetch"
               type="button"
               onClick={() => fuelQuery.refetch()}
               className="tap-target"
@@ -327,17 +330,17 @@ export function NutritionView() {
                 <p className="font-mono" style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
                   Pasti registrati oggi
                 </p>
-                <Link href="/body/fuel/diario" style={{ fontSize: 12, fontWeight: 600, color: "var(--rosso-avviso)", textDecoration: "none" }}>
+                <Link data-track="nutrition.body-fuel-diario" href="/body/fuel/diario" style={{ fontSize: 12, fontWeight: 600, color: "var(--rosso-avviso)", textDecoration: "none" }}>
                   Diario completo →
                 </Link>
               </div>
 
               {/* Azioni rapide aggiunta pasto */}
               <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-                <button
+                <button data-track="nutrition.opencamera"
                   type="button"
                   onClick={openCamera}
-                  disabled={logPhoto.isPending}
+                  {...dis(logPhoto.isPending, "in_caricamento")}
                   className="tap-target press-soft"
                   style={{
                     flex: 1,
@@ -359,10 +362,10 @@ export function NutritionView() {
                   <CameraIcon size={15} strokeWidth={2} />
                   <span>Fotografa</span>
                 </button>
-                <button
+                <button data-track="nutrition.setflow"
                   type="button"
                   onClick={() => setFlow({ kind: "compose" })}
-                  disabled={describeMeal.isPending}
+                  {...dis(describeMeal.isPending, "in_caricamento")}
                   className="tap-target press-soft"
                   style={{
                     flex: 1,

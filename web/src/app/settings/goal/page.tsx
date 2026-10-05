@@ -134,7 +134,7 @@ export default function RaceGoalSettingsPage() {
             La gara si legge contro sedute che esistono già: importa un piano, o collega Garmin
             e torna qui.
           </p>
-          <button
+          <button data-track="settings.goal.router-push"
             type="button"
             onClick={() => router.push("/import")}
             className="press-soft"
@@ -194,7 +194,7 @@ export default function RaceGoalSettingsPage() {
               hai già in calendario restano dove sono: le rileggo per dirti se ti portano lì.
             </p>
           )}
-          <button
+          <button data-track="settings.goal.startedit"
             type="button"
             onClick={startEdit}
             className="press-soft"
@@ -257,7 +257,7 @@ function GoalSummary({ goal, animate, onEdit }: { goal: RaceGoal; animate: boole
       </SlideUp>
 
       <SlideUp active={animate} delayMs={200} style={{ marginTop: 12 }}>
-        <button
+        <button data-track="settings.goal.onedit"
           type="button"
           onClick={onEdit}
           className="press-soft"
@@ -335,7 +335,7 @@ function GoalForm({
           {PRESET_DISTANCES.map((preset) => {
             const selected = Math.abs(Number(distanceKm.replace(",", ".")) - preset.km) < 0.001;
             return (
-              <button
+              <button data-track="settings.goal.setdistancekm"
                 key={preset.label}
                 type="button"
                 onClick={() => setDistanceKm(String(preset.km))}
@@ -392,7 +392,7 @@ function GoalForm({
       )}
 
       <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-        <button
+        <button data-track="settings.goal.oncancel"
           type="button"
           onClick={onCancel}
           className="press-soft"
@@ -400,7 +400,7 @@ function GoalForm({
         >
           Annulla
         </button>
-        <button
+        <button data-track="settings.goal.onsave"
           type="button"
           onClick={onSave}
           className="press-soft"
@@ -411,7 +411,7 @@ function GoalForm({
       </div>
 
       {onClear && (
-        <button
+        <button data-track="settings.goal.onclear"
           type="button"
           onClick={onClear}
           className="press-soft"

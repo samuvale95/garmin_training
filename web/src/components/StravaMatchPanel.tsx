@@ -88,7 +88,7 @@ export function StravaMatchPanel({
         <StravaRow label="Sensazione">&quot;{match.felt_note}&quot; · nota da Strava</StravaRow>
       )}
 
-      <Link href={`/shoes?from=${encodeURIComponent(shoesFrom)}`} style={{ textDecoration: "none", color: "inherit" }}>
+      <Link data-track="strava-match-panel.shoes-from-encodeuricomponent-" href={`/shoes?from=${encodeURIComponent(shoesFrom)}`} style={{ textDecoration: "none", color: "inherit" }}>
         <div
           style={{
             display: "flex",

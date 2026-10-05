@@ -165,7 +165,7 @@ function Empty({ title, body, href, cta }: { title: string; body: string; href: 
           {body}
         </p>
       </div>
-      <Link
+      <Link data-track="coach.esecuzione.href"
         href={href}
         className="press-soft"
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: "15px 18px", marginTop: 10, textDecoration: "none", color: "inherit" }}

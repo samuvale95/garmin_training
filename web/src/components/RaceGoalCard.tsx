@@ -35,7 +35,7 @@ export function RaceGoalCard({
 
   return (
     <SlideUp active={animate} delayMs={delayMs} style={{ marginTop: 14 }}>
-      <Link href="/settings/goal" style={{ display: "block", textDecoration: "none", color: "inherit" }}>
+      <Link data-track="race-goal-card.settings-goal" href="/settings/goal" style={{ display: "block", textDecoration: "none", color: "inherit" }}>
         <TiltCard
           maxTilt={4}
           style={{
@@ -93,7 +93,7 @@ export function RaceGoalCard({
 function MissingGoalCard({ sessions, animate, delayMs }: { sessions: number; animate: boolean; delayMs: number }) {
   return (
     <SlideUp active={animate} delayMs={delayMs} style={{ marginTop: 14 }}>
-      <Link href="/settings/goal" style={{ display: "block", textDecoration: "none", color: "inherit" }}>
+      <Link data-track="race-goal-card.settings-goal-2" href="/settings/goal" style={{ display: "block", textDecoration: "none", color: "inherit" }}>
         <motion.div
           whileHover={{ y: -2.5, scale: 1.012 }}
           whileTap={{ scale: 0.985 }}

@@ -86,14 +86,14 @@ export default function DiffPage() {
           background: "linear-gradient(to top, var(--crema) 62%, transparent)",
         }}
       >
-        <PrimaryButton
+        <PrimaryButton data-track="diff.writenewonly"
           state={!diff || diff.to_create.length === 0 ? "disabled" : startSync.isPending ? "loading" : "idle"}
           onClick={writeNewOnly}
         >
           {diff ? `Scrivi le ${diff.to_create.length} nuove` : "Calcolo..."}
         </PrimaryButton>
         {diff && diff.changed.length > 0 && (
-          <button
+          <button data-track="diff.reviewchanged"
             type="button"
             onClick={reviewChanged}
             className="tap-target"

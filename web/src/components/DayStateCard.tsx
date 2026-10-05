@@ -31,7 +31,7 @@ export function DayStateCard({ verdict, narrative, animate, delayMs = 0 }: { ver
 
   return (
     <SlideUp active={animate} delayMs={delayMs} style={{ marginTop: 14 }}>
-      <Link
+      <Link data-track="day-state-card.body-stato"
         href="/body/stato"
         className="press-soft"
         style={{

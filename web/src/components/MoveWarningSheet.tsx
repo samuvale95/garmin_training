@@ -6,6 +6,7 @@ import { Illustration } from "@/components/Illustration";
 import { EVIDENCE_LABELS, clearPendingMove, recordMoveDecision, usePendingMove } from "@/lib/moveWarnings";
 import { useUpdateSession } from "@/lib/queries";
 import { formatFullDate } from "@/lib/format";
+import { useModalTracking } from "@/lib/useTracking";
 
 /** The warning after a risky move (§0.5 of the brainstorming): what the rule is, with the
  * user's own sessions, and three answers. Never a block: "Confermo" keeps the move as
@@ -14,6 +15,7 @@ export function MoveWarningSheet() {
   const move = usePendingMove();
   const updateSession = useUpdateSession();
   const { reduced } = useMotionEnabled();
+  useModalTracking("move_warning", !!move);
   if (!move) return null;
 
   const { adapted } = move.check;
@@ -117,7 +119,7 @@ export function MoveWarningSheet() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
           {adapted && (
-            <motion.button
+            <motion.button data-track="move-warning-sheet.answer"
               type="button"
               whileTap={{ scale: 0.96 }}
               whileHover={{ scale: 1.015, y: -1 }}
@@ -128,7 +130,7 @@ export function MoveWarningSheet() {
               Adatta: {adapted.title}
             </motion.button>
           )}
-          <motion.button
+          <motion.button data-track="move-warning-sheet.answer-2"
             type="button"
             whileTap={{ scale: 0.96 }}
             whileHover={{ scale: 1.015, y: -1 }}
@@ -138,7 +140,7 @@ export function MoveWarningSheet() {
           >
             Confermo, mi prendo il rischio
           </motion.button>
-          <motion.button
+          <motion.button data-track="move-warning-sheet.answer-3"
             type="button"
             whileTap={{ scale: 0.96 }}
             whileHover={{ scale: 1.015, y: -1 }}

@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import type { CSSProperties, ElementType, ReactNode } from "react";
 import { motion } from "framer-motion";
 import { useMotionEnabled } from "@/lib/motion";
@@ -247,6 +248,8 @@ interface PrimaryButtonProps {
   background?: string;
   textColor?: string;
   type?: "button" | "submit";
+  /** Name in the interaction log (`screen.element`). */
+  "data-track"?: string;
 }
 
 export function PrimaryButton({
@@ -259,6 +262,7 @@ export function PrimaryButton({
   background = "var(--accent)",
   textColor = "var(--crema)",
   type = "button",
+  "data-track": dataTrack,
 }: PrimaryButtonProps) {
   const { reduced } = useMotionEnabled();
   const disabled = state === "disabled" || state === "loading";
@@ -266,10 +270,10 @@ export function PrimaryButton({
   const isLoading = state === "loading";
 
   return (
-    <motion.button
+    <motion.button data-track={dataTrack}
       type={type}
       onClick={onClick}
-      disabled={disabled}
+      {...dis(disabled, state === "loading" ? "in_caricamento" : "non_pronto")}
       className="tap-target"
       whileTap={reduced || disabled ? undefined : { scale: 0.96 }}
       whileHover={reduced || disabled ? undefined : { scale: 1.015, y: -1 }}

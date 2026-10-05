@@ -86,7 +86,7 @@ export default function FuelDiaryPage() {
             WebkitOverflowScrolling: "touch",
           }}
         >
-          <button
+          <button data-track="body.fuel.diario.setselecteddate"
             type="button"
             onClick={() => setSelectedDate(null)}
             className="press-soft"
@@ -110,7 +110,7 @@ export default function FuelDiaryPage() {
             const isSel = selectedDate === d.date;
             const label = isToday ? "Oggi" : d.date.slice(5).replace("-", "/");
             return (
-              <button
+              <button data-track="body.fuel.diario.setselecteddate-2"
                 key={d.date}
                 type="button"
                 onClick={() => setSelectedDate(isSel ? null : d.date)}
@@ -259,7 +259,7 @@ function EmptyDiary({ animate }: { animate: boolean }) {
         Fotografa un piatto o scrivi cosa hai mangiato: da lì in poi lo ritrovi qui, e
         puoi correggerlo quando vuoi.
       </p>
-      <Link
+      <Link data-track="body.fuel.diario.body-fuel"
         href="/body/fuel"
         className="press-soft"
         style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-pill)", padding: "12px 18px", marginTop: 16, textDecoration: "none", fontSize: 14, fontWeight: 600 }}

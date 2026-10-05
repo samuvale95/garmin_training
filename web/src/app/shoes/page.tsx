@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
@@ -115,10 +116,10 @@ function ShoeCard({
           {shoe.wear_percent.toFixed(0)}% dei 700 km
           {shoe.weeks_remaining != null && ` · a questo ritmo si esauriscono in ${shoe.weeks_remaining} settiman${shoe.weeks_remaining === 1 ? "a" : "e"}`}
         </p>
-        <button
+        <button data-track="shoes.onretire"
           type="button"
           onClick={onRetire}
-          disabled={retiring}
+          {...dis(retiring, "in_caricamento")}
           className="tap-target"
           style={{
             marginTop: 12,

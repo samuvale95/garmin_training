@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { Suspense, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
@@ -101,10 +102,10 @@ function SyncScreenInner() {
         })}
       </div>
 
-      <button
+      <button data-track="sync.jobid"
         type="button"
         onClick={() => jobId && cancelSync.mutate(jobId)}
-        disabled={cancelSync.isPending || status?.cancel_requested}
+        {...dis(cancelSync.isPending || status?.cancel_requested, "annullamento_richiesto")}
         className="tap-target"
         style={{ background: "none", border: "none", color: "var(--inchiostro-su-scuro)", fontSize: 12, marginTop: 16, cursor: "pointer" }}
       >

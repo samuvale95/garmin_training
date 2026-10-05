@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { useMotionEnabled } from "@/lib/motion";
+import { markTabMethod } from "@/lib/tracker";
 
 const TABS = [
   { href: "/today", label: "Oggi", path: "M3 11 12 3l9 8M5 10v11h5v-7h4v7h5V10" },
@@ -28,7 +29,7 @@ export function TabBar() {
           >
             {/* scroll={false}: the pager restores each tab's own scroll (TabsPager.tsx);
                 Next's scroll-to-top on navigation would land after it and undo it. */}
-            <Link href={tab.href} scroll={false} className="tap-target tab-link" aria-current={active ? "page" : undefined}>
+            <Link href={tab.href} scroll={false} className="tap-target tab-link" data-track={`tabbar.${tab.href.slice(1)}`} onClick={() => markTabMethod("tap")} aria-current={active ? "page" : undefined}>
               {active && (reduced ? <span className="tab-indicator" /> :
                 <motion.span className="tab-indicator" layoutId="tab-pill" transition={{ type: "spring", stiffness: 420, damping: 36 }} />)}
               <span className="tab-link-content">

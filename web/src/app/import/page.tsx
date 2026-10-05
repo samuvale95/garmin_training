@@ -128,7 +128,7 @@ export default function ImportPlanPage() {
             }}
           />
           <div style={{ marginTop: 10 }}>
-            <PrimaryButton
+            <PrimaryButton data-track="import.acceptpastedtext"
               state={pending ? "loading" : pastedText.trim() ? "idle" : "disabled"}
               onClick={acceptPastedText}
               background="var(--corallo)"
@@ -195,7 +195,7 @@ export default function ImportPlanPage() {
 
 function Row({ icon, label, detail, onClick, spin }: { icon: string; label: string; detail?: string; onClick: () => void; spin: boolean }) {
   return (
-    <button
+    <button data-track="import.onclick"
       type="button"
       onClick={onClick}
       className="tap-target"

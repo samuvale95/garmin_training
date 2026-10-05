@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { useEffect, useState } from "react";
 import { SlideUp } from "@/components/motion/primitives";
 import { BellIcon, DropletIcon, UtensilsIcon, CheckIcon } from "@/components/Icons";
@@ -210,10 +211,10 @@ export function FuelReminderCard({
       {/* Action button & instructions */}
       <div style={{ marginTop: 12 }}>
         {notifStatus.permission === "granted" ? (
-          <button
+          <button data-track="fuel-reminder-card.handletest"
             type="button"
             onClick={handleTest}
-            disabled={testSent}
+            {...dis(testSent, "gia_inviato")}
             style={{
               background: "rgba(34, 34, 34, 0.06)",
               color: "var(--inchiostro)",
@@ -242,7 +243,7 @@ export function FuelReminderCard({
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <button
+            <button data-track="fuel-reminder-card.handleenable"
               type="button"
               onClick={handleEnable}
               style={{

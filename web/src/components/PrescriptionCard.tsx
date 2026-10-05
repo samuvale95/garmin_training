@@ -103,7 +103,7 @@ export function PrescriptionCard({
       </p>
 
       {added ? (
-        <button
+        <button data-track="prescription-card.router-push"
           type="button"
           onClick={() => router.push("/week")}
           className="press-soft"
@@ -112,7 +112,7 @@ export function PrescriptionCard({
           Aggiunta al piano · vedi in Settimana
         </button>
       ) : (
-        <button
+        <button data-track="prescription-card.add"
           type="button"
           onClick={add}
           className="press-soft"
@@ -136,7 +136,7 @@ export function SensitivityTable({ rows, animate, delayMs }: { rows: Sensitivity
 
   return (
     <SlideUp active={animate} delayMs={delayMs} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14 }}>
-      <button
+      <button data-track="prescription-card.setopen"
         type="button"
         onClick={() => setOpen(!open)}
         className="press-soft"

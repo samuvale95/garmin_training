@@ -25,7 +25,7 @@ export default function EntryPage() {
 
   // The only two places this screen can lead. Prefetching them here means the tap lands
   // on a ready screen: a `router.push` on its own fetches the route only once tapped
-  // (unlike a `<Link>`, which prefetches when it comes into view).
+  // (unlike a `<Link data-track="home.link">`, which prefetches when it comes into view).
   useEffect(() => {
     router.prefetch("/connect-garmin");
     router.prefetch("/today");
@@ -91,7 +91,7 @@ export default function EntryPage() {
       </SlideUp>
 
       <SlideUp active={animate} delayMs={500} style={{ marginTop: 16, paddingBottom: 22, display: "flex", flexDirection: "column", gap: 13 }}>
-        <PrimaryButton sheen onClick={() => router.push("/connect-garmin")}>
+        <PrimaryButton data-track="home.router-push" sheen onClick={() => router.push("/connect-garmin")}>
           Continua
         </PrimaryButton>
         <p style={{ font: "500 12px/1.6 var(--font-sans)", color: "var(--inchiostro-35)", textAlign: "center", margin: 0 }}>

@@ -131,7 +131,7 @@ export function ZoneRecalibrationCard({ data, animate = true, delayMs = 0 }: Zon
         {/* Toggle 5-Zone breakdown table */}
         {data.zones.length > 0 && (
           <div style={{ marginTop: 16 }}>
-            <button
+            <button data-track="zone-recalibration-card.setshowtable"
               type="button"
               onClick={() => setShowTable(!showTable)}
               style={{

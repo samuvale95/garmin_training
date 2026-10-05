@@ -385,7 +385,7 @@ export function ReadinessMeaning({ score, href }: { score: number; href?: string
     );
   }
   return (
-    <Link href={href} style={{ textDecoration: "none", color: "inherit" }}>
+    <Link data-track="body-cards.href" href={href} style={{ textDecoration: "none", color: "inherit" }}>
       <span className="font-mono" style={{ fontSize: 11.5, opacity: 0.75, borderBottom: "1px dotted currentColor" }}>
         {text} · cos&apos;è
       </span>

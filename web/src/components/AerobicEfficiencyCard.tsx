@@ -200,7 +200,7 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
                 ? "I battiti tendono a salire un po' prima: mantieni le corse facili davvero lente e riposa."
                 : "Mantieni la costanza nelle corse tranquille senza forzare il ritmo."}
             </p>
-            <button
+            <button data-track="aerobic-efficiency-card.setshowtechnicaldetails"
               type="button"
               onClick={() => setShowTechnicalDetails((v) => !v)}
               className="press-soft"

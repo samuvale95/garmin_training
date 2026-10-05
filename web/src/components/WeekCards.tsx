@@ -308,7 +308,7 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
       }}
     >
       {href ? (
-        <Link href={href} draggable={false} style={{ textDecoration: "none", color: "inherit" }} onPointerDown={onPrefetch}>
+        <Link data-track="week-cards.href" href={href} draggable={false} style={{ textDecoration: "none", color: "inherit" }} onPointerDown={onPrefetch}>
           {body}
         </Link>
       ) : (

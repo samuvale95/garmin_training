@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
 import { useMotionEnabled } from "@/lib/motion";
 import { apiUrl } from "@/lib/apiClient";
@@ -415,19 +416,19 @@ export function FuelCorrectionSheet({ entry, onClose }: { entry: FoodEntry; onCl
         </p>
 
         <div style={{ display: "flex", gap: 10 }}>
-          <button
+          <button data-track="fuel-correction-sheet.remove"
             type="button"
             onClick={remove}
-            disabled={busy}
+            {...dis(busy, "in_caricamento")}
             className="tap-target"
             style={{ background: "var(--sabbia-chip)", color: "var(--rosso-avviso)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: busy ? "default" : "pointer" }}
           >
             Elimina
           </button>
-          <button
+          <button data-track="fuel-correction-sheet.save"
             type="button"
             onClick={save}
-            disabled={busy}
+            {...dis(busy, "in_caricamento")}
             className="tap-target"
             style={{ flex: 1, background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: busy ? "default" : "pointer" }}
           >

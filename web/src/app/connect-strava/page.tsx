@@ -63,10 +63,10 @@ export default function ConnectStravaPage() {
       <div style={{ flex: 1 }} />
 
       <SlideUp active={animate} delayMs={340} style={{ paddingBottom: 24, display: "flex", flexDirection: "column", gap: 12 }}>
-        <PrimaryButton state={authorize.isPending ? "loading" : "idle"} onClick={handleAuthorize}>
+        <PrimaryButton data-track="connect-strava.handleauthorize" state={authorize.isPending ? "loading" : "idle"} onClick={handleAuthorize}>
           Autorizza Strava
         </PrimaryButton>
-        <button
+        <button data-track="connect-strava.router-push"
           type="button"
           onClick={() => router.push("/settings")}
           className="tap-target"

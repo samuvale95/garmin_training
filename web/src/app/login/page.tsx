@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -202,10 +203,10 @@ export default function LoginPage() {
         )}
 
         {/* High-end Google Button */}
-        <motion.button
+        <motion.button data-track="login.handlesignin"
           type="button"
           onClick={handleSignIn}
-          disabled={pending}
+          {...dis(pending, "in_caricamento")}
           whileTap={{ scale: 0.97 }}
           whileHover={{ scale: 1.015, y: -1, boxShadow: "0 8px 24px rgba(0,0,0,0.08)" }}
           transition={{ type: "spring", stiffness: 450, damping: 25 }}
@@ -255,7 +256,7 @@ export default function LoginPage() {
           )}
         </motion.button>
 
-        <button
+        <button data-track="login.signindev"
           type="button"
           onClick={() => signInDev()}
           style={{

@@ -95,7 +95,7 @@ function WorkoutDetailContent() {
           {/* Only once the step structure is here: the editor is seeded from it, and a
               pencil tapped before it lands would open an empty form. */}
           {session && (
-            <Link
+            <Link data-track="workout.id.modifica-allenamento"
               href={`/workout/${params.id}/edit?date=${date}`}
               className="tap-target"
               aria-label="Modifica allenamento"
@@ -134,7 +134,7 @@ function WorkoutDetailContent() {
       }
       footer={
         <div style={{ marginTop: 28, textAlign: "center" }}>
-          <Link
+          <Link data-track="workout.id.week"
             href="/week"
             className="tap-target"
             style={{

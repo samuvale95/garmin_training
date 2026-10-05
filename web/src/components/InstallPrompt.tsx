@@ -110,7 +110,7 @@ export function InstallPrompt() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           {!isIOS && deferredPrompt && (
-            <motion.button
+            <motion.button data-track="install-prompt.handleinstallclick"
               whileTap={{ scale: 0.94 }}
               onClick={handleInstallClick}
               style={{
@@ -132,7 +132,7 @@ export function InstallPrompt() {
             </motion.button>
           )}
 
-          <button
+          <button data-track="install-prompt.chiudi-avviso"
             onClick={handleDismiss}
             aria-label="Chiudi avviso"
             style={{

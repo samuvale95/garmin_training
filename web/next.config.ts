@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Stamped on every interaction event so a pattern can be tied to the build that caused it.
+  env: {
+    NEXT_PUBLIC_APP_VERSION: (process.env.RENDER_GIT_COMMIT ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "dev").slice(0, 8),
+  },
   /* config options here */
   // Consente al dev server di rispondere alle richieste provenienti da
   // dispositivi sulla stessa rete locale (es. telefono via QR code).

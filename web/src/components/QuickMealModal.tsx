@@ -1,6 +1,8 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { useState, useRef, useEffect, type ChangeEvent } from "react";
+import { useModalTracking } from "@/lib/useTracking";
 import { motion, AnimatePresence } from "framer-motion";
 import { CloseIcon, PlusIcon, LightningIcon, PencilIcon, CameraIcon, CheckIcon } from "@/components/Icons";
 import { PortionPicker } from "@/components/FuelCorrectionSheet";
@@ -48,6 +50,8 @@ export function QuickMealModal({
   const describeMeal = useDescribeMeal();
   const logPhoto = useLogPhoto();
   const athleteLevel = useAthleteLevel();
+
+  useModalTracking("quick_meal", isOpen);
 
   // Reset when opened
   useEffect(() => {
@@ -177,7 +181,7 @@ export function QuickMealModal({
               </p>
               <h2 style={{ font: "600 20px/1.2 var(--font-sans)", margin: "4px 0 0" }}>Registra Pasto o Snack</h2>
             </div>
-            <button
+            <button data-track="quick-meal-modal.onclose"
               onClick={onClose}
               className="tap-target"
               style={{
@@ -203,7 +207,7 @@ export function QuickMealModal({
 
           {/* Mode Switcher */}
           <div style={{ display: "flex", background: "var(--sabbia)", padding: 3, borderRadius: 14, marginBottom: 18 }}>
-            <button
+            <button data-track="quick-meal-modal.button"
               onClick={() => { setMode("preset"); setSelectedPreset(null); }}
               style={{
                 flex: 1,
@@ -226,7 +230,7 @@ export function QuickMealModal({
               <LightningIcon size={13} strokeWidth={2.2} />
               <span>Rapidi</span>
             </button>
-            <button
+            <button data-track="quick-meal-modal.setmode"
               onClick={() => setMode("text")}
               style={{
                 flex: 1,
@@ -249,7 +253,7 @@ export function QuickMealModal({
               <PencilIcon size={13} strokeWidth={2} />
               <span>Scrivi</span>
             </button>
-            <button
+            <button data-track="quick-meal-modal.button-2"
               onClick={() => {
                 setMode("photo");
                 fileInputRef.current?.click();
@@ -292,7 +296,7 @@ export function QuickMealModal({
               {!selectedPreset ? (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   {COMMON_RUNNER_SNACKS.map((snack) => (
-                    <motion.button
+                    <motion.button data-track="quick-meal-modal.handleselectpreset"
                       key={snack.name}
                       whileTap={{ scale: 0.96 }}
                       onClick={() => handleSelectPreset(snack)}
@@ -331,7 +335,7 @@ export function QuickMealModal({
                         Base: {selectedPreset.portion}
                       </p>
                     </div>
-                    <button
+                    <button data-track="quick-meal-modal.setselectedpreset"
                       onClick={() => setSelectedPreset(null)}
                       style={{
                         background: "none",
@@ -389,8 +393,8 @@ export function QuickMealModal({
                     );
                   })()}
 
-                  <button
-                    disabled={saving || success}
+                  <button data-track="quick-meal-modal.handlesavepreset"
+                    {...dis(saving || success, "in_caricamento")}
                     onClick={handleSavePreset}
                     style={{
                       display: "flex",
@@ -449,8 +453,8 @@ export function QuickMealModal({
                   marginBottom: 12,
                 }}
               />
-              <button
-                disabled={saving || success || !textInput.trim()}
+              <button data-track="quick-meal-modal.handlesavetext"
+                {...dis(saving || success || !textInput.trim(), "in_caricamento_o_testo_vuoto")}
                 onClick={handleSaveText}
                 style={{
                   display: "flex",
@@ -488,8 +492,8 @@ export function QuickMealModal({
               <p style={{ fontSize: 14, color: "var(--inchiostro-70)", margin: "0 0 14px" }}>
                 Scatta o seleziona una foto del piatto per la stima automatica.
               </p>
-              <button
-                disabled={saving || success}
+              <button data-track="quick-meal-modal.fileinputref-current"
+                {...dis(saving || success, "in_caricamento")}
                 onClick={() => fileInputRef.current?.click()}
                 style={{
                   padding: "12px 24px",

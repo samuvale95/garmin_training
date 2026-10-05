@@ -1,5 +1,6 @@
 "use client";
 
+import { dis } from "@/lib/disabled";
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { SlideUp, WordIn } from "@/components/motion/primitives";
@@ -95,7 +96,7 @@ export default function BodySettingsPage() {
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
             <p style={{ fontSize: 13, color: "var(--inchiostro-50)", margin: 0 }}>peso</p>
             {!editing && (
-              <button
+              <button data-track="settings.body.startedit"
                 type="button"
                 onClick={startEdit}
                 className="tap-target"
@@ -118,7 +119,7 @@ export default function BodySettingsPage() {
                 className="font-mono"
                 style={{ ...weightInputStyle, fontSize: 32 }}
               />
-              <button
+              <button data-track="settings.body.save"
                 type="button"
                 onClick={save}
                 className="tap-target"
@@ -128,7 +129,7 @@ export default function BodySettingsPage() {
               </button>
             </div>
           ) : (
-            <button type="button" onClick={startEdit} style={{ display: "block", background: "none", border: "none", padding: 0, marginTop: 4, textAlign: "left", cursor: "pointer" }}>
+            <button data-track="settings.body.startedit-2" type="button" onClick={startEdit} style={{ display: "block", background: "none", border: "none", padding: 0, marginTop: 4, textAlign: "left", cursor: "pointer" }}>
               <span className="font-mono" style={{ fontSize: 40, fontWeight: 500, color: "var(--inchiostro)" }}>
                 {formatWeight(effective.weightKg)}
               </span>
@@ -177,10 +178,10 @@ export default function BodySettingsPage() {
               className="font-mono"
               style={{ ...weightInputStyle, color: draft ? "var(--inchiostro)" : "var(--inchiostro-35)" }}
             />
-            <button
+            <button data-track="settings.body.save-2"
               type="button"
               onClick={save}
-              disabled={!draft}
+              {...dis(!draft, "dati_non_caricati")}
               className="tap-target"
               style={{ background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 24px", fontSize: 15, fontWeight: 600, cursor: draft ? "pointer" : "default", opacity: draft ? 1 : 0.5 }}
             >
@@ -235,7 +236,7 @@ export default function BodySettingsPage() {
       )}
 
       {effective?.source === "manual" && (
-        <button
+        <button data-track="settings.body.setmanualweight"
           type="button"
           onClick={() => setManualWeight(null)}
           className="tap-target"
