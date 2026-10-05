@@ -10,7 +10,7 @@ from __future__ import annotations
 import base64
 from datetime import date as date_type
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -298,6 +298,19 @@ class SetGoalRequest(BaseModel):
 
 class DeletePlanResponse(BaseModel):
     ok: bool
+
+
+# ---- interaction events ---------------------------------------------------------------------
+
+
+class EventBatchIn(BaseModel):
+    """A batch of raw interaction events; each one is validated and trimmed by `interactions`."""
+
+    session_id: str = Field(min_length=1, max_length=64)
+    events: list[dict[str, Any]]
+    app_version: str | None = Field(default=None, max_length=40)
+    standalone: bool | None = None
+    user_agent: str | None = Field(default=None, max_length=200)
 
 
 # ---- diff -----------------------------------------------------------------------------------
