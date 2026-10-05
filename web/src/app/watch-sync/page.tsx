@@ -8,6 +8,7 @@ import { PrimaryButton, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMotionEnabled, useMountOnce } from "@/lib/motion";
 import { useRefreshServerData } from "@/lib/queries";
 import { lastSyncLabel, missingDataNote, useWatchSyncStatus } from "@/lib/watchSync";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** Garmin Connect Mobile's URL scheme. The watch -> cloud sync is the Garmin app's job
  * and only its job: there is no API to trigger it from here, so the whole screen exists
@@ -58,6 +59,7 @@ export default function WatchSyncPage() {
   const animate = useMountOnce("watch-sync");
   const { reduced } = useMotionEnabled();
   const watch = useWatchSyncStatus();
+  useScreenReady(watch.ready);
   const { mutate: recheck, isPending: rechecking } = useRefreshServerData();
 
   // The data arrived (here, or while the user was over in Garmin Connect): this screen

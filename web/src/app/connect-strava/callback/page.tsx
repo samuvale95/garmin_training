@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PrimaryButton } from "@/components/motion/primitives";
 import { useConnectStrava } from "@/lib/queries";
 import { ApiError } from "@/lib/apiClient";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** Strava redirects here with `?code=...` (or `?error=access_denied` if the user
  * declined) after the consent screen at STRAVA_REDIRECT_URI. This completes the
@@ -32,6 +33,7 @@ function StravaCallback() {
   const connect = useConnectStrava();
   const [error, setError] = useState<string | null>(null);
   const attempted = useRef(false);
+  useScreenReady(!!error || connect.isSuccess || connect.isError);
 
   useEffect(() => {
     if (attempted.current) return;

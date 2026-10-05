@@ -9,10 +9,12 @@ import { useConnectGarmin, useGarminStatus } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
 import { ApiError } from "@/lib/apiClient";
 import { numberToItalianWords } from "@/lib/format";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 export default function RateLimitPage() {
   const router = useRouter();
   const { data } = useGarminStatus();
+  useScreenReady(!!data);
   const [remaining, setRemaining] = useState<number | null>(null);
   const lastGarminEmail = usePassoStore((s) => s.lastGarminEmail);
   const latestJob = usePassoStore((s) => s.writeJobHistory[0]);

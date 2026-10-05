@@ -9,6 +9,7 @@ import { useMountOnce } from "@/lib/motion";
 import { useParsePlanFile, useParsePlanText, usePlanQuery, useSetPlan } from "@/lib/queries";
 import { ApiError } from "@/lib/apiClient";
 import { isoWeekNumber } from "@/lib/sessionVisuals";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 function daysAgo(isoDate: string): string {
   const days = Math.floor((Date.now() - new Date(isoDate).getTime()) / 86_400_000);
@@ -23,6 +24,7 @@ function weeksSpanned(sessions: { date: string }[]): number {
 }
 
 export default function ImportPlanPage() {
+  useScreenReady(true);
   const router = useRouter();
   const animate = useMountOnce("import");
   const { data: plan } = usePlanQuery();

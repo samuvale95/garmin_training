@@ -7,6 +7,7 @@ import { SkeletonStravaPanel } from "@/components/skeletons";
 import { StravaComparisonScreen } from "@/components/StravaComparisonScreen";
 import { useMountOnce } from "@/lib/motion";
 import { useStravaActivityMatch, useStravaStatus, useWorkoutSession, useWorkoutsForDate } from "@/lib/queries";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** Full planned-vs-done comparison for a live Garmin-calendar workout (no local plan)
  * -- the same screen as `session/[id]/strava`, reached the same way: from the "Svolta,
@@ -24,6 +25,7 @@ function WorkoutStravaContent() {
 
   const stravaStatus = useStravaStatus();
   const matchQuery = useStravaActivityMatch(session, !!stravaStatus.data?.connected);
+  useScreenReady(!!session && !matchQuery.isPending);
 
   return (
     <StravaComparisonScreen

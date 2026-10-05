@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** Screen 13 ("Il corpo dice no") as it was: a full-screen takeover of Oggi, triggered
  * by a single low readiness score, and only ever about *tomorrow's* session.
@@ -13,6 +14,8 @@ import { useRouter } from "next/navigation";
  * replaced it rather than on nothing.
  */
 export default function BodyConflictPage() {
+  // A redirect: nothing here to wait for.
+  useScreenReady(true);
   const router = useRouter();
   useEffect(() => {
     router.replace("/body/stato");

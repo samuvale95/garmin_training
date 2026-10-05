@@ -7,11 +7,13 @@ import { Illustration } from "@/components/Illustration";
 import { PrimaryButton, WordIn, SlideUp } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useGarminStatus, usePlanQuery } from "@/lib/queries";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 export default function EntryPage() {
   const router = useRouter();
   const { data: plan } = usePlanQuery();
   const status = useGarminStatus();
+  useScreenReady(!!plan || !status.isPending);
   const garminConnected = status.data?.connected ?? false;
   const animate = useMountOnce("entry");
 

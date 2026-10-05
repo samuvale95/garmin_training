@@ -20,8 +20,11 @@ import { usePassoStore } from "@/lib/store";
 import { downloadPlanYaml } from "@/lib/planYaml";
 import { countdownLabel, goalTitle } from "@/lib/raceGoal";
 import { minutesAgo } from "@/lib/format";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 export default function SettingsPage() {
+  // Every section renders from the first paint; the Garmin/Strava rows fill in place.
+  useScreenReady(true);
   const router = useRouter();
   const { data: garminStatus } = useGarminStatus();
   const { data: device } = useGarminDevice(garminStatus?.connected ?? false);

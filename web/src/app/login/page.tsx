@@ -7,8 +7,10 @@ import { motion } from "framer-motion";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { RunnerIcon, WatchIcon } from "@/components/Icons";
 import { signInDev, signInWithGoogle } from "@/lib/auth";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 export default function LoginPage() {
+  useScreenReady(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

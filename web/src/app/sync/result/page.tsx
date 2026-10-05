@@ -10,6 +10,7 @@ import { useStartSync, useSyncJobStatus } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
 import { useSyncFlowStore } from "@/lib/syncFlowStore";
 import { capitalize, formatDuration, formatShortDate, numberToItalianWords } from "@/lib/format";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 function ResultScreenInner() {
   const router = useRouter();
@@ -21,6 +22,7 @@ function ResultScreenInner() {
   const startSync = useStartSync();
 
   const status = liveStatus ?? history.find((h) => h.jobId === jobId);
+  useScreenReady(!!status);
   if (!status) {
     return (
       <div style={{ padding: 22 }}>

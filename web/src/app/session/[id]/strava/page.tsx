@@ -5,6 +5,7 @@ import { StravaComparisonScreen } from "@/components/StravaComparisonScreen";
 import { useMountOnce } from "@/lib/motion";
 import { useRequirePlan } from "@/lib/guards";
 import { findPlanSession, useStravaActivityMatch, useStravaStatus } from "@/lib/queries";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 export default function SessionStravaPage() {
   const params = useParams<{ id: string }>();
@@ -14,6 +15,7 @@ export default function SessionStravaPage() {
 
   const stravaStatus = useStravaStatus();
   const matchQuery = useStravaActivityMatch(session, !!stravaStatus.data?.connected);
+  useScreenReady(!!session && !matchQuery.isPending);
 
   return (
     <StravaComparisonScreen

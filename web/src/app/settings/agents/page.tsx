@@ -21,11 +21,13 @@ import {
   type AgentRun,
   type ProposalStatus,
 } from "@/lib/agents";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** Screen "Agenti" (admin only): the switch, the budget, the proposal queue and the run
  * history. Agents only ever propose; every change goes through a decision here. */
 export default function AgentsAdminPage() {
   const { data: me, isPending } = useIsAdmin();
+  useScreenReady(!isPending);
 
   return (
     <div style={{ padding: "24px 22px 40px" }}>

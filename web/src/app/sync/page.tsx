@@ -10,11 +10,13 @@ import { StatusDot, WordIn, BarGrow } from "@/components/motion/primitives";
 import { useCancelSync, useSyncJobStatus } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
 import { useSyncFlowStore } from "@/lib/syncFlowStore";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 function SyncScreenInner() {
   const router = useRouter();
   const jobId = useSearchParams().get("job");
   const { data: status } = useSyncJobStatus(jobId);
+  useScreenReady(!jobId || !!status);
   const cancelSync = useCancelSync();
   const addJobHistory = usePassoStore((s) => s.addJobHistory);
   const startedAt = useSyncFlowStore((s) => s.startedAt);

@@ -8,8 +8,10 @@ import { PrimaryButton, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useStravaAuthorize } from "@/lib/queries";
 import { ApiError } from "@/lib/apiClient";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 export default function ConnectStravaPage() {
+  useScreenReady(true);
   const router = useRouter();
   const animate = useMountOnce("connect-strava");
   const authorize = useStravaAuthorize();

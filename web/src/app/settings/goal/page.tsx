@@ -13,6 +13,7 @@ import { countdownLabel, distanceLabel, formatPaceSecPerKm, formatTargetTime, ta
 import { formatFullDate } from "@/lib/format";
 import { shiftDateKey, toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
 import type { RaceGoal } from "@/lib/types";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 /** The distances offered as one tap. Anything else is typed in km -- these are only
  * the four that account for nearly every race a plan gets written for. */
@@ -68,6 +69,7 @@ export default function RaceGoalSettingsPage() {
   // before that -- just enough to say "you have sessions ahead" honestly.
   const liveRangeEnd = goal ? goal.race_date : shiftDateKey(todayKey, GOAL_LOOKAHEAD_DAYS);
   const workoutsQuery = useWorkouts(todayKey, liveRangeEnd, liveMode);
+  useScreenReady(isHydrated && !(liveMode && workoutsQuery.isPending));
   const sessions = useMemo(
     () => (plan?.sessions ?? workoutsToSessions(workoutsQuery.data?.workouts ?? [])),
     [plan?.sessions, workoutsQuery.data]

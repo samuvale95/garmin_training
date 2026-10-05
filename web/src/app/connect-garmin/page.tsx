@@ -11,8 +11,10 @@ import { useMountOnce } from "@/lib/motion";
 import { useConnectGarmin } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
 import { ApiError } from "@/lib/apiClient";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 export default function ConnectGarminPage() {
+  useScreenReady(true);
   const router = useRouter();
   const animate = useMountOnce("connect-garmin");
   const [email, setEmail] = useState("");

@@ -7,8 +7,10 @@ import { PrimaryButton } from "@/components/motion/primitives";
 import { useStartSync } from "@/lib/queries";
 import { useSyncFlowStore } from "@/lib/syncFlowStore";
 import { capitalize, formatShortDate, numberToItalianWords } from "@/lib/format";
+import { useScreenReady } from "@/lib/useScreenReady";
 
 export default function ConfirmDeletionsPage() {
+  useScreenReady(true);
   const router = useRouter();
   const changed = useSyncFlowStore((s) => s.changed);
   const markStarted = useSyncFlowStore((s) => s.markStarted);
