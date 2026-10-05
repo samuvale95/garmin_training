@@ -15,10 +15,10 @@ would hand one person's Garmin/Strava reads to whoever asks next -- see the inci
 this was written to prevent, `garmin_session.py`'s docstring on why the old singleton
 had to go.
 
-Deliberately not thread-locked around the *factory*: two concurrent misses may both
-call upstream and the last one wins. Serializing them would mean holding a lock across
-a multi-second network call, and these are idempotent reads where a duplicate costs a
-request, not correctness. The store itself is lock-protected.
+Concurrent misses on the *same* key share one factory call (single flight): the
+followers wait on the leader's result -- or its exception -- instead of each calling
+upstream. Different keys never wait on each other, and the global lock is never held
+across a factory call, only around the store and the in-flight table.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import threading
 import time
+from concurrent.futures import Future
 from collections.abc import Callable, Hashable, Iterable
 from datetime import date, timedelta
 from typing import Any, TypeVar
@@ -127,6 +128,7 @@ class TTLCache:
     def __init__(self) -> None:
         self._entries: dict[tuple[str, str, Hashable], tuple[float, Any]] = {}
         self._lock = threading.Lock()
+        self._inflight: dict[tuple[str, str, Hashable], Future] = {}
 
     def get_or_call(
         self,
@@ -169,6 +171,42 @@ class TTLCache:
                         self._entries[(namespace, user_id, key)] = (time.monotonic() + ttl, val)
                     return val  # type: ignore[return-value]
 
+        if refresh:
+            return self._compute(namespace, user_id, key, ttl, factory, is_narrative_ns)
+
+        # Single flight: a concurrent miss on the same key waits for the call already in
+        # progress instead of starting its own. The fuel screen alone asks for the same
+        # Garmin weight from ten requests at once, and on a 0.1-CPU host the duplicates
+        # were what pushed every request past the client's timeout.
+        entry_key = (namespace, user_id, key)
+        with self._lock:
+            flight = self._inflight.get(entry_key)
+            leader = flight is None
+            if leader:
+                flight = self._inflight[entry_key] = Future()
+        if not leader:
+            return flight.result()
+        try:
+            value = self._compute(namespace, user_id, key, ttl, factory, is_narrative_ns)
+        except BaseException as exc:
+            flight.set_exception(exc)
+            raise
+        else:
+            flight.set_result(value)
+            return value
+        finally:
+            with self._lock:
+                self._inflight.pop(entry_key, None)
+
+    def _compute(
+        self,
+        namespace: str,
+        user_id: str,
+        key: Hashable,
+        ttl: float,
+        factory: Callable[[], T],
+        is_narrative_ns: bool,
+    ) -> T:
         value = factory()
         with self._lock:
             self._entries[(namespace, user_id, key)] = (time.monotonic() + ttl, value)
@@ -259,7 +297,11 @@ def invalidate_calendar(user_id: str) -> None:
 # not depend on what was eaten -- but they do depend on the weight, and a user who has
 # just changed something is exactly who should not be told a stale number, so both drop
 # together.
-NUTRITION_NAMESPACES = ("nutrition:targets", "nutrition:narrative")
+#
+# Targets are deliberately NOT in this list: they are a function of the day, the plan and
+# the weight, never of what was eaten. Dropping them here forced a full recompute (and a
+# Garmin round-trip) right after every meal, which is exactly when it failed.
+NUTRITION_NAMESPACES = ("nutrition:narrative",)
 
 
 def invalidate_nutrition(user_id: str) -> None:

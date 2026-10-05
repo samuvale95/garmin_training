@@ -307,3 +307,61 @@ def test_body_conflict_reuses_the_cached_snapshot(client, monkeypatch):
     assert client.post("/body/conflict", json={}).status_code == 200
 
     assert calls["count"] == 1
+
+
+def test_concurrent_misses_on_the_same_key_share_one_call():
+    import threading
+    import time
+
+    cache.clear()
+    calls = []
+
+    def slow_factory():
+        calls.append(1)
+        time.sleep(0.2)
+        return {"weight_kg": 70}
+
+    results = []
+    threads = [
+        threading.Thread(target=lambda: results.append(cache.get_or_call("test:single-flight", "u1", None, 60, slow_factory)))
+        for _ in range(8)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(calls) == 1
+    assert results == [{"weight_kg": 70}] * 8
+
+
+def test_concurrent_misses_share_the_leaders_exception():
+    import threading
+    import time
+
+    cache.clear()
+    calls = []
+
+    def failing_factory():
+        calls.append(1)
+        time.sleep(0.2)
+        raise GarminSyncError("down")
+
+    errors = []
+
+    def call():
+        try:
+            cache.get_or_call("test:single-flight-error", "u1", None, 60, failing_factory)
+        except GarminSyncError as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=call) for _ in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(calls) == 1
+    assert len(errors) == 5
+    # Nothing is cached on failure: the next miss tries again.
+    assert cache.get_or_call("test:single-flight-error", "u1", None, 60, lambda: "ok") == "ok"

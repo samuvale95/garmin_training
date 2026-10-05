@@ -43,6 +43,9 @@ def body_metrics_or_empty(user_id: str) -> dict:
         )
     except Exception:  # noqa: BLE001 - no Garmin is a supported state, not an error
         logger.warning("body metrics unavailable, degrading to no weight", exc_info=True)
+        # Remember the failure briefly: otherwise every request re-attempts a slow,
+        # often rate-limited Garmin login and the fuel screen times out into an error.
+        cache.put("garmin:body_metrics", user_id, None, 120, {})
         return {}
 
 
