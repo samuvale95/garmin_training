@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .. import checkin, db, history, interactions, move_check, plan_adaptation, plan_store
+from ..agents import store as agent_store
 from ..garmin_sync import GarminRateLimitError, GarminSyncError
 from ..parser import TrainingPlanValidationError
 from ..strava_sync import StravaAuthError
@@ -34,6 +35,8 @@ from .routes_summary import router as summary_router
 from .routes_progress import router as progress_router
 from .routes_energy import router as energy_router
 from .routes_events import router as events_router
+from .routes_agents import cron_router as agents_cron_router
+from .routes_agents import router as agents_router
 
 # The CLI (cli.py) calls this too, but `uvicorn training_plan.api:app` never goes
 # through cli.py -- without this, GARMIN_EMAIL/GARMIN_PASSWORD/STRAVA_* in a local
@@ -70,6 +73,7 @@ def _ensure_schema() -> None:
     move_check.ensure_schema()
     plan_adaptation.ensure_schema()
     interactions.ensure_schema()
+    agent_store.ensure_schema()
     # Raw interaction events live 60 days; trimming at startup is enough for a one-person app.
     try:
         interactions.purge_old()
@@ -150,6 +154,9 @@ app.include_router(summary_router, tags=["summary"], dependencies=_auth_gate)
 app.include_router(progress_router, tags=["progress"], dependencies=_auth_gate)
 app.include_router(energy_router, tags=["energy"], dependencies=_auth_gate)
 app.include_router(events_router, tags=["events"], dependencies=_auth_gate)
+app.include_router(agents_router, tags=["agents"], dependencies=_auth_gate)
+# Not JWT-gated: the scheduler has no user session. Guarded by AGENTS_CRON_SECRET instead.
+app.include_router(agents_cron_router, tags=["agents"])
 
 
 @app.get("/health")

@@ -27,3 +27,9 @@ services:
       # Comma-separated origins allowed by CORS -- the deployed Vercel URL(s).
       - key: PASSO_WEB_ORIGIN
         sync: false
+      # Supabase user ids allowed on the agents admin page, comma-separated.
+      - key: PASSO_ADMIN_USER_IDS
+        sync: false
+      # Shared secret for POST /agents/cron (same value as the GitHub Actions secret).
+      - key: AGENTS_CRON_SECRET
+        sync: false

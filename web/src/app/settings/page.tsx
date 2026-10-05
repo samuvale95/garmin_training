@@ -14,6 +14,7 @@ import { SlideUp, StatusDot } from "@/components/motion/primitives";
 import { ChevronRight } from "@/components/Icons";
 import { useAthleteLevel, useClearPlan, useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, usePlanQuery, useResetAllLocalData, useStravaStatus } from "@/lib/queries";
 import { useAthleteIdentity } from "@/lib/identity";
+import { useIsAdmin } from "@/lib/agents";
 import { signOut } from "@/lib/auth";
 import { usePassoStore } from "@/lib/store";
 import { downloadPlanYaml } from "@/lib/planYaml";
@@ -30,6 +31,7 @@ export default function SettingsPage() {
   const { data: plan } = usePlanQuery();
   const { data: athleteLevel } = useAthleteLevel();
   const identity = useAthleteIdentity();
+  const { data: isAdmin } = useIsAdmin();
   const prefs = usePassoStore((s) => s.prefs);
   const setPref = usePassoStore((s) => s.setPref);
   const profile = usePassoStore((s) => s.profile);
@@ -208,6 +210,20 @@ export default function SettingsPage() {
           </Link>
         </Card>
       </SlideUp>
+
+      {isAdmin?.is_admin && (
+        <SlideUp delayMs={140}>
+          <Card>
+            <Link data-track="settings.settings-agents" href="/settings/agents" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ flex: 1 }}>
+                <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Agenti</span>
+                <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>proposte, esecuzioni e budget</span>
+              </span>
+              <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
+            </Link>
+          </Card>
+        </SlideUp>
+      )}
 
       <SlideUp delayMs={150}>
         <Card>

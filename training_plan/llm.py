@@ -477,3 +477,56 @@ def compose_plan(messages: list[dict]) -> str | None:
 
 def parse_json_object(raw: str) -> dict | None:
     return _parse_json_object(raw)
+
+
+class ChatResult(BaseModel):
+    content: str | None
+    cost_usd: float = 0.0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+
+def chat_with_usage(
+    messages: list[dict], *, model: str | None = None, max_tokens: int = 1500, json_object: bool = False
+) -> ChatResult | None:
+    """One chat completion plus what it cost, for callers that run on a budget (the
+    agents in `training_plan/agents`). `None` when no model is configured or the call
+    failed -- same rule as the rest of this module.
+
+    OpenRouter reports the real charge when asked (`usage.include`); a provider that does
+    not leaves `cost_usd` at 0 and the token counts are what the budget can go on.
+    """
+    key = _api_key()
+    if not key:
+        return None
+    payload: dict[str, Any] = {
+        "model": model or os.getenv("LLM_AGENT_MODEL") or os.getenv("LLM_TEXT_MODEL", DEFAULT_TEXT_MODEL),
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "usage": {"include": True},
+    }
+    if json_object:
+        payload["response_format"] = {"type": "json_object"}
+    try:
+        response = httpx.post(
+            f"{_base_url()}/chat/completions",
+            headers={"Authorization": f"Bearer {key}", "HTTP-Referer": "https://passo.local", "X-Title": "Passo agents"},
+            json=payload,
+            timeout=_timeout(),
+        )
+        response.raise_for_status()
+        data = response.json()
+    except Exception:  # noqa: BLE001 - degrade, never raise
+        logger.warning("agent LLM call failed", exc_info=True)
+        return None
+    usage = data.get("usage") or {}
+    try:
+        content = data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        content = None
+    return ChatResult(
+        content=content.strip() if isinstance(content, str) and content.strip() else None,
+        cost_usd=float(usage.get("cost") or 0.0),
+        prompt_tokens=int(usage.get("prompt_tokens") or 0),
+        completion_tokens=int(usage.get("completion_tokens") or 0),
+    )

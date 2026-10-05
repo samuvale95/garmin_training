@@ -313,6 +313,81 @@ class EventBatchIn(BaseModel):
     user_agent: str | None = Field(default=None, max_length=200)
 
 
+# ---- agents (admin) ---------------------------------------------------------------------
+
+
+class AgentSettingsIn(BaseModel):
+    enabled: bool | None = None
+    daily_budget_usd: float | None = Field(default=None, ge=0, le=50)
+    monthly_budget_usd: float | None = Field(default=None, ge=0, le=500)
+
+
+class AgentSettingsOut(BaseModel):
+    enabled: bool
+    hard_disabled: bool
+    daily_budget_usd: float
+    monthly_budget_usd: float
+    spent_today_usd: float
+    spent_month_usd: float
+
+
+class AgentInfo(BaseModel):
+    name: str
+    description: str
+    schedule: str
+    max_steps: int
+    max_cost_per_run_usd: float
+    max_proposals_per_week: int
+    last_success: datetime | None
+
+
+class AgentsOverview(BaseModel):
+    settings: AgentSettingsOut
+    agents: list[AgentInfo]
+
+
+class AgentRunOut(BaseModel):
+    id: int
+    agent: str
+    trigger: str
+    status: str
+    started_at: datetime
+    finished_at: datetime | None
+    steps: int
+    llm_calls: int
+    cost_usd: float
+    output: dict[str, Any]
+    error: str | None
+
+
+class AgentProposalOut(BaseModel):
+    id: int
+    agent: str
+    run_id: int | None
+    category: str
+    title: str
+    problem: str
+    evidence: dict[str, Any]
+    severity: str
+    confidence: float
+    proposal: str
+    impact: str | None
+    effort: str | None
+    status: str
+    created_at: datetime
+    decided_at: datetime | None
+    decision_note: str | None
+
+
+class ProposalDecisionIn(BaseModel):
+    status: Literal["approvata", "scartata", "realizzata", "nuova"]
+    note: str | None = Field(default=None, max_length=500)
+
+
+class AdminMe(BaseModel):
+    is_admin: bool
+
+
 # ---- diff -----------------------------------------------------------------------------------
 
 

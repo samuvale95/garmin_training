@@ -32,7 +32,7 @@ const PERSIST_BUSTER = "passo-v1";
 /** Query keys whose cached value must never be restored from a previous page load:
  * the plan keeps its own localStorage mirror (see `usePlanQuery`, which must stay the
  * single writer), and a sync job's progress belongs to the process that ran it. */
-const VOLATILE_KEYS = ["plan-state", "sync-job"];
+const VOLATILE_KEYS = ["plan-state", "sync-job", "admin-agents"];
 
 function isPersistable(query: Query): boolean {
   return !VOLATILE_KEYS.includes(String(query.queryKey[0]));
