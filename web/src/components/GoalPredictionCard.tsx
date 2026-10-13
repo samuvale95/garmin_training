@@ -82,7 +82,7 @@ export function GoalPredictionCard({ prediction, animate = true, delayMs = 0 }: 
                   marginTop: 10,
                   padding: "8px 12px",
                   borderRadius: "var(--radius-card)",
-                  background: prediction.gap_seconds != null && prediction.gap_seconds >= 0 ? "rgba(16, 185, 129, 0.08)" : "rgba(249, 115, 22, 0.08)",
+                  background: prediction.gap_seconds != null && prediction.gap_seconds >= 0 ? "var(--verde)" : "var(--giallo)",
                 }}
               >
                 <span style={{ fontSize: 12, color: "var(--inchiostro-70)" }}>
@@ -94,7 +94,7 @@ export function GoalPredictionCard({ prediction, animate = true, delayMs = 0 }: 
                     style={{
                       fontSize: 12,
                       fontWeight: 700,
-                      color: prediction.gap_seconds != null && prediction.gap_seconds >= 0 ? "#047857" : "#c2410c",
+                      color: prediction.gap_seconds != null && prediction.gap_seconds >= 0 ? "var(--verde-testo)" : "var(--giallo-testo)",
                     }}
                   >
                     {prediction.gap_seconds != null && prediction.gap_seconds >= 0

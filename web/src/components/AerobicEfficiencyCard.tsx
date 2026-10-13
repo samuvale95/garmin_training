@@ -17,9 +17,9 @@ const TREND_CONFIG = {
   miglioramento: {
     Icon: TrendUpIcon,
     label: "In miglioramento",
-    color: "#059669",
-    bg: "rgba(5, 150, 105, 0.1)",
-    border: "1px solid rgba(5, 150, 105, 0.2)",
+    color: "var(--verde-testo)",
+    bg: "var(--verde)",
+    border: "var(--border-airbnb)",
   },
   stabile: {
     Icon: TrendFlatIcon,
@@ -31,9 +31,9 @@ const TREND_CONFIG = {
   calo: {
     Icon: TrendDownIcon,
     label: "In calo",
-    color: "#b91c1c",
-    bg: "rgba(185, 28, 28, 0.08)",
-    border: "1px solid rgba(185, 28, 28, 0.2)",
+    color: "var(--rosso-testo)",
+    bg: "var(--rosa-avviso)",
+    border: "var(--border-airbnb)",
   },
 };
 
@@ -156,7 +156,7 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
                 margin: 0,
                 textTransform: "uppercase",
                 letterSpacing: ".05em",
-                color: "#047857",
+                color: "var(--verde-testo)",
               }}
             >
               Efficienza & Deriva Cardiaca
@@ -228,8 +228,8 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
         {trend && (!isLevel1 || showTechnicalDetails) && (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, margin: "14px 0" }}>
             {/* EF attuale */}
-            <div style={{ background: "rgba(37, 99, 235, 0.06)", padding: 12, borderRadius: "var(--radius-card)", border: "1px solid rgba(37, 99, 235, 0.12)" }}>
-              <span style={{ fontSize: 11, color: "var(--azzurro-scuro)", fontWeight: 700, textTransform: "uppercase" }}>
+            <div style={{ background: "var(--azzurro)", padding: 12, borderRadius: "var(--radius-card)", border: "var(--border-airbnb)" }}>
+              <span style={{ fontSize: 11, color: "var(--azzurro-testo)", fontWeight: 700, textTransform: "uppercase" }}>
                 EF attuale
               </span>
               <p className="font-mono" style={{ fontSize: 22, fontWeight: 700, margin: "4px 0 2px", color: "var(--inchiostro)" }}>
@@ -255,16 +255,12 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
               style={{
                 background: recentDecoupling
                   ? recentDecoupling.decoupling_pct < 5
-                    ? "rgba(5, 150, 105, 0.08)"
-                    : "rgba(225, 112, 85, 0.1)"
+                    ? "var(--verde)"
+                    : "var(--rosa-avviso)"
                   : "rgba(34, 34, 34, 0.03)",
                 padding: 12,
                 borderRadius: "var(--radius-card)",
-                border: recentDecoupling
-                  ? recentDecoupling.decoupling_pct < 5
-                    ? "1px solid rgba(5, 150, 105, 0.18)"
-                    : "1px solid rgba(225, 112, 85, 0.22)"
-                  : "var(--border-airbnb)",
+                border: "var(--border-airbnb)",
               }}
             >
               <span
@@ -274,8 +270,8 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
                   textTransform: "uppercase",
                   color: recentDecoupling
                     ? recentDecoupling.decoupling_pct < 5
-                      ? "#059669"
-                      : "var(--corallo)"
+                      ? "var(--verde-testo)"
+                      : "var(--rosso-testo)"
                     : "var(--inchiostro-50)",
                 }}
               >
@@ -289,8 +285,8 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
                   margin: "4px 0 2px",
                   color: recentDecoupling
                     ? recentDecoupling.decoupling_pct < 5
-                      ? "#065f46"
-                      : "var(--corallo-scuro)"
+                      ? "var(--verde-testo)"
+                      : "var(--rosso-testo)"
                     : "var(--inchiostro-35)",
                 }}
               >
@@ -328,10 +324,10 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro-70)" }}>Andamento EF</span>
             <div style={{ display: "flex", gap: 10, fontSize: 10, color: "var(--inchiostro-50)" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2.5, background: "#3b82f6" }} /> EF
+                <span style={{ width: 8, height: 2.5, background: "var(--azzurro-tratto)" }} /> EF
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#f97316" }} /> Lungo
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--rosso-avviso)" }} /> Lungo
               </span>
             </div>
           </div>
@@ -342,9 +338,9 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
               style={{ width: "100%", height: "auto", minHeight: 80, display: "block" }}
             >
               {/* Area fill */}
-              <path d={sparkline.areaD} fill="rgba(59, 130, 246, 0.08)" />
+              <path d={sparkline.areaD} fill="var(--azzurro)" />
               {/* Line */}
-              <path d={sparkline.pathD} fill="none" stroke="#3b82f6" strokeWidth={2.5} strokeLinecap="round" />
+              <path d={sparkline.pathD} fill="none" stroke="var(--azzurro-tratto)" strokeWidth={2.5} strokeLinecap="round" />
               {/* Decoupling dots on long runs */}
               {sparkline.decouplingDots.map((dot, i) => (
                 <circle
@@ -352,7 +348,7 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
                   cx={dot.x}
                   cy={dot.y}
                   r={4}
-                  fill={dot.pct < 5 ? "#10b981" : "#f97316"}
+                  fill={dot.pct < 5 ? "var(--verde-tratto-scuro)" : "var(--rosso-avviso)"}
                   stroke="#fff"
                   strokeWidth={1.5}
                 />
@@ -398,7 +394,7 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
                       width: 6,
                       height: 6,
                       borderRadius: "50%",
-                      background: f.severity === "attenzione" ? "#f97316" : "#10b981",
+                      background: f.severity === "attenzione" ? "var(--rosso-avviso)" : "var(--verde-tratto-scuro)",
                       flexShrink: 0,
                     }}
                   />

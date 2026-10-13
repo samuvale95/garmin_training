@@ -137,8 +137,8 @@ export function FuelReminderCard({
               display: "inline-flex",
               alignItems: "center",
               gap: 5,
-              background: "rgba(16, 185, 129, 0.12)",
-              color: "#059669",
+              background: "var(--verde)",
+              color: "var(--verde-testo)",
             }}
           >
             <BellIcon size={12} strokeWidth={2.4} />
@@ -151,8 +151,8 @@ export function FuelReminderCard({
               fontWeight: 700,
               padding: "3px 9px",
               borderRadius: "var(--radius-pill)",
-              background: "rgba(239, 68, 68, 0.1)",
-              color: "#dc2626",
+              background: "var(--rosa-avviso)",
+              color: "var(--rosso-testo)",
             }}
           >
             Notifiche bloccate
@@ -170,17 +170,17 @@ export function FuelReminderCard({
       {/* Two steps: Snack and Water */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, margin: "14px 0" }}>
         {/* Snack block */}
-        <div style={{ background: "rgba(245, 158, 11, 0.08)", padding: 12, borderRadius: "var(--radius-card)" }}>
+        <div style={{ background: "var(--giallo)", padding: 12, borderRadius: "var(--radius-card)" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: "#b45309", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--giallo-testo)", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 4 }}>
               <UtensilsIcon size={11} strokeWidth={2.2} />
               <span>Merenda (−90&apos;)</span>
             </span>
-            <span className="font-mono" style={{ fontSize: 13, fontWeight: 700, color: "#78350f" }}>
+            <span className="font-mono" style={{ fontSize: 13, fontWeight: 700, color: "var(--giallo-testo)" }}>
               ore {snackTime}
             </span>
           </div>
-          <p className="font-mono" style={{ fontSize: 18, fontWeight: 800, margin: "6px 0 2px", color: "#78350f" }}>
+          <p className="font-mono" style={{ fontSize: 18, fontWeight: 800, margin: "6px 0 2px", color: "var(--giallo-testo)" }}>
             ~{snackGrams} carbo
           </p>
           <span style={{ fontSize: 10.5, color: "var(--inchiostro-70)", lineHeight: 1.3, display: "block" }}>
@@ -189,17 +189,17 @@ export function FuelReminderCard({
         </div>
 
         {/* Hydration block */}
-        <div style={{ background: "rgba(14, 165, 233, 0.08)", padding: 12, borderRadius: "var(--radius-card)" }}>
+        <div style={{ background: "var(--azzurro)", padding: 12, borderRadius: "var(--radius-card)" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: "#0369a1", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--azzurro-testo)", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 4 }}>
               <DropletIcon size={11} strokeWidth={2.2} />
               <span>Acqua (−45&apos;)</span>
             </span>
-            <span className="font-mono" style={{ fontSize: 13, fontWeight: 700, color: "#0c4a6e" }}>
+            <span className="font-mono" style={{ fontSize: 13, fontWeight: 700, color: "var(--azzurro-testo)" }}>
               ore {waterTime}
             </span>
           </div>
-          <p className="font-mono" style={{ fontSize: 18, fontWeight: 800, margin: "6px 0 2px", color: "#0c4a6e" }}>
+          <p className="font-mono" style={{ fontSize: 18, fontWeight: 800, margin: "6px 0 2px", color: "var(--azzurro-testo)" }}>
             ~{hydrationMl} ml
           </p>
           <span style={{ fontSize: 10.5, color: "var(--inchiostro-70)", lineHeight: 1.3, display: "block" }}>

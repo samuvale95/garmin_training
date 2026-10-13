@@ -118,25 +118,25 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
 
         {/* 3 Metric Columns */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, margin: "14px 0" }}>
-          <div style={{ background: "rgba(59, 130, 246, 0.08)", padding: 12, borderRadius: "var(--radius-card)" }}>
-            <span style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700, textTransform: "uppercase" }}>Fitness (CTL)</span>
-            <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 2px", color: "#1e3a8a" }}>
+          <div style={{ background: "var(--azzurro)", padding: 12, borderRadius: "var(--radius-card)" }}>
+            <span style={{ fontSize: 11, color: "var(--azzurro-testo)", fontWeight: 700, textTransform: "uppercase" }}>Fitness (CTL)</span>
+            <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 2px", color: "var(--azzurro-testo)" }}>
               {current.ctl.toFixed(0)}
             </p>
             <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>media 42 giorni</span>
           </div>
 
-          <div style={{ background: "rgba(249, 115, 22, 0.08)", padding: 12, borderRadius: "var(--radius-card)" }}>
-            <span style={{ fontSize: 11, color: "#c2410c", fontWeight: 700, textTransform: "uppercase" }}>Fatica (ATL)</span>
-            <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 2px", color: "#7c2d12" }}>
+          <div style={{ background: "var(--giallo)", padding: 12, borderRadius: "var(--radius-card)" }}>
+            <span style={{ fontSize: 11, color: "var(--giallo-testo)", fontWeight: 700, textTransform: "uppercase" }}>Fatica (ATL)</span>
+            <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 2px", color: "var(--giallo-testo)" }}>
               {current.atl.toFixed(0)}
             </p>
             <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>media 7 giorni</span>
           </div>
 
-          <div style={{ background: current.tsb >= 0 ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.08)", padding: 12, borderRadius: "var(--radius-card)" }}>
-            <span style={{ fontSize: 11, color: current.tsb >= 0 ? "#047857" : "#b91c1c", fontWeight: 700, textTransform: "uppercase" }}>Forma (TSB)</span>
-            <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 2px", color: current.tsb >= 0 ? "#064e3b" : "#7f1d1d" }}>
+          <div style={{ background: current.tsb >= 0 ? "var(--verde)" : "var(--rosa-avviso)", padding: 12, borderRadius: "var(--radius-card)" }}>
+            <span style={{ fontSize: 11, color: current.tsb >= 0 ? "var(--verde-testo)" : "var(--rosso-testo)", fontWeight: 700, textTransform: "uppercase" }}>Forma (TSB)</span>
+            <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 2px", color: current.tsb >= 0 ? "var(--verde-testo)" : "var(--rosso-testo)" }}>
               {current.tsb > 0 ? `+${current.tsb.toFixed(0)}` : current.tsb.toFixed(0)}
             </p>
             <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>CTL − ATL</span>
@@ -201,15 +201,15 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
               {activeTab === "all" && (
                 <>
                   <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <span style={{ width: 8, height: 2.5, background: "#3b82f6" }} /> Fitness
+                    <span style={{ width: 8, height: 2.5, background: "var(--azzurro-tratto)" }} /> Fitness
                   </span>
                   <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <span style={{ width: 8, height: 2.5, background: "#f97316" }} /> Fatica
+                    <span style={{ width: 8, height: 2.5, background: "var(--rosso-avviso)" }} /> Fatica
                   </span>
                 </>
               )}
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2.5, background: "#10b981" }} /> TSB
+                <span style={{ width: 8, height: 2.5, background: "var(--verde-tratto-scuro)" }} /> TSB
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 4, opacity: 0.7 }}>
                 <span style={{ width: 8, height: 0, borderTop: "2px dashed #888" }} /> Futuro
@@ -229,7 +229,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
                 y={Math.min(chart.freshMinY, chart.freshMaxY)}
                 width={chart.width - chart.padding.left - chart.padding.right}
                 height={Math.abs(chart.freshMinY - chart.freshMaxY)}
-                fill="rgba(16, 185, 129, 0.08)"
+                fill="var(--verde)"
               />
 
               {/* Shaded Optimal Build Band (-25 to -10) */}
@@ -238,7 +238,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
                 y={Math.min(chart.optMinY, chart.optMaxY)}
                 width={chart.width - chart.padding.left - chart.padding.right}
                 height={Math.abs(chart.optMinY - chart.optMaxY)}
-                fill="rgba(59, 130, 246, 0.05)"
+                fill="var(--azzurro)"
               />
 
               {/* Zero TSB Line */}
@@ -281,19 +281,19 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
               {/* Curves */}
               {activeTab === "all" && (
                 <>
-                  {/* CTL Fitness (Blue) */}
-                  <path d={chart.ctlHistPath} fill="none" stroke="#3b82f6" strokeWidth={2.2} strokeLinecap="round" />
-                  <path d={chart.ctlProjPath} fill="none" stroke="#3b82f6" strokeWidth={2} strokeDasharray="4 4" opacity={0.7} />
+                  {/* CTL Fitness */}
+                  <path d={chart.ctlHistPath} fill="none" stroke="var(--azzurro-tratto)" strokeWidth={2.2} strokeLinecap="round" />
+                  <path d={chart.ctlProjPath} fill="none" stroke="var(--azzurro-tratto)" strokeWidth={2} strokeDasharray="4 4" opacity={0.7} />
 
-                  {/* ATL Fatigue (Orange) */}
-                  <path d={chart.atlHistPath} fill="none" stroke="#f97316" strokeWidth={2} strokeLinecap="round" />
-                  <path d={chart.atlProjPath} fill="none" stroke="#f97316" strokeWidth={1.8} strokeDasharray="4 4" opacity={0.7} />
+                  {/* ATL Fatigue */}
+                  <path d={chart.atlHistPath} fill="none" stroke="var(--rosso-avviso)" strokeWidth={2} strokeLinecap="round" />
+                  <path d={chart.atlProjPath} fill="none" stroke="var(--rosso-avviso)" strokeWidth={1.8} strokeDasharray="4 4" opacity={0.7} />
                 </>
               )}
 
-              {/* TSB Form (Emerald / Red) */}
-              <path d={chart.tsbHistPath} fill="none" stroke="#10b981" strokeWidth={2.5} strokeLinecap="round" />
-              <path d={chart.tsbProjPath} fill="none" stroke="#10b981" strokeWidth={2.2} strokeDasharray="4 4" opacity={0.8} />
+              {/* TSB Form */}
+              <path d={chart.tsbHistPath} fill="none" stroke="var(--verde-tratto-scuro)" strokeWidth={2.5} strokeLinecap="round" />
+              <path d={chart.tsbProjPath} fill="none" stroke="var(--verde-tratto-scuro)" strokeWidth={2.2} strokeDasharray="4 4" opacity={0.8} />
             </svg>
           </div>
 

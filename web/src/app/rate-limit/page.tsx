@@ -78,7 +78,7 @@ export default function RateLimitPage() {
           <span className="anim-tick">:</span>
           {String(seconds).padStart(2, "0")}
         </p>
-        <div style={{ height: 6, borderRadius: 100, background: "#f3ddd2", overflow: "hidden" }}>
+        <div style={{ height: 6, borderRadius: 100, background: "var(--corallo-chiaro)", overflow: "hidden" }}>
           <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, progress * 100))}%`, background: "var(--rosso-avviso)", borderRadius: 100 }} />
         </div>
         <p style={{ fontSize: 12, color: "var(--inchiostro-50)", marginTop: 14, lineHeight: 1.5 }}>

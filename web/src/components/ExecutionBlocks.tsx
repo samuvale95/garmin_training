@@ -217,8 +217,8 @@ export function SessionExecutionRow({
         {execution.hr_quality && execution.hr_quality !== "alta" && (
           <span
             style={{
-              background: execution.hr_quality === "bassa" ? "rgba(220, 38, 38, 0.12)" : "rgba(234, 179, 8, 0.15)",
-              color: execution.hr_quality === "bassa" ? "#b91c1c" : "#854d0e",
+              background: execution.hr_quality === "bassa" ? "var(--rosa-avviso)" : "var(--giallo)",
+              color: execution.hr_quality === "bassa" ? "var(--rosso-testo)" : "var(--giallo-testo)",
               borderRadius: "var(--radius-pill)",
               padding: "2px 8px",
               fontSize: 10,
