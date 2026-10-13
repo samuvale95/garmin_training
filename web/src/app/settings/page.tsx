@@ -259,24 +259,36 @@ export default function SettingsPage() {
           <p className="font-serif-italic" style={{ fontSize: 13, margin: "0 0 12px" }}>
             Ogni modifica fatta dall&apos;app te la riscrivo dentro, e puoi riscaricarlo quando vuoi.
           </p>
-          <button data-track="settings.plan"
-            type="button"
-            {...dis(!plan, "dati_non_caricati")}
-            onClick={() => plan && downloadPlanYaml(plan.sessions, plan.filename ?? "piano.yaml", plan.goal)}
-            className="tap-target"
-            style={{
-              background: "none",
-              color: "var(--azzurro-testo)",
-              border: "none",
-              fontSize: 13,
-              fontWeight: 700,
-              padding: 0,
-              cursor: plan ? "pointer" : "default",
-              opacity: plan ? 1 : 0.5,
-            }}
-          >
-            Scarica {plan?.filename ?? "il YAML"}
-          </button>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 18px" }}>
+            <button data-track="settings.plan"
+              type="button"
+              {...dis(!plan, "dati_non_caricati")}
+              onClick={() => plan && downloadPlanYaml(plan.sessions, plan.filename ?? "piano.yaml", plan.goal)}
+              className="tap-target"
+              style={{
+                background: "none",
+                color: "var(--azzurro-testo)",
+                border: "none",
+                fontSize: 13,
+                fontWeight: 700,
+                padding: 0,
+                cursor: plan ? "pointer" : "default",
+                opacity: plan ? 1 : 0.5,
+              }}
+            >
+              Scarica {plan?.filename ?? "il YAML"}
+            </button>
+            {/* The only way back to /import once a plan already exists -- without this,
+                a new or updated file has nowhere to be brought in from. */}
+            <button data-track="settings.import-plan"
+              type="button"
+              onClick={() => router.push("/import")}
+              className="tap-target"
+              style={{ background: "none", color: "var(--azzurro-testo)", border: "none", fontSize: 13, fontWeight: 700, padding: 0, cursor: "pointer" }}
+            >
+              {plan ? "Importa un nuovo file" : "Importa un file"}
+            </button>
+          </div>
         </div>
       </SlideUp>
 
