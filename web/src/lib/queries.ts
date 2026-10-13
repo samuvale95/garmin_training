@@ -1771,3 +1771,24 @@ export function useRetireShoe() {
     },
   });
 }
+
+export function useUnretireShoe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (gearId: string) => apiPost<{ id: string; retired: boolean }>(`/strava/shoes/${gearId}/unretire`),
+    onMutate: async (gearId) => {
+      await queryClient.cancelQueries({ queryKey: ["strava", "shoes"] });
+      const previous = queryClient.getQueryData<{ shoes: Shoe[] }>(["strava", "shoes"]);
+      queryClient.setQueryData<{ shoes: Shoe[] } | undefined>(["strava", "shoes"], (old) =>
+        old ? { shoes: old.shoes.map((s) => (s.id === gearId ? { ...s, retired: false } : s)) } : old
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context) queryClient.setQueryData(["strava", "shoes"], context.previous);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["strava", "shoes"] });
+    },
+  });
+}

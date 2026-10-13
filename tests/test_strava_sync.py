@@ -78,7 +78,7 @@ def test_exchange_code_stores_tokens(monkeypatch, tmp_path):
         assert data["code"] == "auth-code"
         return FakeResponse(200, {"access_token": "a1", "refresh_token": "r1", "expires_at": 999, "athlete": {"id": 7}})
 
-    monkeypatch.setattr(strava_sync.httpx, "post", fake_post)
+    monkeypatch.setattr(strava_sync._SHARED_HTTP_CLIENT, "post", fake_post)
     sync.exchange_code("auth-code")
 
     stored = json.loads((tmp_path / "strava_tokens.json").read_text())
@@ -99,7 +99,7 @@ def test_connection_status_disconnected_with_no_tokens(tmp_path):
 
 def test_disconnect_clears_tokenstore(monkeypatch, tmp_path):
     sync = make_sync(tmp_path, tokens=valid_tokens())
-    monkeypatch.setattr(strava_sync.httpx, "post", lambda *a, **k: FakeResponse(200, {}))
+    monkeypatch.setattr(strava_sync._SHARED_HTTP_CLIENT, "post", lambda *a, **k: FakeResponse(200, {}))
     sync.disconnect()
     assert sync.connection_status() == {"connected": False}
 
@@ -112,7 +112,7 @@ def test_expired_token_is_refreshed_before_use(monkeypatch, tmp_path):
         calls.append(data)
         return FakeResponse(200, {"access_token": "a2", "refresh_token": "r2", "expires_at": int(time.time()) + 3600})
 
-    monkeypatch.setattr(strava_sync.httpx, "post", fake_post)
+    monkeypatch.setattr(strava_sync._SHARED_HTTP_CLIENT, "post", fake_post)
     token = sync._ensure_fresh_access_token()
 
     assert token == "a2"
@@ -121,7 +121,7 @@ def test_expired_token_is_refreshed_before_use(monkeypatch, tmp_path):
 
 def test_refresh_failure_clears_local_state(monkeypatch, tmp_path):
     sync = make_sync(tmp_path, tokens=valid_tokens(expires_at=int(time.time()) - 10))
-    monkeypatch.setattr(strava_sync.httpx, "post", lambda *a, **k: FakeResponse(400, {"error": "invalid_grant"}))
+    monkeypatch.setattr(strava_sync._SHARED_HTTP_CLIENT, "post", lambda *a, **k: FakeResponse(400, {"error": "invalid_grant"}))
 
     with pytest.raises(StravaAuthError):
         sync._ensure_fresh_access_token()
@@ -137,7 +137,7 @@ def _session(sport="running", steps=None) -> TrainingSession:
 
 def test_find_activity_match_no_activities(monkeypatch, tmp_path):
     sync = make_sync(tmp_path, tokens=valid_tokens())
-    monkeypatch.setattr(strava_sync.httpx, "get", lambda *a, **k: FakeResponse(200, []))
+    monkeypatch.setattr(strava_sync._SHARED_HTTP_CLIENT, "get", lambda *a, **k: FakeResponse(200, []))
     result = sync.find_activity_match(_session())
     assert result == {"matched": False}
 
@@ -165,7 +165,7 @@ def test_find_activity_match_single_activity(monkeypatch, tmp_path):
             )
         raise AssertionError(f"unexpected url {url}")
 
-    monkeypatch.setattr(strava_sync.httpx, "get", fake_get)
+    monkeypatch.setattr(strava_sync._SHARED_HTTP_CLIENT, "get", fake_get)
 
     steps = [Step(type="interval", duration_type="distance", duration_value=1.0, target_pace=PaceTarget(260, 250)) for _ in range(6)]
     result = sync.find_activity_match(_session(steps=steps))
@@ -192,7 +192,7 @@ def test_find_activity_match_picks_closest_duration(monkeypatch, tmp_path):
         activity_id = int(url.rsplit("/", 1)[-1])
         return FakeResponse(200, {"id": activity_id, "distance": 14000, "moving_time": 3000})
 
-    monkeypatch.setattr(strava_sync.httpx, "get", fake_get_by_path)
+    monkeypatch.setattr(strava_sync._SHARED_HTTP_CLIENT, "get", fake_get_by_path)
 
     steps = [Step(type="interval", duration_type="time", duration_value=50.0)]  # 50 min planned
     result = sync.find_activity_match(_session(steps=steps))
@@ -202,7 +202,7 @@ def test_find_activity_match_picks_closest_duration(monkeypatch, tmp_path):
 def test_find_activity_match_ignores_incompatible_sport(monkeypatch, tmp_path):
     sync = make_sync(tmp_path, tokens=valid_tokens())
     monkeypatch.setattr(
-        strava_sync.httpx,
+        strava_sync._SHARED_HTTP_CLIENT,
         "get",
         lambda *a, **k: FakeResponse(200, [{"id": 1, "type": "Ride", "sport_type": "Ride", "moving_time": 3000}]),
     )
@@ -243,7 +243,7 @@ def test_find_activity_matches_for_range_buckets_by_date_with_one_list_call(monk
         activity_id = int(url.rsplit("/", 1)[-1])
         return FakeResponse(200, {"id": activity_id, "distance": 10000, "moving_time": 1800})
 
-    monkeypatch.setattr(strava_sync.httpx, "get", fake_get)
+    monkeypatch.setattr(strava_sync._SHARED_HTTP_CLIENT, "get", fake_get)
 
     matches = sync.find_activity_matches_for_range([monday, wednesday, friday])
 
@@ -307,7 +307,7 @@ def test_shoe_wear_computes_percent_and_estimate(monkeypatch, tmp_path):
             return FakeResponse(200, {"id": "g1", "name": "Endorphin Speed 3", "distance": 512000, "retired": False})
         raise AssertionError(url)
 
-    monkeypatch.setattr(strava_sync.httpx, "get", fake_get)
+    monkeypatch.setattr(strava_sync._SHARED_HTTP_CLIENT, "get", fake_get)
     shoes = sync.shoe_wear()
 
     assert len(shoes) == 1
@@ -331,7 +331,7 @@ def test_retire_shoe_persists_and_excludes_from_active(monkeypatch, tmp_path):
             return FakeResponse(200, {"id": "g1", "name": "Old shoe", "distance": 100000, "retired": False})
         raise AssertionError(url)
 
-    monkeypatch.setattr(strava_sync.httpx, "get", fake_get)
+    monkeypatch.setattr(strava_sync._SHARED_HTTP_CLIENT, "get", fake_get)
     shoes = sync.shoe_wear()
     assert shoes[0]["retired"] is True
 
@@ -349,7 +349,7 @@ def test_retire_shoe_survives_a_disconnect(monkeypatch, tmp_path):
     sync = make_sync(tmp_path, tokens=valid_tokens())
     sync.retire_shoe("g1")
 
-    monkeypatch.setattr(strava_sync.httpx, "post", lambda *a, **k: FakeResponse(200, {}))
+    monkeypatch.setattr(strava_sync._SHARED_HTTP_CLIENT, "post", lambda *a, **k: FakeResponse(200, {}))
     sync.disconnect()
 
     assert sync.connection_status() == {"connected": False}
@@ -374,7 +374,7 @@ def test_athlete_profile_returns_name_and_photo(monkeypatch, tmp_path):
             },
         )
 
-    monkeypatch.setattr(strava_sync.httpx, "get", fake_get)
+    monkeypatch.setattr(strava_sync._SHARED_HTTP_CLIENT, "get", fake_get)
     assert sync.athlete_profile() == {
         "name": "Samuele Valente",
         "image_url": "https://cdn.strava.com/large.jpg",
@@ -387,7 +387,7 @@ def test_athlete_profile_ignores_the_default_avatar_placeholder(monkeypatch, tmp
     falling back to Garmin's."""
     sync = make_sync(tmp_path, tokens=valid_tokens())
     monkeypatch.setattr(
-        strava_sync.httpx,
+        strava_sync._SHARED_HTTP_CLIENT,
         "get",
         lambda *a, **k: FakeResponse(200, {"firstname": "Samuele", "profile": "avatar/athlete/large.png"}),
     )
@@ -397,7 +397,7 @@ def test_athlete_profile_ignores_the_default_avatar_placeholder(monkeypatch, tmp
 
 def test_athlete_profile_with_no_name_at_all(monkeypatch, tmp_path):
     sync = make_sync(tmp_path, tokens=valid_tokens())
-    monkeypatch.setattr(strava_sync.httpx, "get", lambda *a, **k: FakeResponse(200, {}))
+    monkeypatch.setattr(strava_sync._SHARED_HTTP_CLIENT, "get", lambda *a, **k: FakeResponse(200, {}))
 
     assert sync.athlete_profile() == {"name": None, "image_url": None}
 

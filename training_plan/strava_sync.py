@@ -57,6 +57,18 @@ RECENT_WINDOW_DAYS = 56  # 8 weeks, used for the "estimated time to exhaustion" 
 # limit is per-app, so a wide fan-out is not free either).
 MAX_PARALLEL_READS = 6
 
+# A bare `httpx.get`/`httpx.post` opens a fresh connection (and pays a full TLS
+# handshake) on every call -- the same problem `garmin_sync.py`'s
+# `_pooled_api_session` exists to fix for Garmin. `shoe_wear()` alone fires one
+# `/athlete` read, a paged `/athlete/activities` read and up to `MAX_PARALLEL_READS`
+# concurrent `/gear/{id}` reads; without a shared pool each of those pays its own
+# handshake even though they run on the same host seconds apart. `httpx.Client` is
+# thread-safe, so the pool is shared across the `ThreadPoolExecutor` workers too.
+_SHARED_HTTP_CLIENT = httpx.Client(
+    limits=httpx.Limits(max_connections=20, max_keepalive_connections=20),
+    timeout=10,
+)
+
 # Strava's `type`/`sport_type` values, mapped onto this app's sport vocabulary
 # (training_plan.models.SUPPORTED_SPORTS). Unrecognized Strava types fall back to
 # "other", which is treated as compatible with any planned sport (design.md decision
@@ -187,7 +199,7 @@ class StravaSync:
 
     def exchange_code(self, code: str) -> None:
         self._require_client_credentials()
-        response = httpx.post(
+        response = _SHARED_HTTP_CLIENT.post(
             STRAVA_TOKEN_URL,
             data={
                 "client_id": self._client_id,
@@ -227,7 +239,7 @@ class StravaSync:
         access_token = tokens.get("access_token")
         if access_token:
             try:
-                httpx.post(STRAVA_DEAUTHORIZE_URL, params={"access_token": access_token}, timeout=5)
+                _SHARED_HTTP_CLIENT.post(STRAVA_DEAUTHORIZE_URL, params={"access_token": access_token}, timeout=5)
             except httpx.HTTPError:
                 pass  # best-effort remote revocation; local removal below is what matters
         self._tokenstore.unlink(missing_ok=True)
@@ -251,7 +263,7 @@ class StravaSync:
             if tokens.get("expires_at", 0) > _now() + 60:
                 return tokens["access_token"]
 
-            response = httpx.post(
+            response = _SHARED_HTTP_CLIENT.post(
                 STRAVA_TOKEN_URL,
                 data={
                     "client_id": self._client_id,
@@ -268,11 +280,10 @@ class StravaSync:
 
     def _get(self, path: str, params: dict | None = None) -> httpx.Response:
         access_token = self._ensure_fresh_access_token()
-        response = httpx.get(
+        response = _SHARED_HTTP_CLIENT.get(
             f"{STRAVA_API_BASE}{path}",
             params=params,
             headers={"Authorization": f"Bearer {access_token}"},
-            timeout=10,
         )
         if response.status_code == 401:
             self._tokenstore.unlink(missing_ok=True)
@@ -459,6 +470,11 @@ class StravaSync:
     def retire_shoe(self, gear_id: str) -> None:
         retired = self._retired_gear_ids()
         retired.add(gear_id)
+        _write_json_atomically(self._shoestore, {"retired_gear_ids": sorted(retired)})
+
+    def unretire_shoe(self, gear_id: str) -> None:
+        retired = self._retired_gear_ids()
+        retired.discard(gear_id)
         _write_json_atomically(self._shoestore, {"retired_gear_ids": sorted(retired)})
 
     def athlete_profile(self) -> dict:

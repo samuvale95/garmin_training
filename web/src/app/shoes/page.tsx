@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { BarGrow, SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { useRetireShoe, useShoes } from "@/lib/queries";
+import { useRetireShoe, useShoes, useUnretireShoe } from "@/lib/queries";
 import { useScreenReady } from "@/lib/useScreenReady";
 
 export default function ShoesPage() {
@@ -24,6 +24,7 @@ function ShoesScreen() {
   const shoesQuery = useShoes();
   useScreenReady(!shoesQuery.isLoading);
   const retire = useRetireShoe();
+  const unretire = useUnretireShoe();
 
   const shoes = shoesQuery.data?.shoes ?? [];
   const active = shoes.filter((s) => !s.retired);
@@ -65,11 +66,32 @@ function ShoesScreen() {
           <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--inchiostro-50)", marginTop: 26 }}>
             Archiviate
           </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10, opacity: 0.55 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
             {retired.map((shoe) => (
-              <div key={shoe.id} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 14, display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>{shoe.name}</span>
-                <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{shoe.distance_km.toFixed(0)} km</span>
+              <div key={shoe.id} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, opacity: 0.75 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{shoe.name}</span>
+                  <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{shoe.distance_km.toFixed(0)} km</span>
+                </div>
+                <button data-track="shoes.onunretire"
+                  type="button"
+                  onClick={() => unretire.mutate(shoe.id)}
+                  {...dis(unretire.isPending && unretire.variables === shoe.id, "in_caricamento")}
+                  className="tap-target press-soft"
+                  style={{
+                    flex: "none",
+                    background: "var(--crema-card)",
+                    border: "1px solid var(--border-airbnb)",
+                    borderRadius: "var(--radius-pill)",
+                    padding: "8px 14px",
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: "var(--inchiostro)",
+                    cursor: unretire.isPending ? "default" : "pointer",
+                  }}
+                >
+                  Ripristina
+                </button>
               </div>
             ))}
           </div>

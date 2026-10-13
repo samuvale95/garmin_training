@@ -148,3 +148,10 @@ async def retire_shoe(gear_id: str, user_id: str = Depends(current_user_id)) -> 
     await run_in_threadpool(lambda: _run(user_id, lambda sync: sync.retire_shoe(gear_id)))
     cache.invalidate(("strava:shoes",), user_id)
     return schemas.RetireShoeResponse(id=gear_id, retired=True)
+
+
+@router.post("/strava/shoes/{gear_id}/unretire", response_model=schemas.RetireShoeResponse)
+async def unretire_shoe(gear_id: str, user_id: str = Depends(current_user_id)) -> schemas.RetireShoeResponse:
+    await run_in_threadpool(lambda: _run(user_id, lambda sync: sync.unretire_shoe(gear_id)))
+    cache.invalidate(("strava:shoes",), user_id)
+    return schemas.RetireShoeResponse(id=gear_id, retired=False)
