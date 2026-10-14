@@ -48,6 +48,7 @@ import { useWatchSyncStatus } from "@/lib/watchSync";
 import { SkeletonTodayHero } from "@/components/skeletons";
 import { usePassoStore } from "@/lib/store";
 import { useTrainingSlot } from "@/lib/trainingHabits";
+import { EVENING_MINUTES, useDayFocus } from "@/lib/dayFocus";
 import { classifySession, sessionDistanceKm, shiftDateKey, toDateKey, weekBounds, workoutsToSessions, type DisplaySession } from "@/lib/sessionVisuals";
 import { capitalize, formatFullDate, groupSteps, numberToItalianWords, relativeDayLabel, stepGroupLine } from "@/lib/format";
 import { useScreenReady } from "@/lib/useScreenReady";
@@ -153,6 +154,14 @@ export function TodayView() {
   const refreshMutation = useRefreshServerData();
   // The clock the home screen reorders itself by (see the meal card below).
   const nowMinutes = useClockMinutes();
+  // After a session, its check-in and analysis lead the screen (see dayFocus).
+  const { focus } = useDayFocus({
+    todayKey,
+    sessionToday: planOrLiveSessions.some((s) => s.date === todayKey),
+    training,
+    garminConnected: access.garminConnected,
+    enabled: access.ready,
+  });
   // Ready also with neither plan nor Garmin: the guard is sending the user to /import.
   useScreenReady(access.ready && !(liveMode && workoutsQuery.isPending), "/today");
 
@@ -184,7 +193,12 @@ export function TodayView() {
 
   // When today is a rest day, preview the next upcoming session instead of just
   // saying "nothing today" -- matches the design's "domani · martedì 11" hero card.
-  const heroSession = todaySession ?? sessions.filter((s) => s.date > todayKey).sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
+  // In the evening, once today's session is behind (done, or a rest day), the card
+  // looks ahead to the next one: that is the session there is still something to do for.
+  const nextSession = sessions.filter((s) => s.date > todayKey).sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
+  const evening = nowMinutes != null && nowMinutes >= EVENING_MINUTES;
+  const lookAhead = focus === "domani" || (focus === "recupero" && evening);
+  const heroSession = lookAhead ? nextSession ?? todaySession : todaySession ?? nextSession;
   const heroGroups = heroSession?.steps ? groupSteps(heroSession.steps).filter((g) => g.kind === "interval" || g.kind === "warmup" || g.kind === "cooldown") : [];
   const heroMainGroup = heroGroups.find((g) => g.kind === "interval") ?? heroGroups[0] ?? null;
 
@@ -212,34 +226,12 @@ export function TodayView() {
   const readiness = bodyQuery.data?.readiness_score;
   const sleepMinutes = bodyQuery.data?.sleep?.total_minutes;
 
-  return (
-    <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
-      <div style={{ padding: "22px 20px 12px" }}>
-        <TodayHeader onOpenQuickLog={() => setQuickMealOpen(true)} />
-
-        <header className="today-intro">
-          <h1>Il tuo oggi</h1>
-          <p>{capitalize(formatFullDate(todayKey))} · Un passo alla volta.</p>
-        </header>
-
-        {/* 1. HERO ALLENAMENTO + BADGE PRONTEZZA UNIFICATI */}
-        <TodayHeroUnified
-        heroSession={heroSession}
-        heroMainGroup={heroMainGroup}
-        heroMatch={heroMatch}
-        heroHref={heroHref}
-        verdict={verdictQuery.data}
-        today={today}
-        animate={animate}
-      />
-
-      {/* 1b. COSA MANGIARE ADESSO, quando è urgente */}
-      {mealUrgent && nowMealCard}
-
-      {/* 2. ADATTAMENTO DEL PIANO (Se richiesto) */}
-      {hasPlan && <AdaptationCard animate={animate} delayMs={120} />}
-
-      {/* 3. CHECK-IN POST CORSA (On-top prioritario appena conclusa) */}
+  // The check-in and the technique analysis. Just after a session -- and until the
+  // check-in is answered -- they are the thing to do and sit above everything else;
+  // the next morning ("ieri") or once answered they wait further down.
+  const postSessionFirst = focus === "recupero" && checkInDay === "oggi" && !checkInOn(todayKey);
+  const postSession = (
+    <>
       {checkInDay && (
         <CheckInCard
           key={checkInDay === "oggi" ? todayKey : yesterdayKey}
@@ -252,7 +244,6 @@ export function TodayView() {
         />
       )}
 
-      {/* 3b. INSIGHT COACH POST-CORSA: 1-tap all'analisi della tecnica */}
       {trainedOn(todayKey) && (
         <SlideUp active={animate} delayMs={140} style={{ marginTop: 10 }}>
           <Link data-track="today.coach"
@@ -302,6 +293,41 @@ export function TodayView() {
           </Link>
         </SlideUp>
       )}
+    </>
+  );
+
+  return (
+    <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
+      <div style={{ padding: "22px 20px 12px" }}>
+        <TodayHeader onOpenQuickLog={() => setQuickMealOpen(true)} />
+
+        <header className="today-intro">
+          <h1>Il tuo oggi</h1>
+          <p>{capitalize(formatFullDate(todayKey))} · Un passo alla volta.</p>
+        </header>
+
+        {/* 0. APPENA FINITO L'ALLENAMENTO: com'è andata viene prima di tutto */}
+        {postSessionFirst && postSession}
+
+        {/* 1. HERO ALLENAMENTO + BADGE PRONTEZZA UNIFICATI */}
+        <TodayHeroUnified
+        heroSession={heroSession}
+        heroMainGroup={heroMainGroup}
+        heroMatch={heroMatch}
+        heroHref={heroHref}
+        verdict={heroSession?.date === todayKey || !todaySession ? verdictQuery.data : null}
+        today={today}
+        animate={animate}
+      />
+
+      {/* 1b. COSA MANGIARE ADESSO, quando è urgente */}
+      {mealUrgent && nowMealCard}
+
+      {/* 2. ADATTAMENTO DEL PIANO (Se richiesto) */}
+      {hasPlan && <AdaptationCard animate={animate} delayMs={120} />}
+
+      {/* 3. CHECK-IN E ANALISI, qui quando non sono la cosa del momento */}
+      {!postSessionFirst && postSession}
 
       {/* 5. VITAL STRIP COMPATTA: Prontezza, Sonno, Carbo (0 tap) */}
       <TodayVitalStrip

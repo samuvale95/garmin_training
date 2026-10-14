@@ -90,6 +90,9 @@ interface DraggableWeekCardProps {
   onDragOver: (pageY: number) => void;
   onDrop: (card: DayCardData, pageY: number) => void;
   onPrefetch?: () => void;
+  /** "oggi" / "prossimo": the session the week is waiting on, drawn louder than the rest
+   * so it is found without reading the list. */
+  emphasis?: "oggi" | "prossimo" | null;
 }
 
 type Phase = "idle" | "pressing" | "dragging";
@@ -117,7 +120,7 @@ type Phase = "idle" | "pressing" | "dragging";
  * identity changes, so nothing remounts it to reset its dragged position -- the
  * snap-back has to be explicit. On a real move the card's `key` lives under a different
  * day row after the state update and this instance unmounts anyway. */
-export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragStateChange, onDragOver, onDrop, onPrefetch }: DraggableWeekCardProps) {
+export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragStateChange, onDragOver, onDrop, onPrefetch, emphasis = null }: DraggableWeekCardProps) {
   const { reduced } = useMotionEnabled();
   const dragControls = useDragControls();
   const [phase, setPhase] = useState<Phase>("idle");
@@ -203,8 +206,8 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
       row
       style={{
         background: "var(--crema-card)",
-        border: isHeavy ? "1.5px solid rgba(255, 111, 89, 0.3)" : "var(--border-airbnb)",
-        boxShadow: "var(--shadow-airbnb-subtle)",
+        border: emphasis ? "2px solid var(--inchiostro)" : isHeavy ? "1.5px solid rgba(255, 111, 89, 0.3)" : "var(--border-airbnb)",
+        boxShadow: emphasis ? "var(--shadow-airbnb-card)" : "var(--shadow-airbnb-subtle)",
         color: "var(--inchiostro)",
         borderRadius: "var(--radius-card)",
         padding: "11px 16px",
@@ -218,6 +221,14 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {emphasis && (
+          <span
+            className="font-mono"
+            style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-pill)", padding: "2px 8px" }}
+          >
+            {emphasis}
+          </span>
+        )}
         <span className="session-kind" style={{ background: visual.background, color: visual.foreground }}>{visual.label}</span>
         {isHeavy && (
           <span

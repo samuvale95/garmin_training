@@ -301,6 +301,14 @@ export function WeekPageContent() {
       ? `${doneKm.toFixed(0)} / ${weekKm.toFixed(0)} km · ${weekSessions.length} sedute`
       : `${weekKm.toFixed(0)} km · ${weekSessions.length} sedute`;
 
+  // The session the week is waiting on: today's, unless it is already done, else the
+  // next one this week. Only on the current week -- elsewhere nothing is "next".
+  const doneToday = (storedActivities.data?.activities ?? []).some((a) => a.day === todayKey && a.family !== "walk");
+  const nextDayKey =
+    offset === 0
+      ? days.find((d) => d.cards.length > 0 && (doneToday ? d.key > todayKey : d.key >= todayKey))?.key ?? null
+      : null;
+
   const firstRestIndex = days.findIndex((d) => d.cards.length === 0 && d.offPlan.length === 0);
   const weekInClass = reduced || direction === 0 ? undefined : "anim-week-in";
 
@@ -405,6 +413,7 @@ export function WeekPageContent() {
 
               {days.map((day, i) => {
                 const isToday = day.key === todayKey;
+                const isPast = day.key < todayKey;
                 const match = stravaMatches.data?.matches[day.key];
                 const isDropTarget = !!carried && hoverDayKey === day.key && carried.session.date !== day.key;
                 return (
@@ -441,7 +450,20 @@ export function WeekPageContent() {
                         {day.date.getDate()}
                       </span>
                     </div>
-                    <div className={isDropTarget ? "day-drop-target" : undefined} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div
+                      className={isDropTarget ? "day-drop-target" : undefined}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                        // Days already behind stay readable but step back: what is left
+                        // of the week is what can still be acted on.
+                        opacity: isPast && !carried ? 0.62 : 1,
+                        transition: "opacity 160ms var(--ease)",
+                      }}
+                    >
                       {day.cards.length === 0 && day.offPlan.length === 0 ? (
                         <RestCard animate={animate} delayMs={i * 70} withIllustration={i === firstRestIndex} />
                       ) : (
@@ -456,6 +478,7 @@ export function WeekPageContent() {
                             onDragOver={handleDragOver}
                             onDrop={handleCardDrop}
                             onPrefetch={card.workout ? () => prefetchWorkoutSession(card.workout!) : undefined}
+                            emphasis={j === 0 && day.key === nextDayKey ? (isToday ? "oggi" : "prossimo") : null}
                           />
                         ))
                       )}
