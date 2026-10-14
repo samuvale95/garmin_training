@@ -7,7 +7,9 @@ import { TiltCard } from "@/components/motion/TiltCard";
 import { Illustration } from "@/components/Illustration";
 import { countdownLabel, distanceLabel, formatPaceSecPerKm, formatTargetTime, goalTitle, targetPaceSecPerKm } from "@/lib/raceGoal";
 import { formatFullDate } from "@/lib/format";
-import type { RaceGoal } from "@/lib/types";
+import { StatusPill } from "@/components/BodyCards";
+import { BAND_STATUS, predictedText } from "@/components/GoalPredictionCard";
+import type { RaceGoal, RacePredictionData } from "@/lib/types";
 
 /** The race the plan is written for, on Oggi.
  *
@@ -19,12 +21,16 @@ import type { RaceGoal } from "@/lib/types";
 export function RaceGoalCard({
   goal,
   upcomingSessions = 0,
+  prediction,
   animate,
   delayMs = 0,
 }: {
   goal: RaceGoal | null | undefined;
   /** Sessions still to come. Zero means: say nothing. */
   upcomingSessions?: number;
+  /** Goal confidence, when it has loaded: its band goes on the card, the rest stays on
+   * the goal screen one tap away. */
+  prediction?: RacePredictionData;
   animate: boolean;
   delayMs?: number;
 }) {
@@ -73,6 +79,8 @@ export function RaceGoalCard({
                 {goal.target_time_seconds != null && ` · ${formatTargetTime(goal.target_time_seconds)}`}
                 {pace != null && ` (${formatPaceSecPerKm(pace)}/km)`}
               </p>
+
+              {prediction && !past && <PredictionStrip prediction={prediction} />}
             </div>
             <div style={{ flexShrink: 0, marginLeft: 8, width: 48, height: 48, position: "relative" }}>
               <Illustration name="obiettivo" size={48} position="relative" />
@@ -81,6 +89,21 @@ export function RaceGoalCard({
         </TiltCard>
       </Link>
     </SlideUp>
+  );
+}
+
+/** The band and the predicted time, in one line under the race. */
+function PredictionStrip({ prediction }: { prediction: RacePredictionData }) {
+  const predicted = predictedText(prediction);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(0,0,0,0.07)" }}>
+      {prediction.band && <StatusPill status={BAND_STATUS[prediction.band]}>{prediction.band_label}</StatusPill>}
+      {predicted ? (
+        <span className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-70)" }}>previsto {predicted}</span>
+      ) : (
+        <span style={{ fontSize: 12.5, color: "var(--inchiostro-50)" }}>Nessuna corsa recente da cui stimare il tempo</span>
+      )}
+    </div>
   );
 }
 

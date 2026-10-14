@@ -1,179 +1,182 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { SlideUp } from "@/components/motion/primitives";
-import type { RacePredictionData } from "@/lib/types";
+import { Explainer, StatusPill } from "@/components/BodyCards";
+import { STATUS_STYLE, type SignalStatus } from "@/lib/bodySignals";
+import type { GoalBand, PredictionFactor, RacePredictionData } from "@/lib/types";
 
-interface GoalPredictionCardProps {
-  prediction: RacePredictionData;
-  animate?: boolean;
-  delayMs?: number;
-}
-
-const SEVERITY_STYLE: Record<string, { background: string; color: string; label: string }> = {
-  ok: { background: "var(--verde-chiaro)", color: "var(--verde-testo)", label: "ok" },
-  attenzione: { background: "var(--rosa-avviso)", color: "var(--rosso-testo)", label: "da verificare" },
-  sconosciuto: { background: "var(--sabbia-chip)", color: "var(--inchiostro-70)", label: "nota" },
+/** How each band reads at a glance: the same green / amber / coral as Corpo. */
+export const BAND_STATUS: Record<GoalBand, SignalStatus> = {
+  avanti: "ok",
+  in_linea: "ok",
+  ambizioso: "attenzione",
+  fuori_portata: "allerta",
 };
 
-export function GoalPredictionCard({ prediction, animate = true, delayMs = 0 }: GoalPredictionCardProps) {
-  const isUnknown = prediction.confidence === "non_valutabile";
+const NEUTRAL = { bg: "var(--sabbia)", text: "var(--inchiostro-70)", stroke: "var(--inchiostro-35)", edge: "rgba(0,0,0,0.08)" };
+
+function severityStatus(severity: PredictionFactor["severity"]): SignalStatus | null {
+  return severity === "ok" ? "ok" : severity === "attenzione" ? "attenzione" : null;
+}
+
+/** "3:22:05" or, when runs and VO₂max disagree, "3:18:00–3:31:00". */
+export function predictedText(p: RacePredictionData): string | null {
+  if (p.predicted_low_formatted && p.predicted_high_formatted) return `${p.predicted_low_formatted}–${p.predicted_high_formatted}`;
+  return p.predicted_time_formatted ?? null;
+}
+
+/** Goal confidence, as the plan wrote it: a band (never a percentage) and the three
+ * inputs it comes from, each on its own tile so the one dragging the picture is the
+ * one in colour. Everything here is arithmetic from `race_prediction.py`; `narrative`
+ * is the only sentence a model may have written, and it falls back to `summary`. */
+export function GoalPredictionCard({
+  prediction: p,
+  narrative,
+  animate = true,
+  delayMs = 0,
+}: {
+  prediction: RacePredictionData;
+  narrative?: string | null;
+  animate?: boolean;
+  delayMs?: number;
+}) {
+  const status = p.band ? BAND_STATUS[p.band] : null;
+  const tone = status ? STATUS_STYLE[status] : NEUTRAL;
+  const predicted = predictedText(p);
+  const slower = p.gap_seconds != null && p.gap_seconds > 0;
+
+  const adh = p.adherence;
+  const adhStatus: SignalStatus | null =
+    adh.session_pct == null ? null : adh.session_pct >= 85 ? "ok" : adh.session_pct >= 70 ? "attenzione" : "allerta";
+  const riskStatus: SignalStatus | null =
+    p.risk.level === "basso" ? "ok" : p.risk.level === "moderato" ? "attenzione" : p.risk.level === "alto" ? "allerta" : null;
+  const vo2 = p.factors.find((f) => f.key === "vo2max");
+  const formStatus: SignalStatus = p.status === "dati_insufficienti" ? "attenzione" : vo2 ? severityStatus(vo2.severity) ?? "ok" : "ok";
+
+  const riskFlags = p.risk.signals.filter((s) => s.severity === "attenzione").length;
+  const details = [...p.risk.signals, ...p.factors];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* 1. Main Projection Card */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <SlideUp
         active={animate}
         delayMs={delayMs}
         style={{
-          background: "var(--crema-card)",
+          background: `linear-gradient(160deg, ${tone.bg} 0%, var(--crema-card) 75%)`,
           borderRadius: "var(--radius-card-lg)",
-          padding: 20,
-          border: "1px solid rgba(34, 34, 34, 0.06)",
+          border: `1.5px solid ${tone.edge}`,
+          boxShadow: "var(--shadow-airbnb-subtle)",
+          padding: "18px 18px 16px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-          <p
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              margin: 0,
-              textTransform: "uppercase",
-              letterSpacing: ".05em",
-              color: "var(--inchiostro-50)",
-            }}
-          >
-            Previsione Dinamica & Confidenza
-          </p>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              padding: "3px 10px",
-              borderRadius: "var(--radius-pill)",
-              background: prediction.confidence_color.startsWith("var") ? prediction.confidence_color : prediction.confidence_color,
-              color: prediction.confidence_color === "var(--azzurro)" ? "var(--inchiostro)" : "#ffffff",
-            }}
-          >
-            {prediction.confidence_label}
-          </span>
-        </div>
-
-        {/* Prediction figures */}
-        {!isUnknown && prediction.predicted_time_formatted ? (
-          <div style={{ margin: "14px 0" }}>
-            <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "8px 16px" }}>
-              <p className="font-mono" style={{ fontSize: 32, fontWeight: 800, margin: 0, color: "var(--inchiostro)" }}>
-                {prediction.predicted_time_formatted}
-              </p>
-              {prediction.predicted_pace_formatted && (
-                <span className="font-mono" style={{ fontSize: 16, fontWeight: 600, color: "var(--inchiostro-70)" }}>
-                  passo medio {prediction.predicted_pace_formatted}
-                </span>
-              )}
-            </div>
-
-            {/* Target comparison */}
-            {prediction.target_time_formatted && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  marginTop: 10,
-                  padding: "8px 12px",
-                  borderRadius: "var(--radius-card)",
-                  background: prediction.gap_seconds != null && prediction.gap_seconds >= 0 ? "var(--verde)" : "var(--giallo)",
-                }}
-              >
-                <span style={{ fontSize: 12, color: "var(--inchiostro-70)" }}>
-                  Obiettivo dichiarato: <strong className="font-mono">{prediction.target_time_formatted}</strong>
-                </span>
-                {prediction.gap_formatted && (
-                  <span
-                    className="font-mono"
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: prediction.gap_seconds != null && prediction.gap_seconds >= 0 ? "var(--verde-testo)" : "var(--giallo-testo)",
-                    }}
-                  >
-                    {prediction.gap_seconds != null && prediction.gap_seconds >= 0
-                      ? `${prediction.gap_formatted} di margine`
-                      : `${prediction.gap_formatted} rispetto al target`}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div style={{ margin: "14px 0" }}>
-            <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 6px", color: "var(--inchiostro)" }}>
-              {prediction.headline}
-            </p>
-            <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-70)", margin: 0, lineHeight: 1.45 }}>
-              {prediction.verdict}
-            </p>
+        <p className="font-mono" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: tone.text, margin: 0 }}>
+          Confidenza sull&apos;obiettivo{p.weeks_left > 0 ? ` · ${p.weeks_left} settimane` : ""}
+        </p>
+        <p style={{ fontWeight: 700, fontSize: 22, lineHeight: 1.15, letterSpacing: "-.01em", margin: "5px 0 0" }}>{p.headline}</p>
+        {p.band_lowered && (
+          <div style={{ marginTop: 8 }}>
+            <StatusPill status="attenzione">un gradino in meno per la costanza</StatusPill>
           </div>
         )}
 
-        {/* Verdict & Advice */}
-        <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-80)", margin: "8px 0 0", lineHeight: 1.45 }}>
-          {prediction.advice}
-        </p>
-
-        {/* Reference effort mention */}
-        {prediction.reference_effort && (
-          <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(34, 34, 34, 0.06)", fontSize: 11, color: "var(--inchiostro-50)" }}>
-            Proiezione Riegel calcolata da:{" "}
-            <strong>
-              {prediction.reference_effort.title} ({prediction.reference_effort.distance_km} km a {prediction.reference_effort.pace_min_km.toFixed(2)}/km)
-            </strong>{" "}
-            il {prediction.reference_effort.date}
+        {predicted && (
+          <div style={{ display: "flex", alignItems: "flex-end", flexWrap: "wrap", gap: "6px 18px", marginTop: 14 }}>
+            <div>
+              <p style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: 0 }}>previsto oggi</p>
+              <p className="font-mono" style={{ fontSize: predicted.length > 9 ? 22 : 30, fontWeight: 700, letterSpacing: "-.02em", margin: "2px 0 0" }}>{predicted}</p>
+            </div>
+            {p.target_time_formatted && (
+              <div>
+                <p style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: 0 }}>obiettivo</p>
+                <p className="font-mono" style={{ fontSize: 18, fontWeight: 600, margin: "2px 0 0", color: "var(--inchiostro-70)" }}>{p.target_time_formatted}</p>
+              </div>
+            )}
+            {p.gap_formatted && status && (
+              <span style={{ marginBottom: 3 }}>
+                <StatusPill status={status}>{`${p.gap_formatted.replace(/^[+−]/, "")} ${slower ? "sopra" : "sotto"}`}</StatusPill>
+              </span>
+            )}
           </div>
+        )}
+
+        <p style={{ fontSize: 14, lineHeight: 1.4, color: "var(--inchiostro-70)", margin: "12px 0 0" }}>{narrative || p.summary}</p>
+        {p.prediction_basis && (
+          <p style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "8px 0 0" }}>
+            Stima {p.prediction_basis}
+            {p.predicted_pace_formatted ? ` · passo medio ${p.predicted_pace_formatted}` : ""}
+          </p>
         )}
       </SlideUp>
 
-      {/* 2. Factors Breakdown */}
-      {prediction.factors.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {prediction.factors.map((factor, i) => {
-            const style = SEVERITY_STYLE[factor.severity] ?? SEVERITY_STYLE.sconosciuto;
-            return (
-              <SlideUp
-                key={factor.key}
-                active={animate}
-                delayMs={delayMs + 60 + i * 40}
-                style={{
-                  background: "var(--crema-card)",
-                  borderRadius: "var(--radius-row)",
-                  padding: "12px 16px",
-                  border: "1px solid rgba(34, 34, 34, 0.04)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                  <p style={{ fontWeight: 600, fontSize: 13.5, margin: 0 }}>{factor.label}</p>
-                  <span
-                    style={{
-                      background: style.background,
-                      color: style.color,
-                      borderRadius: "var(--radius-pill)",
-                      padding: "2px 8px",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      flex: "none",
-                    }}
-                  >
-                    {style.label}
-                  </span>
-                </div>
-                <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "4px 0 0", lineHeight: 1.4 }}>
-                  {factor.detail}
-                </p>
-              </SlideUp>
-            );
-          })}
+      <SlideUp active={animate} delayMs={delayMs + 60}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+          <DriverTile status={formStatus} label="Forma" value={!predicted ? "—" : p.predicted_low_formatted ? "intervallo" : (p.predicted_time_formatted ?? "—")}>
+            {p.status === "dati_insufficienti" ? "manca un riferimento" : p.predicted_low_formatted ? "corse e VO₂max non concordano" : "dalle corse recenti"}
+          </DriverTile>
+          <DriverTile status={adhStatus} label="Costanza" value={adh.sessions_planned ? `${adh.sessions_done}/${adh.sessions_planned}` : "—"}>
+            {adh.sessions_planned
+              ? `sedute in 6 sett.${adh.volume_pct != null ? ` · ${Math.round(adh.km_done)} km su ${Math.round(adh.km_planned ?? 0)}` : ""}`
+              : "nessuna seduta in programma"}
+          </DriverTile>
+          <DriverTile status={riskStatus} label="Rischio" value={p.risk.level === "sconosciuto" ? "—" : p.risk.level}>
+            {riskFlags === 0 ? "nessun segnale" : riskFlags === 1 ? "1 segnale" : `${riskFlags} segnali`}
+          </DriverTile>
         </div>
-      )}
+      </SlideUp>
+
+      <SlideUp
+        active={animate}
+        delayMs={delayMs + 120}
+        style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", border: "var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", padding: "6px 14px" }}
+      >
+        {details.map((f, i) => {
+          const s = severityStatus(f.severity);
+          const style = s ? STATUS_STYLE[s] : NEUTRAL;
+          return (
+            <div key={f.key} style={{ display: "flex", gap: 10, padding: "10px 0", borderTop: i ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
+              <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: "50%", background: style.stroke, flex: "none", marginTop: 5 }} />
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontSize: 13.5, fontWeight: 600, margin: 0, color: s === "attenzione" ? STATUS_STYLE.attenzione.text : "var(--inchiostro)" }}>{f.label}</p>
+                <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "2px 0 0", lineHeight: 1.4 }}>{f.detail}</p>
+              </div>
+            </div>
+          );
+        })}
+        <div style={{ paddingBottom: 10 }}>
+          <Explainer track="goal-prediction.explainer" label="Come lo calcolo">
+            Il tempo viene dalla tua corsa recente più veloce (formula di Riegel), confrontata con il VO₂max. Rispetto
+            all&apos;obiettivo: fino all&apos;1% più veloce sei avanti, entro il 2% più lento in linea, entro il 6% ambizioso,
+            oltre fuori portata. Se nelle ultime 6 settimane hai fatto meno del 70% delle sedute il giudizio scende di un
+            gradino. Il rischio guarda il carico degli ultimi 7 giorni rispetto alle 4 settimane, la prontezza degli ultimi
+            14 giorni e quanto deve crescere il volume per arrivare alla settimana più carica del piano.
+          </Explainer>
+        </div>
+      </SlideUp>
+    </div>
+  );
+}
+
+function DriverTile({ status, label, value, children }: { status: SignalStatus | null; label: string; value: string; children: ReactNode }) {
+  const style = status ? STATUS_STYLE[status] : NEUTRAL;
+  const flagged = status === "attenzione" || status === "allerta";
+  return (
+    <div
+      style={{
+        minWidth: 0,
+        background: flagged ? style.bg : "var(--crema-card)",
+        border: flagged ? `1.5px solid ${style.edge}` : "var(--border-airbnb)",
+        boxShadow: "var(--shadow-airbnb-subtle)",
+        borderRadius: "var(--radius-row)",
+        padding: "10px 11px",
+      }}
+    >
+      <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: flagged ? style.text : "var(--inchiostro-70)" }}>
+        <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: "50%", background: style.stroke }} />
+        {label}
+      </span>
+      <p className="font-mono" style={{ fontSize: 17, fontWeight: 700, margin: "5px 0 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</p>
+      <p style={{ fontSize: 11, color: flagged ? style.text : "var(--inchiostro-50)", margin: "3px 0 0", lineHeight: 1.25 }}>{children}</p>
     </div>
   );
 }

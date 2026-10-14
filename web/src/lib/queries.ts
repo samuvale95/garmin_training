@@ -688,22 +688,40 @@ export function useGoalFitNarrative(sessions: TrainingSession[], goal: RaceGoal 
   });
 }
 
-/** Dynamic race prediction and goal confidence based on actual executed runs. */
-export function useGoalPrediction(sessions: TrainingSession[], goal: RaceGoal | null | undefined, enabled = true) {
-  const goalPayload = goal
+function goalPayloadOf(goal: RaceGoal | null | undefined) {
+  return goal
     ? { race_date: goal.race_date, distance_km: goal.distance_km, name: goal.name, target_time_seconds: goal.target_time_seconds }
     : null;
+}
+
+function goalPredictionKey(name: string, sessions: TrainingSession[], goal: RaceGoal | null | undefined) {
+  return [
+    name,
+    goal?.race_date ?? null,
+    goal?.distance_km ?? null,
+    goal?.target_time_seconds ?? null,
+    sessions.length ? planFingerprint(sessions) : null,
+  ];
+}
+
+/** Goal confidence: the band and its three inputs (prediction, adherence, risk). */
+export function useGoalPrediction(sessions: TrainingSession[], goal: RaceGoal | null | undefined, enabled = true) {
   return useQuery({
-    queryKey: [
-      "plan-goal-prediction",
-      goal?.race_date ?? null,
-      goal?.distance_km ?? null,
-      goal?.target_time_seconds ?? null,
-      sessions.length ? planFingerprint(sessions) : null,
-    ],
-    queryFn: ({ signal }) => apiPost<RacePredictionData>("/plan/goal-prediction", { sessions, goal: goalPayload }, signal),
+    queryKey: goalPredictionKey("plan-goal-prediction", sessions, goal),
+    queryFn: ({ signal }) => apiPost<RacePredictionData>("/plan/goal-prediction", { sessions, goal: goalPayloadOf(goal) }, signal),
     enabled: enabled && !!goal,
     staleTime: 10 * 60_000,
+  });
+}
+
+/** The same assessment in one or two sentences -- the model's, or the templated
+ * `summary` when the model is not there (`source` says which). */
+export function useGoalPredictionNarrative(sessions: TrainingSession[], goal: RaceGoal | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: goalPredictionKey("plan-goal-prediction-narrative", sessions, goal),
+    queryFn: ({ signal }) => apiPost<Narrative>("/plan/goal-prediction/narrative", { sessions, goal: goalPayloadOf(goal) }, signal),
+    enabled: enabled && !!goal,
+    staleTime: 30 * 60_000,
   });
 }
 

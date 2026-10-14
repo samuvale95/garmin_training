@@ -2338,69 +2338,109 @@ class PredictionFactorOut(BaseModel):
     detail: str
     severity: str
 
+    @classmethod
+    def from_model(cls, f: "race_prediction.PredictionFactor") -> "PredictionFactorOut":
+        return cls(key=f.key, label=f.label, detail=f.detail, severity=f.severity)
+
+
+class AdherenceOut(BaseModel):
+    sessions_planned: int
+    sessions_done: int
+    session_pct: float | None = None
+    km_planned: float | None = None
+    km_done: float
+    volume_pct: float | None = None
+
+
+class RiskOut(BaseModel):
+    level: str
+    acwr: float | None = None
+    readiness_recent: float | None = None
+    readiness_previous: float | None = None
+    ramp_pct: float | None = None
+    signals: list[PredictionFactorOut] = Field(default_factory=list)
+
 
 class RacePredictionResponse(BaseModel):
+    """Goal confidence, part 2 of the plan: a band and its three inputs, never a score."""
+
+    status: str
     predicted_time_seconds: int | None = None
     predicted_time_formatted: str | None = None
-    predicted_pace_sec_km: int | None = None
+    predicted_low_formatted: str | None = None
+    predicted_high_formatted: str | None = None
     predicted_pace_formatted: str | None = None
+    prediction_basis: str | None = None
+    vo2max_time_formatted: str | None = None
     target_time_seconds: int | None = None
     target_time_formatted: str | None = None
     gap_seconds: int | None = None
     gap_formatted: str | None = None
-    confidence: str
-    confidence_score: int
-    confidence_label: str
-    confidence_color: str
+    gap_pct: float | None = None
+    band: str | None = None
+    band_label: str | None = None
+    band_lowered: bool = False
+    softened: bool = False
+    weeks_left: int
+    phase: str
     headline: str
-    verdict: str
-    advice: str
+    summary: str
+    adherence: AdherenceOut
+    risk: RiskOut
     reference_effort: ReferenceEffortOut | None = None
     longest_completed_km: float | None = None
     guide_longest_km: float | None = None
-    volume_adherence_pct: float | None = None
     factors: list[PredictionFactorOut] = Field(default_factory=list)
 
     @classmethod
     def from_model(cls, res: "race_prediction.RacePredictionResult") -> "RacePredictionResponse":
-        pred_time_fmt = race_prediction.format_duration(res.predicted_time_seconds) if res.predicted_time_seconds else None
-        pred_pace_fmt = race_prediction.format_pace(res.predicted_pace_sec_km) if res.predicted_pace_sec_km else None
-        tgt_time_fmt = race_prediction.format_duration(res.target_time_seconds) if res.target_time_seconds else None
-        
+        fmt = race_prediction.format_duration
         gap_fmt = None
         if res.gap_seconds is not None:
-            sign = "+" if res.gap_seconds > 0 else "-"
-            gap_fmt = f"{sign}{race_prediction.format_duration(abs(res.gap_seconds))}"
-
+            gap_fmt = f"{'+' if res.gap_seconds > 0 else '−'}{fmt(abs(res.gap_seconds))}" if res.gap_seconds else "0:00"
+        adh = res.adherence
         return cls(
+            status=res.status,
             predicted_time_seconds=res.predicted_time_seconds,
-            predicted_time_formatted=pred_time_fmt,
-            predicted_pace_sec_km=res.predicted_pace_sec_km,
-            predicted_pace_formatted=pred_pace_fmt,
+            predicted_time_formatted=fmt(res.predicted_time_seconds) if res.predicted_time_seconds else None,
+            predicted_low_formatted=fmt(res.predicted_low_seconds) if res.predicted_low_seconds else None,
+            predicted_high_formatted=fmt(res.predicted_high_seconds) if res.predicted_high_seconds else None,
+            predicted_pace_formatted=race_prediction.format_pace(res.predicted_pace_sec_km) if res.predicted_pace_sec_km else None,
+            prediction_basis=res.prediction_basis,
+            vo2max_time_formatted=fmt(res.vo2max_time_seconds) if res.vo2max_time_seconds else None,
             target_time_seconds=res.target_time_seconds,
-            target_time_formatted=tgt_time_fmt,
+            target_time_formatted=fmt(res.target_time_seconds) if res.target_time_seconds else None,
             gap_seconds=res.gap_seconds,
             gap_formatted=gap_fmt,
-            confidence=res.confidence,
-            confidence_score=res.confidence_score,
-            confidence_label=res.confidence_label,
-            confidence_color=res.confidence_color,
+            gap_pct=res.gap_pct,
+            band=res.band,
+            band_label=res.band_label,
+            band_lowered=res.band_lowered,
+            softened=res.softened,
+            weeks_left=res.weeks_left,
+            phase=res.phase,
             headline=res.headline,
-            verdict=res.verdict,
-            advice=res.advice,
+            summary=res.summary,
+            adherence=AdherenceOut(
+                sessions_planned=adh.sessions_planned,
+                sessions_done=adh.sessions_done,
+                session_pct=round(adh.session_ratio * 100) if adh.session_ratio is not None else None,
+                km_planned=adh.km_planned,
+                km_done=adh.km_done,
+                volume_pct=round(adh.volume_ratio * 100) if adh.volume_ratio is not None else None,
+            ),
+            risk=RiskOut(
+                level=res.risk.level,
+                acwr=res.risk.acwr,
+                readiness_recent=res.risk.readiness_recent,
+                readiness_previous=res.risk.readiness_previous,
+                ramp_pct=res.risk.ramp_pct,
+                signals=[PredictionFactorOut.from_model(f) for f in res.risk.signals],
+            ),
             reference_effort=ReferenceEffortOut.from_model(res.reference_effort) if res.reference_effort else None,
             longest_completed_km=res.longest_completed_km,
             guide_longest_km=res.guide_longest_km,
-            volume_adherence_pct=res.volume_adherence_pct,
-            factors=[
-                PredictionFactorOut(
-                    key=f.key,
-                    label=f.label,
-                    detail=f.detail,
-                    severity=f.severity,
-                )
-                for f in res.factors
-            ],
+            factors=[PredictionFactorOut.from_model(f) for f in res.factors],
         )
 
 

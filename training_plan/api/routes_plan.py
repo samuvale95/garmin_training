@@ -8,6 +8,7 @@ shapes the result back to JSON.
 from __future__ import annotations
 
 import hashlib
+import logging
 import tempfile
 from datetime import date, timedelta
 from pathlib import Path
@@ -25,6 +26,8 @@ from .auth import current_user_id
 from .cache import TTL_GOAL_FIT_NARRATIVE, TTL_PLAN_DIFF, cache, invalidate_calendar
 from .routes_coach import _zones, coach_state
 from .jobs import job_store
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -598,53 +601,91 @@ async def plan_goal_fit_narrative(
     )
 
 
+def _goal_prediction(user_id: str, payload: schemas.GoalFitRequest) -> race_prediction.RacePredictionResult:
+    """Goal confidence from what is stored: 60 days of activities and of wellness rows
+    (readiness trend, VO2max). Garmin is asked for VO2max only when the stored days carry
+    none -- one less live call on a screen that opens often."""
+    today = payload.date or date.today()
+    start = today - timedelta(days=60)
+    acts = history.activities_between(user_id, start, today)
+    try:
+        wellness = history.wellness_between(user_id, start, today)
+    except Exception:  # noqa: BLE001 - no readiness trend narrows the risk, never breaks it
+        logger.warning("wellness history unavailable for the goal prediction", exc_info=True)
+        wellness = []
+
+    vo2max = next((float(row["vo2max"]) for row in reversed(wellness) if row.get("vo2max")), None)
+    if vo2max is None:
+        try:
+            status_dict = garmin_session.run(user_id, lambda sync: sync.training_status())
+            if isinstance(status_dict, dict):
+                value = status_dict.get("vo2MaxPreciseValue") or status_dict.get("vo2MaxValue")
+                vo2max = float(value) if value else None
+        except Exception:  # noqa: BLE001 - without VO2max the prediction just loses its cross-check
+            vo2max = None
+
+    aerobic_thr_hr = None
+    try:
+        zones = _zones(user_id)
+        if zones:
+            aerobic_thr_hr = zones.aerobic_hr
+    except Exception:  # noqa: BLE001
+        pass
+
+    return race_prediction.assess_race_prediction(
+        activities=acts,
+        goal=payload.goal.to_model(),
+        planned_sessions=[s.to_model() for s in payload.sessions],
+        today=today,
+        vo2max=vo2max,
+        aerobic_threshold_hr=aerobic_thr_hr,
+        wellness=wellness,
+    )
+
+
 @router.post("/plan/goal-prediction", response_model=schemas.RacePredictionResponse)
 async def plan_goal_prediction(
     payload: schemas.GoalFitRequest,
     user_id: str = Depends(current_user_id),
 ) -> schemas.RacePredictionResponse:
-    """Predict race finish time and calculate honest goal confidence from executed runs.
+    """Goal confidence: a band (avanti / in linea / ambizioso / fuori portata) and its
+    three inputs -- predicted time, adherence, risk -- each shown on its own. All of it
+    arithmetic in `race_prediction`; the sentence is at `/plan/goal-prediction/narrative`."""
+    res = await run_in_threadpool(_goal_prediction, user_id, payload)
+    return schemas.RacePredictionResponse.from_model(res)
 
-    Uses Peter Riegel formula on recent performance efforts, checks volume adherence,
-    and cross-checks the longest completed run against recommended guides.
-    """
-    today = payload.date or date.today()
+
+@router.post("/plan/goal-prediction/narrative", response_model=schemas.NarrativeResponse)
+async def plan_goal_prediction_narrative(
+    payload: schemas.GoalFitRequest, refresh: bool = False, user_id: str = Depends(current_user_id)
+) -> schemas.NarrativeResponse:
+    """The same assessment, phrased -- falling back to its templated summary. Cached on
+    the conclusion, so the model is asked again only when the band, the prediction (to
+    the minute), the adherence or the risk moves."""
     goal = payload.goal.to_model()
-    sessions = [s.to_model() for s in payload.sessions]
+    res = await run_in_threadpool(_goal_prediction, user_id, payload)
 
-    def compute() -> schemas.RacePredictionResponse:
-        start_date = today - timedelta(days=60)
-        acts = history.activities_between(user_id, start_date, today)
+    def compute() -> schemas.NarrativeResponse:
+        text = llm.write_goal_narrative(race_prediction.prediction_facts(res, goal))
+        if text:
+            return schemas.NarrativeResponse(text=text, source="model")
+        return schemas.NarrativeResponse(text=res.summary, source="template")
 
-        vo2max = None
-        try:
-            status_dict = garmin_session.run(user_id, lambda sync: sync.training_status())
-            if isinstance(status_dict, dict):
-                vo2max = status_dict.get("vo2MaxPreciseValue") or status_dict.get("vo2MaxValue")
-                if vo2max:
-                    vo2max = float(vo2max)
-        except Exception:
-            pass
-
-        aerobic_thr_hr = None
-        try:
-            zones = _zones(user_id)
-            if zones:
-                aerobic_thr_hr = zones.aerobic_hr
-        except Exception:
-            pass
-
-        res = race_prediction.assess_race_prediction(
-            activities=acts,
-            goal=goal,
-            planned_sessions=sessions,
-            today=today,
-            vo2max=vo2max,
-            aerobic_threshold_hr=aerobic_thr_hr,
-        )
-        return schemas.RacePredictionResponse.from_model(res)
-
-    return await run_in_threadpool(compute)
+    key = (
+        goal.race_date,
+        goal.target_time_seconds,
+        res.status,
+        res.band,
+        res.band_lowered,
+        (res.predicted_time_seconds or 0) // 60,
+        res.adherence.sessions_done,
+        res.adherence.sessions_planned,
+        res.risk.level,
+        res.weeks_left,
+    )
+    return await run_in_threadpool(
+        lambda: cache.get_or_call("plan:goal-prediction-narrative", user_id, key, TTL_GOAL_FIT_NARRATIVE, compute, refresh=refresh)
+    )
 
 
 @router.post("/plan/diff", response_model=schemas.DiffResponse)

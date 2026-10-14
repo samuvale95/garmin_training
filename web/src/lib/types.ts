@@ -314,26 +314,58 @@ export interface PredictionFactor {
   severity: "ok" | "attenzione" | "sconosciuto";
 }
 
+export interface GoalAdherence {
+  sessions_planned: number;
+  sessions_done: number;
+  session_pct?: number | null;
+  km_planned?: number | null;
+  km_done: number;
+  volume_pct?: number | null;
+}
+
+export interface GoalRisk {
+  level: "basso" | "moderato" | "alto" | "sconosciuto";
+  acwr?: number | null;
+  readiness_recent?: number | null;
+  readiness_previous?: number | null;
+  ramp_pct?: number | null;
+  signals: PredictionFactor[];
+}
+
+export type GoalBand = "avanti" | "in_linea" | "ambizioso" | "fuori_portata";
+
+/** Goal confidence (`training_plan/race_prediction.py`): a band and its three inputs,
+ * each computed on its own -- never a percentage. `band` is null without a target time
+ * or without a recent effort to predict from (`status` says which). */
 export interface RacePredictionData {
+  status: "valutato" | "senza_tempo_obiettivo" | "dati_insufficienti";
   predicted_time_seconds?: number | null;
   predicted_time_formatted?: string | null;
-  predicted_pace_sec_km?: number | null;
+  /** Both set when runs and VO₂max disagree by more than 5%: the prediction is a range. */
+  predicted_low_formatted?: string | null;
+  predicted_high_formatted?: string | null;
   predicted_pace_formatted?: string | null;
+  prediction_basis?: string | null;
+  vo2max_time_formatted?: string | null;
   target_time_seconds?: number | null;
   target_time_formatted?: string | null;
+  /** predicted − target: positive is slower than the target. */
   gap_seconds?: number | null;
   gap_formatted?: string | null;
-  confidence: "alta" | "media" | "cauta" | "non_valutabile";
-  confidence_score: number;
-  confidence_label: string;
-  confidence_color: string;
+  gap_pct?: number | null;
+  band?: GoalBand | null;
+  band_label?: string | null;
+  band_lowered: boolean;
+  softened: boolean;
+  weeks_left: number;
+  phase: string;
   headline: string;
-  verdict: string;
-  advice: string;
+  summary: string;
+  adherence: GoalAdherence;
+  risk: GoalRisk;
   reference_effort?: ReferenceEffort | null;
   longest_completed_km?: number | null;
   guide_longest_km?: number | null;
-  volume_adherence_pct?: number | null;
   factors: PredictionFactor[];
 }
 
