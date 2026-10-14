@@ -38,6 +38,7 @@ import type {
   PlanDiff,
   Progress,
   RaceGoal,
+  SessionSlot,
   RacePredictionData,
   RescheduleResult,
   ScheduledWorkout,
@@ -1557,11 +1558,22 @@ function fuelStaleTime(date: string): number {
  * (and, for the narrative, a paid model call) computed against "nothing scheduled",
  * immediately thrown away when the real plan lands under a different cache key. Callers
  * pass whatever tells them the plan has arrived. */
-export function useFuelTargets(date: string, sessions: TrainingSession[], weightKg: number | null | undefined, enabled = true) {
+/** `sessionSlot` is when the session happens (see `useTrainingSlot`): every screen
+ * asking for today's targets must pass the same one, or they read different plans. */
+export function useFuelTargets(
+  date: string,
+  sessions: TrainingSession[],
+  weightKg: number | null | undefined,
+  enabled: boolean,
+  sessionSlot: SessionSlot
+) {
   return useQuery({
-    queryKey: ["nutrition", "targets", date, weightKg ?? null, sessions.length ? planFingerprint(sessions) : null],
+    queryKey: ["nutrition", "targets", date, weightKg ?? null, sessions.length ? planFingerprint(sessions) : null, sessionSlot],
     queryFn: ({ signal }) =>
-      apiPost<FuelTargets>("/nutrition/targets", { date, sessions, weight_kg: weightKg ?? null }, signal),
+      apiPost<FuelTargets>("/nutrition/targets", { date, sessions, weight_kg: weightKg ?? null, session_slot: sessionSlot }, signal),
+    // Switching the slot is a new key; keep the previous plan on screen until the new
+    // one lands instead of flashing the skeleton.
+    placeholderData: keepPreviousData,
     enabled,
     staleTime: fuelStaleTime(date),
   });

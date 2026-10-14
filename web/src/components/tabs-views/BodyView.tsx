@@ -22,6 +22,7 @@ import { useWatchSyncStatus } from "@/lib/watchSync";
 import { toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
 import { formatFullDate, stressCaption } from "@/lib/format";
 import { usePassoStore } from "@/lib/store";
+import { useTrainingSlot } from "@/lib/trainingHabits";
 import type { DayTarget } from "@/lib/types";
 import { useScreenReady } from "@/lib/useScreenReady";
 
@@ -57,7 +58,8 @@ export function BodyView() {
     : workoutsToSessions(workoutsQuery.data?.workouts ?? []);
 
   // Targets query starts as soon as access is ready
-  const fuelQuery = useFuelTargets(todayKey, sessions, manualWeight?.weightKg, access.ready);
+  const training = useTrainingSlot(todayKey, access.ready);
+  const fuelQuery = useFuelTargets(todayKey, sessions, manualWeight?.weightKg, access.ready && training.ready, training.slot);
   const prefetchNarrative = usePrefetchFuelNarrative();
   const fuel = fuelQuery.data;
   const fuelDegraded = fuel?.weight_source === "reference" && sessions.length === 0;

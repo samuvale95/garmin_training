@@ -601,7 +601,15 @@ export interface MealSlot {
   protein_g: number;
   portions: Portion[];
   note: string | null;
+  /** "13:00": where the meal sits once the session has been placed in the day. */
+  clock: string | null;
+  /** The two meals that answer to the session. */
+  role: "pre" | "post" | null;
 }
+
+/** When in the day the session happens -- a plan has dates, not times, so this is the
+ * user's answer, and it moves the meals around the session, never the grams. */
+export type SessionSlot = "mattina" | "mezzogiorno" | "pomeriggio" | "sera";
 
 export interface DuringSession {
   carb_g_per_hour: [number, number];
@@ -629,6 +637,9 @@ export interface FuelTargets {
   recovery: RecoveryWindow | null;
   // Fetched separately (/nutrition/narrative) -- always null on the targets response.
   narrative: string | null;
+  /** Where the session was placed ("pomeriggio" -> "18:00"); both null on a rest day. */
+  session_slot: SessionSlot | null;
+  session_clock: string | null;
 }
 
 // ---- coach / technique ---------------------------------------------------------------
