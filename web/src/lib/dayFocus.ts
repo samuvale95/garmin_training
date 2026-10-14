@@ -45,11 +45,11 @@ export function dayFocus({
   return nowMinutes >= EVENING_MINUTES ? "domani" : "prontezza";
 }
 
-/** One line under a screen's title saying why it is ordered the way it is. */
+/** A short label under a screen's title saying which moment it is ordered for. */
 export const FOCUS_LINE: Record<DayFocus, string> = {
-  prontezza: "Prima di allenarti: come hai dormito e quanto sei pronto.",
-  recupero: "Dopo l'allenamento: energia rimasta, stress e cosa ti aspetta domani.",
-  domani: "È sera: conta come arrivi a domani.",
+  prontezza: "Prima dell'allenamento",
+  recupero: "Dopo l'allenamento",
+  domani: "Sera · si guarda a domani",
 };
 
 /** `dayFocus` for today, from the clock, the watch and the plan. The activity query is
