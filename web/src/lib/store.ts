@@ -2,12 +2,16 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { SyncItemResult } from "./types";
+import type { SessionSlot, SyncItemResult } from "./types";
 
 export interface Prefs {
   avvisamiSeIlCorpoNonRegge: boolean;
   chiediPrimaDiCancellare: boolean;
   menoMovimento: boolean;
+  /** When the user usually trains: what the meals of the day are placed around. Kept
+   * across visits -- asking every time is how a screen gets answered with whatever the
+   * default happens to be. */
+  orarioAllenamento: SessionSlot;
 }
 
 /** Local-only display identity (name/email the user types in Settings). There is no
@@ -62,6 +66,7 @@ const defaultPrefs: Prefs = {
   // "Chiedi prima di cancellare" defaults on, by design (README screen 15).
   chiediPrimaDiCancellare: true,
   menoMovimento: false,
+  orarioAllenamento: "pomeriggio",
 };
 
 const defaultProfile: Profile = { name: "", email: "" };

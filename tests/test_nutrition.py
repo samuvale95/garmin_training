@@ -321,3 +321,83 @@ def test_the_gym_is_not_fuelled_during():
     sessions = [_session([_time_step(100)], day=date(2026, 8, 10), sport="strength_training")]
     fuelling = nutrition.daily_fuelling(date(2026, 8, 10), sessions, weight_kg=70.0)
     assert fuelling.during is None
+
+
+# ---- the day on the clock -----------------------------------------------------------
+
+
+def _hard_day(slot, minutes=100):
+    sessions = [
+        _session(
+            [
+                _time_step(15, _pace(360), "warmup"),
+                RepeatBlock(reps=6, steps=[_time_step(5, _pace(300)), _time_step(2, None, "recovery")]),
+                _time_step(minutes - 57, _pace(360), "cooldown"),
+            ],
+            day=date(2026, 8, 10),
+        )
+    ]
+    return nutrition.daily_fuelling(date(2026, 8, 10), sessions, weight_kg=70.0, profile=_profile(), session_slot=slot)
+
+
+def _by_role(fuelling, role):
+    return next(meal for meal in fuelling.meals if meal.role == role)
+
+
+@pytest.mark.parametrize("slot", ["mattina", "pomeriggio", "sera"])
+def test_the_slot_moves_meals_never_grams(slot):
+    """Picking when you run changes *when* the day's carbohydrate is eaten, not how much
+    of it there is: the screen shows one total, and it must not move under the user's
+    finger."""
+    reference = sum(meal.carb_g for meal in _hard_day("pomeriggio").meals)
+    assert sum(meal.carb_g for meal in _hard_day(slot).meals) == reference
+
+
+@pytest.mark.parametrize("slot", ["mattina", "pomeriggio", "sera"])
+def test_meals_come_in_the_order_they_are_eaten(slot):
+    clocks = [meal.clock for meal in _hard_day(slot).meals]
+    assert None not in clocks
+    assert clocks == sorted(clocks)
+
+
+def test_a_morning_session_makes_breakfast_the_recovery_meal():
+    """Nobody gets up at five for a two-and-a-half-hour pre-run meal: before a morning
+    session there is a small snack, and breakfast is eaten after, as the recovery."""
+    fuelling = _hard_day("mattina")
+    pre, post = _by_role(fuelling, "pre"), _by_role(fuelling, "post")
+    assert pre.clock == "06:45"
+    assert pre.carb_g <= nutrition.PRE_EARLY_MAX_CARB_G
+    assert post.name == "Colazione di recupero"
+    assert "colazione" not in [meal.key for meal in fuelling.meals]
+    assert fuelling.session_clock == "07:30"
+
+
+def test_an_evening_session_makes_dinner_the_recovery_meal():
+    fuelling = _hard_day("sera")
+    post = _by_role(fuelling, "post")
+    assert post.name == "Cena di recupero"
+    assert "cena" not in [meal.key for meal in fuelling.meals]
+    assert post.clock > fuelling.session_clock
+
+
+def test_an_afternoon_session_gets_a_real_meal_before_it():
+    fuelling = _hard_day("pomeriggio")
+    assert _by_role(fuelling, "pre").clock == "15:30"
+    # The afternoon snack would sit an hour from the pre-session meal: it moves to the
+    # morning instead of stacking two meals on top of each other.
+    snack = next(meal for meal in fuelling.meals if meal.key == "spuntino")
+    assert snack.clock == "10:30"
+
+
+def test_after_a_hard_session_the_recovery_window_is_on_the_plate():
+    """Same moment, one number: the window's note goes on the meal after the session
+    instead of a second block quoting different grams for the same hour."""
+    post = _by_role(_hard_day("pomeriggio"), "post")
+    assert post.note == nutrition.RECOVERY_NOTE
+
+
+def test_a_rest_day_runs_on_the_ordinary_clock():
+    fuelling = nutrition.daily_fuelling(date(2026, 8, 10), [], weight_kg=70.0, profile=_profile(), session_slot="sera")
+    assert [meal.clock for meal in fuelling.meals] == ["07:30", "10:30", "13:00", "16:30", "20:00"]
+    assert all(meal.role is None for meal in fuelling.meals)
+    assert fuelling.session_clock is None and fuelling.session_slot is None

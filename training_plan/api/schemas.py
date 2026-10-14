@@ -1186,6 +1186,9 @@ class MealSlotOut(BaseModel):
     protein_g: int
     portions: list[PortionOut] = Field(default_factory=list)
     note: str | None = None
+    # "13:00": where the meal sits once the session has been placed in the day.
+    clock: str | None = None
+    role: Literal["pre", "post"] | None = None
 
     @classmethod
     def from_model(cls, slot: "nutrition.MealSlot") -> "MealSlotOut":
@@ -1197,6 +1200,8 @@ class MealSlotOut(BaseModel):
             protein_g=slot.protein_g,
             portions=[PortionOut.from_model(p) for p in slot.portions],
             note=slot.note,
+            clock=slot.clock,
+            role=slot.role,
         )
 
 
@@ -1245,6 +1250,9 @@ class FuelTargetsRequest(BaseModel):
     sessions: list[TrainingSessionIn] = Field(default_factory=list)
     # A weight typed in by the user wins over Garmin's. Omitted means "ask Garmin".
     weight_kg: float | None = None
+    # When in the day today's session happens. A plan has dates, not times, so this is
+    # the user's answer -- it moves the meals around the session, never the grams.
+    session_slot: Literal["mattina", "pomeriggio", "sera"] = "pomeriggio"
 
 
 class FuelTargetsResponse(BaseModel):
@@ -1262,6 +1270,9 @@ class FuelTargetsResponse(BaseModel):
     # The model's sentence is fetched separately (/nutrition/narrative) so this response
     # stays instant; it is null here by construction, never "not yet loaded".
     narrative: str | None = None
+    # Where the session was placed ("pomeriggio" -> "18:00"); both null on a rest day.
+    session_slot: str | None = None
+    session_clock: str | None = None
 
     @classmethod
     def from_model(cls, fuelling: "nutrition.DailyFuelling") -> "FuelTargetsResponse":
@@ -1275,6 +1286,8 @@ class FuelTargetsResponse(BaseModel):
             meals=[MealSlotOut.from_model(m) for m in fuelling.meals],
             during=DuringSessionOut.from_model(fuelling.during),
             recovery=RecoveryWindowOut.from_model(fuelling.recovery),
+            session_slot=fuelling.session_slot,
+            session_clock=fuelling.session_clock,
         )
 
 

@@ -6,30 +6,28 @@ import { SlideUp } from "@/components/motion/primitives";
 import { BellIcon, DropletIcon, UtensilsIcon, CheckIcon } from "@/components/Icons";
 import {
   calculateHydrationMl,
-  calculateSnackGrams,
   getNotificationStatus,
   requestNotificationPermission,
   sendTestReminder,
   showNotification,
   type NotificationStatus,
 } from "@/lib/notifications";
-import type { DayTarget } from "@/lib/types";
-import type { RunTimeSlot } from "@/components/FuelBlocks";
+import type { DayTarget, MealSlot } from "@/lib/types";
 
 interface FuelReminderCardProps {
   todayTarget?: DayTarget | null;
-  timeSlot: RunTimeSlot;
+  /** "18:00": where the session sits in today's plan (`FuelTargets.session_clock`). */
+  sessionClock: string | null;
+  /** The plan's own pre-session meal. The snack shown here *is* that meal -- a second
+   * time and a second gram count computed in this file used to sit under the plan and
+   * disagree with it. */
+  preMeal: MealSlot | null;
   animate?: boolean;
   delayMs?: number;
 }
 
-const SLOT_TIMES: Record<RunTimeSlot, { hour: number; minute: number; label: string }> = {
-  mattina: { hour: 7, minute: 30, label: "07:30" },
-  pomeriggio: { hour: 18, minute: 0, label: "18:00" },
-  sera: { hour: 20, minute: 0, label: "20:00" },
-};
-
-function subtractMinutes(hour: number, minute: number, minsToSubtract: number): string {
+function subtractMinutes(clock: string, minsToSubtract: number): string {
+  const [hour, minute] = clock.split(":").map(Number);
   let totalMins = hour * 60 + minute - minsToSubtract;
   if (totalMins < 0) totalMins += 24 * 60;
   const h = Math.floor(totalMins / 60) % 24;
@@ -39,7 +37,8 @@ function subtractMinutes(hour: number, minute: number, minsToSubtract: number): 
 
 export function FuelReminderCard({
   todayTarget,
-  timeSlot,
+  sessionClock,
+  preMeal,
   animate = true,
   delayMs = 0,
 }: FuelReminderCardProps) {
@@ -53,16 +52,13 @@ export function FuelReminderCard({
     setNotifStatus(getNotificationStatus());
   }, []);
 
-  if (!todayTarget || todayTarget.load === "riposo") {
+  if (!todayTarget || todayTarget.load === "riposo" || !sessionClock) {
     return null;
   }
 
-  const slotInfo = SLOT_TIMES[timeSlot] || SLOT_TIMES.pomeriggio;
-  const snackTime = subtractMinutes(slotInfo.hour, slotInfo.minute, 90);
-  const waterTime = subtractMinutes(slotInfo.hour, slotInfo.minute, 45);
-
+  const waterTime = subtractMinutes(sessionClock, 45);
   const hydrationMl = calculateHydrationMl(todayTarget.duration_minutes, todayTarget.load === "molto_lungo");
-  const snackGrams = calculateSnackGrams(todayTarget.load);
+  const snackFoods = preMeal?.portions.map((p) => (p.grams != null ? `${p.food} ${p.grams} g` : p.food)).join(", ");
 
   async function handleEnable() {
     const perm = await requestNotificationPermission();
@@ -161,7 +157,7 @@ export function FuelReminderCard({
       </div>
 
       <p style={{ font: "600 17px/1.2 var(--font-sans)", letterSpacing: "-.01em", margin: "0 0 4px" }}>
-        Programma pre-corsa (uscita alle {slotInfo.label})
+        Programma pre-corsa (uscita alle {sessionClock})
       </p>
       <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-70)", margin: "0 0 14px", lineHeight: 1.4 }}>
         Il carburante e i liquidi fanno effetto se arrivano con il giusto anticipo rispetto alla partenza.
@@ -169,24 +165,30 @@ export function FuelReminderCard({
 
       {/* Two steps: Snack and Water */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, margin: "14px 0" }}>
-        {/* Snack block */}
-        <div style={{ background: "var(--giallo)", padding: 12, borderRadius: "var(--radius-card)" }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--giallo-testo)", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 4 }}>
-              <UtensilsIcon size={11} strokeWidth={2.2} />
-              <span>Merenda (−90&apos;)</span>
-            </span>
-            <span className="font-mono" style={{ fontSize: 13, fontWeight: 700, color: "var(--giallo-testo)" }}>
-              ore {snackTime}
-            </span>
+        {/* Snack block: the plan's pre-session meal, not a second opinion on it */}
+        {preMeal ? (
+          <div style={{ background: "var(--giallo)", padding: 12, borderRadius: "var(--radius-card)" }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--giallo-testo)", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <UtensilsIcon size={11} strokeWidth={2.2} />
+                <span>Prima</span>
+              </span>
+              <span className="font-mono" style={{ fontSize: 13, fontWeight: 700, color: "var(--giallo-testo)" }}>
+                ore {preMeal.clock}
+              </span>
+            </div>
+            <p className="font-mono" style={{ fontSize: 18, fontWeight: 800, margin: "6px 0 2px", color: "var(--giallo-testo)" }}>
+              ~{preMeal.carb_g} g carbo
+            </p>
+            {snackFoods && (
+              <span style={{ fontSize: 10.5, color: "var(--inchiostro-70)", lineHeight: 1.3, display: "block" }}>
+                {snackFoods.charAt(0).toUpperCase() + snackFoods.slice(1)}
+              </span>
+            )}
           </div>
-          <p className="font-mono" style={{ fontSize: 18, fontWeight: 800, margin: "6px 0 2px", color: "var(--giallo-testo)" }}>
-            ~{snackGrams} carbo
-          </p>
-          <span style={{ fontSize: 10.5, color: "var(--inchiostro-70)", lineHeight: 1.3, display: "block" }}>
-            Banana con miele, 3 fette biscottate o barretta di cereali.
-          </span>
-        </div>
+        ) : (
+          <div />
+        )}
 
         {/* Hydration block */}
         <div style={{ background: "var(--azzurro)", padding: 12, borderRadius: "var(--radius-card)" }}>

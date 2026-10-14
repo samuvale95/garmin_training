@@ -4,6 +4,7 @@ import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { keepPreviousData, useMutation, useMutationState, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm, apiPut } from "./apiClient";
 import { shiftDateKey, toDateKey, weekBounds } from "./sessionVisuals";
+import { usePassoStore } from "./store";
 import type {
   ActivityForm,
   Adaptation,
@@ -1558,10 +1559,16 @@ function fuelStaleTime(date: string): number {
  * immediately thrown away when the real plan lands under a different cache key. Callers
  * pass whatever tells them the plan has arrived. */
 export function useFuelTargets(date: string, sessions: TrainingSession[], weightKg: number | null | undefined, enabled = true) {
+  // Read here rather than passed in, so every screen asking for today's targets asks
+  // with the same slot and shares one cache entry.
+  const sessionSlot = usePassoStore((s) => s.prefs.orarioAllenamento);
   return useQuery({
-    queryKey: ["nutrition", "targets", date, weightKg ?? null, sessions.length ? planFingerprint(sessions) : null],
+    queryKey: ["nutrition", "targets", date, weightKg ?? null, sessions.length ? planFingerprint(sessions) : null, sessionSlot],
     queryFn: ({ signal }) =>
-      apiPost<FuelTargets>("/nutrition/targets", { date, sessions, weight_kg: weightKg ?? null }, signal),
+      apiPost<FuelTargets>("/nutrition/targets", { date, sessions, weight_kg: weightKg ?? null, session_slot: sessionSlot }, signal),
+    // Switching the slot is a new key; keep the previous plan on screen until the new
+    // one lands instead of flashing the skeleton.
+    placeholderData: keepPreviousData,
     enabled,
     staleTime: fuelStaleTime(date),
   });

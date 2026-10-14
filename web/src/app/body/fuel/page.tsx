@@ -11,13 +11,8 @@ import { FuelCorrectionSheet, PortionPicker, macroAtPortion } from "@/components
 import { LogDayPicker, defaultLogDay, logDateKey, type LogDay } from "@/components/LogDayPicker";
 import { useMounted } from "@/lib/hydration";
 import { DayEnergyCard } from "@/components/DayEnergyCard";
-import {
-  SessionTimeSelectorCard,
-  DayFuelTimelineBlock,
-  TomorrowFuelBanner,
-  MealList,
-  type RunTimeSlot,
-} from "@/components/FuelBlocks";
+import { MealList } from "@/components/FuelBlocks";
+import { FuelDayPlan } from "@/components/FuelDayPlan";
 import { FuelReminderCard } from "@/components/FuelReminderCard";
 import { useMountOnce } from "@/lib/motion";
 import { formatWeekday } from "@/lib/format";
@@ -136,7 +131,8 @@ export default function FuelPage() {
   const [flow, setFlow] = useState<Flow>({ kind: "idle" });
   useFlowTracking("meal", flow.kind);
   const [correcting, setCorrecting] = useState<FoodEntry | null>(null);
-  const [runTimeSlot, setRunTimeSlot] = useState<RunTimeSlot>("pomeriggio");
+  const sessionSlot = usePassoStore((s) => s.prefs.orarioAllenamento);
+  const setPref = usePassoStore((s) => s.setPref);
   // The day a new meal is logged to. Unset until the user picks: the default depends on
   // the clock (after midnight a late dinner still belongs to yesterday), which is only
   // known once mounted -- the server render can't know the user's local time.
@@ -266,11 +262,6 @@ export default function FuelPage() {
   const entries = day?.entries ?? [];
   const hasPlan = sessions.length > 0;
   const narrative = narrativeQuery.data?.text;
-  // The hero already prints one of these two sentences; the comment block only earns
-  // its place when it has something else to say (the model's narrative shown above,
-  // the deterministic advice below). Identical text stacked twice was the screen's
-  // most visible flaw.
-  const commentText = fuel && narrative && narrative !== fuel.advice ? fuel.advice : null;
 
   return (
     <div style={{ padding: "22px 20px 148px" }}>
@@ -319,37 +310,25 @@ export default function FuelPage() {
         <FuelSkeleton />
       ) : (
         <>
-          {/* 1. SCHEDA SEDUTA & SELETTORE ORARIO (Chiara, amichevole, discreta) */}
-          <SessionTimeSelectorCard
-            animate={animate}
-            fuel={fuel}
-            timeSlot={runTimeSlot}
-            onSelectTimeSlot={setRunTimeSlot}
-          />
-
-          {/* 1.5 PROMEMORIA MERENDA & IDRATAZIONE PRE-CORSA */}
-          <FuelReminderCard
-            animate={animate}
-            delayMs={120}
-            todayTarget={fuel.today}
-            timeSlot={runTimeSlot}
-          />
-
-          {/* 2. TIMELINE DELLA GIORNATA ALIMENTARE (IL PROTAGONISTA) */}
-          <DayFuelTimelineBlock
-            animate={animate}
-            fuel={fuel}
-            timeSlot={runTimeSlot}
-          />
-
-          {/* 3. DOMANI IN ARRIVO */}
-          <TomorrowFuelBanner animate={animate} fuel={fuel} />
+          {/* What to eat, and when: the plates the backend sized, on the clock. */}
+          <div style={{ marginTop: 18 }}>
+            <FuelDayPlan
+              fuel={fuel}
+              status={statusQuery.data}
+              narrative={narrative}
+              slot={sessionSlot}
+              onSlotChange={(slot) => setPref("orarioAllenamento", slot)}
+              animate={animate}
+            />
+          </div>
 
           {/* 4. TODAY'S LOGGED MEALS (se presenti) */}
           <MealList entries={entries} animate={animate} onSelect={setCorrecting} />
 
           {/* 5. ENERGY BALANCE (se abilitato dai livelli atleta) */}
           {dayEnergy.data && <DayEnergyCard energy={dayEnergy.data} numbers={showEnergy} animate={animate} delayMs={280} />}
+
+          <FuelReminderCard animate={animate} delayMs={120} todayTarget={fuel.today} sessionClock={fuel.session_clock} preMeal={fuel.meals.find((meal) => meal.role === "pre") ?? null} />
 
           {/* 6. NAVIGATION: Diary & 7-Day History */}
           <SlideUp active={animate} delayMs={340} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>

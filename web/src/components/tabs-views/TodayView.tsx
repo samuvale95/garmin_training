@@ -138,7 +138,9 @@ export function TodayView() {
   const [quickMealOpen, setQuickMealOpen] = useState(false);
   const planOrLiveSessions = access.plan ? access.plan.sessions : workoutsToSessions(workoutsQuery.data?.workouts ?? []);
   const fuelStatus = useFuelStatus(todayKey, undefined, access.ready);
-  const fuelTargets = useFuelTargets(todayKey, planOrLiveSessions, undefined, access.ready);
+  // Same weight as the Nutrizione tab, so both read one cache entry and one answer.
+  const manualWeight = usePassoStore((s) => s.manualWeight);
+  const fuelTargets = useFuelTargets(todayKey, planOrLiveSessions, manualWeight?.weightKg, access.ready);
 
   // Until we know whether there's a plan or a live Garmin connection there is nothing
   // real to show -- but "nothing real" used to mean `return null`, i.e. an empty screen
@@ -287,6 +289,7 @@ export function TodayView() {
       {heroSession && (
         <PreWorkoutContextCard
           todayTarget={fuelTargets.data?.today}
+          preMeal={fuelTargets.data?.meals.find((meal) => meal.role === "pre") ?? null}
           onOpenQuickLog={() => setQuickMealOpen(true)}
           active={animate}
           trained={trainedOn(todayKey) || heroSession.date > todayKey}

@@ -4,10 +4,13 @@ import { motion } from "framer-motion";
 import { SlideUp } from "@/components/motion/primitives";
 import { LightningIcon } from "@/components/Icons";
 import { calculateHydrationMl, calculateSnackGrams } from "@/lib/notifications";
-import type { DayTarget } from "@/lib/types";
+import type { DayTarget, MealSlot } from "@/lib/types";
 
 interface PreWorkoutContextCardProps {
   todayTarget?: DayTarget | null;
+  /** The plan's pre-session meal: when present, its time and grams are the ones shown,
+   * so this card and the Nutrizione tab give the same answer. */
+  preMeal?: MealSlot | null;
   onOpenQuickLog: () => void;
   active?: boolean;
   trained?: boolean;
@@ -18,6 +21,7 @@ interface PreWorkoutContextCardProps {
 
 export function PreWorkoutContextCard({
   todayTarget,
+  preMeal,
   onOpenQuickLog,
   active = true,
   trained = false,
@@ -40,7 +44,8 @@ export function PreWorkoutContextCard({
   }
 
   const isLongOrHard = todayTarget.load === "molto_lungo" || todayTarget.load === "duro";
-  const snackGramsText = calculateSnackGrams(todayTarget.load);
+  const snackGramsText = preMeal ? `${preMeal.carb_g} g` : calculateSnackGrams(todayTarget.load);
+  const snackFoods = preMeal?.portions.map((p) => (p.grams != null ? `${p.food} ${p.grams} g` : p.food)).join(", ");
   const hydrationMl = calculateHydrationMl(isLongOrHard ? 90 : 45, isLongOrHard);
 
   return (
@@ -78,7 +83,7 @@ export function PreWorkoutContextCard({
             ~{snackGramsText} carboidrati · {hydrationMl}ml acqua
           </p>
           <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>
-            Mangia 60–90 min prima per massimizzare la resa
+            {preMeal?.clock ? `Alle ${preMeal.clock}${snackFoods ? `: ${snackFoods}` : ""}` : "Mangia 60–90 min prima per massimizzare la resa"}
           </p>
         </div>
 

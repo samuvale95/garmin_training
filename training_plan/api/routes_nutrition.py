@@ -145,6 +145,7 @@ async def nutrition_targets(
             weight_kg=weight,
             weight_source=source,
             profile=_resolve_profile(user_id),
+            session_slot=payload.session_slot,
         )
         return schemas.FuelTargetsResponse.from_model(fuelling)
 
@@ -152,7 +153,7 @@ async def nutrition_targets(
         lambda: cache.get_or_call(
             "nutrition:targets",
             user_id,
-            (day, plan_key, payload.weight_kg),
+            (day, plan_key, payload.weight_kg, payload.session_slot),
             TTL_NUTRITION_TARGETS,
             compute,
             refresh=refresh,

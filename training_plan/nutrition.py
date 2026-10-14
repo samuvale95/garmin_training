@@ -275,6 +275,10 @@ class DailyFuelling:
     # either to matter.
     during: "DuringSession | None" = None
     recovery: "RecoveryWindow | None" = None
+    # When in the day the session was placed (what the user picked), and the clock time
+    # that stands for -- None on a rest day, when there is nothing to place.
+    session_slot: "SessionSlot | None" = None
+    session_clock: str | None = None
 
 
 def has_quality_work(session: TrainingSession) -> bool:
@@ -437,6 +441,7 @@ def daily_fuelling(
     weight_kg: float | None = None,
     weight_source: Literal["scale", "profile", "manual", "reference"] | None = None,
     profile: BodyProfile | None = None,
+    session_slot: "SessionSlot" = "pomeriggio",
 ) -> DailyFuelling:
     """Today's and tomorrow's targets plus the sentence that explains them.
 
@@ -475,9 +480,11 @@ def daily_fuelling(
         today=today_target,
         tomorrow=tomorrow_target,
         advice=templated_advice(today_target, tomorrow_target),
-        meals=meal_plan(today_target, tomorrow_target),
+        meals=meal_plan(today_target, tomorrow_target, session_slot),
         during=during_session(today_target),
         recovery=recovery_window(today_target, weight_kg),
+        session_slot=session_slot if today_target.load != "riposo" else None,
+        session_clock=session_clock(today_target, session_slot),
     )
 
 
@@ -550,6 +557,11 @@ class MealSlot:
     protein_g: int
     portions: list[Portion] = field(default_factory=list)
     note: str | None = None
+    # The clock time the meal is placed at ("13:00"), worked out from when the session
+    # is -- what the screen orders the day by and how it knows which meal is next.
+    clock: str | None = None
+    # "pre" / "post" for the two meals that answer to the session, None otherwise.
+    role: Literal["pre", "post"] | None = None
 
 
 @dataclass
@@ -665,6 +677,77 @@ MEAL_NOTES = {
     "cena": "qui vanno i carboidrati che servono a domani",
 }
 
+RECOVERY_NOTE = "entro un'ora dalla fine: finestra ottimale per il ripristino del glicogeno e la sintesi muscolare"
+
+# ---- placing the meals on the clock ------------------------------------------------------
+#
+# A plan has dates, not times: when in the day a session happens is the one thing the
+# user tells the screen ("mattina" / "pomeriggio" / "sera"). These are the clock times
+# those words stand for, and where every meal sits on a day with nothing to work around.
+# All in minutes after midnight.
+
+SessionSlot = Literal["mattina", "pomeriggio", "sera"]
+DEFAULT_SESSION_SLOT: SessionSlot = "pomeriggio"
+SESSION_START_MINUTES: dict[str, int] = {"mattina": 7 * 60 + 30, "pomeriggio": 18 * 60, "sera": 19 * 60 + 30}
+# A session the plan gives no duration for is placed as an hour long.
+DEFAULT_SESSION_MINUTES = 60
+
+MEAL_CLOCK: dict[str, int] = {
+    "colazione": 7 * 60 + 30,
+    "spuntino_mattina": 10 * 60 + 30,
+    "pranzo": 13 * 60,
+    "spuntino": 16 * 60 + 30,
+    "cena": 20 * 60,
+}
+MID_MORNING = 10 * 60 + 30
+
+# The meal before: two and a half hours ahead, enough to digest a real plate -- except
+# before a morning session, where nobody gets up at five to eat, and the honest version
+# is something small three quarters of an hour before.
+PRE_LEAD_MINUTES = 150
+PRE_LEAD_EARLY_MINUTES = 45
+# ...and three quarters of an hour is room for a slice of bread with honey, not for the
+# pre-session share of a big day: the rest moves to the recovery breakfast.
+PRE_EARLY_MAX_CARB_G = 30
+# "Subito dopo": the time it takes to stop, cool down and get to food.
+POST_LAG_MINUTES = 15
+# A main meal that falls between the start of the session and an hour after its end
+# *is* the recovery meal: breakfast after a morning run, dinner after an evening one.
+# Printing both would be two plates thirty minutes apart, which is not a day anyone eats.
+RECOVERY_MEAL_WINDOW_MINUTES = 60
+# A snack this close to the pre-session meal moves to mid-morning instead.
+SNACK_MIN_GAP_MINUTES = 120
+
+# What a main meal turned recovery meal is built from: quick carbohydrate first.
+RECOVERY_MEAL_ANCHORS: dict[str, tuple[list[str], list[str], list[Portion]]] = {
+    "colazione": (
+        ["pane", "miele o marmellata", "banana", "avena"],
+        ["yogurt greco", "uova"],
+        [],
+    ),
+    "cena": (
+        ["riso", "patate", "pane"],
+        ["salmone", "uova", "legumi cotti"],
+        [Portion(food="verdura", grams=200), Portion(food="olio extravergine", grams=10)],
+    ),
+}
+RECOVERY_MEAL_NAMES = {"colazione": "Colazione di recupero", "cena": "Cena di recupero"}
+
+
+def _clock(minutes: int) -> str:
+    """"HH:MM", on the nearest quarter hour: a plan that says 08:56 is claiming a
+    precision nobody eats to."""
+    minutes = int(round(minutes / 15.0) * 15)
+    minutes = max(0, min(minutes, 23 * 60 + 45))
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def session_clock(today: "DayTarget", session_slot: SessionSlot) -> str | None:
+    """The clock time today's session is placed at, or None on a rest day."""
+    if today.load == "riposo":
+        return None
+    return _clock(SESSION_START_MINUTES[session_slot])
+
 
 def _fill(target_g: float, foods: list[str], table: dict[str, tuple[float, int]]) -> tuple[list[Portion], float]:
     """Portions that together carry `target_g` of one macro, and whatever is left over.
@@ -692,13 +775,37 @@ def _mid(range_g: tuple[int, int]) -> float:
     return (range_g[0] + range_g[1]) / 2
 
 
-def meal_plan(today: DayTarget, tomorrow: DayTarget) -> list[MealSlot]:
-    """Today's targets, spent across today's meals.
+@dataclass
+class _PlannedMeal:
+    """A meal while it is being placed: grams decided, foods not yet."""
+
+    name: str
+    timing: str
+    carb_g: int
+    protein_g: int
+    clock: int | None
+    anchors: tuple[list[str], list[str], list[Portion]]
+    role: Literal["pre", "post"] | None = None
+    # The breakfast or dinner folded into the recovery meal, if one was.
+    absorbed: str | None = None
+
+
+def meal_plan(
+    today: DayTarget, tomorrow: DayTarget, session_slot: SessionSlot = DEFAULT_SESSION_SLOT
+) -> list[MealSlot]:
+    """Today's targets, spent across today's meals, in the order they are eaten.
 
     Sized on the *midpoint* of each range rather than either end: a plan built on the
     top of the band would systematically overshoot, and one built on the bottom would
     read as a restriction. The ranges stay on screen next to it, so the midpoint is
     presented as one way to land inside them, not as the answer.
+
+    `session_slot` is when in the day the session happens. It moves meals, never grams:
+    the meal before the session goes two and a half hours ahead of it (three quarters of
+    an hour before a morning one), and a breakfast or dinner that would land inside the
+    session or right after it becomes the recovery meal, carrying both shares. The day's
+    total is the same whichever slot is picked -- only *when* each part of it is eaten
+    changes, which is the thing the slot is for.
     """
     if today.carb_g is None or today.protein_g is None:
         return []
@@ -708,17 +815,63 @@ def meal_plan(today: DayTarget, tomorrow: DayTarget) -> list[MealSlot]:
     trains = today.load != "riposo"
     shares = MEAL_SHARES_TRAINING if trains else MEAL_SHARES_REST
 
-    slots: list[MealSlot] = []
-    for key, name, timing, carb_share, protein_share in shares:
-        carb_g = round(carb_total * carb_share)
-        protein_g = round(protein_total * protein_share)
-        carb_foods, protein_foods, extras = MEAL_ANCHORS[key]
+    plan: dict[str, _PlannedMeal] = {
+        key: _PlannedMeal(
+            name=name,
+            timing=timing,
+            carb_g=round(carb_total * carb_share),
+            protein_g=round(protein_total * protein_share),
+            clock=MEAL_CLOCK.get(key),
+            anchors=MEAL_ANCHORS[key],
+        )
+        for key, name, timing, carb_share, protein_share in shares
+    }
 
-        carb_portions, carb_left = _fill(carb_g, carb_foods, CARB_FOODS)
-        protein_portions, _ = _fill(protein_g, protein_foods, PROTEIN_FOODS)
+    if trains:
+        start = SESSION_START_MINUTES[session_slot]
+        end = start + round(today.duration_minutes or DEFAULT_SESSION_MINUTES)
+        early = session_slot == "mattina"
+
+        pre, post = plan["pre"], plan["post"]
+        pre.timing = "45 min prima" if early else "2-3 h prima"
+        pre.clock = start - (PRE_LEAD_EARLY_MINUTES if early else PRE_LEAD_MINUTES)
+        pre.role = "pre"
+        if early and pre.carb_g > PRE_EARLY_MAX_CARB_G:
+            post.carb_g += pre.carb_g - PRE_EARLY_MAX_CARB_G
+            pre.carb_g = PRE_EARLY_MAX_CARB_G
+        post.timing = "entro un'ora dalla fine"
+        post.clock = end + POST_LAG_MINUTES
+        post.role = "post"
+
+        for host in ("colazione", "cena"):
+            meal = plan[host]
+            if meal.clock is not None and start <= meal.clock <= end + RECOVERY_MEAL_WINDOW_MINUTES:
+                post.name = RECOVERY_MEAL_NAMES[host]
+                post.carb_g += meal.carb_g
+                post.protein_g += meal.protein_g
+                post.clock = max(meal.clock, end + POST_LAG_MINUTES)
+                post.anchors = RECOVERY_MEAL_ANCHORS[host]
+                post.absorbed = host
+                del plan[host]
+                break
+
+        snack = plan["spuntino"]
+        if snack.clock is not None and abs(snack.clock - pre.clock) < SNACK_MIN_GAP_MINUTES:
+            snack.timing = "metà mattina"
+            snack.clock = MID_MORNING
+
+    slots: list[MealSlot] = []
+    for key, meal in plan.items():
+        carb_foods, protein_foods, extras = meal.anchors
+        carb_portions, carb_left = _fill(meal.carb_g, carb_foods, CARB_FOODS)
+        protein_portions, _ = _fill(meal.protein_g, protein_foods, PROTEIN_FOODS)
         portions = [*carb_portions, *protein_portions, *extras]
 
         note = MEAL_NOTES.get(key)
+        # After a session that actually emptied something, the meal after it is where
+        # the recovery window is spent -- the one fact worth printing on that plate.
+        if meal.role == "post" and today.load in ("duro", "molto_lungo"):
+            note = RECOVERY_NOTE
         # A meal whose share does not fit on one plate says so instead of printing a
         # portion nobody would serve. It happens on the biggest days, which are exactly
         # the days when "spread it out" is the real advice.
@@ -726,20 +879,23 @@ def meal_plan(today: DayTarget, tomorrow: DayTarget) -> list[MealSlot]:
             note = f"restano {round(carb_left)} g di carboidrati: spostali su un altro momento"
         # The evening plate is the one that answers to tomorrow, not today, and on the
         # night before a big session that is the only thing worth saying about it.
-        if key == "cena" and tomorrow.load in ("duro", "molto_lungo"):
+        if "cena" in (key, meal.absorbed) and tomorrow.load in ("duro", "molto_lungo"):
             note = "domani si lavora: qui i carboidrati non si tagliano"
 
         slots.append(
             MealSlot(
                 key=key,
-                name=name,
-                timing=timing,
-                carb_g=carb_g,
-                protein_g=protein_g,
+                name=meal.name,
+                timing=meal.timing,
+                carb_g=meal.carb_g,
+                protein_g=meal.protein_g,
                 portions=portions,
                 note=note,
+                clock=_clock(meal.clock) if meal.clock is not None else None,
+                role=meal.role,
             )
         )
+    slots.sort(key=lambda slot: slot.clock or "99:99")
     return slots
 
 
@@ -794,7 +950,7 @@ def recovery_window(today: DayTarget, weight_kg: float) -> RecoveryWindow | None
     return RecoveryWindow(
         carb_g=carb_g,
         protein_g=protein_g,
-        note="entro un'ora dalla fine: finestra ottimale per il ripristino del glicogeno e la sintesi muscolare",
+        note=RECOVERY_NOTE,
         portions=[*carb_portions, *protein_portions],
     )
 

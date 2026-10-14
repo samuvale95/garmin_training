@@ -12,13 +12,8 @@ import { FuelCorrectionSheet, PortionPicker, macroAtPortion } from "@/components
 import { LogDayPicker, defaultLogDay, logDateKey, type LogDay } from "@/components/LogDayPicker";
 import { useMounted } from "@/lib/hydration";
 import { DayEnergyCard } from "@/components/DayEnergyCard";
-import {
-  SessionTimeSelectorCard,
-  DayFuelTimelineBlock,
-  TomorrowFuelBanner,
-  MealList,
-  type RunTimeSlot,
-} from "@/components/FuelBlocks";
+import { MealList } from "@/components/FuelBlocks";
+import { FuelDayPlan } from "@/components/FuelDayPlan";
 import { FuelReminderCard } from "@/components/FuelReminderCard";
 import { useMountOnce } from "@/lib/motion";
 import { formatWeekday } from "@/lib/format";
@@ -121,7 +116,8 @@ export function NutritionView() {
   const [flow, setFlow] = useState<Flow>({ kind: "idle" });
   useFlowTracking("meal", flow.kind);
   const [correcting, setCorrecting] = useState<FoodEntry | null>(null);
-  const [runTimeSlot, setRunTimeSlot] = useState<RunTimeSlot>("pomeriggio");
+  const sessionSlot = usePassoStore((s) => s.prefs.orarioAllenamento);
+  const setPref = usePassoStore((s) => s.setPref);
 
   const mounted = useMounted();
   const [pickedLogDay, setPickedLogDay] = useState<LogDay | null>(null);
@@ -238,7 +234,6 @@ export function NutritionView() {
   const day = dayQuery.data;
   const entries = day?.entries ?? [];
   const narrative = narrativeQuery.data?.text;
-  const commentText = fuel && narrative && narrative !== fuel.advice ? fuel.advice : null;
 
   return (
     <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
@@ -287,44 +282,15 @@ export function NutritionView() {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 16 }}>
-            {/* 1. SCHEDA SEDUTA & SELETTORE ORARIO */}
-            <SessionTimeSelectorCard
-              animate={animate}
+            {/* What to eat, and when: the plates the backend sized, on the clock. */}
+            <FuelDayPlan
               fuel={fuel}
-              timeSlot={runTimeSlot}
-              onSelectTimeSlot={setRunTimeSlot}
-            />
-
-            {/* 2. PROMEMORIA PRE-CORSA */}
-            <FuelReminderCard
+              status={statusQuery.data}
+              narrative={narrative}
+              slot={sessionSlot}
+              onSlotChange={(slot) => setPref("orarioAllenamento", slot)}
               animate={animate}
-              delayMs={120}
-              todayTarget={fuel.today}
-              timeSlot={runTimeSlot}
             />
-
-            {/* 3. TIMELINE DELLA GIORNATA ALIMENTARE */}
-            <DayFuelTimelineBlock
-              animate={animate}
-              fuel={fuel}
-              timeSlot={runTimeSlot}
-            />
-
-            {/* 4. DOMANI IN ARRIVO */}
-            <TomorrowFuelBanner
-              animate={animate}
-              fuel={fuel}
-            />
-
-            {/* 5. BILANCIO ENERGETICO */}
-            {showEnergy && dayEnergy.data && (
-              <DayEnergyCard
-                energy={dayEnergy.data}
-                numbers={true}
-                animate={animate}
-                delayMs={280}
-              />
-            )}
 
             {/* 6. DIARIO PASTI DEL GIORNO */}
             <div style={{ marginTop: 8 }}>
@@ -397,6 +363,12 @@ export function NutritionView() {
                 onSelect={(entry) => setCorrecting(entry)}
               />
             </div>
+
+            {showEnergy && dayEnergy.data && (
+              <DayEnergyCard energy={dayEnergy.data} numbers={true} animate={animate} delayMs={280} />
+            )}
+
+            <FuelReminderCard animate={animate} delayMs={120} todayTarget={fuel.today} sessionClock={fuel.session_clock} preMeal={fuel.meals.find((meal) => meal.role === "pre") ?? null} />
 
             <input
               ref={fileInputRef}
