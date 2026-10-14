@@ -1,5 +1,6 @@
 "use client";
 
+import { PushControl } from "@/components/PushControl";
 import { dis } from "@/lib/disabled";
 import { useState } from "react";
 import { useMounted } from "@/lib/hydration";
@@ -240,9 +241,19 @@ export default function SettingsPage() {
         </Card>
       </SlideUp>
 
+      <SlideUp delayMs={160}>
+        <Card>
+          <p style={{ fontWeight: 600, margin: "0 0 8px" }}>Notifiche</p>
+          <PushControl />
+          <Toggle label="Promemoria dei pasti" checked={prefs.promemoriaPasti} onChange={(v) => setPref("promemoriaPasti", v)} />
+          <Toggle label="Acqua prima di correre" checked={prefs.promemoriaAcqua} onChange={(v) => setPref("promemoriaAcqua", v)} />
+        </Card>
+      </SlideUp>
+
       <SlideUp delayMs={170}>
         <Card>
           <p style={{ fontWeight: 600, margin: "0 0 4px" }}>Preferenze</p>
+          <Toggle label="Vibrazioni al tocco" checked={prefs.vibrazioni} onChange={(v) => setPref("vibrazioni", v)} />
           <Toggle label="Avvisami se il corpo non regge" checked={prefs.avvisamiSeIlCorpoNonRegge} onChange={(v) => setPref("avvisamiSeIlCorpoNonRegge", v)} />
           <Toggle label="Chiedi prima di cancellare" checked={prefs.chiediPrimaDiCancellare} onChange={(v) => setPref("chiediPrimaDiCancellare", v)} />
           <Toggle label="Meno movimento" checked={prefs.menoMovimento} onChange={(v) => setPref("menoMovimento", v)} />
@@ -382,6 +393,8 @@ function Card({ children }: { children: React.ReactNode }) {
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label
+      role="switch"
+      aria-checked={checked}
       onClick={(e) => {
         e.preventDefault();
         onChange(!checked);

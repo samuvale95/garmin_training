@@ -614,7 +614,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       )}
 
       <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 10 }}>
-        <PrimaryButton data-track="workout-editor.handlesave"
+        <PrimaryButton data-haptic="success" data-track="workout-editor.handlesave"
           state={
             !dayIsValid ? "disabled" : calendarLookupFailed ? "idle" : isSaving || !calendarIdentityKnown ? "loading" : "idle"
           }

@@ -8,6 +8,12 @@ export interface Prefs {
   avvisamiSeIlCorpoNonRegge: boolean;
   chiediPrimaDiCancellare: boolean;
   menoMovimento: boolean;
+  /** Tactile feedback on taps, swipes and confirmations (see haptics.ts). */
+  vibrazioni: boolean;
+  /** Push reminders at meal times (see ReminderScheduler). */
+  promemoriaPasti: boolean;
+  /** Push reminder to drink 45 minutes before the session. */
+  promemoriaAcqua: boolean;
 }
 
 /** Local-only display identity (name/email the user types in Settings). There is no
@@ -68,6 +74,9 @@ const defaultPrefs: Prefs = {
   // "Chiedi prima di cancellare" defaults on, by design (README screen 15).
   chiediPrimaDiCancellare: true,
   menoMovimento: false,
+  vibrazioni: true,
+  promemoriaPasti: true,
+  promemoriaAcqua: true,
 };
 
 const defaultProfile: Profile = { name: "", email: "" };

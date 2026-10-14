@@ -616,7 +616,7 @@ function ComposeScreen({
         </>
       )}
 
-      <button data-track="body.fuel.submit"
+      <button data-haptic="success" data-track="body.fuel.submit"
         type="button"
         onClick={submit}
         {...dis(!ready || saving, "form_incompleto_o_in_caricamento")}

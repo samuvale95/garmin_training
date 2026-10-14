@@ -1,5 +1,6 @@
 "use client";
 
+import { haptic } from "@/lib/haptics";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
@@ -107,9 +108,7 @@ export function SwipeableTabContainer({ children }: { children: ReactNode }) {
 
     if (currentX < -threshold && activeTabIdx < TAB_ROUTES.length - 1) {
       // Complete swipe Left -> animate out and navigate to next tab
-      if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-        navigator.vibrate(8);
-      }
+      haptic("selection");
       animate(dragX, -containerWidth, {
         type: "spring",
         stiffness: 420,
@@ -120,9 +119,7 @@ export function SwipeableTabContainer({ children }: { children: ReactNode }) {
       });
     } else if (currentX > threshold && activeTabIdx > 0) {
       // Complete swipe Right -> animate out and navigate to prev tab
-      if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-        navigator.vibrate(8);
-      }
+      haptic("selection");
       animate(dragX, containerWidth, {
         type: "spring",
         stiffness: 420,

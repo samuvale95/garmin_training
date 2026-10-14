@@ -1,5 +1,6 @@
 "use client";
 
+import { haptic } from "@/lib/haptics";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -50,12 +51,6 @@ const SWIPE_MIN_PX = 52;
  * and the fastest it scrolls (px per frame) once the finger is right at the edge. */
 const AUTOSCROLL_EDGE_PX = 92;
 const AUTOSCROLL_MAX_PX = 13;
-
-function haptic(pattern: number | number[]) {
-  if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-    navigator.vibrate(pattern);
-  }
-}
 
 export function WeekPageContent() {
   const access = useCalendarAccess();
@@ -159,7 +154,7 @@ export function WeekPageContent() {
       setHoverDayKey(key);
       // A short tick every time the card crosses into another day: the drop target is
       // under the finger, where it can't be seen.
-      if (key) haptic(6);
+      if (key) haptic("selection");
     },
     [dayKeyAtPageY]
   );
@@ -178,10 +173,10 @@ export function WeekPageContent() {
     const targetKey = dayKeyAtPageY(pageY);
     if (!targetKey || targetKey === card.session.date) return;
     if (isRewritten(targetKey) || isRewritten(card.session.date)) {
-      haptic([30, 30, 30]);
+      haptic("error");
       return;
     }
-    haptic([10, 40, 14]);
+    haptic("success");
     if (card.planId != null) {
       moveSession(card.planId, card.session.date, targetKey);
     } else if (card.workout) {

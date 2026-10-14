@@ -250,6 +250,8 @@ interface PrimaryButtonProps {
   type?: "button" | "submit";
   /** Name in the interaction log (`screen.element`). */
   "data-track"?: string;
+  /** Feel of the tap (see HapticsProvider); a plain tick when omitted. */
+  "data-haptic"?: string;
 }
 
 export function PrimaryButton({
@@ -263,6 +265,7 @@ export function PrimaryButton({
   textColor = "var(--crema)",
   type = "button",
   "data-track": dataTrack,
+  "data-haptic": dataHaptic,
 }: PrimaryButtonProps) {
   const { reduced } = useMotionEnabled();
   const disabled = state === "disabled" || state === "loading";
@@ -270,7 +273,7 @@ export function PrimaryButton({
   const isLoading = state === "loading";
 
   return (
-    <motion.button data-track={dataTrack}
+    <motion.button data-track={dataTrack} data-haptic={dataHaptic}
       type={type}
       onClick={onClick}
       {...dis(disabled, state === "loading" ? "in_caricamento" : "non_pronto")}

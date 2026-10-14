@@ -1,6 +1,7 @@
 import { TabBar } from "@/components/TabBar";
 import { TabsPager } from "@/components/TabsPager";
 import { HistorySync } from "@/components/HistorySync";
+import { ReminderScheduler } from "@/components/ReminderScheduler";
 
 export default function TabsLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,6 +12,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
       </div>
       <TabBar />
       <HistorySync />
+      <ReminderScheduler />
     </div>
   );
 }

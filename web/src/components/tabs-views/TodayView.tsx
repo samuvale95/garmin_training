@@ -12,6 +12,7 @@ import { CheckInCard } from "@/components/CheckInCard";
 import { AdaptationCard } from "@/components/AdaptationCard";
 import { Mascot, Tokens } from "@/components/ProgressBits";
 import { RaceGoalCard } from "@/components/RaceGoalCard";
+import { PushNudge } from "@/components/PushNudge";
 import { TiltCard } from "@/components/motion/TiltCard";
 import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/motion/primitives";
 import { ChevronRight, ArrowRight, ArrowUpRight, PlusIcon, TargetIcon, UtensilsIcon } from "@/components/Icons";
@@ -427,6 +428,8 @@ export function TodayView() {
           </SlideUp>
         </Link>
       )}
+
+      <PushNudge />
 
       {/* Without a race this asks for one */}
       <RaceGoalCard

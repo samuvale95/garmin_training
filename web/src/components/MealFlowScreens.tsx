@@ -189,7 +189,7 @@ export function ComposeScreen({
         </>
       )}
 
-      <button data-track="meal-flow-screens.submit"
+      <button data-haptic="success" data-track="meal-flow-screens.submit"
         type="button"
         onClick={submit}
         {...dis(!ready || saving, "form_incompleto_o_in_caricamento")}

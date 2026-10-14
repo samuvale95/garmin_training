@@ -47,3 +47,10 @@ def no_model_calls(monkeypatch):
     """
     monkeypatch.delenv("OPENRUTER_API_KEY", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def no_push_loop(monkeypatch):
+    """The app's startup would otherwise start the minute-by-minute push dispatcher
+    (`routes_push.dispatch_loop`) inside every TestClient."""
+    monkeypatch.setenv("PASSO_PUSH_LOOP", "0")
