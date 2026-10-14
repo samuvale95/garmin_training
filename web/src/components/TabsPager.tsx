@@ -1,5 +1,6 @@
 "use client";
 
+import { haptic } from "@/lib/haptics";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { animate, useMotionValue, useMotionValueEvent } from "framer-motion";
@@ -186,9 +187,7 @@ export function TabsPager({ children }: { children?: React.ReactNode }) {
     }
 
     if (newIdx !== activeIdx) {
-      if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-        navigator.vibrate(8);
-      }
+      haptic("selection");
       // Animate track to target tab with responsive spring
       animate(xPercent, -newIdx * 100, {
         type: "spring",

@@ -1,5 +1,6 @@
 "use client";
 
+import { haptic } from "@/lib/haptics";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { BrandMark } from "@/components/motion/BrandMark";
@@ -62,9 +63,7 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
     if (currentDistance >= PULL_THRESHOLD) {
       setRefreshing(true);
       // Haptic confirmation if available
-      if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-        navigator.vibrate(12);
-      }
+      haptic("medium");
       // Hold indicator at threshold height while refreshing
       animate(pullDistance, PULL_THRESHOLD, { type: "spring", stiffness: 350, damping: 28 });
       try {

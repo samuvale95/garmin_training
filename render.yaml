@@ -30,6 +30,13 @@ services:
       # Supabase user ids allowed on the agents admin page, comma-separated.
       - key: PASSO_ADMIN_USER_IDS
         sync: false
-      # Shared secret for POST /agents/cron (same value as the GitHub Actions secret).
+      # Shared secret for POST /agents/cron and POST /push/dispatch (same value as the
+      # GitHub Actions secret).
       - key: AGENTS_CRON_SECRET
+        sync: false
+      # Optional. Web Push signing key and contact; without them the server generates a
+      # key once and keeps it in the database (see training_plan/push.py).
+      - key: VAPID_PRIVATE_KEY_PEM
+        sync: false
+      - key: VAPID_SUBJECT
         sync: false

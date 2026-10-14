@@ -3,7 +3,8 @@
 // forever, so after a deploy a tab switch could be answered with another build's page
 // data -- which Next rejects by reloading the whole app (white flash, everything
 // fading back in). Activating v2 deletes that cache.
-const CACHE_NAME = "passo-pwa-v2";
+// v3: adds the push handlers below.
+const CACHE_NAME = "passo-pwa-v3";
 const STATIC_ASSETS = [
   "/",
   "/manifest.webmanifest",
@@ -91,6 +92,58 @@ self.addEventListener("fetch", (event) => {
         });
         return networkResponse;
       });
+    })
+  );
+});
+
+// ---- push --------------------------------------------------------------------------
+// Reminders sent by the server (training_plan/push.py) while the app is closed. The
+// payload is {title, body, tag, url}; a tag replaces an earlier notification with the
+// same one instead of stacking a second "Pranzo".
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = { title: "Passo", body: event.data ? event.data.text() : "" };
+  }
+  const title = data.title || "Passo";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || "",
+      tag: data.tag || undefined,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url: data.url || "/today" },
+      vibrate: [18, 60, 24],
+      renotify: !!data.tag,
+    })
+  );
+});
+
+// Tapping the notification opens the app on the screen the reminder is about -- the
+// already-open window if there is one, a new one otherwise.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL((event.notification.data && event.notification.data.url) || "/today", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (client.url.startsWith(self.location.origin) && "focus" in client) {
+          client.navigate(target).catch(() => {});
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(target);
+    })
+  );
+});
+
+// The browser rotated the subscription: tell the server about the new one.
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      clients.forEach((client) => client.postMessage({ type: "passo-push-resubscribe" }));
     })
   );
 });

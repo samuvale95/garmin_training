@@ -1,5 +1,6 @@
 "use client";
 
+import { haptic } from "@/lib/haptics";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, useDragControls } from "framer-motion";
@@ -25,12 +26,6 @@ export interface DayCardData {
  * iOS and Android use for their own drag-to-reorder lists. */
 const LONG_PRESS_MS = 320;
 const MOVE_SLOP_PX = 8;
-
-function haptic(pattern: number | number[]) {
-  if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-    navigator.vibrate(pattern);
-  }
-}
 
 // ---- rest day --------------------------------------------------------------------------------
 
@@ -183,7 +178,7 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
       suppressClick.current = true;
       setPhase("dragging");
       onDragStateChange(true);
-      haptic(14);
+      haptic("medium");
       dragControls.start(nativeEvent);
     }, LONG_PRESS_MS);
   }

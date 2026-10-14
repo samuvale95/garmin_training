@@ -1,0 +1,38 @@
+# Delivers due push reminders (meals, water before the session) -- see training_plan/push.py.
+#
+# While the API is awake its own loop sends them every minute; this job is what wakes
+# it, since Render's free plan sleeps when idle. GitHub runs scheduled jobs at best every
+# five minutes (often a few minutes late), so a reminder can arrive up to ~10 minutes
+# after its time when the server was asleep.
+#
+# Needs the same two repository settings as agents-cron.yml:
+#   secrets.AGENTS_CRON_SECRET  -- same value as the API's AGENTS_CRON_SECRET env var
+#   vars.PASSO_API_URL          -- the API's base URL, e.g. https://passo-api.onrender.com
+name: push-cron
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: push-cron
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Send due reminders
+        env:
+          API_URL: ${{ vars.PASSO_API_URL }}
+          SECRET: ${{ secrets.AGENTS_CRON_SECRET }}
+        run: |
+          if [ -z "$API_URL" ] || [ -z "$SECRET" ]; then
+            echo "PASSO_API_URL or AGENTS_CRON_SECRET not configured; skipping."
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error \
+            --retry 3 --retry-delay 15 --retry-all-errors --max-time 90 \
+            -X POST "$API_URL/push/dispatch" -H "x-cron-secret: $SECRET"

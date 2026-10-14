@@ -229,7 +229,7 @@ export default function DayStatePage() {
                   Fatto, il piano è aggiornato.
                 </p>
               ) : todayId ? (
-                <button data-track="body.stato.applyalternative"
+                <button data-haptic="success" data-track="body.stato.applyalternative"
                   type="button"
                   onClick={() => applyAlternative(verdict)}
                   className="press-soft"

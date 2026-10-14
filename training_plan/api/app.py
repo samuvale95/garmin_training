@@ -7,6 +7,7 @@ for the actual logic they call.
 
 from __future__ import annotations
 
+import asyncio
 import os
 
 from dotenv import load_dotenv
@@ -14,7 +15,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .. import admins, checkin, db, history, interactions, move_check, plan_adaptation, plan_store
+from .. import admins, checkin, db, history, interactions, move_check, plan_adaptation, plan_store, push
 from ..agents import store as agent_store
 from ..garmin_sync import GarminRateLimitError, GarminSyncError
 from ..parser import TrainingPlanValidationError
@@ -37,6 +38,9 @@ from .routes_energy import router as energy_router
 from .routes_events import router as events_router
 from .routes_agents import cron_router as agents_cron_router
 from .routes_agents import router as agents_router
+from .routes_push import cron_router as push_cron_router
+from .routes_push import dispatch_loop as push_dispatch_loop
+from .routes_push import router as push_router
 
 # The CLI (cli.py) calls this too, but `uvicorn training_plan.api:app` never goes
 # through cli.py -- without this, GARMIN_EMAIL/GARMIN_PASSWORD/STRAVA_* in a local
@@ -75,11 +79,21 @@ def _ensure_schema() -> None:
     interactions.ensure_schema()
     agent_store.ensure_schema()
     admins.ensure_schema()
+    push.ensure_schema()
     # Raw interaction events live 60 days; trimming at startup is enough for a one-person app.
     try:
         interactions.purge_old()
     except Exception:
         pass
+
+
+@app.on_event("startup")
+async def _start_push_dispatch() -> None:
+    """Reminders go out on time while the server is awake; the GitHub Actions cron
+    (push-cron.yml) wakes it and covers the minutes it sleeps. Off with PASSO_PUSH_LOOP=0
+    (tests, scripts)."""
+    if os.getenv("PASSO_PUSH_LOOP", "1") != "0":
+        app.state.push_task = asyncio.create_task(push_dispatch_loop())
 
 
 @app.exception_handler(AuthError)
@@ -156,8 +170,10 @@ app.include_router(progress_router, tags=["progress"], dependencies=_auth_gate)
 app.include_router(energy_router, tags=["energy"], dependencies=_auth_gate)
 app.include_router(events_router, tags=["events"], dependencies=_auth_gate)
 app.include_router(agents_router, tags=["agents"], dependencies=_auth_gate)
+app.include_router(push_router, tags=["push"], dependencies=_auth_gate)
 # Not JWT-gated: the scheduler has no user session. Guarded by AGENTS_CRON_SECRET instead.
 app.include_router(agents_cron_router, tags=["agents"])
+app.include_router(push_cron_router, tags=["push"])
 
 
 @app.get("/health")

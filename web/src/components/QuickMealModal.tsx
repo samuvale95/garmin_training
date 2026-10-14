@@ -393,7 +393,7 @@ export function QuickMealModal({
                     );
                   })()}
 
-                  <button data-track="quick-meal-modal.handlesavepreset"
+                  <button data-haptic="success" data-track="quick-meal-modal.handlesavepreset"
                     {...dis(saving || success, "in_caricamento")}
                     onClick={handleSavePreset}
                     style={{

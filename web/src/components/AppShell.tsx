@@ -8,6 +8,7 @@ import { InstallPrompt } from "@/components/InstallPrompt";
 import { RouteTransition } from "@/components/motion/RouteTransition";
 import { TrackerProvider } from "@/components/TrackerProvider";
 import { SmoothScroll } from "@/components/SmoothScroll";
+import { HapticsProvider } from "@/components/HapticsProvider";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { reduced } = useMotionEnabled();
@@ -15,6 +16,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-shell" data-motion={reduced ? "reduced" : undefined}>
       <OfflineBanner />
       <TrackerProvider />
+      <HapticsProvider />
       <SmoothScroll />
       <RouteTransition>{children}</RouteTransition>
       <MoveWarningSheet />

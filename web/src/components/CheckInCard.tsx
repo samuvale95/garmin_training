@@ -199,7 +199,7 @@ function ChipRow<T extends string>({
         {options.map(([key, text]) => {
           const selected = value === key;
           return (
-            <motion.button data-track="check-in-card.onchange"
+            <motion.button data-haptic="light" data-track="check-in-card.onchange"
               key={key}
               type="button"
               role="radio"

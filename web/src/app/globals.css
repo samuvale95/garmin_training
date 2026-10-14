@@ -90,6 +90,39 @@ body {
   margin: 0;
 }
 
+/* Feel like an installed app, not a web page: no rubber-band bounce of the whole page
+   (the app has its own pull-to-refresh), no grey flash on every tap, no "copy / look
+   up" callout or text selection when a finger rests on a button, no 300 ms wait or
+   zoom on a double tap. Inputs and text areas keep selection, they need it. */
+html {
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a,
+button,
+label,
+summary,
+[role="button"],
+[role="switch"],
+[role="tab"],
+.tap-target {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+img,
+svg {
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+}
+
 body {
   background: var(--crema);
   color: var(--inchiostro);
