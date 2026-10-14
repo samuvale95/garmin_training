@@ -106,6 +106,14 @@ actually periodises. Do not present it as an assessment of the plan.
 
 ## Part 2 — Goal confidence
 
+> **Stato: fatto.** Implementato in `training_plan/race_prediction.py` (non `goal.py`),
+> esposto da `POST /plan/goal-prediction` e `POST /plan/goal-prediction/narrative`
+> invece di `/goal/confidence`. Due scelte prese in implementazione: quando corse e
+> VO₂max divergono, la fascia si giudica sull'estremo più lento dell'intervallo (uno
+> che scavalca l'obiettivo non è "avanti"); l'aderenza alle sedute conta come fatta
+> una corsa entro un giorno dalla data prevista. Card su Obiettivo e fascia sulla card
+> della gara in Oggi.
+
 ### Principle
 
 **Every number is deterministic and reproducible. The model only writes prose.**

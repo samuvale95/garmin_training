@@ -25,7 +25,6 @@ import { PullToRefresh } from "@/components/PullToRefresh";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import {
-  GOAL_LOOKAHEAD_DAYS,
   useActivities,
   useBodyToday,
   useCheckAdaptation,
@@ -42,9 +41,10 @@ import {
   useStravaActivityMatches,
   useStravaStatus,
   useWeekWorkouts,
-  useWorkouts,
+  useGoalPrediction,
 } from "@/lib/queries";
 import { useWatchSyncStatus } from "@/lib/watchSync";
+import { useGoalSessions } from "@/lib/goalSessions";
 import { SkeletonTodayHero } from "@/components/skeletons";
 import { usePassoStore } from "@/lib/store";
 import { useTrainingSlot } from "@/lib/trainingHabits";
@@ -77,12 +77,18 @@ export function TodayView() {
 
   const avvisamiSeIlCorpoNonRegge = usePassoStore((s) => s.prefs.avvisamiSeIlCorpoNonRegge);
 
-  // The race this account trains for, in the plan or standalone -- see useRaceGoal.
-  // Without a plan there is no bounded "rest of the calendar" to count, so a live
-  // lookahead stands in for it, but only while there's no goal yet to ask the prompt
-  // about; once one is set, the goal screen reads the calendar bounded by the race date.
+  // The race this account trains for, in the plan or standalone -- see useRaceGoal --
+  // and the sessions it is read against, the same ones (and the same cached request) as
+  // the goal screen: they count the sessions ahead for the "per che gara?" prompt, and
+  // feed the goal-confidence band shown on the race card.
   const { goal } = useRaceGoal(access.plan, access.ready);
-  const liveLookahead = useWorkouts(todayKey, shiftDateKey(todayKey, GOAL_LOOKAHEAD_DAYS), liveMode && !goal);
+  const goalSessions = useGoalSessions({ plan: access.plan, goal, todayKey, liveMode });
+  const raceAhead = !!goal && goal.race_date >= todayKey;
+  const goalPrediction = useGoalPrediction(
+    goalSessions.sessions,
+    goal,
+    access.ready && raceAhead && (!liveMode || goalSessions.workoutsQuery.isSuccess)
+  );
 
   // "19 L'orologio non ha ancora parlato" replaces Today when the watch hasn't pushed
   // to Garmin's cloud in over 24h: with no overnight data there is nothing to interpret,
@@ -425,9 +431,8 @@ export function TodayView() {
       {/* Without a race this asks for one */}
       <RaceGoalCard
         goal={goal}
-        upcomingSessions={
-          access.plan ? access.plan.sessions.filter((s) => s.date >= todayKey).length : liveLookahead.data?.workouts.length ?? 0
-        }
+        upcomingSessions={goalSessions.sessions.filter((s) => s.date >= todayKey).length}
+        prediction={raceAhead ? goalPrediction.data : undefined}
         animate={animate}
         delayMs={180}
       />

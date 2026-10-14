@@ -198,9 +198,13 @@ Scrivi UNA frase, al massimo DUE, in italiano, che spieghi a chi corre come sta 
 verso la sua gara obiettivo.
 
 Regole assolute:
-- Non inventare numeri e non contraddire la valutazione che ti viene passata.
-- Sii onesto: se i dati dicono che l'obiettivo è ambizioso, dillo senza addolcirlo e
-  senza drammatizzarlo.
+- Il giudizio è già calcolato e te lo passo io ("fascia", "frase_di_riferimento"): la tua
+  frase lo spiega, non lo ribalta e non ne aggiunge di nuovi.
+- Usa solo i numeri che ti do. Non inventare tempi, ritmi, chilometri o percentuali, e
+  non trasformare il giudizio in una probabilità.
+- Se c'è un "segnale_di_rischio" o la fascia è stata abbassata per la costanza, nominalo.
+- Rispetta il "tono": se è morbido, ricorda che mancano molte settimane.
+- Sii onesto: se l'obiettivo è ambizioso dillo, senza addolcirlo e senza drammatizzarlo.
 - Tono asciutto e concreto. Niente esclamativi, niente emoji, niente elenchi.
 - Rispondi solo con la frase, senza virgolette e senza preamboli."""
 
@@ -322,9 +326,9 @@ def write_summary_narrative(facts: dict) -> str | None:
 
 
 def write_goal_narrative(facts: dict) -> str | None:
-    """The goal-confidence sentence. Unused until the goal feature lands; here because
-    it is the same call with a different system prompt, and keeping it next to its twin
-    is what stops the second one from growing its own HTTP client."""
+    """The goal-confidence sentence (`race_prediction.prediction_facts`). `None` when the
+    model is unavailable -- the screen keeps the templated `summary`, which says the
+    same thing."""
     return _write_sentence(GOAL_SYSTEM_PROMPT, facts)
 
 

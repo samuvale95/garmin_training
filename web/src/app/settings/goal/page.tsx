@@ -1,17 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { SlideUp } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
-import { GOAL_LOOKAHEAD_DAYS, useGoalFit, useGoalFitNarrative, useGoalPrediction, usePlanQuery, useRaceGoal, useSetRaceGoal, useWorkouts } from "@/lib/queries";
+import { useGoalFit, useGoalFitNarrative, useGoalPrediction, useGoalPredictionNarrative, usePlanQuery, useRaceGoal, useSetRaceGoal } from "@/lib/queries";
+import { useGoalSessions } from "@/lib/goalSessions";
 import { GoalFitBlock } from "@/components/GoalFitBlock";
 import { GoalPredictionCard } from "@/components/GoalPredictionCard";
 import { countdownLabel, distanceLabel, formatPaceSecPerKm, formatTargetTime, targetPaceSecPerKm } from "@/lib/raceGoal";
 import { formatFullDate } from "@/lib/format";
-import { shiftDateKey, toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
+import { toDateKey } from "@/lib/sessionVisuals";
 import type { RaceGoal } from "@/lib/types";
 import { useScreenReady } from "@/lib/useScreenReady";
 
@@ -64,16 +65,10 @@ export default function RaceGoalSettingsPage() {
   const todayKey = toDateKey(new Date());
   // The sessions already there, read against whatever race is set. This is the whole
   // point of the block below: a goal named today is compared with workouts written
-  // weeks (or, for a live calendar, days) ago, without importing anything again. With
-  // no plan the range is bounded by the race once one exists, or a fixed lookahead
-  // before that -- just enough to say "you have sessions ahead" honestly.
-  const liveRangeEnd = goal ? goal.race_date : shiftDateKey(todayKey, GOAL_LOOKAHEAD_DAYS);
-  const workoutsQuery = useWorkouts(todayKey, liveRangeEnd, liveMode);
+  // weeks (or, for a live calendar, days) ago, without importing anything again. The
+  // range is shared with Oggi (see useGoalSessions).
+  const { sessions, workoutsQuery } = useGoalSessions({ plan, goal, todayKey, liveMode });
   useScreenReady(isHydrated && !(liveMode && workoutsQuery.isPending));
-  const sessions = useMemo(
-    () => (plan?.sessions ?? workoutsToSessions(workoutsQuery.data?.workouts ?? [])),
-    [plan?.sessions, workoutsQuery.data]
-  );
   const upcomingSessions = sessions.filter((s) => s.date >= todayKey).length;
 
   const [editing, setEditing] = useState(false);
@@ -86,6 +81,7 @@ export default function RaceGoalSettingsPage() {
   const fitQuery = useGoalFit(sessions, goal, !!goal && !editing);
   const fitNarrative = useGoalFitNarrative(sessions, goal, !!goal && !editing && !!fitQuery.data);
   const predictionQuery = useGoalPrediction(sessions, goal, !!goal && !editing);
+  const predictionNarrative = useGoalPredictionNarrative(sessions, goal, !!goal && !editing && !!predictionQuery.data);
 
   function startEdit() {
     setName(goal?.name ?? "");
@@ -166,7 +162,7 @@ export default function RaceGoalSettingsPage() {
           <GoalSummary goal={goal} animate={animate} onEdit={startEdit} />
           {predictionQuery.data && (
             <div style={{ marginTop: 22 }}>
-              <GoalPredictionCard prediction={predictionQuery.data} animate={animate} delayMs={180} />
+              <GoalPredictionCard prediction={predictionQuery.data} narrative={predictionNarrative.data?.text} animate={animate} delayMs={180} />
             </div>
           )}
           {fitQuery.data ? (
