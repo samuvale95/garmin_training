@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { AerobicEfficiencyData, EFPoint } from "@/lib/types";
 import { SlideUp } from "./motion/primitives";
+import { Explainer } from "./BodyCards";
 import { useAthleteLevel } from "@/lib/queries";
 import { TrendUpIcon, TrendDownIcon, TrendFlatIcon, ChevronRight } from "@/components/Icons";
 
@@ -123,7 +124,7 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
           Efficienza Aerobica
         </p>
         <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-50)", margin: 0 }}>
-          Non ci sono ancora abbastanza corse facili con dati di frequenza cardiaca per calcolare l'efficienza aerobica.
+          Non ci sono ancora abbastanza corse facili con dati di frequenza cardiaca per calcolare l&apos;efficienza aerobica.
         </p>
       </SlideUp>
     );
@@ -301,9 +302,11 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
 
         {/* Explanation */}
         {(!isLevel1 || showTechnicalDetails) && (
-          <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-70)", margin: "8px 0 0", lineHeight: 1.45 }}>
-            Misura se il cuore accelera nella seconda metà dei lunghi a parità di passo. Meno del 5% di deriva indica che il motore aerobico tiene senza affanno.
-          </p>
+          <Explainer track="aerobic-efficiency-card.explainer">
+            L&apos;efficienza (EF) è quanta strada fai per ogni battito: se sale, corri più veloce allo stesso sforzo. La
+            deriva misura se il cuore accelera nella seconda metà dei lunghi a parità di passo: sotto il 5% il motore
+            aerobico tiene senza affanno.
+          </Explainer>
         )}
       </SlideUp>
 

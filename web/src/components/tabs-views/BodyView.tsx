@@ -5,12 +5,12 @@ import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Avatar } from "@/components/Avatar";
-import { HrvCard, ReadinessMeaning, SleepCard } from "@/components/BodyCards";
+import { HrvCard, readinessBand, SleepCard } from "@/components/BodyCards";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { ProgressRing, SlideUp } from "@/components/motion/primitives";
 import { TiltCard } from "@/components/motion/TiltCard";
-import { ChevronRight, AlertTriangleIcon } from "@/components/Icons";
+import { AlertTriangleIcon, BatteryIcon, CheckIcon, ChevronRight, HeartIcon, LightningIcon, MoonIcon, PulseIcon, RunnerIcon, SunIcon, TrendUpIcon } from "@/components/Icons";
 import { PersonalCorrelationsCard } from "@/components/PersonalCorrelationsCard";
 import { AerobicEfficiencyCard } from "@/components/AerobicEfficiencyCard";
 import { LoadingIndicator3D } from "@/components/LoadingIndicator3D";
@@ -20,10 +20,11 @@ import { useCalendarAccess } from "@/lib/guards";
 import { useAerobicEfficiency, useBodyToday, useFuelTargets, usePersonalCorrelations, usePlanQuery, usePrefetchFuelNarrative, useRefreshServerData, useWeekWorkouts } from "@/lib/queries";
 import { useWatchSyncStatus } from "@/lib/watchSync";
 import { shiftDateKey, toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
-import { formatFullDate, stressCaption } from "@/lib/format";
+import { formatFullDate } from "@/lib/format";
 import { usePassoStore } from "@/lib/store";
 import { useTrainingSlot } from "@/lib/trainingHabits";
 import { FOCUS_LINE, useDayFocus, type DayFocus } from "@/lib/dayFocus";
+import { bodySignals, readinessStatus, STATUS_STYLE, type BodySignal, type SignalKey, type SignalStatus } from "@/lib/bodySignals";
 import type { BodySnapshot, DayTarget } from "@/lib/types";
 import { useScreenReady } from "@/lib/useScreenReady";
 
@@ -201,7 +202,7 @@ export function BodyView() {
         <h1>Come stai oggi?</h1>
         <p>{data ? formatFullDate(data.date) : "Recupero, energia e allenamento."}</p>
         {data?.has_overnight_data && activeSubTab === "oggi" && (
-          <p style={{ fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)", margin: "4px 0 0" }}>{FOCUS_LINE[focus]}</p>
+          <FocusChip focus={focus} />
         )}
       </header>
 
@@ -343,8 +344,8 @@ export function BodyView() {
               Panoramiche
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <NavRow href="/body/load" label="Carico cronico & 4 settimane" />
-              <NavRow href="/coach" label="Tecnica, dinamica e passo" />
+              <NavRow href="/body/load" label="Carico & forma" hint="Quanto stai caricando nelle ultime 4 settimane" icon={<TrendUpIcon size={16} />} tint="var(--azzurro)" ink="var(--azzurro-testo)" />
+              <NavRow href="/coach" label="Tecnica e passo" hint="Cadenza, dinamica e ritmi delle tue corse" icon={<RunnerIcon size={16} />} tint="var(--verde)" ink="var(--verde-tratto-scuro)" />
             </div>
           </div>
 
@@ -394,25 +395,38 @@ export function BodyView() {
   );
 }
 
-/** How loud the readiness score should be: the colour of the ring and of the card's
- * edge say "go", "careful" or "stop" before the number is read. */
-function readinessTone(score: number | null): { color: string; edge: string } {
-  if (score == null || score >= 65) return { color: "var(--verde-tratto-scuro)", edge: "rgba(16, 185, 129, 0.28)" };
-  if (score >= 50) return { color: "var(--rosso-avviso)", edge: "rgba(179, 74, 32, 0.32)" };
-  return { color: "var(--corallo-accent)", edge: "rgba(217, 45, 85, 0.38)" };
+const SIGNAL_ICON: Record<SignalKey, (props: { size?: number }) => ReactNode> = {
+  sonno: MoonIcon,
+  hrv: PulseIcon,
+  cuore: HeartIcon,
+  battery: BatteryIcon,
+  stress: LightningIcon,
+};
+
+/** The verdict in words. Before a session it is advice; after it, or in the evening,
+ * the morning's score is history and is told as such. */
+function readinessHeadline(status: SignalStatus, focus: DayFocus): string {
+  if (focus === "prontezza") {
+    if (status === "ok") return "Pronto a lavorare";
+    if (status === "attenzione") return "Allenati, senza forzare";
+    return "Vacci piano oggi";
+  }
+  if (status === "ok") return "Stamattina eri pronto";
+  if (status === "attenzione") return "Stamattina eri a metà";
+  return "Stamattina eri scarico";
 }
 
-// Below this the battery is worth pointing at: what's left for the rest of the day is
-// thin, which is what matters after a session.
-const LOW_BATTERY_PERCENT = 30;
-const HIGH_STRESS = 50;
-const RHR_DELTA_ALERT = 5;
+// After a session or in the evening the vitals sit above the readiness card already;
+// it lists only what they don't show.
+const VITAL_KEYS: SignalKey[] = ["cuore", "battery", "stress"];
 
 /** The "Oggi" half of Corpo. The same five blocks every time -- readiness, vitals, the
  * night, tomorrow, food -- in the order the moment asks for (see `DayFocus`): in the
- * morning the night comes first, after a session the tank, in the evening tomorrow. A
- * number outside its range is marked where it stands rather than left for the user to
- * judge against a norm they don't remember. */
+ * morning the night comes first, after a session the tank, in the evening tomorrow.
+ *
+ * Every number arrives judged (see `bodySignals`): the readiness card names the ones
+ * that are off before anything else is read, and each tile and card wears its verdict's
+ * colour, so the screen can be skimmed by colour and read only where it is not green. */
 function BodyTodaySections({
   data,
   focus,
@@ -440,122 +454,135 @@ function BodyTodaySections({
   }
 
   const score = data.readiness_score;
-  const tone = readinessTone(score);
+  const status = readinessStatus(score);
+  const tone = STATUS_STYLE[status];
   const careful = (score ?? 100) < 60;
-
-  const rhrHigh =
-    data.resting_heart_rate != null &&
-    (data.rhr_norm?.has_personal_norm
-      ? data.resting_heart_rate > data.rhr_norm.normal_max
-      : (data.resting_heart_rate_delta ?? 0) >= RHR_DELTA_ALERT);
-  const batteryLow = data.battery_percent != null && data.battery_percent < LOW_BATTERY_PERCENT;
-  const stressHigh = data.stress_level != null && data.stress_level >= HIGH_STRESS;
+  const signals = bodySignals(data);
+  const byKey = (key: SignalKey) => signals.find((s) => s.key === key) ?? null;
+  const summarized = focus === "prontezza" ? signals : signals.filter((s) => !VITAL_KEYS.includes(s.key));
+  const offSignals = summarized.filter((s) => s.status !== "ok");
+  const okSignals = summarized.filter((s) => s.status === "ok");
 
   const readiness = (
     <SlideUp active={animate} delayMs={150} style={{ marginTop: 12 }}>
       <TiltCard
         maxTilt={4.5}
         style={{
-          background: "var(--crema-card)",
+          background: `linear-gradient(160deg, ${tone.bg} 0%, var(--crema-card) 72%)`,
           color: "var(--inchiostro)",
           border: `1.5px solid ${tone.edge}`,
           boxShadow: "var(--shadow-airbnb-subtle)",
           borderRadius: "var(--radius-card-lg)",
-          padding: "18px 16px",
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
+          padding: "18px 16px 16px",
         }}
       >
-        <ProgressRing value={(score ?? 0) / 100} size={90} strokeWidth={8.5} trackColor="var(--sabbia-chip)" color={tone.color}>
-          <p className="font-mono" style={{ fontSize: 23, fontWeight: 700, margin: 0, color: "var(--inchiostro)" }}>{score ?? "—"}</p>
-        </ProgressRing>
-        <div style={{ minWidth: 0 }}>
-          <p style={{ fontWeight: 700, fontSize: 15.5, margin: "0 0 3px" }}>
-            {focus === "prontezza" ? ((score ?? 0) >= 65 ? "Pronto a lavorare" : "Vacci piano oggi") : "Prontezza di stamattina"}
-          </p>
-          {score != null && <ReadinessMeaning score={score} href="/body/prontezza" />}
-          <p className="font-serif-italic" style={{ fontSize: 13.5, margin: "5px 0 0", lineHeight: 1.3 }}>
-            {data.readiness_message ?? "Tocca il punteggio per vedere da cosa nasce."}
-          </p>
-          {data.overnight_reliability === "parziale" && (
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 5,
-                background: "rgba(255, 255, 255, 0.45)",
-                color: "var(--verde-testo)",
-                padding: "3px 8px",
-                borderRadius: 6,
-                fontSize: 11,
-                fontWeight: 600,
-                marginTop: 6,
-              }}
-            >
-              <AlertTriangleIcon size={12} strokeWidth={2.2} />
-              <span>Dato notturno parziale</span>
-              {data.overnight_reliability_note && <span style={{ fontWeight: 400, opacity: 0.85 }}>· {data.overnight_reliability_note}</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <ProgressRing value={(score ?? 0) / 100} size={92} strokeWidth={9} trackColor="rgba(255,255,255,0.7)" color={tone.stroke}>
+            <div style={{ textAlign: "center", lineHeight: 1 }}>
+              <p className="font-mono" style={{ fontSize: 26, fontWeight: 700, margin: 0, color: "var(--inchiostro)" }}>{score ?? "—"}</p>
+              <p className="font-mono" style={{ fontSize: 10, margin: "3px 0 0", color: "var(--inchiostro-50)" }}>su 100</p>
             </div>
-          )}
+          </ProgressRing>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p className="font-mono" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: tone.text, margin: 0 }}>
+              {focus === "prontezza" ? "Prontezza" : "Prontezza di stamattina"}
+              {score != null && ` · ${readinessBand(score).label}`}
+            </p>
+            <p style={{ fontWeight: 700, fontSize: 21, lineHeight: 1.15, letterSpacing: "-.01em", margin: "4px 0 0" }}>
+              {readinessHeadline(status, focus)}
+            </p>
+            {data.readiness_message && (
+              <p style={{ fontSize: 13.5, color: "var(--inchiostro-70)", margin: "4px 0 0", lineHeight: 1.3 }}>{data.readiness_message}</p>
+            )}
+            <Link data-track="body.prontezza" href="/body/prontezza" style={{ display: "inline-block", fontSize: 12, fontWeight: 600, color: tone.text, marginTop: 6, textDecoration: "none" }}>
+              Da cosa nasce →
+            </Link>
+          </div>
         </div>
+
+        {summarized.length > 0 && (
+          <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", marginTop: 14, paddingTop: 12 }}>
+            {offSignals.length > 0 && (
+              <>
+                <p style={{ fontSize: 12, fontWeight: 700, margin: "0 0 8px", color: "var(--inchiostro-70)" }}>Da tenere d&apos;occhio</p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 }}>
+                  {offSignals.map((s) => (
+                    <SignalChip key={s.key} signal={s} />
+                  ))}
+                </div>
+              </>
+            )}
+            {okSignals.length > 0 && (
+              <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, margin: offSignals.length > 0 ? "10px 0 0" : 0, color: STATUS_STYLE.ok.text }}>
+                <CheckIcon size={14} strokeWidth={2.6} style={{ color: STATUS_STYLE.ok.stroke, flex: "none" }} />
+                <span>
+                  <strong>Nella norma:</strong> {okSignals.map((s) => s.label).join(" · ")}
+                </span>
+              </p>
+            )}
+          </div>
+        )}
+
+        {data.overnight_reliability === "parziale" && (
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              background: STATUS_STYLE.attenzione.bg,
+              color: STATUS_STYLE.attenzione.text,
+              padding: "3px 8px",
+              borderRadius: 6,
+              fontSize: 11,
+              fontWeight: 600,
+              marginTop: 10,
+            }}
+          >
+            <AlertTriangleIcon size={12} strokeWidth={2.2} />
+            <span>Dato notturno parziale</span>
+            {data.overnight_reliability_note && <span style={{ fontWeight: 400, opacity: 0.85 }}>· {data.overnight_reliability_note}</span>}
+          </div>
+        )}
       </TiltCard>
     </SlideUp>
   );
 
+  const heart = byKey("cuore");
+  const battery = byKey("battery");
+  const stress = byKey("stress");
+  const rhrNorm = data.rhr_norm?.has_personal_norm ? data.rhr_norm : null;
   const vitals = (
-    <div style={{ marginTop: 16 }}>
+    <div style={{ marginTop: 18 }}>
       <SectionLabel>{focus === "prontezza" ? "Parametri vitali" : "Come stai adesso"}</SectionLabel>
-      <div style={{ display: "flex", gap: 9 }}>
-        <SmallMetric
-          label="Cuore a riposo"
-          value={data.resting_heart_rate != null ? `${data.resting_heart_rate}` : "—"}
-          unit="bpm"
-          caption={
-            data.rhr_norm?.has_personal_norm
-              ? `norma ${Math.round(data.rhr_norm.normal_min)}–${Math.round(data.rhr_norm.normal_max)}`
-              : data.resting_heart_rate_delta != null
-                ? `${data.resting_heart_rate_delta > 0 ? "+" : ""}${data.resting_heart_rate_delta} vs 7gg`
-                : undefined
-          }
-          alert={rhrHigh ? "più alto del solito" : undefined}
-        />
-        <SmallMetric
-          label="Body Battery"
-          value={data.battery_percent != null ? `${data.battery_percent}%` : "—"}
-          caption="energia residua"
-          alert={batteryLow ? "riserva bassa" : undefined}
-        >
-          {data.battery_percent != null && (
-            <div style={{ height: 4, borderRadius: 100, background: "var(--sabbia-chip)", marginTop: 8, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${data.battery_percent}%`, background: batteryLow ? "var(--corallo-accent)" : "var(--giallo-testo)", borderRadius: 100 }} />
-            </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+        <MetricTile signal={heart} fallbackLabel="Cuore a riposo" icon={HeartIcon}>
+          {rhrNorm && data.resting_heart_rate != null && (
+            <RangeGauge value={data.resting_heart_rate} low={rhrNorm.normal_min} high={rhrNorm.normal_max} color={STATUS_STYLE[heart?.status ?? "ok"].stroke} />
           )}
-        </SmallMetric>
-        <SmallMetric
-          label="Stress"
-          value={data.stress_level != null ? `${data.stress_level}` : "—"}
-          unit="su 100"
-          caption={stressHigh ? undefined : stressCaption(data.stress_level) ?? undefined}
-          alert={stressHigh ? "sopra la norma" : undefined}
-        />
+        </MetricTile>
+        <MetricTile signal={battery} fallbackLabel="Body Battery" icon={BatteryIcon}>
+          {data.battery_percent != null && <FillGauge percent={data.battery_percent} color={STATUS_STYLE[battery?.status ?? "ok"].stroke} />}
+        </MetricTile>
+        <MetricTile signal={stress} fallbackLabel="Stress" icon={LightningIcon}>
+          {data.stress_level != null && <FillGauge percent={data.stress_level} color={STATUS_STYLE[stress?.status ?? "ok"].stroke} />}
+        </MetricTile>
       </div>
     </div>
   );
 
   const night = (
     <div style={{ marginTop: 18 }}>
-      <SectionLabel>{focus === "prontezza" ? "Riposo & Sonno" : "La notte scorsa"}</SectionLabel>
+      <SectionLabel>{focus === "prontezza" ? "La notte" : "La notte scorsa"}</SectionLabel>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {data.sleep ? (
-          <SleepCard sleep={data.sleep} animate={animate} delayMs={240} />
+          <SleepCard sleep={data.sleep} animate={animate} delayMs={240} signal={byKey("sonno")} />
         ) : (
           <SlideUp active={animate} delayMs={240} style={{ background: "var(--azzurro)", color: "var(--azzurro-testo)", borderRadius: "var(--radius-card)", padding: 16 }}>
             <p className="font-mono" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", margin: 0 }}>Sonno</p>
             <p style={{ fontSize: 13, margin: "8px 0 0" }}>Non disponibile</p>
           </SlideUp>
         )}
-        <HrvCard points={data.hrv_seven_day} lastNight={data.hrv_last_night_ms} animate={animate} delayMs={300} norm={data.hrv_norm} />
+        <HrvCard points={data.hrv_seven_day} lastNight={data.hrv_last_night_ms} animate={animate} delayMs={300} norm={data.hrv_norm} signal={byKey("hrv")} />
       </div>
     </div>
   );
@@ -574,30 +601,101 @@ function BodyTodaySections({
         borderRadius: "var(--radius-card)",
         padding: "16px 18px",
         marginTop: 18,
+        display: "flex",
+        gap: 12,
+        alignItems: "flex-start",
       }}
     >
-      <p style={{ fontWeight: 700, fontSize: 13.5, margin: "0 0 4px" }}>
-        {tomorrowTitle ? `Domani: ${tomorrowTitle.toLowerCase()}` : "Domani: riposo"}
-      </p>
-      <p className="font-serif-italic" style={{ fontSize: 14.5, margin: 0, color: careful ? "var(--inchiostro-su-scuro)" : "var(--inchiostro-70)" }}>
-        {!tomorrowTitle
-          ? careful
-            ? "Un giorno di riposo arriva al momento giusto: lascia che il corpo recuperi."
-            : "Nessun allenamento in programma: recupera e goditi la giornata."
-          : careful
-            ? "I numeri di oggi consigliano prudenza: guarda cosa suggerisce il piano di domani."
-            : "I numeri sono positivi: il piano di domani può restare com'è."}
-      </p>
+      <span
+        aria-hidden="true"
+        style={{
+          width: 32,
+          height: 32,
+          flex: "none",
+          borderRadius: "50%",
+          display: "grid",
+          placeItems: "center",
+          background: careful ? "rgba(255,255,255,0.12)" : STATUS_STYLE.ok.bg,
+          color: careful ? "var(--corallo)" : STATUS_STYLE.ok.stroke,
+        }}
+      >
+        {careful ? <AlertTriangleIcon size={16} strokeWidth={2.2} /> : <CheckIcon size={16} strokeWidth={2.6} />}
+      </span>
+      <div style={{ minWidth: 0 }}>
+        <p style={{ fontWeight: 700, fontSize: 15, margin: "0 0 3px" }}>
+          {tomorrowTitle ? `Domani: ${tomorrowTitle.toLowerCase()}` : "Domani: riposo"}
+        </p>
+        <p style={{ fontSize: 13.5, lineHeight: 1.35, margin: 0, color: careful ? "var(--inchiostro-su-scuro)" : "var(--inchiostro-70)" }}>
+          {!tomorrowTitle
+            ? careful
+              ? "Il riposo arriva al momento giusto."
+              : "Recupera e goditi la giornata."
+            : careful
+              ? "I numeri di oggi consigliano prudenza: valuta di alleggerire."
+              : "I numeri sono buoni: il piano può restare com'è."}
+        </p>
+      </div>
     </SlideUp>
   );
 
   const blocks = { readiness, vitals, night, tomorrow, nutrition };
   const order: Record<DayFocus, (keyof typeof blocks)[]> = {
-    prontezza: ["readiness", "night", "vitals", "tomorrow", "nutrition"],
+    prontezza: ["readiness", "vitals", "night", "tomorrow", "nutrition"],
     recupero: ["vitals", "tomorrow", "nutrition", "readiness", "night"],
     domani: ["tomorrow", "nutrition", "vitals", "readiness", "night"],
   };
   return <>{order[focus].map((name) => <Fragment key={name}>{blocks[name]}</Fragment>)}</>;
+}
+
+/** One out-of-range number inside the readiness card: what it is, how much, and what is
+ * wrong with it, on the verdict's colour. Two to a row, so four of them stay compact. */
+function SignalChip({ signal }: { signal: BodySignal }) {
+  const style = STATUS_STYLE[signal.status];
+  const Icon = SIGNAL_ICON[signal.key];
+  return (
+    <div style={{ minWidth: 0, background: style.bg, color: style.text, borderRadius: "var(--radius-sm)", padding: "8px 10px" }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600 }}>
+        <span aria-hidden="true" style={{ color: style.stroke, display: "inline-flex" }}><Icon size={13} /></span>
+        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{signal.label}</span>
+      </span>
+      <span style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
+        <span className="font-mono" style={{ fontSize: 15, fontWeight: 700, color: "var(--inchiostro)" }}>
+          {signal.value}
+          {signal.unit && <span style={{ fontSize: 10.5, fontWeight: 400 }}> {signal.unit}</span>}
+        </span>
+        <span style={{ fontSize: 11.5, fontWeight: 700 }}>{signal.verdict}</span>
+      </span>
+    </div>
+  );
+}
+
+const FOCUS_ICON: Record<DayFocus, ReactNode> = {
+  prontezza: <SunIcon size={13} />,
+  recupero: <RunnerIcon size={13} />,
+  domani: <MoonIcon size={13} />,
+};
+
+/** Which moment of the day the screen is ordered for, as a chip rather than a sentence. */
+function FocusChip({ focus }: { focus: DayFocus }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        marginTop: 8,
+        padding: "4px 10px",
+        borderRadius: "var(--radius-pill)",
+        background: focus === "domani" ? "var(--lilla)" : focus === "recupero" ? "var(--verde)" : "var(--giallo)",
+        color: focus === "domani" ? "var(--lilla-testo)" : focus === "recupero" ? "var(--verde-testo)" : "var(--giallo-testo)",
+        fontSize: 12,
+        fontWeight: 700,
+      }}
+    >
+      {FOCUS_ICON[focus]}
+      {FOCUS_LINE[focus]}
+    </span>
+  );
 }
 
 function SectionLabel({ children }: { children: ReactNode }) {
@@ -618,57 +716,107 @@ function SectionLabel({ children }: { children: ReactNode }) {
   );
 }
 
-function SmallMetric({
-  label,
-  value,
-  unit,
-  caption,
-  alert,
+/** A vital as a tile coloured by its verdict: plain card when fine, amber or coral
+ * when not, with the verdict as its last line and a small gauge to show how far off. */
+function MetricTile({
+  signal,
+  fallbackLabel,
+  icon: Icon,
   children,
 }: {
-  label: string;
-  value: string;
-  /** The unit, where the number has one that isn't obvious from the figure itself.
-   * "53" and "53 bpm" are not the same amount of information. */
-  unit?: string;
-  caption?: string;
-  /** Set when the value is outside its range: a short phrase saying how, printed in the
-   * accent colour with an accent edge, so the one number to look at is found first. */
-  alert?: string;
+  signal: BodySignal | null;
+  fallbackLabel: string;
+  icon: (props: { size?: number }) => ReactNode;
   children?: ReactNode;
 }) {
+  const status = signal?.status ?? "ok";
+  const style = STATUS_STYLE[status];
+  const flagged = status !== "ok";
   return (
     <motion.div
       whileHover={{ y: -2.5, scale: 1.02 }}
       transition={{ type: "spring", stiffness: 420, damping: 24 }}
       style={{
-        flex: 1,
         minWidth: 0,
-        background: alert ? "var(--corallo-chiaro)" : "var(--crema-card)",
+        background: flagged ? style.bg : "var(--crema-card)",
         borderRadius: "var(--radius-row)",
-        padding: 12,
-        border: alert ? "1.5px solid rgba(217, 45, 85, 0.35)" : "var(--border-airbnb)",
+        padding: "11px 11px 12px",
+        border: flagged ? `1.5px solid ${style.edge}` : "var(--border-airbnb)",
         boxShadow: "var(--shadow-airbnb-subtle)",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
-      <p className="font-mono" style={{ fontSize: 16, margin: "0 0 2px" }}>
-        {value}
-        {unit && <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}> {unit}</span>}
+      <span style={{ display: "flex", alignItems: "flex-start", gap: 5, color: flagged ? style.text : "var(--inchiostro-70)" }}>
+        <span aria-hidden="true" style={{ color: style.stroke, display: "inline-flex", marginTop: 1 }}><Icon size={13} /></span>
+        <span style={{ fontSize: 11.5, fontWeight: 600, lineHeight: 1.2 }}>{signal?.label ?? fallbackLabel}</span>
+      </span>
+      <p className="font-mono" style={{ fontSize: 22, fontWeight: 600, margin: "6px 0 0", letterSpacing: "-.02em" }}>
+        {signal?.value ?? "—"}
+        {signal?.unit && <span style={{ fontSize: 11, fontWeight: 400, color: "var(--inchiostro-50)" }}> {signal.unit}</span>}
       </p>
-      <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>{label}</p>
-      {caption && <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>{caption}</p>}
-      {alert && <p style={{ fontSize: 12, fontWeight: 700, color: "var(--corallo-testo)", margin: "4px 0 0" }}>{alert}</p>}
       {children}
+      {signal && (
+        <p style={{ fontSize: 11.5, fontWeight: 700, color: flagged ? style.text : STATUS_STYLE.ok.stroke, margin: "6px 0 0", lineHeight: 1.2 }}>{signal.verdict}</p>
+      )}
     </motion.div>
   );
 }
 
-function NavRow({ href, label }: { href: string; label: string }) {
+/** How full something is, 0-100. */
+function FillGauge({ percent, color }: { percent: number; color: string }) {
+  return (
+    <div aria-hidden="true" style={{ height: 5, borderRadius: 100, background: "rgba(0,0,0,0.07)", marginTop: 8, overflow: "hidden" }}>
+      <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, percent))}%`, background: color, borderRadius: 100 }} />
+    </div>
+  );
+}
+
+/** Where a value sits against its personal normal band: the band in green, the value as
+ * a dot, so "56, norm 46-52" is seen as "to the right of the band" without reading. */
+function RangeGauge({ value, low, high, color }: { value: number; low: number; high: number; color: string }) {
+  const pad = Math.max(4, (high - low) * 0.8);
+  const min = Math.min(low - pad, value - 2);
+  const max = Math.max(high + pad, value + 2);
+  const at = (v: number) => ((v - min) / (max - min)) * 100;
+  return (
+    <div aria-hidden="true" title={`norma ${Math.round(low)}–${Math.round(high)}`} style={{ position: "relative", height: 5, borderRadius: 100, background: "rgba(0,0,0,0.07)", marginTop: 8 }}>
+      <div style={{ position: "absolute", top: 0, bottom: 0, left: `${at(low)}%`, width: `${at(high) - at(low)}%`, background: STATUS_STYLE.ok.edge, borderRadius: 100 }} />
+      <div style={{ position: "absolute", top: -3, left: `calc(${at(value)}% - 5.5px)`, width: 11, height: 11, borderRadius: "50%", background: color, border: "2px solid var(--crema-card)" }} />
+    </div>
+  );
+}
+
+function NavRow({
+  href,
+  label,
+  hint,
+  icon,
+  tint,
+  ink,
+}: {
+  href: string;
+  label: string;
+  hint?: string;
+  icon?: ReactNode;
+  tint?: string;
+  ink?: string;
+}) {
   return (
     <motion.div whileHover={{ x: 4, scale: 1.01 }} whileTap={{ scale: 0.98 }} transition={{ type: "spring", stiffness: 450, damping: 26 }}>
       <Link data-track="body.href" href={href} className="body-nav-row tap-target">
-        <span style={{ fontSize: 14, fontWeight: 600 }}>{label}</span>
-        <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
+        <span style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+          {icon && (
+            <span aria-hidden="true" style={{ width: 34, height: 34, flex: "none", borderRadius: "50%", display: "grid", placeItems: "center", background: tint, color: ink }}>
+              {icon}
+            </span>
+          )}
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: 14.5, fontWeight: 600 }}>{label}</span>
+            {hint && <span style={{ display: "block", fontSize: 12, color: "var(--inchiostro-50)", marginTop: 2 }}>{hint}</span>}
+          </span>
+        </span>
+        <ChevronRight size={16} style={{ color: "var(--inchiostro-50)", flex: "none" }} />
       </Link>
     </motion.div>
   );

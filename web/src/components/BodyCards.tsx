@@ -4,7 +4,10 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { SlideUp } from "@/components/motion/primitives";
 import { Illustration } from "@/components/Illustration";
+import type { ReactNode } from "react";
+import { MoonIcon, PulseIcon } from "@/components/Icons";
 import { formatMinutes, weekdayInitial } from "@/lib/format";
+import { STATUS_STYLE, type BodySignal, type SignalStatus } from "@/lib/bodySignals";
 import type { HrvPoint, ReadinessFactor, SleepPhases } from "@/lib/types";
 
 // The three cards on "Come stai" that had numbers but no meaning: a sleep total with
@@ -41,7 +44,64 @@ function phaseMinutes(sleep: SleepPhases, key: keyof SleepPhases): number | null
   return typeof value === "number" ? value : null;
 }
 
-export function SleepCard({ sleep, animate, delayMs }: { sleep: SleepPhases; animate: boolean; delayMs: number }) {
+// Below these shares of the night a phase is marked short; above the awake one, long.
+const DEEP_MIN_PCT = 13;
+const REM_MIN_PCT = 20;
+const AWAKE_MAX_PCT = 10;
+
+function phaseIsOff(key: keyof SleepPhases, pct: number): boolean {
+  if (key === "deep_minutes") return pct < DEEP_MIN_PCT;
+  if (key === "rem_minutes") return pct < REM_MIN_PCT;
+  if (key === "awake_minutes") return pct > AWAKE_MAX_PCT;
+  return false;
+}
+
+/** A verdict as a coloured pill: the first thing on a card, so the card's point is read
+ * before its numbers. */
+export function StatusPill({ status, children }: { status: SignalStatus; children: ReactNode }) {
+  const style = STATUS_STYLE[status];
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        background: style.bg,
+        color: style.text,
+        borderRadius: "var(--radius-pill)",
+        padding: "3px 9px",
+        fontSize: 11.5,
+        fontWeight: 700,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "50%", background: style.stroke }} />
+      {children}
+    </span>
+  );
+}
+
+/** "What is this" text, folded away: it is read once, and after that it is in the way. */
+export function Explainer({ track, label = "Cos'è?", children }: { track: string; label?: string; children: ReactNode }) {
+  return (
+    <details className="body-explainer">
+      <summary data-track={track}>{label}</summary>
+      <p>{children}</p>
+    </details>
+  );
+}
+
+export function SleepCard({
+  sleep,
+  animate,
+  delayMs,
+  signal,
+}: {
+  sleep: SleepPhases;
+  animate: boolean;
+  delayMs: number;
+  signal?: BodySignal | null;
+}) {
   const total = sleep.total_minutes ?? 0;
   // The bar is drawn over the phases that were actually measured, not over the night's
   // total: the two differ by a few minutes on most nights, and a bar that does not
@@ -49,10 +109,7 @@ export function SleepCard({ sleep, animate, delayMs }: { sleep: SleepPhases; ani
   const measured = SLEEP_PHASES.reduce((sum, phase) => sum + (phaseMinutes(sleep, phase.key) ?? 0), 0) || 1;
 
   return (
-    <SlideUp
-      active={animate}
-      delayMs={delayMs}
-    >
+    <SlideUp active={animate} delayMs={delayMs}>
       <motion.div
         whileHover={{ y: -3, scale: 1.012 }}
         transition={{ type: "spring", stiffness: 400, damping: 25 }}
@@ -67,63 +124,68 @@ export function SleepCard({ sleep, animate, delayMs }: { sleep: SleepPhases; ani
           overflow: "hidden",
         }}
       >
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-        <p className="font-mono" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", margin: 0 }}>
-          Sonno
-        </p>
-        {sleep.score != null && (
-          <span
-            style={{
-              background: "rgba(23,42,66,.12)",
-              borderRadius: "var(--radius-pill)",
-              padding: "3px 9px",
-              fontSize: 11,
-              fontWeight: 700,
-            }}
-          >
-            qualità {sleep.score}/100{sleep.score_label ? ` · ${sleep.score_label}` : ""}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span aria-hidden="true" style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--azzurro)", color: "var(--azzurro-testo)", display: "grid", placeItems: "center" }}>
+              <MoonIcon size={15} />
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>Sonno</span>
           </span>
-        )}
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div>
-          <p className="font-mono" style={{ fontSize: 26, fontWeight: 500, letterSpacing: "-.02em", margin: "8px 0 0" }}>
-            {formatMinutes(total)}
-          </p>
-          <p style={{ fontSize: 11.5, opacity: 0.75, margin: "2px 0 0" }}>dormite in tutto</p>
+          {signal && (
+            <StatusPill status={signal.status}>
+              {sleep.score != null ? `${sleep.score}/100 · ` : ""}
+              {signal.verdict}
+            </StatusPill>
+          )}
         </div>
-      </div>
 
-      <Illustration name="sonno" width={56} height={56} right={12} top={46} active={animate} delayMs={delayMs + 80} />
+        <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginTop: 10 }}>
+          <span className="font-mono" style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-.02em" }}>{formatMinutes(total)}</span>
+          <span style={{ fontSize: 12.5, color: "var(--inchiostro-50)" }}>dormite</span>
+        </div>
 
-      <div style={{ display: "flex", height: 7, borderRadius: 100, overflow: "hidden", marginTop: 12 }}>
-        {SLEEP_PHASES.map((phase) => {
-          const minutes = phaseMinutes(sleep, phase.key) ?? 0;
-          return <div key={phase.key} style={{ width: `${(minutes / measured) * 100}%`, background: phase.color }} />;
-        })}
-      </div>
+        <Illustration name="sonno" width={52} height={52} right={14} top={44} active={animate} delayMs={delayMs + 80} />
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 12 }}>
-        {SLEEP_PHASES.map((phase) => {
-          const minutes = phaseMinutes(sleep, phase.key);
-          if (minutes == null) return null;
-          return (
-            <div key={phase.key} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: "50%", background: phase.color, flex: "none" }} />
-              <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{phase.label}</span>
-              <span className="font-mono" style={{ fontSize: 13 }}>{formatMinutes(minutes)}</span>
-              <span className="font-mono" style={{ fontSize: 11, opacity: 0.6, width: 38, textAlign: "right" }}>
-                {Math.round((minutes / measured) * 100)}%
-              </span>
-            </div>
-          );
-        })}
-      </div>
+        <div style={{ display: "flex", height: 10, borderRadius: 100, overflow: "hidden", marginTop: 12, gap: 2 }}>
+          {SLEEP_PHASES.map((phase) => {
+            const minutes = phaseMinutes(sleep, phase.key) ?? 0;
+            return <div key={phase.key} style={{ width: `${(minutes / measured) * 100}%`, background: phase.color, borderRadius: 2 }} />;
+          })}
+        </div>
 
-      <p style={{ fontSize: 11, opacity: 0.7, margin: "10px 0 0", lineHeight: 1.4 }}>
-        Riferimento: profondo {SLEEP_PHASES[0].share}, REM {SLEEP_PHASES[1].share}.
-      </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
+          {SLEEP_PHASES.map((phase) => {
+            const minutes = phaseMinutes(sleep, phase.key);
+            if (minutes == null) return null;
+            const pct = Math.round((minutes / measured) * 100);
+            const off = phaseIsOff(phase.key, pct);
+            return (
+              <div
+                key={phase.key}
+                style={{
+                  borderRadius: "var(--radius-sm)",
+                  padding: "8px 10px",
+                  background: off ? STATUS_STYLE.attenzione.bg : "var(--sabbia)",
+                  borderLeft: `3px solid ${phase.color}`,
+                }}
+              >
+                <p style={{ fontSize: 11.5, fontWeight: 600, margin: 0, color: off ? STATUS_STYLE.attenzione.text : "var(--inchiostro-70)" }}>{phase.label}</p>
+                <p className="font-mono" style={{ fontSize: 15, fontWeight: 600, margin: "2px 0 0" }}>
+                  {formatMinutes(minutes)}
+                  <span style={{ fontSize: 11, fontWeight: 400, color: off ? STATUS_STYLE.attenzione.text : "var(--inchiostro-50)" }}>
+                    {" "}· {pct}%{off ? (phase.key === "awake_minutes" ? " alto" : " basso") : ""}
+                  </span>
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        <Explainer track="body.sleep-explainer">
+          Di solito il sonno profondo è il {SLEEP_PHASES[0].share} e la REM il {SLEEP_PHASES[1].share}; da sveglio{" "}
+          {SLEEP_PHASES[3].share}. Il profondo ripara i muscoli, la REM consolida: se uno dei due è basso la seduta dura
+          pesa di più.
+        </Explainer>
       </motion.div>
     </SlideUp>
   );
@@ -180,62 +242,61 @@ export function HrvCard({
   animate,
   delayMs,
   norm,
+  signal,
 }: {
   points: HrvPoint[];
   lastNight: number | null;
   animate: boolean;
   delayMs: number;
   norm?: import("@/lib/types").BiometricNorm | null;
+  signal?: BodySignal | null;
 }) {
   const values = points.map((p) => p.value_ms).filter((v): v is number => v != null);
-  const max = Math.max(...values, norm?.normal_max ?? 0, 1);
+  const hasNorm = norm?.has_personal_norm ?? false;
+  const max = Math.max(...values, hasNorm && norm ? norm.normal_max : 0, 1);
+  // The axis starts a little under the lowest night, not at zero: nights between 41 and
+  // 47 ms drawn from zero are seven equal bars, and the drop is the whole point.
+  const lowest = Math.min(...values, hasNorm && norm ? norm.normal_min : Infinity);
+  const floor = Number.isFinite(lowest) ? Math.max(0, lowest - (max - lowest) * 0.6 - 2) : 0;
+  const scale = (v: number) => (Math.max(0, v - floor) / Math.max(1, max - floor)) * HRV_CHART_HEIGHT;
   const earlier = values.slice(0, -1);
   const baseline = earlier.length > 0 ? earlier.reduce((sum, v) => sum + v, 0) / earlier.length : null;
-  const delta = baseline != null && lastNight != null ? Math.round(((lastNight - baseline) / baseline) * 100) : null;
-  const hasNorm = norm?.has_personal_norm ?? false;
+  const lastColor = STATUS_STYLE[signal?.status ?? "ok"].stroke;
 
   return (
-    <SlideUp
-      active={animate}
-      delayMs={delayMs}
-    >
+    <SlideUp active={animate} delayMs={delayMs}>
       <motion.div
         whileHover={{ y: -3, scale: 1.012 }}
         transition={{ type: "spring", stiffness: 400, damping: 25 }}
         style={{
-          background: "var(--crema)",
+          background: "var(--crema-card)",
           border: "var(--border-airbnb)",
           boxShadow: "var(--shadow-airbnb-subtle)",
           borderRadius: "var(--radius-card)",
           padding: 16,
         }}
       >
-        <p className="font-mono" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", margin: 0, color: "var(--inchiostro-50)" }}>
-          Variabilità cardiaca
-        </p>
-
-        <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginTop: 8 }}>
-          <span className="font-mono" style={{ fontSize: 26, fontWeight: 500, letterSpacing: "-.02em" }}>
-            {lastNight ?? "—"}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span aria-hidden="true" style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--lilla)", color: "var(--lilla-testo)", display: "grid", placeItems: "center" }}>
+              <PulseIcon size={15} />
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>Variabilità cardiaca</span>
           </span>
-          <span style={{ fontSize: 12.5, color: "var(--inchiostro-50)" }}>ms stanotte</span>
+          {signal && <StatusPill status={signal.status}>{signal.verdict}</StatusPill>}
         </div>
 
-        {hasNorm && norm ? (
-          <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>
-            norma personale: {Math.round(norm.normal_min)}–{Math.round(norm.normal_max)} ms (media {Math.round(norm.mean)})
-            {lastNight != null && (
-              <span style={{ color: lastNight < norm.normal_min ? "var(--corallo-testo)" : "var(--verde-testo)", fontWeight: 600 }}>
-                {lastNight < norm.normal_min ? " · sotto norma" : " · nella norma"}
-              </span>
-            )}
-          </p>
-        ) : baseline != null ? (
-          <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>
-            media delle altre {earlier.length} notti: {Math.round(baseline)} ms
-            {delta != null && ` · ${delta > 0 ? "+" : ""}${delta}%`}
-          </p>
-        ) : null}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginTop: 10 }}>
+          <span className="font-mono" style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-.02em" }}>{lastNight ?? "—"}</span>
+          <span style={{ fontSize: 12.5, color: "var(--inchiostro-50)" }}>ms stanotte</span>
+          <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", marginLeft: "auto" }}>
+            {hasNorm && norm
+              ? `norma ${Math.round(norm.normal_min)}–${Math.round(norm.normal_max)}`
+              : baseline != null
+                ? `media ${Math.round(baseline)}`
+                : ""}
+          </span>
+        </div>
 
         <div style={{ position: "relative", height: HRV_CHART_HEIGHT, marginTop: 14 }}>
           {hasNorm && norm ? (
@@ -246,8 +307,8 @@ export function HrvCard({
                 position: "absolute",
                 left: 0,
                 right: 0,
-                bottom: `${(norm.normal_min / max) * HRV_CHART_HEIGHT}px`,
-                height: `${Math.max(4, ((norm.normal_max - norm.normal_min) / max) * HRV_CHART_HEIGHT)}px`,
+                bottom: `${scale(norm.normal_min)}px`,
+                height: `${Math.max(4, scale(norm.normal_max) - scale(norm.normal_min))}px`,
                 background: "rgba(46,125,50,0.08)",
                 borderTop: "1px dashed rgba(46,125,50,0.35)",
                 borderBottom: "1px dashed rgba(46,125,50,0.35)",
@@ -261,7 +322,7 @@ export function HrvCard({
                 position: "absolute",
                 left: 0,
                 right: 0,
-                bottom: `${(baseline / max) * HRV_CHART_HEIGHT}px`,
+                bottom: `${scale(baseline)}px`,
                 borderTop: "1px dashed var(--inchiostro-35)",
               }}
             />
@@ -269,7 +330,7 @@ export function HrvCard({
           <div style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 4, height: "100%" }}>
             {points.map((point, i) => {
               const isLast = i === points.length - 1;
-              const value = point.value_ms ?? 0;
+              const value = point.value_ms;
               return (
                 <motion.div
                   key={point.date}
@@ -278,8 +339,8 @@ export function HrvCard({
                   title={`${point.value_ms ?? "—"} ms`}
                   style={{
                     flex: 1,
-                    height: `${Math.max(5, (value / max) * HRV_CHART_HEIGHT)}px`,
-                    background: isLast ? "var(--verde-tratto-scuro)" : "var(--neutro-barra)",
+                    height: `${value == null ? 3 : Math.max(5, scale(value))}px`,
+                    background: isLast ? lastColor : "var(--neutro-barra)",
                     borderRadius: 3,
                     transformOrigin: "bottom",
                   }}
@@ -307,11 +368,11 @@ export function HrvCard({
           ))}
         </div>
 
-        <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "10px 0 0", lineHeight: 1.4 }}>
-          Una barra per notte, l&apos;ultima è stanotte. Quanto varia la distanza fra un battito e
-          l&apos;altro mentre dormi: sale quando sei recuperato, scende quando il corpo sta ancora
+        <Explainer track="body.hrv-explainer">
+          Una barra per notte, l&apos;ultima è stanotte; la linea tratteggiata è la tua media. È quanto varia la distanza
+          fra un battito e l&apos;altro mentre dormi: sale quando sei recuperato, scende quando il corpo sta ancora
           lavorando. Conta solo rispetto alla tua media, mai a quella di altri.
-        </p>
+        </Explainer>
       </motion.div>
     </SlideUp>
   );
