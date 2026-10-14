@@ -14,6 +14,7 @@ import { useMounted } from "@/lib/hydration";
 import { DayEnergyCard } from "@/components/DayEnergyCard";
 import { MealList } from "@/components/FuelBlocks";
 import { FuelDayPlan } from "@/components/FuelDayPlan";
+import { useTrainingSlot } from "@/lib/trainingHabits";
 import { FuelReminderCard } from "@/components/FuelReminderCard";
 import { useMountOnce } from "@/lib/motion";
 import { formatWeekday } from "@/lib/format";
@@ -98,7 +99,10 @@ export function NutritionView() {
   const sessions = access.plan ? access.plan.sessions : workoutsToSessions(workoutsQuery.data?.workouts ?? []);
 
   const sessionsReady = access.ready && (!liveMode || !workoutsQuery.isPending);
-  const fuelQuery = useFuelTargets(today, sessions, manualWeight?.weightKg, sessionsReady);
+  // When today's session happens -- the user's habit for this weekday unless they said
+  // otherwise for today. Targets wait for it, or they would be asked for twice.
+  const training = useTrainingSlot(today, access.ready);
+  const fuelQuery = useFuelTargets(today, sessions, manualWeight?.weightKg, sessionsReady && training.ready, training.slot);
   useScreenReady(sessionsReady && (fuelQuery.isError || !!fuelQuery.data), "/nutrition");
   const statusQuery = useFuelStatus(today, manualWeight?.weightKg, sessionsReady);
   const level = useAthleteLevel();
@@ -116,8 +120,6 @@ export function NutritionView() {
   const [flow, setFlow] = useState<Flow>({ kind: "idle" });
   useFlowTracking("meal", flow.kind);
   const [correcting, setCorrecting] = useState<FoodEntry | null>(null);
-  const sessionSlot = usePassoStore((s) => s.prefs.orarioAllenamento);
-  const setPref = usePassoStore((s) => s.setPref);
 
   const mounted = useMounted();
   const [pickedLogDay, setPickedLogDay] = useState<LogDay | null>(null);
@@ -287,8 +289,7 @@ export function NutritionView() {
               fuel={fuel}
               status={statusQuery.data}
               narrative={narrative}
-              slot={sessionSlot}
-              onSlotChange={(slot) => setPref("orarioAllenamento", slot)}
+              training={training}
               animate={animate}
             />
 

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { keepPreviousData, useMutation, useMutationState, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm, apiPut } from "./apiClient";
 import { shiftDateKey, toDateKey, weekBounds } from "./sessionVisuals";
-import { usePassoStore } from "./store";
 import type {
   ActivityForm,
   Adaptation,
@@ -39,6 +38,7 @@ import type {
   PlanDiff,
   Progress,
   RaceGoal,
+  SessionSlot,
   RacePredictionData,
   RescheduleResult,
   ScheduledWorkout,
@@ -1558,10 +1558,15 @@ function fuelStaleTime(date: string): number {
  * (and, for the narrative, a paid model call) computed against "nothing scheduled",
  * immediately thrown away when the real plan lands under a different cache key. Callers
  * pass whatever tells them the plan has arrived. */
-export function useFuelTargets(date: string, sessions: TrainingSession[], weightKg: number | null | undefined, enabled = true) {
-  // Read here rather than passed in, so every screen asking for today's targets asks
-  // with the same slot and shares one cache entry.
-  const sessionSlot = usePassoStore((s) => s.prefs.orarioAllenamento);
+/** `sessionSlot` is when the session happens (see `useTrainingSlot`): every screen
+ * asking for today's targets must pass the same one, or they read different plans. */
+export function useFuelTargets(
+  date: string,
+  sessions: TrainingSession[],
+  weightKg: number | null | undefined,
+  enabled: boolean,
+  sessionSlot: SessionSlot
+) {
   return useQuery({
     queryKey: ["nutrition", "targets", date, weightKg ?? null, sessions.length ? planFingerprint(sessions) : null, sessionSlot],
     queryFn: ({ signal }) =>

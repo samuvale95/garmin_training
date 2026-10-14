@@ -17,7 +17,8 @@ import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/mot
 import { ChevronRight, ArrowRight, ArrowUpRight, PlusIcon, TargetIcon, UtensilsIcon } from "@/components/Icons";
 import { TodayHeroUnified } from "@/components/TodayHeroUnified";
 import { TodayVitalStrip } from "@/components/TodayVitalStrip";
-import { PreWorkoutContextCard } from "@/components/PreWorkoutContextCard";
+import { NowMealCard } from "@/components/NowMealCard";
+import { currentMoment, isUrgent, useClockMinutes } from "@/lib/fuelMoment";
 import { QuickMealModal } from "@/components/QuickMealModal";
 import { WeekStrip } from "@/components/WeekStrip";
 import { PullToRefresh } from "@/components/PullToRefresh";
@@ -46,6 +47,7 @@ import {
 import { useWatchSyncStatus } from "@/lib/watchSync";
 import { SkeletonTodayHero } from "@/components/skeletons";
 import { usePassoStore } from "@/lib/store";
+import { useTrainingSlot } from "@/lib/trainingHabits";
 import { classifySession, sessionDistanceKm, shiftDateKey, toDateKey, weekBounds, workoutsToSessions, type DisplaySession } from "@/lib/sessionVisuals";
 import { capitalize, formatFullDate, groupSteps, numberToItalianWords, relativeDayLabel, stepGroupLine } from "@/lib/format";
 import { useScreenReady } from "@/lib/useScreenReady";
@@ -137,10 +139,11 @@ export function TodayView() {
   // Quick 1-tap food / snack logging modal
   const [quickMealOpen, setQuickMealOpen] = useState(false);
   const planOrLiveSessions = access.plan ? access.plan.sessions : workoutsToSessions(workoutsQuery.data?.workouts ?? []);
-  const fuelStatus = useFuelStatus(todayKey, undefined, access.ready);
   // Same weight as the Nutrizione tab, so both read one cache entry and one answer.
   const manualWeight = usePassoStore((s) => s.manualWeight);
-  const fuelTargets = useFuelTargets(todayKey, planOrLiveSessions, manualWeight?.weightKg, access.ready);
+  const training = useTrainingSlot(todayKey, access.ready);
+  const fuelStatus = useFuelStatus(todayKey, manualWeight?.weightKg, access.ready);
+  const fuelTargets = useFuelTargets(todayKey, planOrLiveSessions, manualWeight?.weightKg, access.ready && training.ready, training.slot);
 
   // Until we know whether there's a plan or a live Garmin connection there is nothing
   // real to show -- but "nothing real" used to mean `return null`, i.e. an empty screen
@@ -148,6 +151,8 @@ export function TodayView() {
   // Above the early return below: a hook after it would run on some renders and not
   // others (first render is always "not ready"), which React rejects outright.
   const refreshMutation = useRefreshServerData();
+  // The clock the home screen reorders itself by (see the meal card below).
+  const nowMinutes = useClockMinutes();
   // Ready also with neither plan nor Garmin: the guard is sending the user to /import.
   useScreenReady(access.ready && !(liveMode && workoutsQuery.isPending), "/today");
 
@@ -194,6 +199,16 @@ export function TodayView() {
 
 
   const pendingChanges = (diffQuery.data?.to_create.length ?? 0) + (diffQuery.data?.changed.length ?? 0);
+
+  // What to eat right now. Urgent -- to eat now or within the hour, the meal before or
+  // after the session, or the session itself -- it goes straight under the session;
+  // otherwise it waits below the day's vitals. The screen's order follows the clock
+  // instead of being the same at 8 in the morning and at 9 in the evening.
+  const mealMoment = fuelTargets.data ? currentMoment(fuelTargets.data, nowMinutes) : null;
+  const mealUrgent = !!mealMoment && isUrgent(mealMoment);
+  const nowMealCard = fuelTargets.data && mealMoment && (
+    <NowMealCard fuel={fuelTargets.data} moment={mealMoment} onLog={() => setQuickMealOpen(true)} animate={animate} delayMs={110} />
+  );
   const readiness = bodyQuery.data?.readiness_score;
   const sleepMinutes = bodyQuery.data?.sleep?.total_minutes;
 
@@ -217,6 +232,9 @@ export function TodayView() {
         today={today}
         animate={animate}
       />
+
+      {/* 1b. COSA MANGIARE ADESSO, quando è urgente */}
+      {mealUrgent && nowMealCard}
 
       {/* 2. ADATTAMENTO DEL PIANO (Se richiesto) */}
       {hasPlan && <AdaptationCard animate={animate} delayMs={120} />}
@@ -285,20 +303,6 @@ export function TodayView() {
         </SlideUp>
       )}
 
-      {/* 4. CONTEXT BANNER PRE-CORSA: Spuntino & Idratazione rapida (1-tap snack) */}
-      {heroSession && (
-        <PreWorkoutContextCard
-          todayTarget={fuelTargets.data?.today}
-          preMeal={fuelTargets.data?.meals.find((meal) => meal.role === "pre") ?? null}
-          onOpenQuickLog={() => setQuickMealOpen(true)}
-          active={animate}
-          trained={trainedOn(todayKey) || heroSession.date > todayKey}
-          carbLoggedG={fuelStatus.data?.totals?.carb_g ?? 0}
-          entriesCount={fuelStatus.data?.totals?.entries ?? 0}
-          dateKey={todayKey}
-        />
-      )}
-
       {/* 5. VITAL STRIP COMPATTA: Prontezza, Sonno, Carbo (0 tap) */}
       <TodayVitalStrip
         readinessScore={readiness}
@@ -307,6 +311,9 @@ export function TodayView() {
         carbTargetG={fuelTargets.data?.today?.carb_g}
         active={animate}
       />
+
+      {/* 5b. COSA MANGIARE, quando non è urgente */}
+      {!mealUrgent && nowMealCard}
 
       {/* 6. STRISCIA 7 GIORNI (LUN-DOM): Panoramica settimana in 0 tap */}
       <WeekStrip

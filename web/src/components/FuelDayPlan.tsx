@@ -1,10 +1,14 @@
 "use client";
 
-import { useSyncExternalStore, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { SlideUp } from "@/components/motion/primitives";
-import { MoonIcon, RunnerIcon, SunIcon } from "@/components/Icons";
+import { RunnerIcon } from "@/components/Icons";
 import { capitalize } from "@/lib/format";
-import type { ComplianceLine, FuelStatus, FuelTargets, MealSlot, Portion, SessionSlot } from "@/lib/types";
+import { currentMoment, inHowLong, NOW_AFTER_MINUTES, portionAmount, portionsInline, toMinutes, useClockMinutes, type Moment } from "@/lib/fuelMoment";
+import { habitSentence, SLOT_LABEL, type TrainingSlot } from "@/lib/trainingHabits";
+import type { ComplianceLine, FuelStatus, FuelTargets, MealSlot, SessionSlot } from "@/lib/types";
+
+const SLOT_ORDER: SessionSlot[] = ["mattina", "mezzogiorno", "pomeriggio", "sera"];
 
 /** "Cosa mangio, e quando" -- the day's fuelling as the plates the backend already
  * sized (`nutrition.meal_plan`), placed on the clock around the session.
@@ -19,93 +23,20 @@ import type { ComplianceLine, FuelStatus, FuelTargets, MealSlot, Portion, Sessio
  * meal is "now", from the clock.
  */
 
-const SLOT_OPTIONS: { slot: SessionSlot; label: string; icon: "sun" | "moon" }[] = [
-  { slot: "mattina", label: "Mattina", icon: "sun" },
-  { slot: "pomeriggio", label: "Pomeriggio", icon: "sun" },
-  { slot: "sera", label: "Sera", icon: "moon" },
-];
-
-// A meal counts as "now" from a little before its time until a while after it: long
-// enough to actually eat it, short enough that the screen moves on.
-const NOW_BEFORE_MINUTES = 20;
-const NOW_AFTER_MINUTES = 45;
-
-function toMinutes(clock: string | null | undefined): number | null {
-  if (!clock) return null;
-  const [h, m] = clock.split(":").map(Number);
-  return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null;
-}
-
-function minutesNow(): number {
-  const d = new Date();
-  return d.getHours() * 60 + d.getMinutes();
-}
-
-function subscribeToClock(onChange: () => void): () => void {
-  const id = window.setInterval(onChange, 30_000);
-  return () => window.clearInterval(id);
-}
-
-/** Minutes after midnight, re-read every half minute; null during server render, so the
- * page never hydrates around a time the server made up. */
-function useClockMinutes(): number | null {
-  return useSyncExternalStore(subscribeToClock, minutesNow, () => null);
-}
-
-function inHowLong(minutes: number): string {
-  if (minutes < 60) return `tra ${minutes} min`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m === 0 ? `tra ${h} h` : `tra ${h} h ${m}`;
-}
-
-function portionAmount(portion: Portion): string | null {
-  if (portion.grams == null) return null;
-  return portion.note ? `${portion.grams} g ${portion.note}` : `${portion.grams} g`;
-}
-
-function portionsInline(portions: Portion[]): string {
-  return portions.map((p) => (p.grams != null ? `${capitalize(p.food)} ${p.grams} g` : capitalize(p.food))).join(" · ");
-}
-
-type Moment =
-  | { kind: "meal"; meal: MealSlot; now: boolean; minutesUntil: number | null }
-  | { kind: "session" }
-  | { kind: "done" };
-
-/** What the top card is about, given the clock. */
-function currentMoment(fuel: FuelTargets, now: number | null): Moment {
-  const meals = fuel.meals.filter((m) => toMinutes(m.clock) != null);
-  if (meals.length === 0) return { kind: "done" };
-  if (now == null) return { kind: "meal", meal: meals[0], now: false, minutesUntil: null };
-
-  const start = toMinutes(fuel.session_clock);
-  const length = fuel.today.duration_minutes ?? 60;
-  if (start != null && now >= start - 10 && now < start + length) return { kind: "session" };
-
-  for (const meal of meals) {
-    const at = toMinutes(meal.clock)!;
-    if (now >= at - NOW_BEFORE_MINUTES && now < at + NOW_AFTER_MINUTES) return { kind: "meal", meal, now: true, minutesUntil: 0 };
-    if (at - NOW_BEFORE_MINUTES > now) return { kind: "meal", meal, now: false, minutesUntil: at - now };
-  }
-  return { kind: "done" };
-}
-
 // ---- the plan -------------------------------------------------------------------------
 
 export function FuelDayPlan({
   fuel,
   status,
   narrative,
-  slot,
-  onSlotChange,
+  training,
   animate,
 }: {
   fuel: FuelTargets;
   status: FuelStatus | undefined;
   narrative: string | undefined;
-  slot: SessionSlot;
-  onSlotChange: (slot: SessionSlot) => void;
+  /** When today's session happens and where that came from (`useTrainingSlot`). */
+  training: TrainingSlot;
   animate: boolean;
 }) {
   const now = useClockMinutes();
@@ -115,7 +46,7 @@ export function FuelDayPlan({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <SessionStrip fuel={fuel} slot={slot} onSlotChange={onSlotChange} animate={animate} />
+      <SessionStrip fuel={fuel} training={training} animate={animate} />
       <NextMealHero fuel={fuel} moment={moment} narrative={narrative} animate={animate} />
       <DayTimeline fuel={fuel} now={now} focusKey={focusKey} trains={trains} animate={animate} />
       {/* Once the day's meals are over the top card is already about tomorrow. */}
@@ -127,21 +58,19 @@ export function FuelDayPlan({
 
 // ---- 1. when do you train -------------------------------------------------------------
 
-function SessionStrip({
-  fuel,
-  slot,
-  onSlotChange,
-  animate,
-}: {
-  fuel: FuelTargets;
-  slot: SessionSlot;
-  onSlotChange: (slot: SessionSlot) => void;
-  animate: boolean;
-}) {
+function SessionStrip({ fuel, training, animate }: { fuel: FuelTargets; training: TrainingSlot; animate: boolean }) {
   const t = fuel.today;
   const rest = t.load === "riposo";
   const title = t.session_title ? capitalize(t.session_title) : rest ? "Giorno di riposo" : "Allenamento";
   const carbs = t.carb_g ? `${t.carb_g[0]}–${t.carb_g[1]} g` : null;
+  const habitSlot = training.habit?.slot ?? null;
+  const sentence = training.habit ? habitSentence(training.habit) : null;
+
+  function choose(slot: SessionSlot) {
+    // Picking what the habit already says is going back to automatic, not a choice
+    // that should outlive today.
+    training.setForToday(slot === habitSlot ? null : slot);
+  }
 
   return (
     <SlideUp active={animate} delayMs={40}>
@@ -164,30 +93,44 @@ function SessionStrip({
 
       {!rest && (
         <div style={{ marginTop: 12 }}>
-          <p style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro-70)", margin: "0 0 6px" }}>Quando ti alleni?</p>
-          <div role="radiogroup" aria-label="Quando ti alleni" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4, background: "var(--sabbia)", padding: 4, borderRadius: 14 }}>
-            {SLOT_OPTIONS.map((option) => {
-              const active = option.slot === slot;
-              const Icon = option.icon === "sun" ? SunIcon : MoonIcon;
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, margin: "0 0 6px" }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro-70)", margin: 0 }}>Quando ti alleni oggi?</p>
+            {training.source === "abitudine" && (
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--verde-testo)", background: "var(--verde)", borderRadius: "var(--radius-pill)", padding: "2px 8px" }}>
+                automatico
+              </span>
+            )}
+            {training.source === "oggi" && (
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "2px 8px" }}>
+                solo per oggi
+              </span>
+            )}
+          </div>
+          <div role="radiogroup" aria-label="Quando ti alleni oggi" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4, background: "var(--sabbia)", padding: 4, borderRadius: 14 }}>
+            {SLOT_ORDER.map((slot) => {
+              const active = slot === training.slot;
               return (
                 <button
-                  key={option.slot}
-                  data-track={`nutrition.orario-${option.slot}`}
+                  key={slot}
+                  data-track={`nutrition.orario-${slot}`}
                   type="button"
                   role="radio"
                   aria-checked={active}
-                  onClick={() => onSlotChange(option.slot)}
+                  onClick={() => choose(slot)}
                   className="tap-target"
                   style={{
                     display: "flex",
+                    flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: 5,
+                    gap: 1,
                     border: "none",
                     borderRadius: 11,
-                    padding: "9px 4px",
-                    fontSize: 12.5,
+                    padding: "7px 2px",
+                    minHeight: 44,
+                    fontSize: 12,
                     fontWeight: 600,
+                    lineHeight: 1.15,
                     cursor: "pointer",
                     background: active ? "var(--crema)" : "transparent",
                     color: active ? "var(--inchiostro)" : "var(--inchiostro-70)",
@@ -195,15 +138,23 @@ function SessionStrip({
                     transition: "background .15s var(--ease)",
                   }}
                 >
-                  <Icon size={13} strokeWidth={2} />
-                  <span>{option.label}</span>
+                  <span>{SLOT_LABEL[slot]}</span>
                   {active && fuel.session_clock && (
-                    <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>{fuel.session_clock}</span>
+                    <span className="font-mono" style={{ fontSize: 10.5, color: "var(--inchiostro-50)" }}>{fuel.session_clock}</span>
                   )}
                 </button>
               );
             })}
           </div>
+          <p style={{ fontSize: 12, lineHeight: 1.4, color: "var(--inchiostro-50)", margin: "6px 2px 0" }}>
+            {training.source === "abitudine" && sentence
+              ? `${sentence} I pasti sono messi in base a questo.`
+              : training.source === "oggi"
+                ? sentence
+                  ? `${sentence} Domani torno a usare il tuo orario abituale.`
+                  : "Domani torno a chiedertelo."
+                : "Non ho ancora abbastanza allenamenti registrati per capire il tuo orario: sceglilo tu."}
+          </p>
         </div>
       )}
     </SlideUp>

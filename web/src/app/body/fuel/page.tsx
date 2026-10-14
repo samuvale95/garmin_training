@@ -13,6 +13,7 @@ import { useMounted } from "@/lib/hydration";
 import { DayEnergyCard } from "@/components/DayEnergyCard";
 import { MealList } from "@/components/FuelBlocks";
 import { FuelDayPlan } from "@/components/FuelDayPlan";
+import { useTrainingSlot } from "@/lib/trainingHabits";
 import { FuelReminderCard } from "@/components/FuelReminderCard";
 import { useMountOnce } from "@/lib/motion";
 import { formatWeekday } from "@/lib/format";
@@ -112,7 +113,10 @@ export default function FuelPage() {
   // away the moment the real plan lands under a different cache key. It also doubled
   // the model calls this screen pays for.
   const sessionsReady = access.ready && (!liveMode || !workoutsQuery.isPending);
-  const fuelQuery = useFuelTargets(today, sessions, manualWeight?.weightKg, sessionsReady);
+  // When today's session happens -- the user's habit for this weekday unless they said
+  // otherwise for today. Targets wait for it, or they would be asked for twice.
+  const training = useTrainingSlot(today, access.ready);
+  const fuelQuery = useFuelTargets(today, sessions, manualWeight?.weightKg, sessionsReady && training.ready, training.slot);
   useScreenReady(sessionsReady && (fuelQuery.isError || !!fuelQuery.data));
   const statusQuery = useFuelStatus(today, manualWeight?.weightKg, sessionsReady);
   // Level 1 builds the habit: no calorie figures while it does.
@@ -131,8 +135,6 @@ export default function FuelPage() {
   const [flow, setFlow] = useState<Flow>({ kind: "idle" });
   useFlowTracking("meal", flow.kind);
   const [correcting, setCorrecting] = useState<FoodEntry | null>(null);
-  const sessionSlot = usePassoStore((s) => s.prefs.orarioAllenamento);
-  const setPref = usePassoStore((s) => s.setPref);
   // The day a new meal is logged to. Unset until the user picks: the default depends on
   // the clock (after midnight a late dinner still belongs to yesterday), which is only
   // known once mounted -- the server render can't know the user's local time.
@@ -316,8 +318,7 @@ export default function FuelPage() {
               fuel={fuel}
               status={statusQuery.data}
               narrative={narrative}
-              slot={sessionSlot}
-              onSlotChange={(slot) => setPref("orarioAllenamento", slot)}
+              training={training}
               animate={animate}
             />
           </div>

@@ -8,10 +8,6 @@ export interface Prefs {
   avvisamiSeIlCorpoNonRegge: boolean;
   chiediPrimaDiCancellare: boolean;
   menoMovimento: boolean;
-  /** When the user usually trains: what the meals of the day are placed around. Kept
-   * across visits -- asking every time is how a screen gets answered with whatever the
-   * default happens to be. */
-  orarioAllenamento: SessionSlot;
 }
 
 /** Local-only display identity (name/email the user types in Settings). There is no
@@ -51,12 +47,18 @@ interface PassoStore {
    * -- sent as `weight_kg` on every /nutrition/targets and /nutrition/narrative call,
    * which is what turns it into `weight_source: "manual"` server-side. */
   manualWeight: { weightKg: number; setOn: string } | null;
+  /** "Oggi mi alleno la sera": when today's session happens, said by the user for one
+   * date only. Every other day the time comes from the activities themselves (see
+   * lib/trainingHabits.ts) -- a choice that stuck forever would quietly replace the
+   * habit it was meant to correct once. */
+  trainingSlotOverride: { date: string; slot: SessionSlot } | null;
 
   setPref: <K extends keyof Prefs>(key: K, value: Prefs[K]) => void;
   setProfile: (profile: Profile) => void;
   setLastGarminEmail: (email: string) => void;
   dismissConflictToday: (dateKey: string) => void;
   setManualWeight: (weightKg: number | null) => void;
+  setTrainingSlotOverride: (date: string, slot: SessionSlot | null) => void;
 
   addJobHistory: (entry: WriteJobHistoryEntry) => void;
 }
@@ -66,7 +68,6 @@ const defaultPrefs: Prefs = {
   // "Chiedi prima di cancellare" defaults on, by design (README screen 15).
   chiediPrimaDiCancellare: true,
   menoMovimento: false,
-  orarioAllenamento: "pomeriggio",
 };
 
 const defaultProfile: Profile = { name: "", email: "" };
@@ -80,6 +81,7 @@ export const usePassoStore = create<PassoStore>()(
       lastGarminEmail: null,
       conflictDismissedDate: null,
       manualWeight: null,
+      trainingSlotOverride: null,
 
       setPref: (key, value) => set((state) => ({ prefs: { ...state.prefs, [key]: value } })),
       setProfile: (profile) => set({ profile }),
@@ -87,6 +89,7 @@ export const usePassoStore = create<PassoStore>()(
       dismissConflictToday: (dateKey) => set({ conflictDismissedDate: dateKey }),
       setManualWeight: (weightKg) =>
         set({ manualWeight: weightKg != null ? { weightKg, setOn: new Date().toISOString() } : null }),
+      setTrainingSlotOverride: (date, slot) => set({ trainingSlotOverride: slot ? { date, slot } : null }),
 
       addJobHistory: (entry) =>
         set((state) => ({ writeJobHistory: [entry, ...state.writeJobHistory].slice(0, 20) })),
@@ -104,6 +107,7 @@ export const usePassoStore = create<PassoStore>()(
         lastGarminEmail: state.lastGarminEmail,
         conflictDismissedDate: state.conflictDismissedDate,
         manualWeight: state.manualWeight,
+        trainingSlotOverride: state.trainingSlotOverride,
       }),
       // zustand/persist's default merge is a single shallow spread of the persisted
       // blob over the fresh state -- a `prefs`/`profile` that's partial (an older app

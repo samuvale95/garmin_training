@@ -344,7 +344,7 @@ def _by_role(fuelling, role):
     return next(meal for meal in fuelling.meals if meal.role == role)
 
 
-@pytest.mark.parametrize("slot", ["mattina", "pomeriggio", "sera"])
+@pytest.mark.parametrize("slot", ["mattina", "mezzogiorno", "pomeriggio", "sera"])
 def test_the_slot_moves_meals_never_grams(slot):
     """Picking when you run changes *when* the day's carbohydrate is eaten, not how much
     of it there is: the screen shows one total, and it must not move under the user's
@@ -353,7 +353,7 @@ def test_the_slot_moves_meals_never_grams(slot):
     assert sum(meal.carb_g for meal in _hard_day(slot).meals) == reference
 
 
-@pytest.mark.parametrize("slot", ["mattina", "pomeriggio", "sera"])
+@pytest.mark.parametrize("slot", ["mattina", "mezzogiorno", "pomeriggio", "sera"])
 def test_meals_come_in_the_order_they_are_eaten(slot):
     clocks = [meal.clock for meal in _hard_day(slot).meals]
     assert None not in clocks
@@ -378,6 +378,17 @@ def test_an_evening_session_makes_dinner_the_recovery_meal():
     assert post.name == "Cena di recupero"
     assert "cena" not in [meal.key for meal in fuelling.meals]
     assert post.clock > fuelling.session_clock
+
+
+def test_a_lunchtime_session_makes_lunch_the_recovery_meal():
+    """The runner who goes out at half past twelve: the meal before is mid-morning, and
+    lunch is what they eat when they get back."""
+    fuelling = _hard_day("mezzogiorno")
+    assert _by_role(fuelling, "pre").clock == "10:00"
+    post = _by_role(fuelling, "post")
+    assert post.name == "Pranzo di recupero"
+    assert "pranzo" not in [meal.key for meal in fuelling.meals]
+    assert fuelling.session_clock == "12:30"
 
 
 def test_an_afternoon_session_gets_a_real_meal_before_it():

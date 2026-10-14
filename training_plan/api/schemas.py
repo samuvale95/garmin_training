@@ -1252,7 +1252,7 @@ class FuelTargetsRequest(BaseModel):
     weight_kg: float | None = None
     # When in the day today's session happens. A plan has dates, not times, so this is
     # the user's answer -- it moves the meals around the session, never the grams.
-    session_slot: Literal["mattina", "pomeriggio", "sera"] = "pomeriggio"
+    session_slot: Literal["mattina", "mezzogiorno", "pomeriggio", "sera"] = "pomeriggio"
 
 
 class FuelTargetsResponse(BaseModel):

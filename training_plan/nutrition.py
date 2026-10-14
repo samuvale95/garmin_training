@@ -686,9 +686,14 @@ RECOVERY_NOTE = "entro un'ora dalla fine: finestra ottimale per il ripristino de
 # those words stand for, and where every meal sits on a day with nothing to work around.
 # All in minutes after midnight.
 
-SessionSlot = Literal["mattina", "pomeriggio", "sera"]
+SessionSlot = Literal["mattina", "mezzogiorno", "pomeriggio", "sera"]
 DEFAULT_SESSION_SLOT: SessionSlot = "pomeriggio"
-SESSION_START_MINUTES: dict[str, int] = {"mattina": 7 * 60 + 30, "pomeriggio": 18 * 60, "sera": 19 * 60 + 30}
+SESSION_START_MINUTES: dict[str, int] = {
+    "mattina": 7 * 60 + 30,
+    "mezzogiorno": 12 * 60 + 30,
+    "pomeriggio": 18 * 60,
+    "sera": 19 * 60 + 30,
+}
 # A session the plan gives no duration for is placed as an hour long.
 DEFAULT_SESSION_MINUTES = 60
 
@@ -712,7 +717,8 @@ PRE_EARLY_MAX_CARB_G = 30
 # "Subito dopo": the time it takes to stop, cool down and get to food.
 POST_LAG_MINUTES = 15
 # A main meal that falls between the start of the session and an hour after its end
-# *is* the recovery meal: breakfast after a morning run, dinner after an evening one.
+# *is* the recovery meal: breakfast after a morning run, lunch after a lunchtime one,
+# dinner after an evening one.
 # Printing both would be two plates thirty minutes apart, which is not a day anyone eats.
 RECOVERY_MEAL_WINDOW_MINUTES = 60
 # A snack this close to the pre-session meal moves to mid-morning instead.
@@ -725,13 +731,22 @@ RECOVERY_MEAL_ANCHORS: dict[str, tuple[list[str], list[str], list[Portion]]] = {
         ["yogurt greco", "uova"],
         [],
     ),
+    "pranzo": (
+        ["pasta", "riso", "pane"],
+        ["petto di pollo", "uova", "parmigiano"],
+        [Portion(food="verdura", grams=200), Portion(food="olio extravergine", grams=15)],
+    ),
     "cena": (
         ["riso", "patate", "pane"],
         ["salmone", "uova", "legumi cotti"],
         [Portion(food="verdura", grams=200), Portion(food="olio extravergine", grams=10)],
     ),
 }
-RECOVERY_MEAL_NAMES = {"colazione": "Colazione di recupero", "cena": "Cena di recupero"}
+RECOVERY_MEAL_NAMES = {
+    "colazione": "Colazione di recupero",
+    "pranzo": "Pranzo di recupero",
+    "cena": "Cena di recupero",
+}
 
 
 def _clock(minutes: int) -> str:
@@ -843,7 +858,7 @@ def meal_plan(
         post.clock = end + POST_LAG_MINUTES
         post.role = "post"
 
-        for host in ("colazione", "cena"):
+        for host in ("colazione", "pranzo", "cena"):
             meal = plan[host]
             if meal.clock is not None and start <= meal.clock <= end + RECOVERY_MEAL_WINDOW_MINUTES:
                 post.name = RECOVERY_MEAL_NAMES[host]

@@ -609,7 +609,7 @@ export interface MealSlot {
 
 /** When in the day the session happens -- a plan has dates, not times, so this is the
  * user's answer, and it moves the meals around the session, never the grams. */
-export type SessionSlot = "mattina" | "pomeriggio" | "sera";
+export type SessionSlot = "mattina" | "mezzogiorno" | "pomeriggio" | "sera";
 
 export interface DuringSession {
   carb_g_per_hour: [number, number];
