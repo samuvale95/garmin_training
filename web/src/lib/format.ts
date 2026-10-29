@@ -412,9 +412,21 @@ export function sleepCaption(sleep: SleepPhases | null): string | null {
 /** One-line "what's actually in this session" note for the week view's day cards --
  * pace/duration/recovery pulled straight from the plan's own steps, replacing the
  * generic category label ("Ripetute") the day card used to fall back to. */
-export function sessionDetailLine(session: { steps?: SessionStep[]; description?: string | null }): string {
-  const steps = session.steps ?? [];
+export function sessionDetailLine(session: {
+  steps?: SessionStep[];
+  description?: string | null;
+  is_short_active?: boolean;
+  short_variant?: { title?: string | null; description?: string | null; steps?: SessionStep[] } | null;
+}): string {
+  const steps =
+    session.is_short_active && session.short_variant?.steps && session.short_variant.steps.length > 0
+      ? session.short_variant.steps
+      : (session.steps ?? []);
+  const description =
+    session.is_short_active && session.short_variant?.description
+      ? session.short_variant.description
+      : (session.description ?? "");
   const groups = groupSteps(steps).filter((g) => g.kind !== "warmup" && g.kind !== "cooldown");
   if (groups.length > 0) return groups.map(stepGroupLine).join(" · ");
-  return session.description ?? "";
+  return description;
 }

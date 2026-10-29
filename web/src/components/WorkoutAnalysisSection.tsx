@@ -143,6 +143,7 @@ export function WorkoutAnalysisSection({
           >
             Punti di Svolta lungo il percorso
           </span>
+          <WorkoutTimelineTrack breakpoints={analysis.breakpoints} segments={analysis.segments ?? []} />
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {analysis.breakpoints.map((bp, i) => (
               <BreakpointCard key={i} breakpoint={bp} animate={animate} delayMs={140 + i * 40} />
@@ -456,6 +457,104 @@ function SegmentRow({ segment }: { segment: WorkoutSegment }) {
           <span style={{ fontSize: 9.5, color: "var(--inchiostro-50)", display: "block" }}>Falcata</span>
           <span className="font-mono" style={{ fontWeight: 600 }}>{segment.avg_stride_m ? `${segment.avg_stride_m} m` : "—"}</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkoutTimelineTrack({
+  breakpoints,
+  segments,
+}: {
+  breakpoints: StreamBreakpoint[];
+  segments: WorkoutSegment[];
+}) {
+  const lastSegmentEndKm = segments[segments.length - 1]?.end_km ?? 0;
+  const maxBreakpointSec = Math.max(...breakpoints.map((b) => b.time_sec), 0);
+  const maxSec = Math.max(maxBreakpointSec, lastSegmentEndKm * 320, 3600);
+  const totalMin = Math.round(maxSec / 60);
+
+  return (
+    <div
+      style={{
+        background: "var(--crema-card)",
+        border: "1px solid var(--border-airbnb)",
+        borderRadius: "var(--radius-card)",
+        padding: "14px 16px 12px",
+        marginBottom: 10,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--inchiostro-50)" }}>
+          Mappa temporale della seduta
+        </span>
+        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
+          0&apos; → {totalMin}&apos;
+        </span>
+      </div>
+
+      <div style={{ position: "relative", height: 28, display: "flex", alignItems: "center" }}>
+        {/* Track Line */}
+        <div style={{ position: "absolute", left: 0, right: 0, height: 6, borderRadius: 3, background: "var(--sabbia-chip)" }} />
+
+        {/* Stable Green Base */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            width: `${Math.min(100, Math.max(5, ((breakpoints[0]?.time_sec ?? maxSec) / maxSec) * 100))}%`,
+            height: 6,
+            borderRadius: 3,
+            background: "var(--verde)",
+          }}
+        />
+
+        {/* Breakpoints markers */}
+        {breakpoints.map((bp, idx) => {
+          const pct = Math.min(95, Math.max(5, (bp.time_sec / maxSec) * 100));
+          const min = Math.round(bp.time_sec / 60);
+          return (
+            <div
+              key={idx}
+              style={{
+                position: "absolute",
+                left: `${pct}%`,
+                transform: "translateX(-50%)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                cursor: "pointer",
+              }}
+              title={`${bp.headline} (${min}' · ${bp.distance_km} km)`}
+            >
+              <span
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  fontFamily: "var(--font-dm-mono)",
+                  background: "var(--corallo)",
+                  color: "var(--corallo-testo)",
+                  padding: "1px 5px",
+                  borderRadius: 6,
+                  whiteSpace: "nowrap",
+                  marginBottom: 2,
+                }}
+              >
+                {min}&apos;
+              </span>
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: "var(--corallo-accent)",
+                  border: "2px solid #fff",
+                  boxShadow: "0 0 5px rgba(232, 93, 78, 0.4)",
+                }}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -78,9 +78,9 @@ export default function CoachPage() {
     [readable, form]
   );
   const trendQuery = useSportTrend(sameSport, !!form?.has_metrics);
-  const isRunning = form ? (form.sport === "running" || form.sport.includes("run")) : true;
-  const analysisQuery = useWorkoutAnalysis(activityId, isRunning);
-  const analysisNarrativeQuery = useWorkoutAnalysisNarrative(activityId, isRunning && !!analysisQuery.data);
+  const isAnalyzable = form ? (form.sport === "running" || form.sport.includes("run") || form.sport === "cycling" || form.sport.includes("bike")) : true;
+  const analysisQuery = useWorkoutAnalysis(activityId, isAnalyzable);
+  const analysisNarrativeQuery = useWorkoutAnalysisNarrative(activityId, isAnalyzable && !!analysisQuery.data);
 
   return (
     <div style={{ padding: "22px 20px 40px" }}>

@@ -3,7 +3,7 @@ import { sessionFallbackPaceSecPerKm, stepDistanceKm } from "./format";
 import { flattenSteps, isRepeatBlock } from "./types";
 import type { ScheduledWorkout, SessionStep, ShortVariant, Sport, TrainingSession } from "./types";
 
-export type SessionKind = "riposo" | "ripetute" | "fondo_lento" | "forza" | "lungo";
+export type SessionKind = "riposo" | "ripetute" | "fondo_lento" | "forza" | "lungo" | "calisthenics" | "bici";
 
 /** Shared shape for anything rendered on Oggi/Settimana -- an imported plan's
  * `TrainingSession` (steps present, distance/interval-aware) or a raw Garmin
@@ -13,6 +13,9 @@ export interface DisplaySession {
   date: string;
   sport: string;
   title: string;
+  description?: string | null;
+  priority?: "key" | "flexible" | "normal" | "optional" | null;
+  min_duration_minutes?: number | null;
   steps?: SessionStep[];
   is_short_active?: boolean;
   short_variant?: ShortVariant | null;
@@ -31,8 +34,34 @@ const VISUALS: Record<SessionKind, Omit<SessionVisual, "kind">> = {
   ripetute: { label: "Ripetute", background: "var(--corallo)", foreground: "var(--corallo-testo)", illustration: "corsa" },
   fondo_lento: { label: "Fondo lento", background: "var(--azzurro)", foreground: "var(--azzurro-testo)", illustration: "fondo_lento" },
   forza: { label: "Forza", background: "var(--lilla)", foreground: "var(--lilla-testo)", illustration: "forza" },
-  lungo: { label: "Lungo", background: "var(--verde)", foreground: "var(--verde-testo)", illustration: "bici" },
+  calisthenics: { label: "Calisthenics", background: "rgba(168, 85, 247, 0.15)", foreground: "#7E22CE", illustration: "forza" },
+  bici: { label: "Bici", background: "var(--verde)", foreground: "var(--verde-testo)", illustration: "bici" },
+  lungo: { label: "Lungo", background: "var(--verde)", foreground: "var(--verde-testo)", illustration: "corsa" },
 };
+
+/** Returns effective steps honoring is_short_active. */
+export function effectiveSteps(session: DisplaySession): SessionStep[] {
+  if (session.is_short_active && session.short_variant?.steps && session.short_variant.steps.length > 0) {
+    return session.short_variant.steps;
+  }
+  return session.steps ?? [];
+}
+
+/** Returns effective title honoring is_short_active. */
+export function effectiveTitle(session: DisplaySession): string {
+  if (session.is_short_active && session.short_variant?.title) {
+    return session.short_variant.title;
+  }
+  return session.title;
+}
+
+/** Returns effective description honoring is_short_active. */
+export function effectiveDescription(session: DisplaySession): string | null {
+  if (session.is_short_active && session.short_variant?.description) {
+    return session.short_variant.description;
+  }
+  return session.description ?? null;
+}
 
 /** A continuous run at or above this distance reads as the week's long one. */
 const LONG_RUN_KM = 15;
@@ -50,17 +79,14 @@ const LONG_RUN_KM = 15;
  * -- a repeat block, or several interval steps with recoveries between them. */
 export function classifySession(session: DisplaySession | null): SessionVisual {
   if (!session) return { kind: "riposo", ...VISUALS.riposo };
-  if (session.sport === "strength_training" || session.sport === "calisthenics") return { kind: "forza", ...VISUALS.forza };
-  if (session.sport === "cycling") return { kind: "lungo", ...VISUALS.lungo };
+  if (session.sport === "calisthenics") return { kind: "calisthenics", ...VISUALS.calisthenics };
+  if (session.sport === "strength_training") return { kind: "forza", ...VISUALS.forza };
+  if (session.sport === "cycling") return { kind: "bici", ...VISUALS.bici };
 
-  const steps =
-    session.is_short_active && session.short_variant?.steps
-      ? session.short_variant.steps
-      : (session.steps ?? []);
+  const steps = effectiveSteps(session);
   const efforts = flattenSteps(steps).filter((s) => s.type === "interval").length;
   if (steps.some(isRepeatBlock) || efforts > 1) return { kind: "ripetute", ...VISUALS.ripetute };
   if (sessionDistanceKm(session) >= LONG_RUN_KM) {
-    // Same green as a long ride, but drawn by a runner.
     return { kind: "lungo", ...VISUALS.lungo, illustration: "corsa" };
   }
   return { kind: "fondo_lento", ...VISUALS.fondo_lento };
@@ -76,10 +102,7 @@ export function classifySession(session: DisplaySession | null): SessionVisual {
  * dropped. */
 export function sessionDistanceKm(session: DisplaySession): number {
   if (session.sport === "strength_training" || session.sport === "calisthenics") return 0;
-  const steps =
-    session.is_short_active && session.short_variant?.steps
-      ? session.short_variant.steps
-      : (session.steps ?? []);
+  const steps = effectiveSteps(session);
   if (session.sport === "cycling") {
     return flattenSteps(steps).reduce((sum, s) => {
       if (s.duration_type === "distance") return sum + s.duration_value;
@@ -89,6 +112,26 @@ export function sessionDistanceKm(session: DisplaySession): number {
   }
   const fallbackPace = sessionFallbackPaceSecPerKm(steps);
   return flattenSteps(steps).reduce((sum, s) => sum + stepDistanceKm(s, fallbackPace), 0);
+}
+
+/** Estimates total duration in minutes of a session. */
+export function sessionDurationMinutes(session: DisplaySession): number {
+  const steps = effectiveSteps(session);
+  if (!steps || steps.length === 0) {
+    if (session.min_duration_minutes) return session.min_duration_minutes;
+    if (session.sport === "calisthenics" || session.sport === "strength_training") return 45;
+    return 30;
+  }
+  const fallbackPace = sessionFallbackPaceSecPerKm(steps);
+  return flattenSteps(steps).reduce((sum, s) => {
+    if (s.duration_type === "time") return sum + s.duration_value;
+    if (session.sport === "cycling") {
+      // 25 km/h -> 2.4 min per km
+      return sum + s.duration_value * 2.4;
+    }
+    const secPerKm = s.target_pace ? (s.target_pace.slower_sec_per_km + s.target_pace.faster_sec_per_km) / 2 : fallbackPace;
+    return sum + (s.duration_value * secPerKm) / 60;
+  }, 0);
 }
 
 export function weekBounds(reference: Date): { start: Date; end: Date } {

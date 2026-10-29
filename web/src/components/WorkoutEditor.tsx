@@ -17,6 +17,7 @@ import type { ScheduledWorkout, SessionStep, Sport, Step, StepType, TrainingSess
 const SPORT_CHIPS: { value: Sport; label: string }[] = [
   { value: "running", label: "Corsa" },
   { value: "cycling", label: "Bici" },
+  { value: "calisthenics", label: "Calisthenics" },
   { value: "strength_training", label: "Forza" },
   { value: "swimming", label: "Nuoto" },
   { value: "other", label: "Riposo" },
@@ -62,7 +63,8 @@ function toEditable(items: SessionStep[]): EditableItem[] {
 function stepSummary(step: Step): string {
   const duration = step.duration_type === "distance" ? `${step.duration_value} km` : `${step.duration_value} min`;
   const pace = step.target_pace ? ` · ${formatPaceRange(step.target_pace)}/km` : "";
-  return `${duration}${pace}`;
+  const note = step.note ? ` · ${step.note}` : "";
+  return `${duration}${pace}${note}`;
 }
 
 /** A new step's starting point, by type. A recovery is born with a slow pace target
@@ -145,6 +147,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
 
   const [date, setDate] = useState(existing?.date ?? toDateKey(new Date()));
   const [sport, setSport] = useState<Sport>((existing?.sport as Sport) ?? "running");
+  const [priority, setPriority] = useState<"key" | "normal" | "optional">(() => (existing?.priority === "key" ? "key" : existing?.priority === "optional" ? "optional" : "normal"));
   const [title, setTitle] = useState(existing?.title ?? "");
   const [description, setDescription] = useState(existing?.description ?? "");
   const [steps, setSteps] = useState<EditableItem[]>(() => toEditable(existing?.steps ?? []));
@@ -240,6 +243,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       duration_type: s.duration_type,
       duration_value: s.duration_value,
       target_pace: s.target_pace,
+      note: s.note?.trim() || null,
     });
     return steps.flatMap((item): SessionStep[] => {
       if (!isEditableBlock(item)) return [strip(item)];
@@ -268,6 +272,11 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       title: title.trim() || "Allenamento",
       description: description.trim() || null,
       steps: plainSteps(),
+      priority: priority === "key" ? "key" : "flexible",
+      min_duration_minutes: existing?.min_duration_minutes ?? null,
+      short_variant: existing?.short_variant ?? null,
+      is_short_active: existing?.is_short_active ?? false,
+      plan_id: existing?.plan_id,
     };
 
     // `garmin` mode edits a workout that isn't in the local plan at all, so it writes
@@ -507,6 +516,48 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
           placeholder="Nome dell'allenamento"
           style={{ width: "100%", border: "none", borderBottom: "1.5px solid var(--sabbia-bordo)", background: "transparent", fontSize: 17, fontWeight: 600, padding: "4px 0 8px", outline: "none" }}
         />
+
+        <div style={{ marginTop: 14 }}>
+          <span style={{ display: "block", fontSize: 11, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--inchiostro-50)", marginBottom: 6 }}>
+            Priorità sessione
+          </span>
+          <div style={{ display: "flex", gap: 6 }}>
+            {[
+              { id: "normal", label: "Normale" },
+              { id: "key", label: "★ Chiave / Fondamentale" },
+              { id: "optional", label: "Opzionale" },
+            ].map((pr) => {
+              const active = priority === pr.id;
+              return (
+                <button
+                  key={pr.id}
+                  type="button"
+                  onClick={() => setPriority(pr.id as "key" | "normal" | "optional")}
+                  style={{
+                    fontSize: 12,
+                    padding: "5px 10px",
+                    borderRadius: "var(--radius-pill)",
+                    border: active ? "1.5px solid var(--inchiostro)" : "1px solid var(--sabbia-bordo)",
+                    background: active ? "var(--inchiostro)" : "var(--crema)",
+                    color: active ? "var(--crema)" : "var(--inchiostro-70)",
+                    fontWeight: active ? 700 : 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  {pr.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {existing?.short_variant && (
+          <div style={{ marginTop: 12, padding: "8px 10px", background: "rgba(232, 93, 78, 0.08)", borderRadius: 10, display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--corallo-testo)", fontWeight: 600 }}>
+              ⚡ Variante salva-tempo presente ({existing.short_variant.steps?.length ?? 0} step)
+            </span>
+          </div>
+        )}
       </div>
 
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 20 }}>
@@ -643,6 +694,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       {editingStep && (
         <StepEditorModal
           step={editingStep}
+          sport={sport}
           onCancel={() => setEditingStep(null)}
           onSave={(updated) => {
             replaceStep(updated);
@@ -877,11 +929,23 @@ function RepsStepper({ reps, onChange }: { reps: number; onChange: (reps: number
   );
 }
 
-function StepEditorModal({ step, onSave, onCancel }: { step: EditableStep; onSave: (step: EditableStep) => void; onCancel: () => void }) {
+function StepEditorModal({
+  step,
+  sport,
+  onSave,
+  onCancel,
+}: {
+  step: EditableStep;
+  sport: Sport;
+  onSave: (step: EditableStep) => void;
+  onCancel: () => void;
+}) {
+  const isStrength = sport === "calisthenics" || sport === "strength_training";
   const [type, setType] = useState<StepType>(step.type);
-  const [durationType, setDurationType] = useState<Step["duration_type"]>(step.duration_type);
+  const [durationType, setDurationType] = useState<Step["duration_type"]>(step.duration_type || (isStrength ? "time" : "distance"));
   const [durationValue, setDurationValue] = useState(step.duration_value);
-  const [hasPace, setHasPace] = useState(!!step.target_pace);
+  const [note, setNote] = useState(step.note ?? "");
+  const [hasPace, setHasPace] = useState(isStrength ? false : !!step.target_pace);
   // Pace is typed -- and only ever typed -- as minutes per km ("4:40"), the same unit
   // the plan file and every other screen use. It lives in state as the raw text so a
   // half-typed "4:" isn't rounded into something else under the cursor; the seconds/km
@@ -894,7 +958,7 @@ function StepEditorModal({ step, onSave, onCancel }: { step: EditableStep; onSav
    * this editor exists to avoid, and a target on a standing rest means nothing. */
   function changeType(next: StepType) {
     setType(next);
-    if (next === "recovery" && !hasPace) {
+    if (!isStrength && next === "recovery" && !hasPace) {
       setSlowerText(formatPaceMinSec(420));
       setFasterText(formatPaceMinSec(360));
       setHasPace(true);
@@ -919,6 +983,7 @@ function StepEditorModal({ step, onSave, onCancel }: { step: EditableStep; onSav
       type,
       duration_type: durationType,
       duration_value: durationValue,
+      note: note.trim() || null,
       // Stored slower-bound-first whichever field each was typed in, the same
       // normalisation `parse_target_pace` applies to the plan file.
       target_pace:
@@ -960,6 +1025,23 @@ function StepEditorModal({ step, onSave, onCancel }: { step: EditableStep; onSav
         <div style={{ width: 36, height: 4, borderRadius: 100, background: "var(--sabbia-bordo)", margin: "0 auto" }} />
         <p style={{ font: "600 18px var(--font-sans)", margin: 0 }}>Modifica step</p>
 
+        <Field label="Esercizio o nota step (opzionale)">
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={
+              sport === "calisthenics"
+                ? "Es: Trazioni 4x8, Dip, Piegamenti zavorrati..."
+                : sport === "strength_training"
+                  ? "Es: Squat 4x6, Panca piana, Plank..."
+                  : sport === "cycling"
+                    ? "Es: Cadenza 90rpm, Salita 5%..."
+                    : "Es: Ritmo maratona, Salita..."
+            }
+            style={selectStyle}
+          />
+        </Field>
+
         <Field label="Tipo">
           <select value={type} onChange={(e) => changeType(e.target.value as StepType)} style={selectStyle}>
             {STEP_TYPES.map((t) => (
@@ -968,9 +1050,6 @@ function StepEditorModal({ step, onSave, onCancel }: { step: EditableStep; onSav
               </option>
             ))}
           </select>
-          {/* What the chosen type actually does on the watch. Without this the
-              difference between "Recupero" and "Riposo" is invisible until the
-              workout is already running. */}
           <p className="font-serif-italic" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>
             {stepTypeHint(type)}
           </p>
@@ -979,8 +1058,8 @@ function StepEditorModal({ step, onSave, onCancel }: { step: EditableStep; onSav
         <Field label="Durata">
           <div style={{ display: "flex", gap: 8 }}>
             <select value={durationType} onChange={(e) => setDurationType(e.target.value as Step["duration_type"])} style={{ ...selectStyle, flex: 1 }}>
-              <option value="distance">distanza (km)</option>
               <option value="time">tempo (min)</option>
+              {!isStrength && <option value="distance">distanza (km)</option>}
             </select>
             <input
               type="number"
@@ -991,39 +1070,43 @@ function StepEditorModal({ step, onSave, onCancel }: { step: EditableStep; onSav
           </div>
         </Field>
 
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-          <input type="checkbox" checked={hasPace} onChange={(e) => setHasPace(e.target.checked)} />
-          Passo target
-        </label>
-        {hasPace && (
-          <Field label="Passo (min/km, più lento – più veloce)">
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                value={slowerText}
-                onChange={(e) => setSlowerText(e.target.value)}
-                inputMode="numeric"
-                placeholder="5:00"
-                aria-label="Passo più lento, minuti al km"
-                className="font-mono"
-                style={{ ...selectStyle, flex: 1 }}
-              />
-              <span>–</span>
-              <input
-                value={fasterText}
-                onChange={(e) => setFasterText(e.target.value)}
-                inputMode="numeric"
-                placeholder="4:40"
-                aria-label="Passo più veloce, minuti al km"
-                className="font-mono"
-                style={{ ...selectStyle, flex: 1 }}
-              />
-            </div>
-            {paceError && (
-              <p role="alert" style={{ color: "var(--rosso-forte)", fontSize: 12, margin: "6px 0 0" }}>
-                {paceError}
-              </p>
+        {!isStrength && (
+          <>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+              <input type="checkbox" checked={hasPace} onChange={(e) => setHasPace(e.target.checked)} />
+              Passo target
+            </label>
+            {hasPace && (
+              <Field label="Passo (min/km, più lento – più veloce)">
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    value={slowerText}
+                    onChange={(e) => setSlowerText(e.target.value)}
+                    inputMode="numeric"
+                    placeholder="5:00"
+                    aria-label="Passo più lento, minuti al km"
+                    className="font-mono"
+                    style={{ ...selectStyle, flex: 1 }}
+                  />
+                  <span>–</span>
+                  <input
+                    value={fasterText}
+                    onChange={(e) => setFasterText(e.target.value)}
+                    inputMode="numeric"
+                    placeholder="4:40"
+                    aria-label="Passo più veloce, minuti al km"
+                    className="font-mono"
+                    style={{ ...selectStyle, flex: 1 }}
+                  />
+                </div>
+                {paceError && (
+                  <p role="alert" style={{ color: "var(--rosso-forte)", fontSize: 12, margin: "6px 0 0" }}>
+                    {paceError}
+                  </p>
+                )}
+              </Field>
             )}
-          </Field>
+          </>
         )}
 
         <div style={{ display: "flex", gap: 10, marginTop: 6 }}>

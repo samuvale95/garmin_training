@@ -82,7 +82,7 @@ export interface TrainingSession {
   locked?: boolean;
   /** The plan this session belongs to (default: "default"). */
   plan_id?: string;
-  priority?: "key" | "flexible";
+  priority?: "key" | "flexible" | "normal" | "optional" | null;
   min_duration_minutes?: number | null;
   short_variant?: ShortVariant | null;
   is_short_active?: boolean;

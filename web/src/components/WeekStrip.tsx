@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { SlideUp } from "@/components/motion/primitives";
-import { classifySession, sessionDistanceKm, toDateKey, type DisplaySession } from "@/lib/sessionVisuals";
+import { classifySession, sessionDistanceKm, sessionDurationMinutes, toDateKey, type DisplaySession } from "@/lib/sessionVisuals";
 
 interface WeekStripProps {
   currentDateKey: string;
@@ -22,19 +22,23 @@ export function WeekStrip({ currentDateKey, sessions, active = true }: WeekStrip
     const d = new Date(monday);
     d.setDate(d.getDate() + i);
     const key = toDateKey(d);
-    const session = sessions.find((s) => s.date === key) ?? null;
+    const daySessions = sessions.filter((s) => s.date === key);
+    const primarySession = daySessions[0] ?? null;
     const isToday = key === currentDateKey;
-    const km = session ? sessionDistanceKm(session) : 0;
-    const isRest = !session || km === 0;
+    const km = daySessions.reduce((sum, s) => sum + sessionDistanceKm(s), 0);
+    const duration = daySessions.reduce((sum, s) => sum + sessionDurationMinutes(s), 0);
+    const isRest = daySessions.length === 0;
 
     return {
       date: d,
       key,
       weekday: d.toLocaleDateString("it-IT", { weekday: "narrow" }).toUpperCase(),
       dayNum: d.getDate(),
-      session,
+      daySessions,
+      primarySession,
       isToday,
       km,
+      duration,
       isRest,
     };
   });
@@ -69,7 +73,7 @@ export function WeekStrip({ currentDateKey, sessions, active = true }: WeekStrip
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
           {days.map((item) => {
-            const visual = classifySession(item.session);
+            const visual = classifySession(item.primarySession);
             return (
               <Link data-track="week-strip.week-date-item-key"
                 key={item.key}
@@ -97,8 +101,8 @@ export function WeekStrip({ currentDateKey, sessions, active = true }: WeekStrip
                     {item.dayNum}
                   </span>
 
-                  {/* Indicator of session */}
-                  <div style={{ height: 6, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {/* Indicator of session(s) */}
+                  <div style={{ height: 6, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
                     {item.isRest ? (
                       <span
                         style={{
@@ -108,6 +112,21 @@ export function WeekStrip({ currentDateKey, sessions, active = true }: WeekStrip
                           background: item.isToday ? "rgba(255,255,255,0.3)" : "var(--sabbia-chip)",
                         }}
                       />
+                    ) : item.daySessions.length > 1 ? (
+                      item.daySessions.slice(0, 2).map((s, idx) => {
+                        const sVisual = classifySession(s);
+                        return (
+                          <span
+                            key={idx}
+                            style={{
+                              width: 5,
+                              height: 5,
+                              borderRadius: "50%",
+                              background: item.isToday ? "var(--corallo)" : sVisual.background,
+                            }}
+                          />
+                        );
+                      })
                     ) : (
                       <span
                         style={{
@@ -121,7 +140,7 @@ export function WeekStrip({ currentDateKey, sessions, active = true }: WeekStrip
                     )}
                   </div>
 
-                  {/* Km text or dash */}
+                  {/* Km text, duration or dash */}
                   <span
                     className="font-mono"
                     style={{
@@ -135,7 +154,7 @@ export function WeekStrip({ currentDateKey, sessions, active = true }: WeekStrip
                           : "var(--inchiostro-70)",
                     }}
                   >
-                    {item.km > 0 ? `${item.km.toFixed(0)}k` : "—"}
+                    {item.km > 0 ? `${item.km.toFixed(0)}k` : item.duration > 0 ? `${Math.round(item.duration)}'` : "—"}
                   </span>
                 </motion.div>
               </Link>

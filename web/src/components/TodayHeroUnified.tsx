@@ -5,8 +5,9 @@ import { ArrowUpRight, CheckIcon } from "@/components/Icons";
 import { Illustration } from "@/components/Illustration";
 import { TiltCard } from "@/components/motion/TiltCard";
 import { SlideUp, StatusDot } from "@/components/motion/primitives";
-import { capitalize, formatFullDate, relativeDayLabel, stepGroupLine, type StepGroup } from "@/lib/format";
-import { classifySession, type DisplaySession } from "@/lib/sessionVisuals";
+import { formatFullDate, relativeDayLabel, stepGroupLine, type StepGroup } from "@/lib/format";
+import { classifySession, effectiveSteps, effectiveTitle, sessionDurationMinutes, type DisplaySession } from "@/lib/sessionVisuals";
+import { useToggleSessionShort } from "@/lib/queries";
 import type { DayVerdict } from "@/lib/types";
 
 interface TodayHeroUnifiedProps {
@@ -17,6 +18,9 @@ interface TodayHeroUnifiedProps {
   verdict?: DayVerdict | null;
   today: Date;
   animate: boolean;
+  todaySessions?: DisplaySession[];
+  selectedSessionIndex?: number;
+  onSelectSessionIndex?: (idx: number) => void;
 }
 
 const STATE_BADGE: Record<string, { label: string; bg: string; color: string; dot: "active" | "queued" | "in_progress" }> = {
@@ -33,9 +37,17 @@ export function TodayHeroUnified({
   verdict,
   today,
   animate,
+  todaySessions,
+  selectedSessionIndex = 0,
+  onSelectSessionIndex,
 }: TodayHeroUnifiedProps) {
   const isWorkout = !!heroSession;
   const badge = verdict ? STATE_BADGE[verdict.state] ?? null : null;
+  const toggleShort = useToggleSessionShort();
+  const currentTitle = heroSession ? effectiveTitle(heroSession) : "";
+  const isStrength = heroSession?.sport === "calisthenics" || heroSession?.sport === "strength_training";
+  const durationMin = heroSession ? Math.round(sessionDurationMinutes(heroSession)) : 0;
+  const hasMultipleSessions = todaySessions && todaySessions.length > 1;
 
   return (
     <SlideUp active={animate} delayMs={100}>
@@ -60,7 +72,7 @@ export function TodayHeroUnified({
         }}
       >
         {/* Top bar: Subtitle date on left, Readiness/Verdict badge on right */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
           <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: 0, letterSpacing: ".02em" }}>
             {heroSession ? `${relativeDayLabel(heroSession.date, today)} · ${formatFullDate(heroSession.date)}` : "Oggi"}
           </p>
@@ -87,13 +99,66 @@ export function TodayHeroUnified({
           )}
         </div>
 
+        {/* Multi-session picker pills if user has 2+ sessions on today */}
+        {hasMultipleSessions && onSelectSessionIndex && (
+          <div style={{ display: "flex", gap: 6, marginBottom: 12, overflowX: "auto", paddingBottom: 2 }}>
+            {todaySessions.map((s, idx) => {
+              const active = idx === selectedSessionIndex;
+              const sportLabel = s.sport === "cycling" ? "Bici" : s.sport === "calisthenics" ? "Calisthenics" : s.sport === "strength_training" ? "Forza" : "Corsa";
+              return (
+                <button
+                  key={`${s.date}-${idx}`}
+                  type="button"
+                  onClick={() => onSelectSessionIndex(idx)}
+                  className="press-soft"
+                  style={{
+                    fontSize: 11.5,
+                    padding: "3px 9px",
+                    borderRadius: "var(--radius-pill)",
+                    border: active ? "1.5px solid var(--inchiostro)" : "1px solid var(--sabbia-bordo)",
+                    background: active ? "var(--inchiostro)" : "var(--sabbia-chip)",
+                    color: active ? "var(--crema)" : "var(--inchiostro-70)",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Seduta {idx + 1}: {sportLabel}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Center: Title + Workout Steps vs Illustration */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             {heroSession ? (
               <>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: ".06em",
+                      background: "var(--sabbia-chip)",
+                      color: "var(--inchiostro-70)",
+                      padding: "2px 7px",
+                      borderRadius: "var(--radius-pill)",
+                    }}
+                  >
+                    {heroSession.sport === "cycling" ? "Bici" : heroSession.sport === "calisthenics" ? "Calisthenics" : heroSession.sport === "strength_training" ? "Forza" : "Corsa"}
+                  </span>
+                  {durationMin > 0 && (
+                    <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
+                      ~{durationMin} min
+                    </span>
+                  )}
+                </div>
+
                 <h2 style={{ font: "600 23px/1.16 var(--font-sans)", letterSpacing: "-.025em", margin: "0 0 6px", color: "var(--inchiostro)" }}>
-                  {heroSession.title}
+                  {currentTitle}
                 </h2>
                 {heroMainGroup && (
                   <p className="font-mono" style={{ fontSize: 13, color: "var(--inchiostro-70)", margin: 0, lineHeight: 1.35 }}>
@@ -101,10 +166,46 @@ export function TodayHeroUnified({
                   </p>
                 )}
                 {heroSession.short_variant && (
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, background: heroSession.is_short_active ? "rgba(232, 93, 78, 0.15)" : "var(--sabbia)", padding: "2px 8px", borderRadius: "var(--radius-pill)" }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: heroSession.is_short_active ? "var(--corallo-testo)" : "var(--inchiostro-70)" }}>
-                      {heroSession.is_short_active ? "⚡ Variante salva-tempo attiva" : "⚡ Poco tempo? Disponibile variante corta"}
-                    </span>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                        background: heroSession.is_short_active ? "rgba(232, 93, 78, 0.15)" : "var(--sabbia)",
+                        padding: "3px 8px",
+                        borderRadius: "var(--radius-pill)",
+                      }}
+                    >
+                      <span style={{ fontSize: 11, fontWeight: 700, color: heroSession.is_short_active ? "var(--corallo-testo)" : "var(--inchiostro-70)" }}>
+                        {heroSession.is_short_active ? "⚡ Salva-tempo attiva" : "⚡ Poco tempo? Disponibile variante corta"}
+                      </span>
+                    </div>
+
+                    {'id' in heroSession && typeof (heroSession as { id?: string }).id === "string" && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const sid = (heroSession as { id?: string }).id;
+                          if (sid) toggleShort(sid);
+                        }}
+                        className="press-soft"
+                        style={{
+                          background: heroSession.is_short_active ? "var(--corallo)" : "var(--inchiostro)",
+                          color: heroSession.is_short_active ? "var(--corallo-testo)" : "var(--crema)",
+                          border: "none",
+                          borderRadius: "var(--radius-pill)",
+                          padding: "2px 8px",
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {heroSession.is_short_active ? "Torna normale" : "Attiva subito"}
+                      </button>
+                    )}
                   </div>
                 )}
                 {heroMatch?.matched && heroMatch.distance_km != null && (
@@ -124,7 +225,7 @@ export function TodayHeroUnified({
                   Giorno di riposo
                 </h2>
                 <p style={{ fontSize: 13.5, color: "var(--inchiostro-70)", margin: 0, lineHeight: 1.4 }}>
-                  Nessuna corsa in programma. Il corpo assorbe il carico e rigenera le fibre.
+                  Nessun allenamento in programma. Il corpo assorbe il carico e rigenera le fibre.
                 </p>
               </div>
             )}

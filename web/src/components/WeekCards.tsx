@@ -8,7 +8,7 @@ import { SlideUp } from "@/components/motion/primitives";
 import { CheckIcon, LightningIcon } from "@/components/Icons";
 import { useMotionEnabled } from "@/lib/motion";
 import { sessionDetailLine } from "@/lib/format";
-import { classifySession, sessionDistanceKm, type DisplaySession } from "@/lib/sessionVisuals";
+import { classifySession, effectiveTitle, sessionDistanceKm, sessionDurationMinutes, type DisplaySession } from "@/lib/sessionVisuals";
 import type { ScheduledWorkout } from "@/lib/types";
 
 export interface DayCardData {
@@ -220,7 +220,7 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
         justifyContent: "center",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
         {emphasis && (
           <span
             className="font-mono"
@@ -230,6 +230,50 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
           </span>
         )}
         <span className="session-kind" style={{ background: visual.background, color: visual.foreground }}>{visual.label}</span>
+        {card.session.priority === "key" && (
+          <span
+            className="font-mono"
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              background: "rgba(245, 158, 11, 0.15)",
+              color: "var(--giallo-testo)",
+              borderRadius: "var(--radius-pill)",
+              padding: "2px 7px",
+            }}
+          >
+            ★ Chiave
+          </span>
+        )}
+        {card.session.is_short_active ? (
+          <span
+            className="font-mono"
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              background: "rgba(232, 93, 78, 0.15)",
+              color: "var(--corallo-testo)",
+              borderRadius: "var(--radius-pill)",
+              padding: "2px 7px",
+            }}
+          >
+            ⚡ Ridotta
+          </span>
+        ) : card.session.short_variant ? (
+          <span
+            className="font-mono"
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              background: "var(--sabbia-chip)",
+              color: "var(--inchiostro-50)",
+              borderRadius: "var(--radius-pill)",
+              padding: "2px 7px",
+            }}
+          >
+            ⚡ Opzione 30&apos;
+          </span>
+        ) : null}
         {isHeavy && (
           <span
             className="font-mono"
@@ -251,15 +295,21 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
           </span>
         )}
       </div>
-      <p style={{ fontSize: 14.5, fontWeight: 600, margin: "2px 0 0", paddingRight: 56, letterSpacing: "-.01em" }}>{card.session.title}</p>
+      <p style={{ fontSize: 14.5, fontWeight: 600, margin: "2px 0 0", paddingRight: 56, letterSpacing: "-.01em" }}>
+        {effectiveTitle(card.session)}
+      </p>
       <p className="font-serif-italic" style={{ fontSize: 12.5, margin: "2px 0 0", color: "var(--inchiostro-70)", paddingRight: 56 }}>
         {detail}
       </p>
-      {matchKm != null && (
+      {matchKm != null ? (
         <p className="font-mono" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, margin: "3px 0 0", color: "var(--verde-tratto-scuro)", fontWeight: 600, paddingRight: 56 }}>
           <CheckIcon size={12} strokeWidth={2.8} /> svolto {matchKm.toFixed(1)} km
         </p>
-      )}
+      ) : km === 0 && (card.session.sport === "calisthenics" || card.session.sport === "strength_training") ? (
+        <p className="font-mono" style={{ fontSize: 11, margin: "3px 0 0", color: "var(--inchiostro-50)" }}>
+          ~{Math.round(sessionDurationMinutes(card.session))} min stimati
+        </p>
+      ) : null}
       {visual.illustration && <Illustration name={visual.illustration} width={48} height={54} breathe={false} active={animate} delayMs={200 + delayMs} />}
     </SlideUp>
   );

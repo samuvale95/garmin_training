@@ -16,6 +16,7 @@ import { PullToRefresh } from "@/components/PullToRefresh";
 import { useCalendarAccess } from "@/lib/guards";
 import {
   useActivities,
+  useDeletePlanById,
   usePlanListQuery,
   usePrefetchWeeks,
   usePrefetchWorkoutSession,
@@ -622,46 +623,136 @@ function NavButton({ label, onClick, children }: { label: string; onClick: () =>
 function PlanSelectorBar() {
   const { data: planList } = usePlanListQuery();
   const toggleActive = useTogglePlanActive();
+  const deletePlan = useDeletePlanById();
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  if (!planList || planList.plans.length <= 1) return null;
+  if (!planList || planList.plans.length === 0) return null;
 
   return (
-    <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--crema-card)", borderRadius: "var(--radius-card)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--inchiostro-50)" }}>
-          Piani attivi ({planList.active_plan_ids.length} di {planList.plans.length})
+    <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", borderRadius: "var(--radius-card)", boxShadow: "var(--shadow-airbnb-subtle)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--inchiostro-50)" }}>
+          {planList.plans.length === 1 ? "Piano attivo" : `Piani allenamento (${planList.active_plan_ids.length} di ${planList.plans.length} attivi)`}
         </span>
-        <Link href="/import" style={{ fontSize: 11.5, color: "var(--azzurro-testo)", textDecoration: "none", fontWeight: 600 }}>
-          + Nuovo / Unisci
+        <Link href="/import" style={{ fontSize: 11.5, color: "var(--corallo)", textDecoration: "none", fontWeight: 700 }}>
+          + Aggiungi / Unisci
         </Link>
       </div>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
         {planList.plans.map((p) => {
           const isActive = p.is_active;
+          const isDeleting = confirmDeleteId === p.id;
+
+          if (isDeleting) {
+            return (
+              <div
+                key={p.id}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px 8px",
+                  borderRadius: "var(--radius-pill)",
+                  background: "var(--rosa-avviso)",
+                  border: "1px solid var(--rosso-forte)",
+                }}
+              >
+                <span style={{ fontSize: 11.5, color: "var(--rosso-forte)", fontWeight: 600 }}>Eliminare {p.name}?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    deletePlan.mutate(p.id);
+                    setConfirmDeleteId(null);
+                  }}
+                  style={{
+                    background: "var(--rosso-forte)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "var(--radius-pill)",
+                    padding: "2px 8px",
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Sì
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteId(null)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--inchiostro-50)",
+                    fontSize: 10.5,
+                    cursor: "pointer",
+                  }}
+                >
+                  No
+                </button>
+              </div>
+            );
+          }
+
           return (
-            <button
+            <div
               key={p.id}
-              type="button"
-              onClick={() => toggleActive.mutate({ planId: p.id, isActive: !isActive })}
               style={{
-                fontSize: 12,
-                padding: "4px 10px",
-                borderRadius: "var(--radius-pill)",
-                border: isActive ? "1.5px solid var(--inchiostro)" : "1px dashed var(--sabbia-chip)",
-                background: isActive ? "var(--sabbia-chip)" : "transparent",
-                color: isActive ? "var(--inchiostro)" : "var(--inchiostro-50)",
-                cursor: "pointer",
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 5,
+                borderRadius: "var(--radius-pill)",
+                border: isActive ? "1.5px solid var(--inchiostro)" : "1px dashed var(--sabbia-bordo)",
+                background: isActive ? "var(--sabbia-chip)" : "transparent",
+                color: isActive ? "var(--inchiostro)" : "var(--inchiostro-50)",
+                padding: "2px 4px 2px 8px",
+                gap: 4,
               }}
             >
-              <span style={{ fontWeight: 700 }}>{isActive ? "●" : "○"}</span>
-              <span>{p.name}</span>
-              <span className="font-mono" style={{ fontSize: 10.5, color: "var(--inchiostro-50)" }}>
-                ({p.sports.join(", ")})
-              </span>
-            </button>
+              <button
+                type="button"
+                onClick={() => toggleActive.mutate({ planId: p.id, isActive: !isActive })}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "inherit",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 0",
+                }}
+              >
+                <span style={{ fontWeight: 700, color: isActive ? "var(--verde-tratto-scuro)" : "var(--inchiostro-35)" }}>
+                  {isActive ? "●" : "○"}
+                </span>
+                <span style={{ fontWeight: 600 }}>{p.name}</span>
+                <span className="font-mono" style={{ fontSize: 10.5, opacity: 0.7 }}>
+                  ({p.sports.join(", ")})
+                </span>
+              </button>
+
+              {planList.plans.length > 1 && (
+                <button
+                  type="button"
+                  title={`Elimina piano ${p.name}`}
+                  onClick={() => setConfirmDeleteId(p.id)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "var(--inchiostro-35)",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    lineHeight: 1,
+                    padding: "2px 4px",
+                    borderRadius: "50%",
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
           );
         })}
       </div>

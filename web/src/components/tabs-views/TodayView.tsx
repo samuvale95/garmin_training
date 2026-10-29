@@ -49,7 +49,7 @@ import { SkeletonTodayHero } from "@/components/skeletons";
 import { usePassoStore } from "@/lib/store";
 import { useTrainingSlot } from "@/lib/trainingHabits";
 import { EVENING_MINUTES, useDayFocus } from "@/lib/dayFocus";
-import { classifySession, sessionDistanceKm, shiftDateKey, toDateKey, weekBounds, workoutsToSessions, type DisplaySession } from "@/lib/sessionVisuals";
+import { classifySession, effectiveDescription, effectiveSteps, effectiveTitle, sessionDistanceKm, sessionDurationMinutes, shiftDateKey, toDateKey, weekBounds, workoutsToSessions, type DisplaySession } from "@/lib/sessionVisuals";
 import { capitalize, formatFullDate, groupSteps, numberToItalianWords, relativeDayLabel, stepGroupLine } from "@/lib/format";
 import { useScreenReady } from "@/lib/useScreenReady";
 
@@ -186,8 +186,10 @@ export function TodayView() {
   }
 
   const sessions: DisplaySession[] = access.plan ? access.plan.sessions : workoutsQuery.data?.workouts ?? [];
+  const [selectedTodaySessionIdx, setSelectedTodaySessionIdx] = useState(0);
 
-  const todaySession = sessions.find((s) => s.date === todayKey) ?? null;
+  const todaySessions = sessions.filter((s) => s.date === todayKey);
+  const todaySession = todaySessions[selectedTodaySessionIdx] ?? todaySessions[0] ?? null;
   const weekSessions = sessions.filter((s) => s.date >= toDateKey(start) && s.date <= toDateKey(end));
   const weekKm = weekSessions.reduce((sum, s) => sum + sessionDistanceKm(s), 0);
 
@@ -205,7 +207,8 @@ export function TodayView() {
   const evening = nowMinutes != null && nowMinutes >= EVENING_MINUTES;
   const lookAhead = focus === "domani" || (focus === "recupero" && evening);
   const heroSession = lookAhead ? nextSession ?? todaySession : todaySession ?? nextSession;
-  const heroGroups = heroSession?.steps ? groupSteps(heroSession.steps).filter((g) => g.kind === "interval" || g.kind === "warmup" || g.kind === "cooldown") : [];
+  const heroSteps = heroSession ? effectiveSteps(heroSession) : [];
+  const heroGroups = heroSteps.length > 0 ? groupSteps(heroSteps).filter((g) => g.kind === "interval" || g.kind === "warmup" || g.kind === "cooldown") : [];
   const heroMainGroup = heroGroups.find((g) => g.kind === "interval") ?? heroGroups[0] ?? null;
 
   const heroMatch = heroSession ? stravaMatches.data?.matches[heroSession.date] : undefined;
@@ -317,14 +320,17 @@ export function TodayView() {
 
         {/* 1. HERO ALLENAMENTO + BADGE PRONTEZZA UNIFICATI */}
         <TodayHeroUnified
-        heroSession={heroSession}
-        heroMainGroup={heroMainGroup}
-        heroMatch={heroMatch}
-        heroHref={heroHref}
-        verdict={heroSession?.date === todayKey || !todaySession ? verdictQuery.data : null}
-        today={today}
-        animate={animate}
-      />
+          heroSession={heroSession}
+          heroMainGroup={heroMainGroup}
+          heroMatch={heroMatch}
+          heroHref={heroHref}
+          verdict={heroSession?.date === todayKey || !todaySession ? verdictQuery.data : null}
+          today={today}
+          animate={animate}
+          todaySessions={todaySessions}
+          selectedSessionIndex={selectedTodaySessionIdx}
+          onSelectSessionIndex={setSelectedTodaySessionIdx}
+        />
 
       {/* 1b. COSA MANGIARE ADESSO, quando è urgente */}
       {mealUrgent && nowMealCard}
@@ -487,7 +493,10 @@ export function TodayView() {
         {restOfWeek.map((session, i) => {
           const visual = classifySession(session);
           const km = sessionDistanceKm(session);
+          const duration = sessionDurationMinutes(session);
           const match = stravaMatches.data?.matches[session.date];
+          const isDurationBased = km === 0 && duration > 0;
+
           return (
             <SlideUp
               key={`${session.date}-${i}`}
@@ -510,18 +519,31 @@ export function TodayView() {
                 <span style={{ font: "500 11px var(--font-sans)", color: "var(--inchiostro-35)", width: 34, flex: "none" }}>
                   {new Date(session.date).toLocaleDateString("it-IT", { weekday: "short" })}
                 </span>
-                <span style={{ font: "500 13.5px var(--font-sans)", flex: 1 }}>{session.title}</span>
+                <span style={{ font: "500 13.5px var(--font-sans)", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {effectiveTitle(session)}
+                </span>
                 {match?.matched && match.distance_km != null ? (
                   <span className="font-mono" style={{ fontSize: 11, color: "var(--verde-tratto-scuro)", width: 60, textAlign: "right", flex: "none" }}>
                     svolto {match.distance_km.toFixed(0)}
                   </span>
-                ) : km > 0 && (
-                  <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", width: 38, textAlign: "right", flex: "none" }}>
+                ) : km > 0 ? (
+                  <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", width: 44, textAlign: "right", flex: "none" }}>
                     {km.toFixed(0)} km
                   </span>
-                )}
+                ) : isDurationBased ? (
+                  <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", width: 44, textAlign: "right", flex: "none" }}>
+                    {Math.round(duration)}&apos;
+                  </span>
+                ) : null}
                 <div style={{ width: 70, height: 4, flex: "none" }}>
-                  <BarGrow value={Math.min(1, km / 20)} height={4} color={visual.background} trackColor="var(--sabbia-chip)" active={animate} delayMs={250 + i * 30} />
+                  <BarGrow
+                    value={km > 0 ? Math.min(1, km / 20) : isDurationBased ? Math.min(1, duration / 60) : 0}
+                    height={4}
+                    color={visual.background}
+                    trackColor="var(--sabbia-chip)"
+                    active={animate}
+                    delayMs={250 + i * 30}
+                  />
                 </div>
               </motion.div>
             </SlideUp>
