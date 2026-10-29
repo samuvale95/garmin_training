@@ -26,6 +26,14 @@ const pill = (primary: boolean): React.CSSProperties => ({
   cursor: "pointer",
 });
 
+const AVAILABLE_SPORTS = [
+  { id: "running", label: "Corsa" },
+  { id: "cycling", label: "Bici" },
+  { id: "calisthenics", label: "Calisthenics (Parco)" },
+  { id: "strength_training", label: "Potenziamento / Forza" },
+  { id: "swimming", label: "Nuoto" },
+];
+
 /** "Genera le prossime settimane" on Settimana: the server writes the window inside the
  * code's limits (see `training_plan/plan_generator.py`), sessions edited by hand stay.
  * Its state lives in the mutation cache (`useGenerationState`), not here. */
@@ -33,6 +41,19 @@ export function PlanGenerateCard({ animate, delayMs = 0 }: { animate: boolean; d
   const generate = useGeneratePlan();
   const generation = useGenerationState();
   const [confirming, setConfirming] = useState(false);
+  const [mode, setMode] = useState<"rebuild" | "augment" | "adapt_current">("rebuild");
+  const [sports, setSports] = useState<string[]>(["running"]);
+  const [userPrompt, setUserPrompt] = useState("");
+
+  const toggleSport = (sportId: string) => {
+    if (sports.includes(sportId)) {
+      if (sports.length > 1) {
+        setSports(sports.filter((s) => s !== sportId));
+      }
+    } else {
+      setSports([...sports, sportId]);
+    }
+  };
 
   if (generation.status === "pending") {
     return (
@@ -74,21 +95,122 @@ export function PlanGenerateCard({ animate, delayMs = 0 }: { animate: boolean; d
     const { start, end } = generationWindow();
     return (
       <div style={card}>
-        <p style={{ fontSize: 14, margin: 0, lineHeight: 1.45 }}>
-          Scrivo le sedute da {formatFullDate(start)} a {formatFullDate(end)}, dentro i limiti del tuo livello. Sostituisce
-          le sedute di quei giorni; quelle che hai modificato a mano restano come sono.
+        <p style={{ fontSize: 14, margin: 0, fontWeight: 600, lineHeight: 1.45 }}>
+          Genera o adatta allenamenti con AI ({formatFullDate(start)} – {formatFullDate(end)})
         </p>
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <button data-track="plan-generate-card.button"
+        <p style={{ fontSize: 12.5, color: "var(--inchiostro-70)", margin: "4px 0 12px", lineHeight: 1.4 }}>
+          L&apos;AI calcolerà le sedute rispettando la cronologia reale dei tuoi carichi e il piano attivo.
+        </p>
+
+        {/* Modalità */}
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro-70)", display: "block", marginBottom: 6 }}>
+            Modalità di generazione
+          </label>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {[
+              { id: "rebuild", label: "Ricostruisci finestra" },
+              { id: "augment", label: "Integra sport / cross-training" },
+              { id: "adapt_current", label: "Adatta al carico attuale" },
+            ].map((m) => {
+              const active = mode === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setMode(m.id as "rebuild" | "augment" | "adapt_current")}
+                  style={{
+                    fontSize: 12,
+                    padding: "5px 10px",
+                    borderRadius: "var(--radius-pill)",
+                    border: active ? "1.5px solid var(--inchiostro)" : "1px solid var(--sabbia-chip)",
+                    background: active ? "var(--inchiostro)" : "var(--crema)",
+                    color: active ? "var(--crema)" : "var(--inchiostro)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Sport coinvolti */}
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro-70)", display: "block", marginBottom: 6 }}>
+            Discipline coinvolte
+          </label>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {AVAILABLE_SPORTS.map((sp) => {
+              const active = sports.includes(sp.id);
+              return (
+                <button
+                  key={sp.id}
+                  type="button"
+                  onClick={() => toggleSport(sp.id)}
+                  style={{
+                    fontSize: 12,
+                    padding: "4px 10px",
+                    borderRadius: "var(--radius-pill)",
+                    border: active ? "1px solid var(--inchiostro)" : "1px dashed var(--sabbia-chip)",
+                    background: active ? "var(--sabbia-chip)" : "transparent",
+                    color: "var(--inchiostro)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <span>{active ? "✓" : "+"}</span>
+                  {sp.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Note / Preferenze utente */}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro-70)", display: "block", marginBottom: 6 }}>
+            Istruzioni o preferenze specifiche (opzionale)
+          </label>
+          <textarea
+            value={userPrompt}
+            onChange={(e) => setUserPrompt(e.target.value)}
+            placeholder="Es: vorrei fare nuoto leggero mercoledì e palestra il venerdì; mantieni la corsa lunga la domenica."
+            rows={2}
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "1px solid var(--sabbia-chip)",
+              background: "var(--crema)",
+              fontSize: 12.5,
+              color: "var(--inchiostro)",
+              resize: "vertical",
+              fontFamily: "inherit",
+            }}
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            data-track="plan-generate-card.button"
             type="button"
             className="press-soft"
             style={pill(true)}
             onClick={() => {
               setConfirming(false);
-              generate.mutate(false);
+              generate.mutate({
+                mode,
+                sports,
+                userPrompt: userPrompt.trim() || null,
+              });
             }}
           >
-            Genera
+            Genera con AI
           </button>
           <button data-track="plan-generate-card.setconfirming" type="button" className="press-soft" style={pill(false)} onClick={() => setConfirming(false)}>
             Annulla
@@ -101,10 +223,10 @@ export function PlanGenerateCard({ animate, delayMs = 0 }: { animate: boolean; d
   return (
     <SlideUp active={animate} delayMs={delayMs} style={{ ...card, display: "flex", alignItems: "center", gap: 10 }}>
       <p className="font-serif-italic" style={{ fontSize: 14, margin: 0, flex: 1 }}>
-        Fatti scrivere le prossime settimane dai tuoi dati.
+        Genera o adatta allenamenti con l&apos;AI su più sport e in base ai tuoi carichi.
       </p>
       <button data-track="plan-generate-card.setconfirming-2" type="button" className="press-soft" style={pill(true)} onClick={() => setConfirming(true)}>
-        Genera
+        Genera con AI
       </button>
     </SlideUp>
   );

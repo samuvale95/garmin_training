@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date as date_type
 
-SUPPORTED_SPORTS = ("running", "cycling", "swimming", "strength_training", "other")
+SUPPORTED_SPORTS = ("running", "cycling", "swimming", "strength_training", "calisthenics", "other")
 SUPPORTED_STEP_TYPES = ("warmup", "interval", "recovery", "rest", "cooldown")
 SUPPORTED_DURATION_TYPES = ("time", "distance")
 
@@ -18,6 +18,7 @@ SPORT_TYPE_PAYLOAD = {
     "cycling": {"sportTypeId": 2, "sportTypeKey": "cycling", "displayOrder": 2},
     "swimming": {"sportTypeId": 3, "sportTypeKey": "swimming", "displayOrder": 3},
     "strength_training": {"sportTypeId": 6, "sportTypeKey": "fitness_equipment", "displayOrder": 6},
+    "calisthenics": {"sportTypeId": 6, "sportTypeKey": "fitness_equipment", "displayOrder": 6},
     "other": {"sportTypeId": 8, "sportTypeKey": "other", "displayOrder": 8},
 }
 
@@ -34,6 +35,8 @@ _GARMIN_SPORT_STEMS = (
     ("cycl", "cycling"),
     ("bik", "cycling"),
     ("ride", "cycling"),
+    ("calisthenic", "calisthenics"),
+    ("street_workout", "calisthenics"),
     ("strength", "strength_training"),
     ("fitness_equipment", "strength_training"),
 )
@@ -139,6 +142,7 @@ class Step:
     duration_type: str
     duration_value: float  # minutes for "time", kilometers for "distance"
     target_pace: PaceTarget | None = None
+    note: str | None = None
 
 
 @dataclass
@@ -164,6 +168,13 @@ class RepeatBlock:
 SessionStep = Step | RepeatBlock
 
 
+@dataclass
+class ShortVariant:
+    title: str
+    description: str | None = None
+    steps: list[SessionStep] = field(default_factory=list)
+
+
 def flatten_steps(steps: list[SessionStep]) -> list[Step]:
     """Every step in execution order, with repeat blocks expanded out.
 
@@ -185,6 +196,7 @@ def flatten_steps(steps: list[SessionStep]) -> list[Step]:
 # none either -- 6:00/km, an unhurried running pace. Mirrors DEFAULT_EASY_PACE_SEC_PER_KM
 # in format.ts; the two must agree or the same session gets two different planned totals.
 DEFAULT_EASY_PACE_SEC_PER_KM = 360.0
+DEFAULT_CYCLING_SPEED_KMH = 25.0
 
 
 def avg_pace_sec_per_km(target: PaceTarget) -> float:
@@ -243,12 +255,34 @@ class TrainingSession:
     title: str
     description: str | None = None
     steps: list[SessionStep] = field(default_factory=list)
+    priority: str = "flexible"
+    min_duration_minutes: float | None = None
+    short_variant: ShortVariant | None = None
+    is_short_active: bool = False
+
+    @property
+    def effective_steps(self) -> list[SessionStep]:
+        if self.is_short_active and self.short_variant and self.short_variant.steps:
+            return self.short_variant.steps
+        return self.steps
+
+    @property
+    def effective_title(self) -> str:
+        if self.is_short_active and self.short_variant and self.short_variant.title:
+            return self.short_variant.title
+        return self.title
+
+    @property
+    def effective_description(self) -> str | None:
+        if self.is_short_active and self.short_variant and self.short_variant.description:
+            return self.short_variant.description
+        return self.description
 
 
 def session_duration_minutes(session: TrainingSession) -> float:
     """Total minutes the session asks for, repeat blocks expanded and distance steps
     converted at their own (or the session's slowest named) pace."""
-    steps = flatten_steps(session.steps)
+    steps = flatten_steps(session.effective_steps)
     fallback = session_fallback_pace(steps)
     return sum(step_duration_minutes(step, fallback) for step in steps)
 
@@ -262,7 +296,17 @@ def session_distance_km(session: TrainingSession) -> float:
     has to be able to spot. Callers that add these up are expected to say how many of
     the sessions they counted had no detail at all.
     """
-    steps = flatten_steps(session.steps)
+    steps = flatten_steps(session.effective_steps)
+    if session.sport in ("strength_training", "calisthenics"):
+        return 0.0
+    if session.sport == "cycling":
+        total = 0.0
+        for step in steps:
+            if step.duration_type == "distance":
+                total += step.duration_value
+            elif step.type != "rest":
+                total += (step.duration_value * DEFAULT_CYCLING_SPEED_KMH) / 60.0
+        return total
     fallback = session_fallback_pace(steps)
     return sum(step_distance_km(step, fallback) for step in steps)
 

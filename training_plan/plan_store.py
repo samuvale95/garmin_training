@@ -45,11 +45,18 @@ CREATE TABLE IF NOT EXISTS plan_session (
     steps        JSONB NOT NULL,
     origin       TEXT NOT NULL,
     locked       BOOLEAN NOT NULL DEFAULT FALSE,
+    plan_id      TEXT NOT NULL DEFAULT 'default',
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, id)
 );
 CREATE INDEX IF NOT EXISTS plan_session_day_idx ON plan_session (user_id, date, position);
+ALTER TABLE plan_session ADD COLUMN IF NOT EXISTS plan_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE plan_session ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'flexible';
+ALTER TABLE plan_session ADD COLUMN IF NOT EXISTS min_duration_minutes REAL DEFAULT NULL;
+ALTER TABLE plan_session ADD COLUMN IF NOT EXISTS short_variant JSONB DEFAULT NULL;
+ALTER TABLE plan_session ADD COLUMN IF NOT EXISTS is_short_active BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE INDEX IF NOT EXISTS plan_session_plan_idx ON plan_session (user_id, plan_id);
 
 ALTER TABLE user_plan ADD COLUMN IF NOT EXISTS sessions_migrated BOOLEAN NOT NULL DEFAULT FALSE;
 """
@@ -73,7 +80,10 @@ FROM user_plan, jsonb_array_elements(user_plan.sessions) WITH ORDINALITY AS t(el
 WHERE user_plan.user_id = %(user_id)s
 """
 
-_COLUMNS = "id, date, position, sport, title, description, steps, origin, locked"
+_COLUMNS = (
+    "id, date, position, sport, title, description, steps, origin, locked, plan_id, "
+    "priority, min_duration_minutes, short_variant, is_short_active"
+)
 
 
 class SessionNotFound(Exception):
@@ -122,15 +132,35 @@ def _out(row: dict) -> dict:
         "steps": row["steps"],
         "origin": row["origin"],
         "locked": row["locked"],
+        "plan_id": row.get("plan_id") or "default",
+        "priority": row.get("priority") or "flexible",
+        "min_duration_minutes": row.get("min_duration_minutes"),
+        "short_variant": row.get("short_variant"),
+        "is_short_active": bool(row.get("is_short_active", False)),
     }
 
 
-def list_sessions(user_id: str) -> list[dict]:
+def list_sessions(user_id: str, plan_id: str | None = None, only_active: bool = False) -> list[dict]:
     with db.connect() as conn, conn.cursor(row_factory=dict_row) as cur:
-        cur.execute(
-            f"SELECT {_COLUMNS} FROM plan_session WHERE user_id = %s ORDER BY date, position, created_at",
-            [user_id],
-        )
+        if plan_id is not None:
+            cur.execute(
+                f"SELECT {_COLUMNS} FROM plan_session WHERE user_id = %s AND plan_id = %s ORDER BY date, position, created_at",
+                [user_id, plan_id],
+            )
+        elif only_active:
+            cur.execute(
+                f"""SELECT ps.id, ps.date, ps.position, ps.sport, ps.title, ps.description, ps.steps, ps.origin, ps.locked, ps.plan_id
+                    FROM plan_session ps
+                    JOIN user_training_plan utp ON utp.user_id = ps.user_id AND utp.id = ps.plan_id
+                    WHERE ps.user_id = %s AND utp.is_active = TRUE
+                    ORDER BY ps.date, ps.position, ps.created_at""",
+                [user_id],
+            )
+        else:
+            cur.execute(
+                f"SELECT {_COLUMNS} FROM plan_session WHERE user_id = %s ORDER BY date, position, created_at",
+                [user_id],
+            )
         return [_out(row) for row in cur.fetchall()]
 
 
@@ -142,13 +172,14 @@ def _next_position(cur, user_id: str, day: str) -> int:
     return cur.fetchone()["next"]
 
 
-def create_session(user_id: str, session: dict, *, origin: Origin) -> dict:
+def create_session(user_id: str, session: dict, *, origin: Origin, plan_id: str | None = None) -> dict:
     """User-created (`manual`) sessions are locked from the start: the user made them."""
+    actual_plan_id = plan_id or session.get("plan_id") or "default"
     with db.connect() as conn, conn.cursor(row_factory=dict_row) as cur:
         position = _next_position(cur, user_id, session["date"])
         cur.execute(
-            f"""INSERT INTO plan_session (user_id, id, date, position, sport, title, description, steps, origin, locked)
-                VALUES (%s, coalesce(%s::uuid, gen_random_uuid()), %s, %s, %s, %s, %s, %s, %s, %s)
+            f"""INSERT INTO plan_session (user_id, id, date, position, sport, title, description, steps, origin, locked, plan_id, priority, min_duration_minutes, short_variant, is_short_active)
+                VALUES (%s, coalesce(%s::uuid, gen_random_uuid()), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING {_COLUMNS}""",
             [
                 user_id,
@@ -161,12 +192,28 @@ def create_session(user_id: str, session: dict, *, origin: Origin) -> dict:
                 Jsonb(session.get("steps") or []),
                 origin,
                 origin == "manual",
+                actual_plan_id,
+                session.get("priority") or "flexible",
+                session.get("min_duration_minutes"),
+                Jsonb(session.get("short_variant")) if session.get("short_variant") else None,
+                bool(session.get("is_short_active", False)),
             ],
         )
         return _out(cur.fetchone())
 
 
-_EDITABLE = ("date", "sport", "title", "description", "steps")
+_EDITABLE = (
+    "date",
+    "sport",
+    "title",
+    "description",
+    "steps",
+    "plan_id",
+    "priority",
+    "min_duration_minutes",
+    "short_variant",
+    "is_short_active",
+)
 
 
 def update_session(user_id: str, session_id: str, changes: dict, *, by_user: bool) -> dict:
@@ -191,7 +238,10 @@ def update_session(user_id: str, session_id: str, changes: dict, *, by_user: boo
         for key in _EDITABLE:
             if key in changes:
                 assignments.append(f"{key} = %s")
-                values.append(Jsonb(changes[key] or []) if key == "steps" else changes[key])
+                if key in ("steps", "short_variant"):
+                    values.append(Jsonb(changes[key]) if changes[key] is not None else None)
+                else:
+                    values.append(changes[key])
         if "date" in changes:
             assignments.append("position = %s")
             values.append(_next_position(cur, user_id, changes["date"]))
@@ -253,6 +303,7 @@ def replace_unlocked(
     *,
     origin: Origin = "ai",
     expected: tuple[date_type, date_type, dict[str, str]] | None = None,
+    plan_id: str = "default",
 ) -> ReplaceResult:
     """The one path for non-user writers: swap the unlocked sessions of `[start, end]`.
 
@@ -273,13 +324,13 @@ def replace_unlocked(
                 raise PlanChanged(user_id)
         cur.execute(
             "SELECT date, sport FROM plan_session "
-            "WHERE user_id = %s AND date BETWEEN %s AND %s AND locked FOR UPDATE",
-            [user_id, start, end],
+            "WHERE user_id = %s AND plan_id = %s AND date BETWEEN %s AND %s AND locked FOR UPDATE",
+            [user_id, plan_id, start, end],
         )
         claimed = {(row["date"].isoformat(), row["sport"]) for row in cur.fetchall()}
         cur.execute(
-            "DELETE FROM plan_session WHERE user_id = %s AND date BETWEEN %s AND %s AND NOT locked",
-            [user_id, start, end],
+            "DELETE FROM plan_session WHERE user_id = %s AND plan_id = %s AND date BETWEEN %s AND %s AND NOT locked",
+            [user_id, plan_id, start, end],
         )
         for session in sessions:
             day = session["date"]
@@ -288,9 +339,10 @@ def replace_unlocked(
             if (day, session["sport"]) in claimed:
                 result.conflicts.append(session)
                 continue
+            sess_plan_id = session.get("plan_id") or plan_id
             cur.execute(
-                f"""INSERT INTO plan_session (user_id, date, position, sport, title, description, steps, origin, locked)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, FALSE) RETURNING {_COLUMNS}""",
+                f"""INSERT INTO plan_session (user_id, date, position, sport, title, description, steps, origin, locked, plan_id, priority, min_duration_minutes, short_variant, is_short_active)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s, %s, %s, %s, %s) RETURNING {_COLUMNS}""",
                 [
                     user_id,
                     day,
@@ -300,26 +352,67 @@ def replace_unlocked(
                     session.get("description"),
                     Jsonb(session.get("steps") or []),
                     origin,
+                    sess_plan_id,
+                    session.get("priority") or "flexible",
+                    session.get("min_duration_minutes"),
+                    Jsonb(session.get("short_variant")) if session.get("short_variant") else None,
+                    bool(session.get("is_short_active", False)),
                 ],
             )
             result.written.append(_out(cur.fetchone()))
     return result
 
 
-def import_sessions(user_id: str, sessions: Iterable[dict]) -> list[dict]:
-    """Replace every session with an imported set: origin `import`, unlocked.
+def delete_plan_sessions(user_id: str, plan_id: str) -> None:
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM plan_session WHERE user_id = %s AND plan_id = %s", [user_id, plan_id])
 
-    Importing a file is the user saying "this is my plan now", so locks go too -- the
-    one place where a bulk write is allowed to remove locked sessions, and only because
-    the user asked for exactly that.
+
+def toggle_short_variant(user_id: str, session_id: str) -> dict:
+    """Toggle is_short_active on a specific session."""
+    with db.connect() as conn, conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            f"""UPDATE plan_session
+                SET is_short_active = NOT is_short_active, updated_at = now()
+                WHERE user_id = %s AND id = %s
+                RETURNING {_COLUMNS}""",
+            [user_id, session_id],
+        )
+        row = cur.fetchone()
+        if not row:
+            raise SessionNotFound(session_id)
+        return _out(row)
+
+
+def import_sessions(
+    user_id: str,
+    sessions: Iterable[dict],
+    plan_id: str = "default",
+    mode: str = "replace",  # "replace" | "merge" | "new_plan"
+) -> list[dict]:
+    """Import sessions into the plan:
+    - 'replace': wipes existing sessions for this plan_id and inserts the new ones.
+    - 'merge': keeps non-overlapping or locked sessions, replacing only unlocked matching (date, sport).
+    - 'new_plan': inserts all sessions under the specified plan_id.
     """
     with db.connect() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
-        cur.execute("DELETE FROM plan_session WHERE user_id = %s", [user_id])
+        if mode in ("replace", "new_plan"):
+            cur.execute("DELETE FROM plan_session WHERE user_id = %s AND plan_id = %s", [user_id, plan_id])
+        elif mode == "merge":
+            incoming_keys = {(s["date"], s["sport"]) for s in sessions}
+            for day, sport in incoming_keys:
+                cur.execute(
+                    "DELETE FROM plan_session WHERE user_id = %s AND plan_id = %s AND date = %s AND sport = %s AND NOT locked",
+                    [user_id, plan_id, day, sport],
+                )
+
         written = []
         for position, session in enumerate(sessions, start=1):
+            sess_plan_id = session.get("plan_id") or plan_id
+            is_locked = bool(session.get("locked", False))
             cur.execute(
-                f"""INSERT INTO plan_session (user_id, date, position, sport, title, description, steps, origin, locked)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'import', FALSE) RETURNING {_COLUMNS}""",
+                f"""INSERT INTO plan_session (user_id, date, position, sport, title, description, steps, origin, locked, plan_id, priority, min_duration_minutes, short_variant, is_short_active)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'import', %s, %s, %s, %s, %s, %s) RETURNING {_COLUMNS}""",
                 [
                     user_id,
                     session["date"],
@@ -328,6 +421,12 @@ def import_sessions(user_id: str, sessions: Iterable[dict]) -> list[dict]:
                     session["title"],
                     session.get("description"),
                     Jsonb(session.get("steps") or []),
+                    is_locked,
+                    sess_plan_id,
+                    session.get("priority") or "flexible",
+                    session.get("min_duration_minutes"),
+                    Jsonb(session.get("short_variant")) if session.get("short_variant") else None,
+                    bool(session.get("is_short_active", False)),
                 ],
             )
             written.append(_out(cur.fetchone()))

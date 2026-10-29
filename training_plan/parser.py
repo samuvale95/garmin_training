@@ -20,6 +20,7 @@ from .models import (
     RaceGoal,
     RepeatBlock,
     SessionStep,
+    ShortVariant,
     Step,
     TrainingSession,
 )
@@ -145,11 +146,16 @@ def _validate_step(label: str, raw_step: Any, errors: list[str]) -> Step | None:
             errors.append(f"{label}: {exc}")
             return None
 
+    note = raw_step.get("note") or raw_step.get("label")
+    if note is not None:
+        note = str(note).strip() or None
+
     return Step(
         type=step_type,
         duration_type=duration_type,
         duration_value=float(duration_value),
         target_pace=target_pace,
+        note=note,
     )
 
 
@@ -318,6 +324,24 @@ def parse_sessions(raw_sessions: list[Any]) -> tuple[list[TrainingSession], list
         title = _validate_title(index, raw_entry, entry_errors)
         steps = _validate_steps(index, raw_entry, entry_errors)
 
+        priority = "key" if raw_entry.get("key") is True or str(raw_entry.get("priority", "")).lower() == "key" else "flexible"
+        raw_min = raw_entry.get("min_duration_minutes")
+        min_duration = float(raw_min) if isinstance(raw_min, (int, float)) and not isinstance(raw_min, bool) else None
+
+        short_variant = None
+        raw_sv = raw_entry.get("short_variant")
+        if isinstance(raw_sv, dict):
+            sv_title = str(raw_sv.get("title") or f"{title} (ridotta)")
+            sv_desc = raw_sv.get("description") or raw_sv.get("note")
+            sv_steps = _validate_steps(index, raw_sv, entry_errors)
+            short_variant = ShortVariant(
+                title=sv_title,
+                description=str(sv_desc) if sv_desc else None,
+                steps=sv_steps,
+            )
+
+        is_short_active = bool(raw_entry.get("is_short_active", False))
+
         errors.extend(entry_errors)
         if entry_errors:
             continue
@@ -329,6 +353,10 @@ def parse_sessions(raw_sessions: list[Any]) -> tuple[list[TrainingSession], list
                 title=title,
                 description=raw_entry.get("description"),
                 steps=steps,
+                priority=priority,
+                min_duration_minutes=min_duration,
+                short_variant=short_variant,
+                is_short_active=is_short_active,
             )
         )
     return sessions, errors
@@ -380,6 +408,8 @@ def _step_out(step: Step) -> dict[str, Any]:
         out["target_pace"] = (
             f"{_pace_token(step.target_pace.slower_sec_per_km)}-{_pace_token(step.target_pace.faster_sec_per_km)}"
         )
+    if step.note:
+        out["note"] = step.note
     return out
 
 
@@ -410,6 +440,11 @@ def serialize_plan(sessions: list[TrainingSession], goal: RaceGoal | None = None
         entry: dict[str, Any] = {"date": session.date.isoformat(), "sport": session.sport, "title": session.title}
         if session.description:
             entry["description"] = session.description
+        if session.priority != "flexible":
+            entry["priority"] = session.priority
+        if session.min_duration_minutes is not None:
+            entry["min_duration_minutes"] = _number(session.min_duration_minutes)
+
         steps = []
         for step in session.steps:
             if isinstance(step, RepeatBlock):
@@ -418,6 +453,22 @@ def serialize_plan(sessions: list[TrainingSession], goal: RaceGoal | None = None
                 steps.append(_step_out(step))
         if steps:
             entry["steps"] = steps
+
+        if session.short_variant is not None:
+            sv_steps = []
+            for step in session.short_variant.steps:
+                if isinstance(step, RepeatBlock):
+                    sv_steps.append({"repeat": step.reps, "steps": [_step_out(s) for s in step.steps]})
+                else:
+                    sv_steps.append(_step_out(step))
+            entry["short_variant"] = {
+                "title": session.short_variant.title,
+                **({"description": session.short_variant.description} if session.short_variant.description else {}),
+                "steps": sv_steps,
+            }
+        if session.is_short_active:
+            entry["is_short_active"] = True
+
         entries.append(entry)
     document["sessions"] = entries
 

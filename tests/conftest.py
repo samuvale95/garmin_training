@@ -33,8 +33,10 @@ from training_plan.api.cache import cache
 @pytest.fixture(autouse=True)
 def cold_server_state():
     cache.clear()
+    cache.invalidate_user("test-user")
     yield
     cache.clear()
+    cache.invalidate_user("test-user")
 
 
 @pytest.fixture(autouse=True)

@@ -6,8 +6,16 @@ import { PageHeader } from "@/components/PageHeader";
 import { Skeleton, SlideUp } from "@/components/motion/primitives";
 import { ChevronRight } from "@/components/Icons";
 import { FocusBlock, MetricRow, PacingBlock, TrendSection } from "@/components/TechniqueBlocks";
+import { WorkoutAnalysisSection } from "@/components/WorkoutAnalysisSection";
 import { useMountOnce } from "@/lib/motion";
-import { useActivities, useActivityForm, useCoachNarrative, useSportTrend } from "@/lib/queries";
+import {
+  useActivities,
+  useActivityForm,
+  useCoachNarrative,
+  useSportTrend,
+  useWorkoutAnalysis,
+  useWorkoutAnalysisNarrative,
+} from "@/lib/queries";
 import { shiftDateKey, toDateKey } from "@/lib/sessionVisuals";
 import { formatPaceOrDash, formatShortDate } from "@/lib/format";
 import type { CompletedActivity } from "@/lib/types";
@@ -70,6 +78,9 @@ export default function CoachPage() {
     [readable, form]
   );
   const trendQuery = useSportTrend(sameSport, !!form?.has_metrics);
+  const isRunning = form ? (form.sport === "running" || form.sport.includes("run")) : true;
+  const analysisQuery = useWorkoutAnalysis(activityId, isRunning);
+  const analysisNarrativeQuery = useWorkoutAnalysisNarrative(activityId, isRunning && !!analysisQuery.data);
 
   return (
     <div style={{ padding: "22px 20px 40px" }}>
@@ -161,6 +172,14 @@ export default function CoachPage() {
                 <TrendSection
                   trends={trendQuery.data.trends}
                   sessionsRead={trendQuery.data.sessions_read}
+                  animate={animate}
+                />
+              )}
+
+              {analysisQuery.data && (
+                <WorkoutAnalysisSection
+                  analysis={analysisQuery.data}
+                  narrativeText={analysisNarrativeQuery.data?.text}
                   animate={animate}
                 />
               )}

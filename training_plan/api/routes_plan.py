@@ -33,31 +33,114 @@ router = APIRouter()
 
 
 @router.get("/plan", response_model=schemas.PlanResponse)
-async def get_plan(user_id: str = Depends(current_user_id)) -> schemas.PlanResponse:
+async def get_plan(
+    plan_id: str | None = None,
+    only_active: bool = False,
+    user_id: str = Depends(current_user_id),
+) -> schemas.PlanResponse:
     def read() -> schemas.PlanResponse:
-        plan = db.get_plan(user_id)
+        plan = db.get_plan(user_id, plan_id=plan_id)
         if plan is None:
             return schemas.PlanResponse(plan=None)
-        return schemas.PlanResponse(plan=schemas.PlanOut.from_model(plan, plan_store.list_sessions(user_id)))
+        sessions = plan_store.list_sessions(user_id, plan_id=plan.id if plan_id else None, only_active=only_active)
+        return schemas.PlanResponse(plan=schemas.PlanOut.from_model(plan, sessions))
 
     return await run_in_threadpool(read)
 
 
+@router.get("/plan/list", response_model=schemas.PlanListResponse)
+async def list_user_plans(user_id: str = Depends(current_user_id)) -> schemas.PlanListResponse:
+    def read() -> schemas.PlanListResponse:
+        plans = db.list_plans(user_id)
+        all_sessions = plan_store.list_sessions(user_id)
+        summaries = []
+        for p in plans:
+            count = sum(1 for s in all_sessions if s.get("plan_id", "default") == p.id)
+            goal = schemas.RaceGoalIn.model_validate(p.goal).to_model() if p.goal else None
+            summaries.append(
+                schemas.PlanSummaryOut(
+                    id=p.id,
+                    name=p.name,
+                    sports=p.sports,
+                    is_active=p.is_active,
+                    sessions_count=count,
+                    goal=schemas.RaceGoalOut.from_model(goal) if goal else None,
+                    imported_at=p.imported_at,
+                )
+            )
+        active_ids = [p.id for p in plans if p.is_active]
+        return schemas.PlanListResponse(plans=summaries, active_plan_ids=active_ids)
+
+    return await run_in_threadpool(read)
+
+
+@router.post("/plan/{plan_id}/toggle-active", response_model=schemas.PlanResponse)
+async def toggle_plan_active(
+    plan_id: str,
+    payload: schemas.PlanToggleActiveRequest,
+    user_id: str = Depends(current_user_id),
+) -> schemas.PlanResponse:
+    def run() -> schemas.PlanResponse:
+        db.set_plan_active(user_id, plan_id, payload.is_active)
+        plan = db.get_plan(user_id, plan_id=plan_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail=f"Piano {plan_id} non trovato")
+        sessions = plan_store.list_sessions(user_id, plan_id=plan_id)
+        return schemas.PlanResponse(plan=schemas.PlanOut.from_model(plan, sessions))
+
+    return await run_in_threadpool(run)
+
+
 @router.put("/plan", response_model=schemas.PlanOut)
 async def save_plan(payload: schemas.PlanIn, user_id: str = Depends(current_user_id)) -> schemas.PlanOut:
-    """Import a plan. Sessions are only taken with `import: true` (see `schemas.PlanIn`)."""
+    """Import a plan with replace, merge, or new_plan mode."""
 
     def write() -> schemas.PlanOut:
-        plan = db.save_plan(
-            user_id=user_id,
-            yaml_text=payload.yaml_text,
-            filename=payload.filename,
-            imported_at=payload.imported_at,
-            goal=payload.goal.model_dump(mode="json") if payload.goal else None,
-        )
+        import inspect
+        from uuid import uuid4
+
+        plan_id = payload.plan_id or "default"
+        if payload.mode == "new_plan" and plan_id == "default":
+            plan_id = f"piano-{uuid4().hex[:8]}"
+
+        plan_sports = payload.sports
+        if not plan_sports:
+            plan_sports = list(dict.fromkeys(s.sport for s in payload.sessions)) or ["running"]
+
+        sig_save = inspect.signature(db.save_plan)
+        save_kw = {
+            "user_id": user_id,
+            "yaml_text": payload.yaml_text,
+            "filename": payload.filename,
+            "imported_at": payload.imported_at,
+            "goal": payload.goal.model_dump(mode="json") if payload.goal else None,
+        }
+        if "plan_id" in sig_save.parameters and plan_id != "default":
+            save_kw["plan_id"] = plan_id
+        if "name" in sig_save.parameters and payload.plan_name:
+            save_kw["name"] = payload.plan_name
+        if "sports" in sig_save.parameters and payload.sports:
+            save_kw["sports"] = plan_sports
+        if "is_active" in sig_save.parameters:
+            save_kw["is_active"] = True
+
+        plan = db.save_plan(**save_kw)
         if payload.is_import:
-            plan_store.import_sessions(user_id, [s.model_dump(mode="json") for s in payload.sessions])
-        return schemas.PlanOut.from_model(plan, plan_store.list_sessions(user_id))
+            sessions_data = [s.model_dump(mode="json") for s in payload.sessions]
+            sig_imp = inspect.signature(plan_store.import_sessions)
+            imp_kw = {}
+            if "plan_id" in sig_imp.parameters and plan_id != "default":
+                imp_kw["plan_id"] = plan_id
+            if "mode" in sig_imp.parameters and payload.mode != "replace":
+                imp_kw["mode"] = payload.mode
+            if imp_kw:
+                plan_store.import_sessions(user_id, sessions_data, **imp_kw)
+            else:
+                plan_store.import_sessions(user_id, sessions_data)
+
+        sig_list = inspect.signature(plan_store.list_sessions)
+        list_kw = {"plan_id": plan_id} if "plan_id" in sig_list.parameters and plan_id != "default" else {}
+        return schemas.PlanOut.from_model(plan, plan_store.list_sessions(user_id, **list_kw))
 
     return await run_in_threadpool(write)
 
@@ -65,6 +148,12 @@ async def save_plan(payload: schemas.PlanIn, user_id: str = Depends(current_user
 @router.delete("/plan", response_model=schemas.DeletePlanResponse)
 async def delete_plan(user_id: str = Depends(current_user_id)) -> schemas.DeletePlanResponse:
     await run_in_threadpool(db.delete_plan, user_id)
+    return schemas.DeletePlanResponse(ok=True)
+
+
+@router.delete("/plan/{plan_id}", response_model=schemas.DeletePlanResponse)
+async def delete_plan_by_id(plan_id: str, user_id: str = Depends(current_user_id)) -> schemas.DeletePlanResponse:
+    await run_in_threadpool(db.delete_plan, user_id, plan_id=plan_id)
     return schemas.DeletePlanResponse(ok=True)
 
 
@@ -81,7 +170,7 @@ def _not_found(session_id: str) -> HTTPException:
 @router.post("/plan/sessions", response_model=schemas.TrainingSessionOut)
 async def create_session(
     payload: schemas.TrainingSessionIn,
-    background_tasks: BackgroundTasks,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     user_id: str = Depends(current_user_id),
 ) -> schemas.TrainingSessionOut:
     def write() -> schemas.TrainingSessionOut:
@@ -109,7 +198,7 @@ async def create_session(
 async def update_session(
     session_id: UUID,
     payload: schemas.SessionPatch,
-    background_tasks: BackgroundTasks,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     user_id: str = Depends(current_user_id),
 ) -> schemas.TrainingSessionOut:
     # Read before-state to know previous date/title
@@ -171,10 +260,56 @@ async def update_session(
     return result
 
 
+@router.post("/plan/sessions/{session_id}/toggle-short", response_model=schemas.TrainingSessionOut)
+async def toggle_session_short_variant(
+    session_id: UUID,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    user_id: str = Depends(current_user_id),
+) -> schemas.TrainingSessionOut:
+    def write() -> schemas.TrainingSessionOut:
+        try:
+            updated = plan_store.toggle_short_variant(user_id, str(session_id))
+        except plan_store.SessionNotFound:
+            raise _not_found(str(session_id))
+        return schemas.TrainingSessionOut.model_validate(updated)
+
+    result = await run_in_threadpool(write)
+
+    # Immediately synchronize update with Garmin Connect (reschedule with effective steps)
+    def _sync_short_to_garmin():
+        try:
+            sess_model = result.to_model()
+            target_date = sess_model.date
+            title = sess_model.title.strip().lower()
+
+            def _push(sync):
+                start = target_date - timedelta(days=2)
+                end = target_date + timedelta(days=2)
+                workouts = sync.list_scheduled_workouts(start, end)
+                target_w = None
+                for w in workouts:
+                    if w.title.strip().lower() == title or (
+                        sess_model.short_variant and w.title.strip().lower() == sess_model.short_variant.title.strip().lower()
+                    ):
+                        target_w = w
+                        break
+                if target_w:
+                    sync.delete_workout(target_w)
+                sync.create_and_schedule(sess_model)
+
+            garmin_session.run(user_id, _push)
+            invalidate_calendar(user_id)
+        except Exception:
+            pass
+
+    background_tasks.add_task(_sync_short_to_garmin)
+    return result
+
+
 @router.delete("/plan/sessions/{session_id}", response_model=schemas.DeletePlanResponse)
 async def delete_session(
     session_id: UUID,
-    background_tasks: BackgroundTasks,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     user_id: str = Depends(current_user_id),
 ) -> schemas.DeletePlanResponse:
     target_to_delete = None
@@ -461,15 +596,26 @@ async def generate_plan(
     def run() -> schemas.GeneratePlanResponse | JSONResponse:
         state = coach_state(user_id)
         profile = state[1].profile if state and state[1] else None
+        import inspect
+
+        sig_gen = inspect.signature(plan_generator.generate)
+        gen_kw: dict[str, Any] = {
+            "profile": profile,
+            "threshold_available": state is not None,
+            "regenerate_skeleton": payload.regenerate_skeleton,
+            "threshold_hr": state[0].threshold_hr if state else None,
+        }
+        if "mode" in sig_gen.parameters and payload.mode != "rebuild":
+            gen_kw["mode"] = payload.mode
+        if "sports" in sig_gen.parameters and payload.sports != ["running"]:
+            gen_kw["sports"] = payload.sports
+        if "user_prompt" in sig_gen.parameters and payload.user_prompt:
+            gen_kw["user_prompt"] = payload.user_prompt
+        if "plan_id" in sig_gen.parameters and payload.plan_id != "default":
+            gen_kw["plan_id"] = payload.plan_id
+
         try:
-            result = plan_generator.generate(
-                user_id,
-                date.today(),
-                profile=profile,
-                threshold_available=state is not None,
-                regenerate_skeleton=payload.regenerate_skeleton,
-                threshold_hr=state[0].threshold_hr if state else None,
-            )
+            result = plan_generator.generate(user_id, date.today(), **gen_kw)
         except plan_generator.GenerationInProgress:
             return _error(409, "validation_failed", "Sto già scrivendo il piano: aspetta che finisca.")
         except plan_generator.GenerationFailed as exc:
@@ -480,29 +626,61 @@ async def generate_plan(
 
 
 @router.get("/plan/skeleton", response_model=schemas.SkeletonResponse)
-async def get_skeleton(user_id: str = Depends(current_user_id)) -> schemas.SkeletonResponse:
-    stored = await run_in_threadpool(db.get_skeleton, user_id)
+async def get_skeleton(plan_id: str = "default", user_id: str = Depends(current_user_id)) -> schemas.SkeletonResponse:
+    import inspect
+
+    sig_skel = inspect.signature(db.get_skeleton)
+    skel_kw = {"plan_id": plan_id} if "plan_id" in sig_skel.parameters and plan_id != "default" else {}
+    stored = await run_in_threadpool(db.get_skeleton, user_id, **skel_kw)
     if not stored:
         return schemas.SkeletonResponse(weeks=None)
     return schemas.SkeletonResponse(weeks=[schemas.SkeletonWeekOut(**week) for week in stored["weeks"]])
 
 
 @router.get("/plan/export")
-async def export_plan(user_id: str = Depends(current_user_id)) -> Response:
-    """The plan as the same YAML the importer reads -- including everything added or
-    edited in the app, so the file stays a real way out."""
+async def export_plan(
+    enriched: bool = False,
+    plan_id: str | None = None,
+    user_id: str = Depends(current_user_id),
+) -> Response:
+    """The plan as YAML: either enriched with history, athlete context and actual metrics (enriched=true),
+    or pure structural YAML."""
 
     def build() -> str:
-        plan = db.get_plan(user_id)
-        sessions = [schemas.TrainingSessionIn.model_validate(s).to_model() for s in plan_store.list_sessions(user_id)]
-        goal = schemas.RaceGoalIn.model_validate(plan.goal).to_model() if plan and plan.goal else None
-        return serialize_plan(sessions, goal)
+        if enriched:
+            from ..plan_export import build_enriched_plan_dict, serialize_enriched_plan_yaml
+
+            data = build_enriched_plan_dict(user_id, plan_id=plan_id)
+            return serialize_enriched_plan_yaml(data)
+        else:
+            import inspect
+
+            sig_get = inspect.signature(db.get_plan)
+            plan = (
+                db.get_plan(user_id, plan_id=plan_id)
+                if "plan_id" in sig_get.parameters and plan_id
+                else db.get_plan(user_id)
+            )
+
+            sig_list = inspect.signature(plan_store.list_sessions)
+            sessions_raw = (
+                plan_store.list_sessions(user_id, plan_id=plan_id)
+                if "plan_id" in sig_list.parameters and plan_id
+                else plan_store.list_sessions(user_id)
+            )
+            sessions = [
+                schemas.TrainingSessionIn.model_validate(s).to_model()
+                for s in sessions_raw
+            ]
+            goal = schemas.RaceGoalIn.model_validate(plan.goal).to_model() if plan and plan.goal else None
+            return serialize_plan(sessions, goal)
 
     text = await run_in_threadpool(build)
+    filename = "piano-passo-arricchito.yaml" if enriched else "piano-passo.yaml"
     return Response(
         content=text,
         media_type="text/yaml; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="piano-passo.yaml"'},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

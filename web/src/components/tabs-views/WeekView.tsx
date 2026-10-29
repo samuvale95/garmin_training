@@ -16,6 +16,7 @@ import { PullToRefresh } from "@/components/PullToRefresh";
 import { useCalendarAccess } from "@/lib/guards";
 import {
   useActivities,
+  usePlanListQuery,
   usePrefetchWeeks,
   usePrefetchWorkoutSession,
   useRefreshServerData,
@@ -24,6 +25,7 @@ import {
   useStravaStatus,
   useIsRewritten,
   useStoredActivities,
+  useTogglePlanActive,
   useWeekWorkouts,
 } from "@/lib/queries";
 import { SkeletonDayCards } from "@/components/skeletons";
@@ -361,6 +363,7 @@ export function WeekPageContent() {
 
         {/* Only on this week: generation always starts tomorrow, so offering it while
             paging through past or later weeks would promise a window it won't write. */}
+        <PlanSelectorBar />
         {offset === 0 && <PlanGenerateCard animate={animate} delayMs={160} />}
 
         {offset <= 0 && (
@@ -613,5 +616,55 @@ function NavButton({ label, onClick, children }: { label: string; onClick: () =>
     >
       {children}
     </motion.button>
+  );
+}
+
+function PlanSelectorBar() {
+  const { data: planList } = usePlanListQuery();
+  const toggleActive = useTogglePlanActive();
+
+  if (!planList || planList.plans.length <= 1) return null;
+
+  return (
+    <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--crema-card)", borderRadius: "var(--radius-card)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--inchiostro-50)" }}>
+          Piani attivi ({planList.active_plan_ids.length} di {planList.plans.length})
+        </span>
+        <Link href="/import" style={{ fontSize: 11.5, color: "var(--azzurro-testo)", textDecoration: "none", fontWeight: 600 }}>
+          + Nuovo / Unisci
+        </Link>
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {planList.plans.map((p) => {
+          const isActive = p.is_active;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => toggleActive.mutate({ planId: p.id, isActive: !isActive })}
+              style={{
+                fontSize: 12,
+                padding: "4px 10px",
+                borderRadius: "var(--radius-pill)",
+                border: isActive ? "1.5px solid var(--inchiostro)" : "1px dashed var(--sabbia-chip)",
+                background: isActive ? "var(--sabbia-chip)" : "transparent",
+                color: isActive ? "var(--inchiostro)" : "var(--inchiostro-50)",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              <span style={{ fontWeight: 700 }}>{isActive ? "●" : "○"}</span>
+              <span>{p.name}</span>
+              <span className="font-mono" style={{ fontSize: 10.5, color: "var(--inchiostro-50)" }}>
+                ({p.sports.join(", ")})
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

@@ -524,6 +524,20 @@ def activities_between(
         return [dict(zip(columns, row)) for row in cur.fetchall()]
 
 
+def get_activity(user_id: str, activity_id: int) -> dict | None:
+    """Retrieve a single stored activity by user_id and activity_id."""
+    columns = ("source", "activity_id", "day", "sport", "title", "distance_km", "duration_min",
+               "avg_hr", "max_hr", "avg_cadence", "avg_power", "elevation_gain", "start_time",
+               "calories", "calories_source")
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"SELECT {', '.join(columns)} FROM activity WHERE user_id = %s AND activity_id = %s LIMIT 1",
+            [user_id, activity_id],
+        )
+        row = cur.fetchone()
+        return dict(zip(columns, row)) if row else None
+
+
 def load_workout_streams(user_id: str, source: str, activity_id: int) -> dict[str, list[float | None]] | None:
     """`load_streams`, falling back on a duplicate's stream when this row has none."""
     streams = load_streams(user_id, source, activity_id)

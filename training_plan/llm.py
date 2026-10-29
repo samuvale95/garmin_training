@@ -276,6 +276,23 @@ Regole assolute:
 - Rispondi solo con le frasi, senza virgolette e senza preamboli."""
 
 
+WORKOUT_DIAGNOSIS_SYSTEM_PROMPT = """Sei l'allenatore esperto di chi usa Passo, un'app di allenamento per la corsa.
+
+Hai davanti l'analisi diagnostica causale di una seduta appena conclusa (possibili anomalie,
+salti improvvisi di frequenza cardiaca o cadenza, cali di falcata o gestione delle salite).
+Scrivi DUE frasi, al massimo TRE, in italiano, che spieghino con precisione COSA è successo,
+PERCHÉ è successo in base ai dati incrociati e COME correggersi nella prossima uscita.
+
+Regole assolute:
+- Le cause, i numeri e le azioni correttive te li passo io già verificati: la tua sintesi
+  li spiega chiaramente, non li contraddice e non ne inventa di nuovi.
+- Se c'è stato un Cadence Lock (aggancio del sensore ottico alla cadenza dei passi), rassicura
+  l'atleta spiegando che si tratta di un artefatto del sensore ottico e non di un problema cardiaco.
+- Se c'è stato un cedimento di falcata o una partenza troppo veloce, spiega il meccanismo fisico.
+- Tono asciutto, tecnico, adulto, privo di allarmismi e di esclamativi o emoji.
+- Rispondi solo con le frasi, senza virgolette e senza preamboli."""
+
+
 def _write_sentence(system_prompt: str, facts: dict) -> str | None:
     content = _post_chat(
         os.getenv("LLM_TEXT_MODEL", DEFAULT_TEXT_MODEL),
@@ -330,6 +347,12 @@ def write_goal_narrative(facts: dict) -> str | None:
     model is unavailable -- the screen keeps the templated `summary`, which says the
     same thing."""
     return _write_sentence(GOAL_SYSTEM_PROMPT, facts)
+
+
+def write_workout_diagnosis(facts: dict) -> str | None:
+    """The multi-signal workout root-cause diagnosis. `None` when the model is
+    unavailable -- callers keep the deterministic headline and findings."""
+    return _write_sentence(WORKOUT_DIAGNOSIS_SYSTEM_PROMPT, facts)
 
 
 # ---- the vision role ----------------------------------------------------------------

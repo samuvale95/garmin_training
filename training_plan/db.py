@@ -23,7 +23,7 @@ picture to show without the original ever touching disk.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date as date_type
 from datetime import datetime, timezone
 from typing import Any, Literal
@@ -65,7 +65,26 @@ CREATE TABLE IF NOT EXISTS user_plan (
 -- -- a plan without a goal is the normal case, not a broken one.
 ALTER TABLE user_plan ADD COLUMN IF NOT EXISTS goal JSONB;
 
--- A race named without a plan behind it yet: `user_plan.goal` needs a plan row to hang
+-- Multi-plan support: allows multiple named plans (e.g. Running, Strength, Triathlon),
+-- each with its own sports list, status, skeleton and goal.
+CREATE TABLE IF NOT EXISTS user_training_plan (
+  user_id      TEXT NOT NULL,
+  id           TEXT NOT NULL DEFAULT 'default',
+  name         TEXT NOT NULL DEFAULT 'Piano Principale',
+  sports       JSONB NOT NULL DEFAULT '["running"]'::jsonb,
+  is_active    BOOLEAN NOT NULL DEFAULT TRUE,
+  goal         JSONB,
+  skeleton     JSONB,
+  yaml_text    TEXT NOT NULL DEFAULT '',
+  filename     TEXT,
+  imported_at  TEXT NOT NULL DEFAULT '',
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_training_plan_active ON user_training_plan(user_id, is_active);
+
+-- The race named without a plan behind it yet: `user_plan.goal` needs a plan row to hang
 -- off, and a live Garmin-calendar-only account has none. Same shape as that column,
 -- its own table so a goal can exist before -- or after -- a plan does. `save_plan`
 -- carries a row from here into the new plan and clears it (see routes_plan.py); nothing
@@ -213,6 +232,13 @@ def connect() -> psycopg.Connection:
 def ensure_schema() -> None:
     with connect() as conn:
         conn.execute(SCHEMA)
+        # Migrate existing user_plan rows into user_training_plan if not present
+        conn.execute(
+            """INSERT INTO user_training_plan (user_id, id, name, sports, is_active, goal, skeleton, yaml_text, filename, imported_at)
+               SELECT user_id, 'default', 'Piano Principale', '["running"]'::jsonb, TRUE, goal, skeleton, yaml_text, filename, imported_at
+               FROM user_plan
+               ON CONFLICT (user_id, id) DO NOTHING"""
+        )
 
 
 def add_entry(
@@ -424,35 +450,103 @@ def totals_between(user_id: str, start: date_type, end: date_type) -> list[dict[
 @dataclass
 class UserPlan:
     yaml_text: str
-    # A list of plain dicts shaped like the frontend's `TrainingSession` (date/sport/
-    # title/description/steps) -- stored as opaque JSON rather than modeled with
-    # `models.TrainingSession`, the same way `thumbnail` stores bytes instead of a
-    # decoded image: nothing server-side reads into a session's structure, it is only
-    # ever round-tripped back to the one client that does.
     sessions: list[dict[str, Any]]
     filename: str | None
     imported_at: str
-    # `{race_date, distance_km, name, target_time_seconds}` or None -- the three facts
-    # the user stated, never the derived phase (see `schemas.RaceGoalOut`).
     goal: dict[str, Any] | None = None
+    id: str = "default"
+    name: str = "Piano Principale"
+    sports: list[str] = field(default_factory=lambda: ["running"])
+    is_active: bool = True
+    skeleton: dict[str, Any] | None = None
 
     @classmethod
     def from_row(cls, row: DictRow) -> "UserPlan":
+        raw_sports = row.get("sports")
+        if isinstance(raw_sports, list):
+            sports = raw_sports
+        elif isinstance(raw_sports, str):
+            try:
+                import json
+
+                sports = json.loads(raw_sports)
+            except Exception:
+                sports = ["running"]
+        else:
+            sports = ["running"]
+
         return cls(
-            yaml_text=row["yaml_text"],
-            sessions=row["sessions"],
-            filename=row["filename"],
-            imported_at=row["imported_at"],
+            yaml_text=row.get("yaml_text") or "",
+            sessions=row.get("sessions") or [],
+            filename=row.get("filename"),
+            imported_at=row.get("imported_at") or "",
             goal=row.get("goal"),
+            id=row.get("id") or "default",
+            name=row.get("name") or "Piano Principale",
+            sports=sports,
+            is_active=bool(row.get("is_active", True)),
+            skeleton=row.get("skeleton"),
         )
 
 
-def get_plan(user_id: str) -> UserPlan | None:
+def get_plan(user_id: str, plan_id: str | None = None) -> UserPlan | None:
     with connect() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
+            if plan_id is not None:
+                cur.execute("SELECT * FROM user_training_plan WHERE user_id = %s AND id = %s", (user_id, plan_id))
+                row = cur.fetchone()
+                if row:
+                    return UserPlan.from_row(row)
+            else:
+                cur.execute(
+                    "SELECT * FROM user_training_plan WHERE user_id = %s ORDER BY (is_active AND id = 'default') DESC, is_active DESC, updated_at DESC LIMIT 1",
+                    (user_id,),
+                )
+                row = cur.fetchone()
+                if row:
+                    return UserPlan.from_row(row)
+            # Fallback to user_plan
             cur.execute("SELECT * FROM user_plan WHERE user_id = %s", (user_id,))
             row = cur.fetchone()
-    return UserPlan.from_row(row) if row else None
+            return UserPlan.from_row(row) if row else None
+
+
+def list_plans(user_id: str) -> list[UserPlan]:
+    with connect() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT * FROM user_training_plan WHERE user_id = %s ORDER BY is_active DESC, updated_at DESC",
+                (user_id,),
+            )
+            rows = cur.fetchall()
+            if not rows:
+                legacy = get_plan(user_id)
+                return [legacy] if legacy else []
+            return [UserPlan.from_row(r) for r in rows]
+
+
+def get_active_plans(user_id: str) -> list[UserPlan]:
+    with connect() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT * FROM user_training_plan WHERE user_id = %s AND is_active = TRUE ORDER BY updated_at DESC",
+                (user_id,),
+            )
+            rows = cur.fetchall()
+            if not rows:
+                legacy = get_plan(user_id)
+                return [legacy] if legacy and legacy.is_active else []
+            return [UserPlan.from_row(r) for r in rows]
+
+
+def set_plan_active(user_id: str, plan_id: str, is_active: bool) -> bool:
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE user_training_plan SET is_active = %s, updated_at = now() WHERE user_id = %s AND id = %s",
+                (is_active, user_id, plan_id),
+            )
+            return cur.rowcount > 0
 
 
 def save_plan(
@@ -462,17 +556,23 @@ def save_plan(
     filename: str | None,
     imported_at: str,
     goal: dict[str, Any] | None = None,
+    plan_id: str = "default",
+    name: str | None = None,
+    sports: list[str] | None = None,
+    is_active: bool = True,
+    skeleton: dict[str, Any] | None = None,
 ) -> UserPlan:
     """The plan-level facts: the last imported file, and the goal. The sessions are
     `plan_store`'s."""
+    if not sports:
+        sports = ["running"]
+    if not name:
+        name = "Piano Principale" if plan_id == "default" else f"Piano {plan_id}"
+
     with connect() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            # A race named before any plan existed yet: this is the plan's first save
-            # (no row for this user so far) and it doesn't state its own goal, so the
-            # one sitting in `user_goal` -- if any -- is what the plan is written for.
-            # Adopted once and removed from there, so it has exactly one home from here.
             if goal is None:
-                cur.execute("SELECT 1 FROM user_plan WHERE user_id = %s", (user_id,))
+                cur.execute("SELECT 1 FROM user_training_plan WHERE user_id = %s AND id = %s", (user_id, plan_id))
                 is_first_save = cur.fetchone() is None
                 if is_first_save:
                     cur.execute("SELECT goal FROM user_goal WHERE user_id = %s", (user_id,))
@@ -480,43 +580,84 @@ def save_plan(
                     if standalone:
                         goal = standalone["goal"]
                         cur.execute("DELETE FROM user_goal WHERE user_id = %s", (user_id,))
-            # The sessions themselves live in `plan_session` now (see plan_store.py). A
-            # new row starts with an empty array and already migrated; an existing row
-            # keeps whatever array it had, untouched, so rolling the code back still
-            # finds the plan as it was before the move.
+
             cur.execute(
-                """INSERT INTO user_plan (user_id, yaml_text, sessions, filename, imported_at, goal, updated_at,
-                                          sessions_migrated)
-                   VALUES (%s, %s, '[]'::jsonb, %s, %s, %s, now(), TRUE)
-                   ON CONFLICT (user_id) DO UPDATE SET
+                """INSERT INTO user_training_plan
+                   (user_id, id, name, sports, is_active, goal, skeleton, yaml_text, filename, imported_at, updated_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                   ON CONFLICT (user_id, id) DO UPDATE SET
+                     name = EXCLUDED.name,
+                     sports = EXCLUDED.sports,
+                     is_active = EXCLUDED.is_active,
                      yaml_text = EXCLUDED.yaml_text,
                      filename = EXCLUDED.filename,
                      imported_at = EXCLUDED.imported_at,
-                     goal = EXCLUDED.goal,
+                     goal = COALESCE(EXCLUDED.goal, user_training_plan.goal),
+                     skeleton = COALESCE(EXCLUDED.skeleton, user_training_plan.skeleton),
                      updated_at = now()
                    RETURNING *""",
-                (user_id, yaml_text, filename, imported_at, Jsonb(goal) if goal else None),
+                (
+                    user_id,
+                    plan_id,
+                    name,
+                    Jsonb(sports),
+                    is_active,
+                    Jsonb(goal) if goal else None,
+                    Jsonb(skeleton) if skeleton else None,
+                    yaml_text,
+                    filename,
+                    imported_at,
+                ),
             )
             row = cur.fetchone()
+
+            # Keep legacy user_plan in sync when modifying default plan
+            if plan_id == "default":
+                cur.execute(
+                    """INSERT INTO user_plan (user_id, yaml_text, sessions, filename, imported_at, goal, updated_at, sessions_migrated)
+                       VALUES (%s, %s, '[]'::jsonb, %s, %s, %s, now(), TRUE)
+                       ON CONFLICT (user_id) DO UPDATE SET
+                         yaml_text = EXCLUDED.yaml_text,
+                         filename = EXCLUDED.filename,
+                         imported_at = EXCLUDED.imported_at,
+                         goal = EXCLUDED.goal,
+                         updated_at = now()""",
+                    (user_id, yaml_text, filename, imported_at, Jsonb(goal) if goal else None),
+                )
     return UserPlan.from_row(row)
 
 
-def ensure_plan(user_id: str) -> None:
+def ensure_plan(user_id: str, plan_id: str = "default", name: str = "Piano Principale") -> None:
     """A plan row for a user who starts adding sessions with no file ever imported."""
+    now_iso = datetime.now(timezone.utc).isoformat()
     with connect() as conn:
         conn.execute(
-            """INSERT INTO user_plan (user_id, yaml_text, sessions, filename, imported_at, sessions_migrated)
-               VALUES (%s, '', '[]'::jsonb, NULL, %s, TRUE)
-               ON CONFLICT (user_id) DO NOTHING""",
-            (user_id, datetime.now(timezone.utc).isoformat()),
+            """INSERT INTO user_training_plan (user_id, id, name, sports, is_active, yaml_text, filename, imported_at)
+               VALUES (%s, %s, %s, '["running"]'::jsonb, TRUE, '', NULL, %s)
+               ON CONFLICT (user_id, id) DO NOTHING""",
+            (user_id, plan_id, name, now_iso),
         )
+        if plan_id == "default":
+            conn.execute(
+                """INSERT INTO user_plan (user_id, yaml_text, sessions, filename, imported_at, sessions_migrated)
+                   VALUES (%s, '', '[]'::jsonb, NULL, %s, TRUE)
+                   ON CONFLICT (user_id) DO NOTHING""",
+                (user_id, now_iso),
+            )
 
 
-def delete_plan(user_id: str) -> None:
+def delete_plan(user_id: str, plan_id: str | None = None) -> None:
     with connect() as conn:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM user_plan WHERE user_id = %s", (user_id,))
-            cur.execute("DELETE FROM plan_session WHERE user_id = %s", (user_id,))
+            if plan_id is None:
+                cur.execute("DELETE FROM user_plan WHERE user_id = %s", (user_id,))
+                cur.execute("DELETE FROM user_training_plan WHERE user_id = %s", (user_id,))
+                cur.execute("DELETE FROM plan_session WHERE user_id = %s", (user_id,))
+            else:
+                cur.execute("DELETE FROM user_training_plan WHERE user_id = %s AND id = %s", (user_id, plan_id))
+                cur.execute("DELETE FROM plan_session WHERE user_id = %s AND plan_id = %s", (user_id, plan_id))
+                if plan_id == "default":
+                    cur.execute("DELETE FROM user_plan WHERE user_id = %s", (user_id,))
 
 
 # ---- the race goal, before any plan exists to hold it ------------------------------------------
@@ -546,14 +687,26 @@ def set_standalone_goal(user_id: str, goal: dict[str, Any] | None) -> dict[str, 
     return row["goal"]
 
 
-def current_goal(user_id: str) -> dict[str, Any] | None:
-    """The race the user is training for: the plan's goal, or the one set before a plan."""
+def current_goal(user_id: str, plan_id: str | None = None) -> dict[str, Any] | None:
+    """The race the user is training for: the specified or active plan's goal, or the one set before a plan."""
     with connect() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
+            if plan_id is not None:
+                cur.execute("SELECT goal FROM user_training_plan WHERE user_id = %s AND id = %s", (user_id, plan_id))
+                row = cur.fetchone()
+                if row and row["goal"]:
+                    return row["goal"]
+            else:
+                cur.execute(
+                    "SELECT goal FROM user_training_plan WHERE user_id = %s AND is_active = TRUE AND goal IS NOT NULL ORDER BY (id = 'default') DESC LIMIT 1",
+                    (user_id,),
+                )
+                row = cur.fetchone()
+                if row and row["goal"]:
+                    return row["goal"]
+
             cur.execute("SELECT goal FROM user_plan WHERE user_id = %s", (user_id,))
             row = cur.fetchone()
-            # A plan row can exist without a goal (`ensure_plan` for a hand-built plan),
-            # and then the standalone one is still the one the user set.
             if row is not None and row["goal"]:
                 return row["goal"]
             cur.execute("SELECT goal FROM user_goal WHERE user_id = %s", (user_id,))
@@ -564,21 +717,30 @@ def current_goal(user_id: str) -> dict[str, Any] | None:
 # ---- the generated plan's skeleton -------------------------------------------------------------
 
 
-def get_skeleton(user_id: str) -> dict[str, Any] | None:
+def get_skeleton(user_id: str, plan_id: str = "default") -> dict[str, Any] | None:
     with connect() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT skeleton FROM user_training_plan WHERE user_id = %s AND id = %s", (user_id, plan_id))
+            row = cur.fetchone()
+            if row and row["skeleton"]:
+                return row["skeleton"]
             cur.execute("SELECT skeleton FROM user_plan WHERE user_id = %s", (user_id,))
             row = cur.fetchone()
     return row["skeleton"] if row else None
 
 
-def save_skeleton(user_id: str, skeleton: dict[str, Any]) -> None:
-    ensure_plan(user_id)
+def save_skeleton(user_id: str, skeleton: dict[str, Any], plan_id: str = "default") -> None:
+    ensure_plan(user_id, plan_id=plan_id)
     with connect() as conn:
         conn.execute(
-            "UPDATE user_plan SET skeleton = %s, updated_at = now() WHERE user_id = %s",
-            (Jsonb(skeleton), user_id),
+            "UPDATE user_training_plan SET skeleton = %s, updated_at = now() WHERE user_id = %s AND id = %s",
+            (Jsonb(skeleton), user_id, plan_id),
         )
+        if plan_id == "default":
+            conn.execute(
+                "UPDATE user_plan SET skeleton = %s, updated_at = now() WHERE user_id = %s",
+                (Jsonb(skeleton), user_id),
+            )
 
 
 # ---- persistent AI narrative cache -------------------------------------------------------------

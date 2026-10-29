@@ -110,6 +110,23 @@ export async function apiGet<T>(
   return handle<T>(response);
 }
 
+export async function apiGetBlob(
+  path: string,
+  params?: Record<string, string | undefined>
+): Promise<Blob> {
+  const url = new URL(path, API_BASE_URL);
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined) url.searchParams.set(key, value);
+    }
+  }
+  const response = await timedFetch(url, { cache: "no-store", headers: await authHeaders() });
+  if (!response.ok) {
+    throw new Error(`Download failed with status ${response.status}`);
+  }
+  return await response.blob();
+}
+
 /** `timeoutMs` for the few calls that are slow by design (plan generation waits on a
  * model); everything else keeps the default above. */
 export async function apiPost<T>(path: string, body?: unknown, signal?: AbortSignal, timeoutMs?: number): Promise<T> {

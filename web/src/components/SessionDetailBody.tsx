@@ -4,13 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { SlideUp } from "@/components/motion/primitives";
 import { sessionDistanceKm } from "@/lib/sessionVisuals";
+import { useToggleSessionShort } from "@/lib/queries";
 import { formatPaceValue, groupDistanceKm, groupSteps, sessionFallbackPaceSecPerKm, stepGroupParts } from "@/lib/format";
 import type { StravaActivityMatch, TrainingSession } from "@/lib/types";
 
 function getSessionIllustration(session: TrainingSession, hasInterval: boolean): string {
   const sport = session.sport?.toLowerCase();
   if (sport === "cycling" || sport === "bici") return "/illustrazioni/bici.webp";
-  if (sport === "strength_training" || sport === "forza") return "/illustrazioni/forza.webp";
+  if (sport === "strength_training" || sport === "forza" || sport === "calisthenics") return "/illustrazioni/forza.webp";
   if (sport === "other" || sport === "riposo") return "/illustrazioni/riposo.webp";
   if (hasInterval) return "/illustrazioni/fiamma.webp";
   return "/illustrazioni/corsa.webp";
@@ -59,8 +60,14 @@ export function SessionDetailBody({
   matchData: StravaActivityMatch | undefined;
   stravaHref: string;
 }) {
-  const steps = session.steps ?? [];
-  const distanceKm = sessionDistanceKm(session);
+  const toggleShort = useToggleSessionShort();
+  const isShortActive = !!session.is_short_active;
+  const effectiveSteps = isShortActive && session.short_variant?.steps ? session.short_variant.steps : (session.steps ?? []);
+  const effectiveTitle = isShortActive && session.short_variant?.title ? session.short_variant.title : session.title;
+  const effectiveDescription = isShortActive && session.short_variant?.description ? session.short_variant.description : session.description;
+
+  const steps = effectiveSteps;
+  const distanceKm = sessionDistanceKm({ ...session, steps: effectiveSteps, is_short_active: isShortActive });
   const groups = groupSteps(steps);
   const fallbackPace = sessionFallbackPaceSecPerKm(steps);
   const hasInterval = groups.some((g) => g.kind === "interval");
@@ -81,11 +88,11 @@ export function SessionDetailBody({
             lineHeight: 1.15,
           }}
         >
-          {session.title}
+          {effectiveTitle}
         </h1>
 
         {/* Description */}
-        {session.description && (
+        {effectiveDescription && (
           <p
             style={{
               fontSize: 14,
@@ -96,7 +103,7 @@ export function SessionDetailBody({
               lineHeight: 1.45,
             }}
           >
-            {session.description}
+            {effectiveDescription}
           </p>
         )}
       </SlideUp>
@@ -110,7 +117,7 @@ export function SessionDetailBody({
             borderRadius: 24,
             padding: "20px 22px",
             boxShadow: "var(--shadow-airbnb)",
-            marginTop: session.description ? 0 : 12,
+            marginTop: effectiveDescription ? 0 : 12,
             position: "relative",
             overflow: "hidden",
           }}
@@ -131,7 +138,7 @@ export function SessionDetailBody({
                     color: "var(--inchiostro)",
                   }}
                 >
-                  {session.sport === "cycling" ? "Bici" : session.sport === "strength_training" ? "Forza" : "Corsa"}
+                  {session.sport === "cycling" ? "Bici" : session.sport === "calisthenics" ? "Calisthenics" : session.sport === "strength_training" ? "Forza" : "Corsa"}
                 </span>
                 {groups.length > 0 && (
                   <span
@@ -234,6 +241,70 @@ export function SessionDetailBody({
           </div>
         </div>
       </SlideUp>
+
+      {/* Salva-Tempo Short Variant Toggle Card */}
+      {session.short_variant && session.id && (
+        <SlideUp delayMs={75}>
+          <div
+            style={{
+              background: isShortActive ? "rgba(232, 93, 78, 0.08)" : "var(--crema-card)",
+              border: isShortActive ? "1.5px solid var(--corallo)" : "1px solid var(--border-airbnb)",
+              borderRadius: 18,
+              padding: "14px 18px",
+              marginTop: 14,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--inchiostro)" }}>
+                  ⚡ Poco tempo oggi?
+                </span>
+                {isShortActive && (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      background: "var(--corallo)",
+                      color: "var(--corallo-testo)",
+                      borderRadius: "var(--radius-pill)",
+                      padding: "2px 7px",
+                    }}
+                  >
+                    Variante attiva
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: 12, color: "var(--inchiostro-70)", margin: "4px 0 0", lineHeight: 1.35 }}>
+                {isShortActive
+                  ? (session.short_variant.description ?? "Variante salva-tempo attiva sull'orologio.")
+                  : "Passa alla variante ridotta salva-tempo (sincronizzata con Garmin)."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => toggleShort(session.id!)}
+              className="press-soft"
+              style={{
+                background: isShortActive ? "var(--corallo)" : "var(--inchiostro)",
+                color: isShortActive ? "var(--corallo-testo)" : "var(--crema)",
+                border: "none",
+                borderRadius: "var(--radius-pill)",
+                padding: "8px 14px",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {isShortActive ? "Torna a Completa" : "Attiva Salva-Tempo"}
+            </button>
+          </div>
+        </SlideUp>
+      )}
 
       {/* Structured Steps Section */}
       <SlideUp delayMs={100} style={{ marginTop: 28 }}>

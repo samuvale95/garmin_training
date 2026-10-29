@@ -17,7 +17,7 @@ import { useAthleteIdentity } from "@/lib/identity";
 import { useIsAdmin } from "@/lib/agents";
 import { signOut } from "@/lib/auth";
 import { usePassoStore } from "@/lib/store";
-import { downloadPlanYaml } from "@/lib/planYaml";
+import { downloadEnrichedPlanYaml, downloadPlanYaml } from "@/lib/planYaml";
 import { countdownLabel, goalTitle } from "@/lib/raceGoal";
 import { minutesAgo } from "@/lib/format";
 import { useScreenReady } from "@/lib/useScreenReady";
@@ -277,6 +277,24 @@ export default function SettingsPage() {
               }}
             >
               Scarica {plan?.filename ?? "il YAML"}
+            </button>
+            <button data-track="settings.plan-enriched"
+              type="button"
+              {...dis(!plan, "dati_non_caricati")}
+              onClick={() => plan && downloadEnrichedPlanYaml()}
+              className="tap-target"
+              style={{
+                background: "none",
+                color: "var(--azzurro-testo)",
+                border: "none",
+                fontSize: 13,
+                fontWeight: 700,
+                padding: 0,
+                cursor: plan ? "pointer" : "default",
+                opacity: plan ? 1 : 0.5,
+              }}
+            >
+              Scarica con storico e carichi (.yaml)
             </button>
             {/* The only way back to /import once a plan already exists -- without this,
                 a new or updated file has nowhere to be brought in from. */}

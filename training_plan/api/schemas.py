@@ -32,6 +32,7 @@ from .. import (
     race_prediction,
     readiness,
     technique,
+    workout_analysis,
     zone_recalibration,
 )
 
@@ -65,6 +66,7 @@ class StepIn(BaseModel):
     duration_type: str
     duration_value: float
     target_pace: PaceTargetIn | None = None
+    note: str | None = None
 
     def to_model(self) -> models.Step:
         return models.Step(
@@ -72,6 +74,7 @@ class StepIn(BaseModel):
             duration_type=self.duration_type,
             duration_value=self.duration_value,
             target_pace=self.target_pace.to_model() if self.target_pace else None,
+            note=self.note,
         )
 
 
@@ -80,6 +83,7 @@ class StepOut(BaseModel):
     duration_type: str
     duration_value: float
     target_pace: PaceTargetOut | None = None
+    note: str | None = None
 
     @classmethod
     def from_model(cls, step: models.Step) -> "StepOut":
@@ -88,6 +92,7 @@ class StepOut(BaseModel):
             duration_type=step.duration_type,
             duration_value=step.duration_value,
             target_pace=PaceTargetOut.from_model(step.target_pace),
+            note=step.note,
         )
 
 
@@ -116,6 +121,38 @@ SessionStepIn = RepeatBlockIn | StepIn
 SessionStepOut = RepeatBlockOut | StepOut
 
 
+class ShortVariantIn(BaseModel):
+    title: str
+    description: str | None = None
+    steps: list[SessionStepIn] = Field(default_factory=list)
+
+    def to_model(self) -> models.ShortVariant:
+        return models.ShortVariant(
+            title=self.title,
+            description=self.description,
+            steps=[s.to_model() for s in self.steps],
+        )
+
+
+class ShortVariantOut(BaseModel):
+    title: str
+    description: str | None = None
+    steps: list[SessionStepOut] = Field(default_factory=list)
+
+    @classmethod
+    def from_model(cls, sv: models.ShortVariant | None) -> "ShortVariantOut | None":
+        if sv is None:
+            return None
+        return cls(
+            title=sv.title,
+            description=sv.description,
+            steps=[
+                RepeatBlockOut.from_model(s) if isinstance(s, models.RepeatBlock) else StepOut.from_model(s)
+                for s in sv.steps
+            ],
+        )
+
+
 class TrainingSessionIn(BaseModel):
     date: date_type
     sport: str
@@ -125,6 +162,12 @@ class TrainingSessionIn(BaseModel):
     # Optional on create: the client may choose the id so it can navigate to the new
     # session before the request returns. Ignored everywhere else.
     id: UUID | None = None
+    plan_id: str | None = None
+    locked: bool | None = None
+    priority: str = "flexible"
+    min_duration_minutes: float | None = None
+    short_variant: ShortVariantIn | None = None
+    is_short_active: bool = False
 
     def to_model(self) -> models.TrainingSession:
         return models.TrainingSession(
@@ -133,6 +176,10 @@ class TrainingSessionIn(BaseModel):
             title=self.title,
             description=self.description,
             steps=[s.to_model() for s in self.steps],
+            priority=self.priority,
+            min_duration_minutes=self.min_duration_minutes,
+            short_variant=self.short_variant.to_model() if self.short_variant else None,
+            is_short_active=self.is_short_active,
         )
 
 
@@ -147,6 +194,11 @@ class TrainingSessionOut(BaseModel):
     id: str | None = None
     origin: Literal["import", "manual", "ai"] | None = None
     locked: bool | None = None
+    plan_id: str | None = None
+    priority: str = "flexible"
+    min_duration_minutes: float | None = None
+    short_variant: ShortVariantOut | None = None
+    is_short_active: bool = False
 
     @classmethod
     def from_model(cls, session: models.TrainingSession) -> "TrainingSessionOut":
@@ -159,6 +211,10 @@ class TrainingSessionOut(BaseModel):
                 RepeatBlockOut.from_model(s) if isinstance(s, models.RepeatBlock) else StepOut.from_model(s)
                 for s in session.steps
             ],
+            priority=session.priority,
+            min_duration_minutes=session.min_duration_minutes,
+            short_variant=ShortVariantOut.from_model(session.short_variant),
+            is_short_active=session.is_short_active,
         )
 
 
@@ -242,9 +298,17 @@ class PlanIn(BaseModel):
     imported_at: str
     goal: RaceGoalIn | None = None
     is_import: bool = Field(False, alias="import")
+    plan_id: str = "default"
+    plan_name: str | None = None
+    sports: list[str] | None = None
+    mode: Literal["replace", "merge", "new_plan"] = "replace"
 
 
 class PlanOut(BaseModel):
+    id: str = "default"
+    name: str = "Piano Principale"
+    sports: list[str] = Field(default_factory=lambda: ["running"])
+    is_active: bool = True
     yaml_text: str
     sessions: list[TrainingSessionOut]
     filename: str | None = None
@@ -257,12 +321,35 @@ class PlanOut(BaseModel):
         # recomputed on every read, because both change with nothing but the date.
         goal = RaceGoalIn.model_validate(plan.goal).to_model() if plan.goal else None
         return cls(
+            id=plan.id,
+            name=plan.name,
+            sports=plan.sports,
+            is_active=plan.is_active,
             yaml_text=plan.yaml_text,
             sessions=[TrainingSessionOut.model_validate(s) for s in sessions],
             filename=plan.filename,
             imported_at=plan.imported_at,
             goal=RaceGoalOut.from_model(goal) if goal else None,
         )
+
+
+class PlanSummaryOut(BaseModel):
+    id: str
+    name: str
+    sports: list[str]
+    is_active: bool
+    sessions_count: int
+    goal: RaceGoalOut | None = None
+    imported_at: str
+
+
+class PlanListResponse(BaseModel):
+    plans: list[PlanSummaryOut]
+    active_plan_ids: list[str]
+
+
+class PlanToggleActiveRequest(BaseModel):
+    is_active: bool
 
 
 class PlanResponse(BaseModel):
@@ -279,6 +366,7 @@ class SessionPatch(BaseModel):
     description: str | None = None
     steps: list[SessionStepIn] | None = None
     locked: bool | None = None
+    plan_id: str | None = None
 
     def changes(self) -> dict:
         sent = self.model_dump(mode="json", exclude_unset=True)
@@ -2174,6 +2262,10 @@ class PlanConflictOut(BaseModel):
 
 class GeneratePlanRequest(BaseModel):
     regenerate_skeleton: bool = False
+    mode: Literal["rebuild", "augment", "adapt_current"] = "rebuild"
+    sports: list[str] = Field(default_factory=lambda: ["running"])
+    user_prompt: str | None = None
+    plan_id: str = "default"
 
 
 class GeneratePlanResponse(BaseModel):
@@ -2628,3 +2720,124 @@ class ErrorResponse(BaseModel):
     message: str
     details: list[str] = Field(default_factory=list)
     retry_after_seconds: int | None = None
+
+
+# ---- workout analysis ----------------------------------------------------------------------
+
+
+class StreamBreakpointOut(BaseModel):
+    time_sec: int
+    distance_km: float
+    kind: str
+    headline: str
+    detail: str
+    before_metrics: dict[str, Any]
+    after_metrics: dict[str, Any]
+
+    @classmethod
+    def from_model(cls, bp: "workout_analysis.StreamBreakpoint") -> "StreamBreakpointOut":
+        return cls(
+            time_sec=bp.time_sec,
+            distance_km=bp.distance_km,
+            kind=bp.kind,
+            headline=bp.headline,
+            detail=bp.detail,
+            before_metrics=bp.before_metrics,
+            after_metrics=bp.after_metrics,
+        )
+
+
+class CausalFindingOut(BaseModel):
+    key: str
+    category: str
+    confidence: str
+    evidence_badge: str
+    title: str
+    what_happened: str
+    why_it_happened: str
+    how_to_improve: str
+    supporting_metrics: list[dict[str, str]] = Field(default_factory=list)
+
+    @classmethod
+    def from_model(cls, f: "workout_analysis.CausalFinding") -> "CausalFindingOut":
+        return cls(
+            key=f.key,
+            category=f.category,
+            confidence=f.confidence,
+            evidence_badge=f.evidence_badge,
+            title=f.title,
+            what_happened=f.what_happened,
+            why_it_happened=f.why_it_happened,
+            how_to_improve=f.how_to_improve,
+            supporting_metrics=f.supporting_metrics,
+        )
+
+
+class WorkoutSegmentOut(BaseModel):
+    label: str
+    start_km: float
+    end_km: float
+    duration_min: float
+    avg_pace_formatted: str
+    avg_pace_sec: int
+    avg_hr: int | None = None
+    avg_cadence: int | None = None
+    avg_stride_m: float | None = None
+    elevation_gain_m: float | None = None
+
+    @classmethod
+    def from_model(cls, seg: "workout_analysis.WorkoutSegment") -> "WorkoutSegmentOut":
+        return cls(
+            label=seg.label,
+            start_km=seg.start_km,
+            end_km=seg.end_km,
+            duration_min=seg.duration_min,
+            avg_pace_formatted=seg.avg_pace_formatted,
+            avg_pace_sec=seg.avg_pace_sec,
+            avg_hr=seg.avg_hr,
+            avg_cadence=seg.avg_cadence,
+            avg_stride_m=seg.avg_stride_m,
+            elevation_gain_m=seg.elevation_gain_m,
+        )
+
+
+class WorkoutAnalysisResponse(BaseModel):
+    activity_id: int
+    date: date_type
+    title: str
+    sport: str
+    duration_min: float
+    distance_km: float
+    avg_pace_formatted: str
+    avg_hr: int | None = None
+    verdict_status: str
+    headline: str
+    summary_deterministic: str
+    coach_narrative: str | None = None
+    breakpoints: list[StreamBreakpointOut] = Field(default_factory=list)
+    findings: list[CausalFindingOut] = Field(default_factory=list)
+    segments: list[WorkoutSegmentOut] = Field(default_factory=list)
+    mechanics_summary: dict[str, Any] = Field(default_factory=dict)
+    vigilia_context: dict[str, Any] = Field(default_factory=dict)
+
+    @classmethod
+    def from_model(cls, res: "workout_analysis.WorkoutAnalysisResult") -> "WorkoutAnalysisResponse":
+        return cls(
+            activity_id=res.activity_id,
+            date=res.date,
+            title=res.title,
+            sport=res.sport,
+            duration_min=res.duration_min,
+            distance_km=res.distance_km,
+            avg_pace_formatted=res.avg_pace_formatted,
+            avg_hr=res.avg_hr,
+            verdict_status=res.verdict_status,
+            headline=res.headline,
+            summary_deterministic=res.summary_deterministic,
+            coach_narrative=res.coach_narrative,
+            breakpoints=[StreamBreakpointOut.from_model(b) for b in res.breakpoints],
+            findings=[CausalFindingOut.from_model(f) for f in res.findings],
+            segments=[WorkoutSegmentOut.from_model(s) for s in res.segments],
+            mechanics_summary=res.mechanics_summary,
+            vigilia_context=res.vigilia_context,
+        )

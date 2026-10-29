@@ -262,3 +262,65 @@ def test_the_trend_seeds_the_per_activity_cache(client, improving, fake_garmin):
     before = len(fake_garmin)
     client.get("/coach/technique/3")
     assert len(fake_garmin) == before
+
+
+def test_workout_analysis_endpoints(client, monkeypatch):
+    from datetime import date
+    from training_plan.workout_analysis import WorkoutAnalysisResult, StreamBreakpoint, CausalFinding
+
+    dummy_result = WorkoutAnalysisResult(
+        activity_id=555,
+        date=date(2026, 10, 28),
+        title="Maratona",
+        sport="running",
+        duration_min=60.0,
+        distance_km=12.0,
+        avg_pace_formatted="5:00/km",
+        avg_hr=155,
+        verdict_status="anomalia_rilevata",
+        headline="Aggancio Cadenza al minuto 50",
+        summary_deterministic="12.0 km a 5:00/km medio in 60 minuti.",
+        breakpoints=[
+            StreamBreakpoint(
+                time_sec=3000,
+                distance_km=10.0,
+                kind="cadence_lock",
+                headline="Cadence lock al min 50",
+                detail="Battiti saliti a 170",
+                before_metrics={"hr": 148},
+                after_metrics={"hr": 170},
+            )
+        ],
+        findings=[
+            CausalFinding(
+                key="cadence_lock",
+                category="sensore",
+                confidence="alta",
+                evidence_badge="stream secondo-per-secondo",
+                title="Cadence lock al 50° minuto",
+                what_happened="Salto a 170 bpm",
+                why_it_happened="Il sensore ottico ha agganciato la cadenza dei passi",
+                how_to_improve="Usa la fascia cardio toracica",
+            )
+        ],
+    )
+
+    monkeypatch.setattr(
+        "training_plan.api.routes_coach._workout_analysis",
+        lambda user_id, activity_id, refresh=False: dummy_result,
+    )
+
+    resp = client.get("/coach/workout-analysis/555")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["activity_id"] == 555
+    assert data["verdict_status"] == "anomalia_rilevata"
+    assert len(data["breakpoints"]) == 1
+    assert data["findings"][0]["key"] == "cadence_lock"
+
+    # Test narrative fallback
+    resp_narrative = client.get("/coach/workout-analysis/555/narrative")
+    assert resp_narrative.status_code == 200
+    narrative_data = resp_narrative.json()
+    assert "Cadence" in narrative_data["text"] or "50" in narrative_data["text"]
+

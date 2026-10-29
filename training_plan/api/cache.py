@@ -89,6 +89,7 @@ TTL_SUMMARY_NARRATIVE = 24 * 60 * 60
 # coach narrative on top of it is a model call, keyed by the same activity.
 TTL_COACH_TECHNIQUE = 24 * 60 * 60
 TTL_COACH_NARRATIVE = 24 * 60 * 60
+TTL_COACH_WORKOUT_ANALYSIS = 24 * 60 * 60
 # The trend is keyed by the exact activity list it covers, and that list changes the
 # moment a new session syncs -- so a shorter TTL buys nothing the key does not already.
 TTL_COACH_TREND = 24 * 60 * 60
@@ -151,6 +152,7 @@ class TTLCache:
             "body:readiness-narrative",
             "nutrition:narrative",
             "coach:narrative",
+            "coach:workout_narrative",
             "goal:fit-narrative",
             "summary:narrative",
         )
@@ -254,6 +256,7 @@ class TTLCache:
                 "body:readiness-narrative",
                 "nutrition:narrative",
                 "coach:narrative",
+                "coach:workout_narrative",
                 "goal:fit-narrative",
                 "summary:narrative",
             ],

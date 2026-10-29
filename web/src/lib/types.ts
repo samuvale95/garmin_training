@@ -1,7 +1,7 @@
 // Mirrors training_plan/api/schemas.py field-for-field. Keep in sync by hand until/
 // unless the backend starts generating an OpenAPI client.
 
-export type Sport = "running" | "cycling" | "swimming" | "strength_training" | "other";
+export type Sport = "running" | "cycling" | "swimming" | "strength_training" | "calisthenics" | "other";
 export type StepType = "warmup" | "interval" | "recovery" | "rest" | "cooldown";
 export type DurationType = "time" | "distance";
 
@@ -15,6 +15,7 @@ export interface Step {
   duration_type: DurationType;
   duration_value: number;
   target_pace?: PaceTarget | null;
+  note?: string | null;
 }
 
 /** A group of steps repeated `reps` times -- Garmin's own repeat group, kept as a
@@ -27,6 +28,12 @@ export interface RepeatBlock {
 
 /** What a session's `steps` may hold: plain steps, repeat blocks, or a mix. */
 export type SessionStep = Step | RepeatBlock;
+
+export interface ShortVariant {
+  title: string;
+  description?: string | null;
+  steps: SessionStep[];
+}
 
 export function isRepeatBlock(item: SessionStep): item is RepeatBlock {
   return "reps" in item;
@@ -73,6 +80,27 @@ export interface TrainingSession {
   origin?: "import" | "manual" | "ai";
   /** The user created, edited or moved it: the AI leaves it alone. */
   locked?: boolean;
+  /** The plan this session belongs to (default: "default"). */
+  plan_id?: string;
+  priority?: "key" | "flexible";
+  min_duration_minutes?: number | null;
+  short_variant?: ShortVariant | null;
+  is_short_active?: boolean;
+}
+
+export interface PlanSummary {
+  id: string;
+  name: string;
+  sports: string[];
+  is_active: boolean;
+  sessions_count: number;
+  goal?: RaceGoal | null;
+  imported_at: string;
+}
+
+export interface PlanListResponse {
+  plans: PlanSummary[];
+  active_plan_ids: string[];
 }
 
 export interface ScheduledWorkout {
@@ -1144,4 +1172,61 @@ export interface DayEnergy {
   message: string;
   /** The same without numbers, for level 1. */
   words: string;
+}
+
+// ---- workout root-cause analysis -------------------------------------------------------
+
+export interface StreamBreakpoint {
+  time_sec: number;
+  distance_km: number;
+  kind: string;
+  headline: string;
+  detail: string;
+  before_metrics: Record<string, string | number>;
+  after_metrics: Record<string, string | number>;
+}
+
+export interface CausalFinding {
+  key: string;
+  category: "sensore" | "meccanica" | "pacing" | "metabolica" | "fisiologica" | "salita";
+  confidence: "alta" | "media" | "ipotesi";
+  evidence_badge: string;
+  title: string;
+  what_happened: string;
+  why_it_happened: string;
+  how_to_improve: string;
+  supporting_metrics: { label: string; value: string }[];
+}
+
+export interface WorkoutSegment {
+  label: string;
+  start_km: number;
+  end_km: number;
+  duration_min: number;
+  avg_pace_formatted: string;
+  avg_pace_sec: number;
+  avg_hr: number | null;
+  avg_cadence: number | null;
+  avg_stride_m: number | null;
+  elevation_gain_m: number | null;
+}
+
+export interface WorkoutAnalysis {
+  activity_id: number;
+  date: string;
+  title: string;
+  sport: string;
+  duration_min: number;
+  distance_km: number;
+  avg_pace_formatted: string;
+  avg_hr: number | null;
+  verdict_status: "ottimo" | "da_rivedere" | "anomalia_rilevata";
+  headline: string;
+  summary_deterministic: string;
+  coach_narrative: string | null;
+  breakpoints: StreamBreakpoint[];
+  findings: CausalFinding[];
+  segments: WorkoutSegment[];
+  mechanics_summary: Record<string, unknown>;
+  vigilia_context: Record<string, unknown>;
 }

@@ -1,7 +1,7 @@
 import type { IllustrationName } from "@/components/Illustration";
 import { sessionFallbackPaceSecPerKm, stepDistanceKm } from "./format";
 import { flattenSteps, isRepeatBlock } from "./types";
-import type { ScheduledWorkout, SessionStep, Sport, TrainingSession } from "./types";
+import type { ScheduledWorkout, SessionStep, ShortVariant, Sport, TrainingSession } from "./types";
 
 export type SessionKind = "riposo" | "ripetute" | "fondo_lento" | "forza" | "lungo";
 
@@ -14,6 +14,8 @@ export interface DisplaySession {
   sport: string;
   title: string;
   steps?: SessionStep[];
+  is_short_active?: boolean;
+  short_variant?: ShortVariant | null;
 }
 
 export interface SessionVisual {
@@ -48,10 +50,13 @@ const LONG_RUN_KM = 15;
  * -- a repeat block, or several interval steps with recoveries between them. */
 export function classifySession(session: DisplaySession | null): SessionVisual {
   if (!session) return { kind: "riposo", ...VISUALS.riposo };
-  if (session.sport === "strength_training") return { kind: "forza", ...VISUALS.forza };
+  if (session.sport === "strength_training" || session.sport === "calisthenics") return { kind: "forza", ...VISUALS.forza };
   if (session.sport === "cycling") return { kind: "lungo", ...VISUALS.lungo };
 
-  const steps = session.steps ?? [];
+  const steps =
+    session.is_short_active && session.short_variant?.steps
+      ? session.short_variant.steps
+      : (session.steps ?? []);
   const efforts = flattenSteps(steps).filter((s) => s.type === "interval").length;
   if (steps.some(isRepeatBlock) || efforts > 1) return { kind: "ripetute", ...VISUALS.ripetute };
   if (sessionDistanceKm(session) >= LONG_RUN_KM) {
@@ -70,7 +75,18 @@ export function classifySession(session: DisplaySession | null): SessionVisual {
  * the session's own slowest pace (see `sessionFallbackPaceSecPerKm`) rather than
  * dropped. */
 export function sessionDistanceKm(session: DisplaySession): number {
-  const steps = session.steps ?? [];
+  if (session.sport === "strength_training" || session.sport === "calisthenics") return 0;
+  const steps =
+    session.is_short_active && session.short_variant?.steps
+      ? session.short_variant.steps
+      : (session.steps ?? []);
+  if (session.sport === "cycling") {
+    return flattenSteps(steps).reduce((sum, s) => {
+      if (s.duration_type === "distance") return sum + s.duration_value;
+      if (s.type === "rest") return sum;
+      return sum + (s.duration_value * 25.0) / 60.0;
+    }, 0);
+  }
   const fallbackPace = sessionFallbackPaceSecPerKm(steps);
   return flattenSteps(steps).reduce((sum, s) => sum + stepDistanceKm(s, fallbackPace), 0);
 }

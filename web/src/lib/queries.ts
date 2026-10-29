@@ -36,6 +36,8 @@ import type {
   Narrative,
   PersonalCorrelationsData,
   PlanDiff,
+  PlanListResponse,
+  PlanSummary,
   Progress,
   RaceGoal,
   SessionSlot,
@@ -49,6 +51,7 @@ import type {
   SyncJobStatus,
   TrainingSession,
   WeekSummary,
+  WorkoutAnalysis,
   ZoneRecalibrationData,
 } from "./types";
 
@@ -101,6 +104,10 @@ export interface PlanState {
   importedAt: string | null;
   /** The race this plan is written for, when it states one (see `RaceGoal`). */
   goal?: RaceGoal | null;
+  planId?: string;
+  planName?: string;
+  sports?: string[];
+  mode?: "replace" | "merge" | "new_plan";
 }
 
 function readLegacyPlan(): PlanState | null {
@@ -259,11 +266,16 @@ function persistPlanToServer(queryClient: ReturnType<typeof useQueryClient>, pla
         // The whole-plan write is an import now (see `schemas.PlanIn`): without this
         // marker the server ignores the sessions.
         import: true,
+        mode: plan.mode ?? "replace",
+        plan_id: plan.planId ?? undefined,
+        plan_name: plan.planName ?? plan.filename ?? undefined,
+        sports: plan.sports ?? undefined,
       })
     : apiDelete<{ ok: boolean }>("/plan");
 
   request
     .then((saved) => {
+      queryClient.invalidateQueries({ queryKey: PLANS_LIST_KEY });
       // The imported sessions come back with the ids the server gave them; without
       // adopting those, the next edit would have nothing to address.
       if (plan && "sessions" in saved && saved.sessions) {
@@ -501,6 +513,24 @@ export function useRemoveSession() {
     apiDelete<{ ok: boolean }>(`/plan/sessions/${id}`).catch(() =>
       replaceSessionLocally(queryClient, id, () => before)
     );
+  };
+}
+
+export function useToggleSessionShort() {
+  const queryClient = useQueryClient();
+  return (id: string) => {
+    const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
+    const before = current?.sessions.find((s) => s.id === id);
+    if (!before) return;
+    const optimistic: TrainingSession = {
+      ...before,
+      is_short_active: !before.is_short_active,
+    };
+    replaceSessionLocally(queryClient, id, () => optimistic);
+
+    apiPost<TrainingSession>(`/plan/sessions/${id}/toggle-short`, {})
+      .then((saved) => replaceSessionLocally(queryClient, id, () => saved))
+      .catch(() => replaceSessionLocally(queryClient, id, () => before));
   };
 }
 
@@ -1115,6 +1145,26 @@ export function useSportTrend(activityIds: number[], enabled = true) {
   });
 }
 
+/** Multi-signal root-cause analysis for a completed workout. */
+export function useWorkoutAnalysis(activityId: number | null, enabled = true) {
+  return useQuery({
+    queryKey: ["coach", "workout-analysis", activityId],
+    queryFn: ({ signal }) => apiGet<WorkoutAnalysis | null>(`/coach/workout-analysis/${activityId}`, undefined, signal),
+    enabled: enabled && activityId != null,
+    staleTime: Infinity,
+  });
+}
+
+/** The narrative for the workout root-cause analysis. */
+export function useWorkoutAnalysisNarrative(activityId: number | null, enabled = true) {
+  return useQuery({
+    queryKey: ["coach", "workout-analysis-narrative", activityId],
+    queryFn: ({ signal }) => apiGet<Narrative>(`/coach/workout-analysis/${activityId}/narrative`, undefined, signal),
+    enabled: enabled && activityId != null,
+    staleTime: Infinity,
+  });
+}
+
 /** What the plan asked for, against what the streams say happened.
  *
  * The most expensive answer in the app -- a Strava match plus a stream fetch per session
@@ -1345,6 +1395,14 @@ const GENERATE_PLAN_KEY = ["plan-generate"] as const;
 /** Generation waits on a model and may retry it: well past the default request timeout. */
 const GENERATE_TIMEOUT_MS = 4 * 60_000;
 
+export interface GeneratePlanOptions {
+  regenerateSkeleton?: boolean;
+  mode?: "rebuild" | "augment" | "adapt_current";
+  sports?: string[];
+  userPrompt?: string | null;
+  planId?: string | null;
+}
+
 /** Write the next weeks of the plan server-side (see `training_plan/plan_generator.py`),
  * then adopt the server's plan, so the new sessions show without a reload. Sessions the
  * user edited by hand are untouched by the server, so nothing local is lost. */
@@ -1352,8 +1410,24 @@ export function useGeneratePlan() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationKey: GENERATE_PLAN_KEY,
-    mutationFn: (regenerateSkeleton: boolean = false) =>
-      apiPost<GeneratePlanResult>("/plan/generate", { regenerate_skeleton: regenerateSkeleton }, undefined, GENERATE_TIMEOUT_MS),
+    mutationFn: (optionsOrRegenerate: boolean | GeneratePlanOptions = false) => {
+      const opts: GeneratePlanOptions =
+        typeof optionsOrRegenerate === "boolean"
+          ? { regenerateSkeleton: optionsOrRegenerate }
+          : optionsOrRegenerate;
+      return apiPost<GeneratePlanResult>(
+        "/plan/generate",
+        {
+          regenerate_skeleton: opts.regenerateSkeleton ?? false,
+          mode: opts.mode ?? "rebuild",
+          sports: opts.sports ?? ["running"],
+          user_prompt: opts.userPrompt ?? null,
+          plan_id: opts.planId ?? null,
+        },
+        undefined,
+        GENERATE_TIMEOUT_MS
+      );
+    },
     onSuccess: async (result) => {
       // Only the generated window is taken from the server: an edit elsewhere in the plan
       // may still be on its way there, and adopting the whole plan would hide it.
@@ -1372,6 +1446,46 @@ export function useGeneratePlan() {
             }
           : plan
       );
+      queryClient.invalidateQueries({ queryKey: ["plan-diff"] });
+      queryClient.invalidateQueries({ queryKey: PLANS_LIST_KEY });
+    },
+  });
+}
+
+// ---- multi-plan management -----------------------------------------------------------------
+
+export const PLANS_LIST_KEY = ["plans-list"] as const;
+
+export function usePlanListQuery() {
+  return useQuery({
+    queryKey: PLANS_LIST_KEY,
+    queryFn: () => apiGet<PlanListResponse>("/plan/list"),
+    staleTime: 30_000,
+  });
+}
+
+export function useTogglePlanActive() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ planId, isActive }: { planId: string; isActive: boolean }) =>
+      apiPost<{ plan_id: string; is_active: boolean }>(`/plan/${planId}/toggle-active`, { is_active: isActive }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: PLANS_LIST_KEY });
+      const { plan } = await apiGet<{ plan: PlanState | null }>("/plan");
+      applyPlanLocally(queryClient, plan);
+      queryClient.invalidateQueries({ queryKey: ["plan-diff"] });
+    },
+  });
+}
+
+export function useDeletePlanById() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (planId: string) => apiDelete<{ deleted_plan_id: string }>(`/plan/${planId}`),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: PLANS_LIST_KEY });
+      const { plan } = await apiGet<{ plan: PlanState | null }>("/plan");
+      applyPlanLocally(queryClient, plan);
       queryClient.invalidateQueries({ queryKey: ["plan-diff"] });
     },
   });

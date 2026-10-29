@@ -100,6 +100,13 @@ export function TodayHeroUnified({
                     {stepGroupLine(heroMainGroup)}
                   </p>
                 )}
+                {heroSession.short_variant && (
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, background: heroSession.is_short_active ? "rgba(232, 93, 78, 0.15)" : "var(--sabbia)", padding: "2px 8px", borderRadius: "var(--radius-pill)" }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: heroSession.is_short_active ? "var(--corallo-testo)" : "var(--inchiostro-70)" }}>
+                      {heroSession.is_short_active ? "⚡ Variante salva-tempo attiva" : "⚡ Poco tempo? Disponibile variante corta"}
+                    </span>
+                  </div>
+                )}
                 {heroMatch?.matched && heroMatch.distance_km != null && (
                   <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, background: "var(--sabbia)", padding: "3px 8px", borderRadius: 8 }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, color: "var(--verde-tratto-scuro)", fontWeight: 600 }}>

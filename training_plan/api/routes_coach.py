@@ -17,7 +17,7 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, Query
 from fastapi.concurrency import run_in_threadpool
 
-from .. import history, intensity, llm, nutrition, paces, prescription, technique, zone_recalibration
+from .. import history, intensity, llm, nutrition, paces, prescription, technique, workout_analysis, zone_recalibration
 from . import garmin_session, routes_strava, schemas
 from .auth import current_user_id
 from .cache import (
@@ -26,6 +26,7 @@ from .cache import (
     TTL_COACH_PLAN,
     TTL_COACH_TECHNIQUE,
     TTL_COACH_TREND,
+    TTL_COACH_WORKOUT_ANALYSIS,
     TTL_COACH_ZONES,
     cache,
 )
@@ -74,6 +75,92 @@ async def coach_technique_narrative(
 
     return await run_in_threadpool(
         lambda: cache.get_or_call("coach:narrative", user_id, activity_id, TTL_COACH_NARRATIVE, compute, refresh=refresh)
+    )
+
+
+def _workout_analysis(
+    user_id: str, activity_id: int, refresh: bool = False
+) -> workout_analysis.WorkoutAnalysisResult | None:
+    def compute() -> workout_analysis.WorkoutAnalysisResult | None:
+        zones = _zones(user_id)
+        res = workout_analysis.compute_workout_analysis(user_id, activity_id, zones=zones)
+        if res is not None:
+            return res
+        # If not found in stored history, attempt live Strava streams
+        try:
+            streams = routes_strava._run(user_id, lambda sync: sync.get_activity_streams(activity_id))
+            if streams and streams.get("time"):
+                fallback_act = {
+                    "source": "strava",
+                    "activity_id": activity_id,
+                    "day": date.today(),
+                    "sport": "running",
+                    "title": "Corsa",
+                }
+                return workout_analysis.compute_workout_analysis(
+                    user_id, activity_id, zones=zones, fallback_streams=streams, fallback_activity=fallback_act
+                )
+        except Exception:
+            pass
+        return None
+
+    return cache.get_or_call(
+        "coach:workout_analysis",
+        user_id,
+        activity_id,
+        TTL_COACH_WORKOUT_ANALYSIS,
+        compute,
+        refresh=refresh,
+    )
+
+
+@router.get("/coach/workout-analysis/{activity_id}", response_model=schemas.WorkoutAnalysisResponse | None)
+async def coach_workout_analysis(
+    activity_id: int, refresh: bool = False, user_id: str = Depends(current_user_id)
+) -> schemas.WorkoutAnalysisResponse | None:
+    """Multi-signal root-cause analysis for a completed workout."""
+    result = await run_in_threadpool(_workout_analysis, user_id, activity_id, refresh)
+    if result is None:
+        return None
+    return schemas.WorkoutAnalysisResponse.from_model(result)
+
+
+@router.get("/coach/workout-analysis/{activity_id}/narrative", response_model=schemas.NarrativeResponse)
+async def coach_workout_analysis_narrative(
+    activity_id: int, refresh: bool = False, user_id: str = Depends(current_user_id)
+) -> schemas.NarrativeResponse:
+    """The root-cause analysis phrased by a coach, falling back to deterministic facts."""
+    result = await run_in_threadpool(_workout_analysis, user_id, activity_id)
+    if result is None:
+        return schemas.NarrativeResponse(text="Nessun dato di stream disponibile per questa seduta.", source="template")
+
+    def compute() -> schemas.NarrativeResponse:
+        facts = {
+            "titolo": result.title,
+            "distanza_km": result.distance_km,
+            "passo_medio": result.avg_pace_formatted,
+            "battiti_medi": result.avg_hr,
+            "anomalie": [
+                {"tipo": b.kind, "minuto": int(round(b.time_sec / 60.0)), "dettaglio": b.detail}
+                for b in result.breakpoints
+            ],
+            "conclusioni": [
+                {"titolo": f.title, "cosa": f.what_happened, "perche": f.why_it_happened, "azione": f.how_to_improve}
+                for f in result.findings
+            ],
+        }
+        text = llm.write_workout_diagnosis(facts)
+        if text:
+            return schemas.NarrativeResponse(text=text, source="model")
+        fallback = result.headline
+        if result.findings:
+            fallback += f". {result.findings[0].why_it_happened}"
+        return schemas.NarrativeResponse(text=fallback, source="template")
+
+    return await run_in_threadpool(
+        lambda: cache.get_or_call(
+            "coach:workout_narrative", user_id, activity_id, TTL_COACH_NARRATIVE, compute, refresh=refresh
+        )
     )
 
 

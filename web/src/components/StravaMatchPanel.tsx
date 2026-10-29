@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { formatPaceValue } from "@/lib/format";
 import type { StravaActivityMatch } from "@/lib/types";
+import { useWorkoutAnalysis, useWorkoutAnalysisNarrative } from "@/lib/queries";
+import { WorkoutAnalysisSection } from "@/components/WorkoutAnalysisSection";
 
 /** The "svolto" and "pianificato" panel for a matched Strava activity -- rendered by
  * `StravaComparisonScreen` for both an imported plan's session and a live
@@ -18,6 +20,10 @@ export function StravaMatchPanel({
   isLoading: boolean;
   shoesFrom: string;
 }) {
+  const activityId = match?.activity_id ?? null;
+  const analysisQuery = useWorkoutAnalysis(activityId, !!activityId);
+  const narrativeQuery = useWorkoutAnalysisNarrative(activityId, !!activityId && !!analysisQuery.data);
+
   if (!match || !match.matched) {
     return (
       <p style={{ fontSize: 14, color: "var(--inchiostro-50)", marginTop: 20, textAlign: "center" }}>
@@ -141,6 +147,14 @@ export function StravaMatchPanel({
           <p style={{ fontWeight: 700, margin: "0 0 4px", fontSize: 14 }}>Cosa cambia nel piano</p>
           <p style={{ fontSize: 13.5, margin: 0, lineHeight: 1.45 }}>{match.plan_note}</p>
         </div>
+      )}
+
+      {analysisQuery.data && (
+        <WorkoutAnalysisSection
+          analysis={analysisQuery.data}
+          narrativeText={narrativeQuery.data?.text}
+          animate={true}
+        />
       )}
     </>
   );

@@ -36,6 +36,7 @@ from .models import (
     PaceTarget,
     RaceGoal,
     RepeatBlock,
+    ShortVariant,
     Step,
     TrainingSession,
     avg_pace_sec_per_km,
@@ -503,42 +504,59 @@ def check(proposal: Sequence[TrainingSession], window: Window) -> list[str]:
 
 # ---- the brief ----------------------------------------------------------------------------
 
-PLAN_SYSTEM_PROMPT = """Sei l'allenatore di Passo, un'app di allenamento per la corsa.
+PLAN_SYSTEM_PROMPT = """Sei l'allenatore di Passo, un'app intelligente di allenamento sportivo (corsa, ciclismo, calisthenics, nuoto, forza).
 
-Componi le sedute di corsa per i giorni indicati, dentro i limiti che ti passo. I limiti
-li ha calcolati l'app dai dati di chi corre: non si discutono e non si superano.
+Componi o adatta le sedute di allenamento per i giorni indicati, dentro i limiti che ti passo. I limiti
+li ha calcolati l'app dai dati reali dell'atleta: non si discutono e non si superano.
 
 Come lavori:
-- Per ogni settimana: minuti totali di corsa fra "minuti_minimi" e "minuti_massimi",
-  non più di "giorni_di_corsa_max" giorni di corsa, non più di "qualita_max" sedute di
-  qualità, nessuna corsa più lunga di "lungo_max_minuti".
-- Una seduta è di qualità se contiene un blocco di ripetute ("repeat") o almeno 5 minuti
-  più veloci della fascia facile. Una corsa di 90 minuti o più è un lungo. Qualità e
-  lungo sono sedute dure.
-- Rispetta le "regole" del livello, alla lettera.
-- Usa solo giorni in "giorni_disponibili" e al massimo una seduta al giorno. Non toccare
-  le "sedute_fisse" e lascia liberi i loro giorni.
-- Ritmi: se ci sono "fasce_di_ritmo", ogni passo warmup, interval e cooldown ha un
-  "target_pace" dentro quelle fasce ("M:SS" o "M:SS-M:SS", minuti al km). Se non ci sono,
-  nessun passo ha "target_pace" e lo sforzo si descrive a parole.
-- Ogni seduta ha una "description" di una o due frasi, in italiano, che dice a cosa serve
-  e come farla. Non citare numeri diversi da quelli della seduta.
-- Titoli brevi e concreti ("Fondo facile 45'", "Soglia 5x5'", "Lungo lento 80'").
+- Sport supportati: "running", "cycling", "calisthenics", "strength_training", "swimming", "other".
+- Se lo sport è "running":
+  - Per ogni settimana: minuti totali di corsa fra "minuti_minimi" e "minuti_massimi",
+    non più di "giorni_di_corsa_max" giorni di corsa, non più di "qualita_max" sedute di
+    qualità, nessuna corsa più lunga di "lungo_max_minuti".
+  - Una seduta è di qualità se contiene un blocco di ripetute ("repeat") o almeno 5 minuti
+    più veloci della fascia facile. Una corsa di 90 minuti o più è un lungo. Qualità e
+    lungo sono sedute dure.
+  - Se ci sono "fasce_di_ritmo", ogni passo warmup, interval e cooldown ha un "target_pace"
+    dentro quelle fasce ("M:SS" o "M:SS-M:SS", minuti al km).
+- Se lo sport è "calisthenics":
+  - Allenamento a corpo libero al parco / sbarra (trazioni, dip, push-up, core, muscle-up).
+  - Poiché focalizzato su parte superiore e tronco, NON affatica le gambe ed è compatibile anche prima o dopo le corse.
+  - Ogni step può avere una "note" esplicativa (es. "Trazioni 8-10 rip", "Dip alle parallele").
+- Se lo sport è "strength_training":
+  - Inserisci sedute di potenziamento funzionale, mobilità e core (30-60 minuti).
+  - REGOLA FONDAMENTALE: Non inserire MAI forza gambe pesante il giorno immediatamente PRIMA di una seduta di qualità o del lungo di corsa.
+- Se lo sport è "cycling" o "swimming":
+  - Inserisci sedute di scarico aerobico o fondo in Z2/recupero attivo (45-90 minuti), ottime per accumulare volume cardiovascolare senza impatto osteoarticolare.
+- Opzione "Salva-Tempo" (short_variant):
+  - Per TUTTE le sedute non fondamentali (corsa facile, calisthenics, bici Z2), genera SEMPRE anche una "short_variant" (durata 25-35 minuti) che l'atleta può attivare nei giorni in cui ha poco tempo:
+    - Per corsa/bici: riduci la durata mantenendo il ritmo facile.
+    - Per calisthenics: struttura la variante corta raggruppando gli esercizi in superset (es. trazioni + dip) o riducendo le serie da 5 a 3.
+- Modalità di generazione:
+  - "rebuild": rigenera le prossime settimane della finestra rispettando le sedute bloccate dell'utente.
+  - "augment": integra il piano attuale aggiungendo sedute per gli sport richiesti (es. calisthenics, bici) lasciando intatte le sedute di corsa già programmate e incastrandole nei giorni liberi.
+  - "adapt_current": adatta o riequilibra il piano tenendo conto delle indicazioni fornite in "indicazioni_utente".
+- Rispetta le "regole" del livello e i giorni di riposo settimanali.
+- Ogni seduta ha una "description" di una o due frasi in italiano con indicazioni chiare e motivanti.
+- Titoli brevi e concreti ("Fondo facile 45'", "Parco: Trazioni e Dip", "Soglia 5x5'", "Lungo lento 80'", "Scarico Z2 Bici 60'").
 
 Rispondi SOLO con un oggetto JSON, senza testo intorno e senza blocchi di codice:
 {"sessions": [
-  {"date": "YYYY-MM-DD", "sport": "running", "title": "...", "description": "...",
+  {"date": "YYYY-MM-DD", "sport": "running", "title": "Corsa facile 50'", "description": "...",
    "steps": [
-     {"type": "warmup", "duration_type": "time", "duration_value": 15, "target_pace": "6:30"},
-     {"repeat": 5, "steps": [
-       {"type": "interval", "duration_type": "time", "duration_value": 5, "target_pace": "5:05"},
-       {"type": "recovery", "duration_type": "time", "duration_value": 2}
-     ]},
-     {"type": "cooldown", "duration_type": "time", "duration_value": 10, "target_pace": "6:30"}
-   ]}
+     {"type": "interval", "duration_type": "time", "duration_value": 50, "target_pace": "5:30"}
+   ],
+   "short_variant": {
+     "title": "Corsa facile (ridotta 30')",
+     "description": "Versione salva-tempo: stimolo aerobico preservato in 30 minuti.",
+     "steps": [
+       {"type": "interval", "duration_type": "time", "duration_value": 30, "target_pace": "5:30"}
+     ]
+   }
+  }
 ]}
-"type" è uno fra warmup, interval, recovery, cooldown; "duration_type" è "time" (minuti)
-o "distance" (chilometri)."""
+"type" è uno fra warmup, interval, recovery, cooldown, rest; "duration_type" è "time" (minuti) o "distance" (chilometri)."""
 
 
 def _rules_in_words(level: int) -> list[str]:
@@ -556,13 +574,21 @@ def _rules_in_words(level: int) -> list[str]:
     return out
 
 
-def brief(window: Window) -> list[dict]:
+def brief(
+    window: Window,
+    mode: str = "rebuild",
+    sports: list[str] | None = None,
+    user_prompt: str | None = None,
+) -> list[dict]:
     from .levels import LEVEL_MEANINGS, LEVEL_NAMES
 
     level = window.level
     goal = window.goal
     facts = {
         "oggi": window.today.isoformat(),
+        "modalita": mode,
+        "sport_richiesti": sports or ["running"],
+        "indicazioni_utente": user_prompt,
         "livello": {"numero": level, "nome": LEVEL_NAMES[level], "significato": LEVEL_MEANINGS.get(level)},
         "obiettivo": None
         if goal is None
@@ -601,6 +627,7 @@ def brief(window: Window) -> list[dict]:
             {
                 "data": s.date.isoformat(),
                 "titolo": s.title,
+                "sport": s.sport,
                 "minuti": round(_running_minutes(s)),
                 "tipo": plan_rules.session_kind(s),
             }
@@ -641,9 +668,12 @@ def ask_model(
     compose: Callable[[list[dict]], str | None] = llm.compose_plan,
     *,
     clock: Callable[[], float] = time.monotonic,
+    mode: str = "rebuild",
+    sports: list[str] | None = None,
+    user_prompt: str | None = None,
 ) -> Attempts:
     """Ask, check, send the failures back; at most `MAX_ATTEMPTS`, within the budget."""
-    messages = brief(window)
+    messages = brief(window, mode=mode, sports=sports, user_prompt=user_prompt)
     started = clock()
     errors: list[str] = []
     attempts = 0
@@ -800,7 +830,24 @@ def compose_fallback(window: Window) -> list[TrainingSession]:
             # Whole minutes, rounded down: rounding up on every day can push the week past
             # its maximum, and rounding down to 5 can drop a small week under its minimum.
             minutes = min(week.long_run_max, int(remaining / len(easy_days)))
-            sessions[day] = _easy_run(day, minutes, window.bands)
+            sess = _easy_run(day, minutes, window.bands)
+            if minutes >= 40:
+                short_m = max(25, int(minutes * 0.6))
+                sess.min_duration_minutes = float(short_m)
+                first_step = sess.steps[0] if sess.steps and isinstance(sess.steps[0], Step) else None
+                sess.short_variant = ShortVariant(
+                    title=f"Corsa facile (ridotta {short_m}')",
+                    description=f"Versione salva-tempo: stimolo aerobico preservato in {short_m} minuti.",
+                    steps=[
+                        Step(
+                            type="interval",
+                            duration_type="time",
+                            duration_value=float(short_m),
+                            target_pace=first_step.target_pace if first_step else None,
+                        )
+                    ],
+                )
+            sessions[day] = sess
         out += [sessions[d] for d in sorted(sessions)]
     return out
 
@@ -902,6 +949,10 @@ def generate(
     write: bool = True,
     threshold_hr: int | None = None,
     hold_lock: bool = True,
+    mode: str = "rebuild",
+    sports: list[str] | None = None,
+    user_prompt: str | None = None,
+    plan_id: str = "default",
 ) -> GenerationResult:
     """Write the next weeks -- or, with `write=False`, only propose them (plan adaptation
     in proposal mode). `threshold_hr` is stored with the skeleton so a later change of
@@ -911,7 +962,7 @@ def generate(
 
     with one_at_a_time(user_id) if hold_lock else nullcontext():
         context, days = plan_rules.gather_context(user_id, today, threshold_available=threshold_available)
-        raw_goal = db.current_goal(user_id)
+        raw_goal = db.current_goal(user_id, plan_id=plan_id)
         goal = goal_from_dict(raw_goal)
         start, end = window_dates(today, goal)
         if goal is not None and goal.race_date < start:
@@ -919,7 +970,7 @@ def generate(
             start, end = window_dates(today)
         mondays = [_monday(start) + timedelta(weeks=k) for k in range((_monday(end) - _monday(start)).days // 7 + 1)]
 
-        stored_skeleton = db.get_skeleton(user_id)
+        stored_skeleton = db.get_skeleton(user_id, plan_id=plan_id)
         regenerated = regenerate_skeleton or not skeleton_is_current(
             stored_skeleton, goal=raw_goal, level=context.effective_level, mondays=mondays
         )
@@ -939,6 +990,7 @@ def generate(
                     "inputs": {"goal": raw_goal, "effective_level": context.effective_level},
                     "weeks": [week.to_dict() for week in weeks],
                 },
+                plan_id=plan_id,
             )
         else:
             weeks = [SkeletonWeek.from_dict(week) for week in stored_skeleton["weeks"]]
@@ -949,11 +1001,15 @@ def generate(
 
         def fresh_window() -> tuple[Window, dict[str, str]]:
             seen = plan_store.snapshot(user_id, *span)
+            stored = plan_store.list_sessions(user_id, plan_id=plan_id)
+            if mode == "augment":
+                # In augment mode, existing sessions within the window are protected as locked
+                stored = [{**s, "locked": True} for s in stored]
             window = build_window(
                 today=today,
                 skeleton=weeks,
                 context=context,
-                stored=plan_store.list_sessions(user_id),
+                stored=stored,
                 days=days,
                 bands=pace_bands(profile),
                 goal=goal,
@@ -962,7 +1018,13 @@ def generate(
 
         window, seen = fresh_window()
         if llm.configured():
-            attempts = ask_model(window, compose)
+            attempts = ask_model(
+                window,
+                compose,
+                mode=mode,
+                sports=sports,
+                user_prompt=user_prompt,
+            )
         else:
             attempts = Attempts(None, 0, "modello non configurato")
 
@@ -992,13 +1054,10 @@ def generate(
                     [session_to_dict(s) for s in (*sessions, *window.fixed)],
                     origin="ai",
                     expected=(*span, seen),
+                    plan_id=plan_id,
                 )
                 break
             except plan_store.PlanChanged:
-                # The user changed the plan while the model was writing: what was checked
-                # is no longer what would be written around. Check the same proposal
-                # against the plan as it is now; if it no longer fits, the rules write a
-                # window that does -- quickly, so the user is not made to wait again.
                 window, seen = fresh_window()
                 if check(sessions, window):
                     source, sessions = SOURCE_RULES, _fallback_or_fail(user_id, window)
@@ -1007,8 +1066,8 @@ def generate(
             raise GenerationFailed(["Il piano continua a cambiare mentre lo scrivo: riprova tra poco."])
 
         if threshold_hr is not None:
-            stored = db.get_skeleton(user_id) or {}
-            db.save_skeleton(user_id, {**stored, "threshold_hr": threshold_hr})
+            stored = db.get_skeleton(user_id, plan_id=plan_id) or {}
+            db.save_skeleton(user_id, {**stored, "threshold_hr": threshold_hr}, plan_id=plan_id)
         return GenerationResult(
             source=source,
             attempts=attempts.count,

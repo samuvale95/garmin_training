@@ -25,6 +25,9 @@ function stepLines(step: Step, indent: string): string[] {
     const range = `${formatPace(step.target_pace.slower_sec_per_km)}-${formatPace(step.target_pace.faster_sec_per_km)}`;
     lines.push(`${indent}  target_pace: ${y(range)}`);
   }
+  if (step.note) {
+    lines.push(`${indent}  note: ${y(step.note)}`);
+  }
   return lines;
 }
 
@@ -57,6 +60,8 @@ export function serializePlanToYaml(sessions: TrainingSession[], goal?: RaceGoal
     lines.push(`    sport: ${session.sport}`);
     lines.push(`    title: ${y(session.title)}`);
     if (session.description) lines.push(`    description: ${y(session.description)}`);
+    if (session.priority && session.priority !== "flexible") lines.push(`    priority: ${session.priority}`);
+    if (session.min_duration_minutes != null) lines.push(`    min_duration_minutes: ${session.min_duration_minutes}`);
     if (session.steps.length > 0) {
       lines.push("    steps:");
       for (const item of session.steps) {
@@ -69,12 +74,43 @@ export function serializePlanToYaml(sessions: TrainingSession[], goal?: RaceGoal
         lines.push(...stepLines(item, "      "));
       }
     }
+    if (session.short_variant) {
+      lines.push("    short_variant:");
+      lines.push(`      title: ${y(session.short_variant.title)}`);
+      if (session.short_variant.description) lines.push(`      description: ${y(session.short_variant.description)}`);
+      if (session.short_variant.steps && session.short_variant.steps.length > 0) {
+        lines.push("      steps:");
+        for (const item of session.short_variant.steps) {
+          if (isRepeatBlock(item)) {
+            lines.push(`        - repeat: ${item.reps}`);
+            lines.push("          steps:");
+            for (const step of item.steps) lines.push(...stepLines(step, "            "));
+            continue;
+          }
+          lines.push(...stepLines(item, "        "));
+        }
+      }
+    }
   }
   return `${lines.join("\n")}\n`;
 }
 
 export function downloadPlanYaml(sessions: TrainingSession[], filename = "piano.yaml", goal?: RaceGoal | null) {
   const blob = new Blob([serializePlanToYaml(sessions, goal)], { type: "text/yaml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadEnrichedPlanYaml(planId?: string, filename = "piano-passo-arricchito.yaml") {
+  const { apiGetBlob } = await import("./apiClient");
+  const blob = await apiGetBlob("/plan/export", {
+    enriched: "true",
+    ...(planId ? { plan_id: planId } : {}),
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

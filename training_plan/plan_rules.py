@@ -78,6 +78,7 @@ RULES: dict[str, Rule] = {
         Rule("deload", EVIDENCE_CONSENSUS, False, (0.80, 0.80, 0.85)),
         Rule("acwr_high", EVIDENCE_RESEARCH, True, (1.35, 1.35, 1.35)),
         Rule("acwr_excessive", EVIDENCE_RESEARCH, True, (1.50, 1.50, 1.50)),
+        Rule("strength_before_hard", EVIDENCE_CONSENSUS, True, (0, 0, 1)),
     )
 }
 
@@ -139,12 +140,17 @@ def _hard_minutes(session: TrainingSession) -> float:
 def session_kind(session: TrainingSession) -> str:
     if session.sport == STRENGTH:
         return KIND_STRENGTH
+    if session.sport == "calisthenics":
+        return "calisthenics"
     if session.sport != RUNNING:
+        dur = session_duration_minutes(session)
+        if dur >= 90 or any(isinstance(step, RepeatBlock) for step in session.effective_steps):
+            return KIND_LONG if dur >= 90 else KIND_QUALITY
         return KIND_OTHER
     # A few strides at the end of an easy run are not a quality session: counting them as
     # one made a plan's easy Tuesday a third hard day. It takes a repeat block or enough
     # minutes of real work.
-    if any(isinstance(step, RepeatBlock) for step in session.steps) or (
+    if any(isinstance(step, RepeatBlock) for step in session.effective_steps) or (
         has_quality_work(session) and _hard_minutes(session) >= MIN_QUALITY_MINUTES
     ):
         return KIND_QUALITY
@@ -507,6 +513,38 @@ def _acwr_limits(planned: list[_Planned], ctx: RuleContext) -> list[Violation]:
     return []
 
 
+def _strength_before_hard(planned: list[_Planned], ctx: RuleContext) -> list[Violation]:
+    level = ctx.effective_level
+    limit = RULES["strength_before_hard"].limit(level)
+    by_day: dict[date_type, list[_Planned]] = {}
+    for item in planned:
+        by_day.setdefault(item.session.date, []).append(item)
+
+    out = []
+    strength_days = sorted([d for d, items in by_day.items() if any(it.kind == KIND_STRENGTH for it in items)])
+    count = 0
+    for s_day in strength_days:
+        next_day = s_day + timedelta(days=1)
+        next_items = by_day.get(next_day, [])
+        hard_next = [it for it in next_items if it.kind in HARD_KINDS]
+        if hard_next:
+            count += 1
+            if count > limit:
+                involved = [it for it in by_day[s_day] if it.kind == KIND_STRENGTH] + hard_next
+                out.append(
+                    _v(
+                        "strength_before_hard",
+                        level,
+                        f"Seduta di forza ({_fmt_day(s_day)}) il giorno prima di una seduta dura ({_fmt_day(next_day)}): "
+                        "le gambe non avranno recuperato a sufficienza prima della qualità o del lungo.",
+                        count,
+                        limit,
+                        involved,
+                    )
+                )
+    return out
+
+
 # ---- the whole thing ---------------------------------------------------------------------
 
 
@@ -541,6 +579,7 @@ def validate(
         *_long_run_growth(planned, context),
         *_deload(weeks, context, start, end),
         *_acwr_limits(planned, context),
+        *_strength_before_hard(planned, context),
     ]
     if only_move_warnings:
         violations = [v for v in violations if v.warn_on_move]

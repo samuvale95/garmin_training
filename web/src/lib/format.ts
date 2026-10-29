@@ -260,17 +260,19 @@ export function stepGroupParts(group: StepGroup): { label: string; detail: strin
     // The recovery's own pace is spelled out too: it is the difference between a
     // jogged recovery and standing still, and the only place the plan says which.
     const rec = recovery
-      ? `${stepTypeLabel(recovery.type).toLowerCase()} ${stepDurationLabel(recovery)}${recovery.target_pace ? ` a ${formatPaceRange(recovery.target_pace)}` : ""}`
+      ? `${stepTypeLabel(recovery.type).toLowerCase()} ${stepDurationLabel(recovery)}${recovery.target_pace ? ` a ${formatPaceRange(recovery.target_pace)}` : ""}${recovery.note ? ` (${recovery.note})` : ""}`
       : "";
-    const rest = extra.map((s) => `${stepTypeLabel(s.type).toLowerCase()} ${stepDurationLabel(s)}`);
+    const rest = extra.map((s) => `${stepTypeLabel(s.type).toLowerCase()} ${stepDurationLabel(s)}${s.note ? ` (${s.note})` : ""}`);
+    const label = step.note ? `${times}${step.note}` : `${times}${stepDurationLabel(step)}`;
     return {
-      label: `${times}${stepDurationLabel(step)}`,
+      label,
       detail: [pace, rec, ...rest].filter(Boolean).join(" · "),
     };
   }
 
   const pace = step.target_pace ? formatPaceRange(step.target_pace) : "libero";
-  return { label: `${times}${stepTypeLabel(kind)}`, detail: `${stepDurationLabel(step)} · ${pace}` };
+  const label = step.note ? `${times}${step.note}` : `${times}${stepTypeLabel(kind)}`;
+  return { label, detail: `${stepDurationLabel(step)} · ${pace}` };
 }
 
 /** One line per group: "6 × 1000 m  4:20-4:10 · rec 400 m", "15 min · libero". */
