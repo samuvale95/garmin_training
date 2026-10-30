@@ -168,6 +168,9 @@ ALTER TABLE activity ADD COLUMN IF NOT EXISTS duplicate_of BIGINT;
 -- `strava` (a ride's kilojoules standing in for kilocalories). NULL is estimated when read.
 ALTER TABLE activity ADD COLUMN IF NOT EXISTS calories REAL;
 ALTER TABLE activity ADD COLUMN IF NOT EXISTS calories_source TEXT;
+-- Where a Garmin activity's heart rate came from: `chest_strap`, `wrist`, or `unknown`
+-- when the summary did not say. NULL is not looked up yet.
+ALTER TABLE activity ADD COLUMN IF NOT EXISTS hr_source TEXT;
 ALTER TABLE activity_stream ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'strava';
 
 DO $$
@@ -528,7 +531,7 @@ def get_activity(user_id: str, activity_id: int) -> dict | None:
     """Retrieve a single stored activity by user_id and activity_id."""
     columns = ("source", "activity_id", "day", "sport", "title", "distance_km", "duration_min",
                "avg_hr", "max_hr", "avg_cadence", "avg_power", "elevation_gain", "start_time",
-               "calories", "calories_source")
+               "calories", "calories_source", "hr_source")
     with db.connect() as conn, conn.cursor() as cur:
         cur.execute(
             f"SELECT {', '.join(columns)} FROM activity WHERE user_id = %s AND activity_id = %s LIMIT 1",
@@ -841,6 +844,27 @@ def activities_needing_stream(user_id: str, source: str, start: date_type, end: 
             [user_id, source, start, end],
         )
         return [int(row[0]) for row in cur.fetchall()]
+
+
+def activities_needing_hr_source(user_id: str, start: date_type, end: date_type) -> list[int]:
+    """Garmin activities with a heart rate whose sensor has not been looked up, newest first."""
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT activity_id FROM activity "
+            "WHERE user_id = %s AND source = 'garmin' AND day BETWEEN %s AND %s "
+            "  AND avg_hr IS NOT NULL AND hr_source IS NULL "
+            "ORDER BY day DESC, start_time DESC NULLS LAST",
+            [user_id, start, end],
+        )
+        return [int(row[0]) for row in cur.fetchall()]
+
+
+def save_hr_source(user_id: str, activity_id: int, hr_source: str) -> None:
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "UPDATE activity SET hr_source = %s WHERE user_id = %s AND source = 'garmin' AND activity_id = %s",
+            [hr_source, user_id, activity_id],
+        )
 
 
 # ---- the athlete's level ----------------------------------------------------------------------

@@ -21,7 +21,9 @@ def _details():
 def test_a_real_detail_becomes_heart_rate_speed_and_time():
     streams = parse_activity_streams(_details())
 
-    assert set(streams) == {"heartrate", "velocity_smooth", "time"}
+    assert set(streams) == {"heartrate", "velocity_smooth", "time", "cadence", "distance", "altitude"}
+    # Both legs, as the cadence-lock check needs it.
+    assert max(c for c in streams["cadence"] if c) > 140
     assert len(streams["heartrate"]) == len(streams["time"]) == len(streams["velocity_smooth"]) == 300
     # About one sample a second, from an elapsed-duration channel starting at zero.
     assert streams["time"][0] == 0.0
