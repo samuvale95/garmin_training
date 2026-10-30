@@ -330,7 +330,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
 
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: "10px 0" }}>
             <p className="font-mono" style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>
-              {assessment.projected_tsb > 0 ? `+${assessment.projected_tsb.toFixed(0)}` : assessment.projected_tsb.toFixed(0)}
+              {(assessment.projected_tsb ?? 0) > 0 ? `+${(assessment.projected_tsb ?? 0).toFixed(0)}` : (assessment.projected_tsb ?? 0).toFixed(0)}
             </p>
             <div>
               <p style={{ fontWeight: 700, fontSize: 15, margin: 0 }}>{assessment.verdict}</p>

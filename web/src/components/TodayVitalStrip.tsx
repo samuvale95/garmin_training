@@ -20,7 +20,9 @@ export function TodayVitalStrip({
   carbTargetG,
   active = true,
 }: TodayVitalStripProps) {
-  const avgCarbTarget = carbTargetG ? Math.round((carbTargetG[0] + carbTargetG[1]) / 2) : 250;
+  const avgCarbTarget = Array.isArray(carbTargetG) && carbTargetG.length >= 2
+    ? Math.round((carbTargetG[0] + carbTargetG[1]) / 2)
+    : typeof carbTargetG === "number" ? carbTargetG : 250;
   const carbPercent = carbLoggedG != null && avgCarbTarget > 0 ? Math.min(100, Math.round((carbLoggedG / avgCarbTarget) * 100)) : 0;
 
   return (

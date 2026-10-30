@@ -24,7 +24,9 @@ from __future__ import annotations
 import json
 import logging
 from datetime import date as date_type
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
+import base64
+import binascii
 from hashlib import sha1
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -258,6 +260,7 @@ async def nutrition_photo(
     image: UploadFile = File(...),
     thumbnail: UploadFile | None = File(None),
     date: date_type | None = Form(None),
+    preview: bool = False,
     user_id: str = Depends(current_user_id),
 ) -> schemas.FoodEntryOut:
     """Estimate one plate from the full photo, but only ever store the thumbnail.
@@ -288,6 +291,8 @@ async def nutrition_photo(
         llm.estimate_macros_from_photo, payload, image.content_type or "image/jpeg"
     )
 
+    if preview:
+        return _food_preview(day,"photo",estimate,thumbnail=thumbnail_bytes)
     entry = await run_in_threadpool(
         lambda: db.add_entry(
             user_id=user_id,
@@ -308,7 +313,7 @@ async def nutrition_photo(
 
 @router.post("/nutrition/describe", response_model=schemas.FoodEntryOut)
 async def nutrition_describe(
-    payload: schemas.DescribeMealRequest, user_id: str = Depends(current_user_id)
+    payload: schemas.DescribeMealRequest, preview: bool = False, user_id: str = Depends(current_user_id)
 ) -> schemas.FoodEntryOut:
     """Estimate one meal from a sentence the user typed.
 
@@ -321,6 +326,8 @@ async def nutrition_describe(
     day = payload.date.isoformat()
     estimate = await run_in_threadpool(llm.estimate_macros_from_text, text)
 
+    if preview:
+        return _food_preview(day,"text",estimate,description=text[:200])
     entry = await run_in_threadpool(
         lambda: db.add_entry(
             user_id=user_id,
@@ -394,3 +401,28 @@ async def nutrition_delete_entry(
         raise HTTPException(status_code=404, detail="Entry not found")
     invalidate_nutrition(user_id)
     return schemas.DeleteEntryResponse(deleted=True)
+
+
+def _food_preview(day,source,estimate,*,description=None,thumbnail=None):
+    return schemas.FoodEntryOut(id=0,date=day,logged_at=datetime.now(timezone.utc),source=source,
+        description=estimate.description if estimate else description,
+        kcal=estimate.kcal if estimate else None,carb_g=estimate.carb_g if estimate else None,
+        protein_g=estimate.protein_g if estimate else None,fat_g=estimate.fat_g if estimate else None,
+        confidence=estimate.confidence if estimate else None,
+        image_url="data:image/jpeg;base64,"+base64.b64encode(thumbnail).decode() if thumbnail else None)
+
+
+@router.post("/nutrition/confirm",response_model=schemas.FoodEntryOut)
+async def confirm_food(payload: schemas.ConfirmFoodRequest,user_id: str = Depends(current_user_id)):
+    thumbnail=None
+    if payload.thumbnail_b64:
+        try: thumbnail=base64.b64decode(payload.thumbnail_b64,validate=True)
+        except (binascii.Error,ValueError) as exc: raise HTTPException(422,detail="Miniatura non valida") from exc
+        if len(thumbnail)>MAX_THUMBNAIL_BYTES: raise HTTPException(413,detail="Miniatura troppo grande")
+    fields=payload.model_dump(exclude={"thumbnail_b64"},mode="json")
+    try:
+        entry=await run_in_threadpool(db.confirm_food_entry,user_id=user_id,thumbnail=thumbnail,**fields)
+    except ValueError as exc:
+        raise HTTPException(409,detail=str(exc)) from exc
+    invalidate_nutrition(user_id)
+    return schemas.FoodEntryOut.from_model(entry)

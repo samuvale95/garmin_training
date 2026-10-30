@@ -41,8 +41,8 @@ export function NowMealCard({
   if (moment.kind === "session") {
     const during = fuel.during;
     const after = fuel.meals.find((meal) => meal.role === "post");
-    overline = `In allenamento · dalle ${fuel.session_clock}`;
-    title = during ? `${during.carb_g_per_hour[0]}–${during.carb_g_per_hour[1]} g di carboidrati all'ora` : "Solo acqua";
+    overline = `Allenamento previsto · ${fuel.session_clock}`;
+    title = during?.carb_g_per_hour ? `${during.carb_g_per_hour[0]}–${during.carb_g_per_hour[1]} g di carboidrati all'ora` : "Solo acqua";
     body = after ? `Dopo, alle ${after.clock}: ${after.name.toLowerCase()} — ${portionsInline(after.portions)}` : null;
   } else {
     const { meal } = moment;

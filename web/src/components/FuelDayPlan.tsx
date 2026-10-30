@@ -187,7 +187,7 @@ function NextMealHero({
     const after = fuel.meals.find((meal) => meal.role === "post");
     return (
       <SlideUp active={animate} delayMs={80} style={card}>
-        <HeroOverline accent>In allenamento · dalle {fuel.session_clock}</HeroOverline>
+        <HeroOverline accent>Allenamento previsto · dalle {fuel.session_clock}</HeroOverline>
         <p style={{ font: "700 22px/1.2 var(--font-outfit)", letterSpacing: "-.02em", margin: "10px 0 0" }}>
           {during ? `${during.carb_g_per_hour[0]}–${during.carb_g_per_hour[1]} g di carboidrati all'ora` : "Solo acqua"}
         </p>
@@ -472,16 +472,16 @@ function DayProgress({ status, animate }: { status: FuelStatus; animate: boolean
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {lines.map((line) => {
-          const top = line.target_g[1] || 1;
+          const top = (line.target_g && line.target_g[1]) || 1;
           const fill = Math.min(1, line.logged_g / top);
-          const low = line.target_g[0] / top;
+          const low = (line.target_g ? line.target_g[0] : 0) / top;
           const color = line.status === "sotto" ? (line.flagged ? "var(--corallo-accent)" : "var(--inchiostro-35)") : "var(--verde-tratto-scuro)";
           return (
             <div key={line.macro}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 4 }}>
-                <span style={{ fontWeight: 600 }}>{MACRO_LABEL[line.macro]}</span>
+                <span style={{ fontWeight: 600 }}>{MACRO_LABEL[line.macro] ?? line.macro}</span>
                 <span className="font-mono" style={{ color: "var(--inchiostro-70)" }}>
-                  {Math.round(line.logged_g)} / {line.target_g[0]}–{line.target_g[1]} g
+                  {Math.round(line.logged_g)} / {line.target_g ? `${line.target_g[0]}–${line.target_g[1]} g` : "—"}
                 </span>
               </div>
               <div style={{ position: "relative", height: 6, background: "var(--sabbia)", borderRadius: 3, overflow: "hidden" }}>

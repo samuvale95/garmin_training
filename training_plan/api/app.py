@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .. import admins, checkin, db, history, interactions, move_check, plan_adaptation, plan_store
+from .. import admins, checkin, db, history, interactions, move_check, plan_adaptation, plan_store, programs
 from ..agents import store as agent_store
 from ..garmin_sync import GarminRateLimitError, GarminSyncError
 from ..parser import TrainingPlanValidationError
@@ -30,6 +30,7 @@ from .routes_history import router as history_router
 from .routes_profile import router as profile_router
 from .routes_nutrition import router as nutrition_router
 from .routes_plan import router as plan_router
+from .routes_programs import router as programs_router
 from .routes_strava import router as strava_router
 from .routes_summary import router as summary_router
 from .routes_progress import router as progress_router
@@ -69,6 +70,7 @@ def _ensure_schema() -> None:
     history.ensure_schema()
     # After db's: it adds a column to `user_plan` and moves each plan's sessions out of it.
     plan_store.ensure_schema()
+    programs.ensure_schema()
     checkin.ensure_schema()
     move_check.ensure_schema()
     plan_adaptation.ensure_schema()
@@ -142,6 +144,7 @@ async def _unhandled_error_handler(request: Request, exc: Exception) -> JSONResp
 # that need it declare their own `Depends(current_user_id)` parameter, which FastAPI
 # resolves from the same per-request cache rather than re-verifying the token twice.
 _auth_gate = [Depends(current_user_id)]
+app.include_router(programs_router)
 app.include_router(plan_router, tags=["plan"], dependencies=_auth_gate)
 app.include_router(garmin_router, tags=["garmin"], dependencies=_auth_gate)
 app.include_router(body_router, tags=["body"], dependencies=_auth_gate)

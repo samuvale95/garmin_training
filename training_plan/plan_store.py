@@ -111,6 +111,7 @@ def ensure_schema() -> None:
         users = [row[0] for row in conn.execute("SELECT user_id FROM user_plan WHERE NOT sessions_migrated")]
     for user_id in users:
         with db.connect() as conn, conn.transaction():
+            conn.execute("SELECT pg_advisory_xact_lock(730297432560)")
             # Re-checked inside the transaction: two processes starting at once must not
             # both copy the same plan.
             pending = conn.execute(
@@ -224,6 +225,7 @@ def update_session(user_id: str, session_id: str, changes: dict, *, by_user: boo
     a locked session raises `SessionLocked`.
     """
     with db.connect() as conn, conn.cursor(row_factory=dict_row) as cur:
+        cur.execute("SELECT pg_advisory_xact_lock(730297432560)")
         cur.execute(
             "SELECT locked FROM plan_session WHERE user_id = %s AND id = %s FOR UPDATE", [user_id, session_id]
         )
@@ -261,6 +263,7 @@ def update_session(user_id: str, session_id: str, changes: dict, *, by_user: boo
 
 def delete_session(user_id: str, session_id: str, *, by_user: bool) -> None:
     with db.connect() as conn, conn.cursor(row_factory=dict_row) as cur:
+        cur.execute("SELECT pg_advisory_xact_lock(730297432560)")
         cur.execute(
             "SELECT locked FROM plan_session WHERE user_id = %s AND id = %s FOR UPDATE", [user_id, session_id]
         )
@@ -273,6 +276,7 @@ def delete_session(user_id: str, session_id: str, *, by_user: bool) -> None:
 
 
 def _snapshot(cur, user_id: str, start: date_type, end: date_type) -> dict[str, str]:
+    cur.execute("SELECT pg_advisory_xact_lock(730297432560)")
     # A hash of the content, not `updated_at`: two writes in one transaction share a
     # `now()`, and what matters is whether the session is different, not when it changed.
     cur.execute(
@@ -318,6 +322,7 @@ def replace_unlocked(
     """
     result = ReplaceResult()
     with db.connect() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+        cur.execute("SELECT pg_advisory_xact_lock(730297432560)")
         if expected is not None:
             since, until, seen = expected
             if _snapshot(cur, user_id, since, until) != seen:

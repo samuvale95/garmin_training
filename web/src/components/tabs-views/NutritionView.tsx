@@ -4,20 +4,18 @@ import { dis } from "@/lib/disabled";
 import { markFlowComplete, useFlowTracking } from "@/lib/useTracking";
 import { useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
-import { Avatar } from "@/components/Avatar";
-import { BrandMark } from "@/components/motion/BrandMark";
+import { useRouter, useSearchParams } from "next/navigation";
+import { safeReturnHref } from "@/lib/navigation";
 import { PulseRing, Skeleton, SlideUp } from "@/components/motion/primitives";
 import { ChevronRight, ArrowRight, PencilIcon, CameraIcon, UtensilsIcon } from "@/components/Icons";
 import { FuelCorrectionSheet, PortionPicker, macroAtPortion } from "@/components/FuelCorrectionSheet";
-import { LogDayPicker, defaultLogDay, logDateKey, type LogDay } from "@/components/LogDayPicker";
-import { useMounted } from "@/lib/hydration";
 import { DayEnergyCard } from "@/components/DayEnergyCard";
 import { MealList } from "@/components/FuelBlocks";
 import { FuelDayPlan } from "@/components/FuelDayPlan";
 import { useTrainingSlot } from "@/lib/trainingHabits";
 import { FuelReminderCard } from "@/components/FuelReminderCard";
 import { useMountOnce } from "@/lib/motion";
-import { formatWeekday } from "@/lib/format";
+import { formatFullDate } from "@/lib/format";
 import { useCalendarAccess } from "@/lib/guards";
 import { ComposeScreen, EstimatingScreen, ReviewScreen, FailedScreen } from "@/components/MealFlowScreens";
 import {
@@ -39,7 +37,6 @@ import { usePassoStore } from "@/lib/store";
 import { shiftDateKey, toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import type { FoodEntry } from "@/lib/types";
-import { motion } from "framer-motion";
 import { useScreenReady } from "@/lib/useScreenReady";
 
 type Preview = { kind: "photo"; url: string } | { kind: "text"; text: string };
@@ -92,7 +89,18 @@ export function NutritionView() {
   const access = useCalendarAccess();
   const refreshMutation = useRefreshServerData();
   const manualWeight = usePassoStore((s) => s.manualWeight);
-  const today = toDateKey(new Date());
+  const calendarToday = toDateKey(new Date());
+  const params = useSearchParams();
+  const router = useRouter();
+  const requestedDate = params.get("date");
+  const today = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) && !Number.isNaN(new Date(`${requestedDate}T12:00:00`).getTime()) ? requestedDate : calendarToday;
+  const view = params.get("view") === "diary" ? "diary" : "plan";
+  const from = safeReturnHref(params.get("from"), "");
+  const openRequested = params.get("log") === "1";
+  const [logOpen, setLogOpen] = useState(openRequested);
+  function setDay(date: string) { if (date) router.replace(`/nutrition?date=${date}&view=${view}`, { scroll: false }); }
+  function setView(next: string) { router.replace(`/nutrition?date=${today}&view=${next}`, { scroll: false }); }
+  function finishMeal() { markFlowComplete("meal"); closeFlow(); setLogOpen(false); if (from) router.push(from); else setView("diary"); }
 
   const liveMode = !access.plan && access.garminConnected;
   const workoutsQuery = useWorkouts(today, shiftDateKey(today, 2), liveMode);
@@ -121,10 +129,8 @@ export function NutritionView() {
   useFlowTracking("meal", flow.kind);
   const [correcting, setCorrecting] = useState<FoodEntry | null>(null);
 
-  const mounted = useMounted();
-  const [pickedLogDay, setPickedLogDay] = useState<LogDay | null>(null);
-  const logDay: LogDay = pickedLogDay ?? (mounted ? defaultLogDay() : "oggi");
-  const logDate = logDateKey(today, logDay);
+  const logDate = today;
+  const mealError = logPhoto.error ?? describeMeal.error ?? addManualEntry.error ?? deleteEntry.error;
 
   function openCamera() {
     fileInputRef.current?.click();
@@ -170,7 +176,7 @@ export function NutritionView() {
         fat_g: asNumber(fields.fat),
         kcal: asNumber(fields.kcal),
       },
-      { onSuccess: () => { markFlowComplete("meal"); setFlow({ kind: "idle" }); } }
+      { onSuccess: finishMeal }
     );
   }
 
@@ -219,14 +225,14 @@ export function NutritionView() {
     return <EstimatingScreen preview={flow.preview} onCancel={cancelEstimating} />;
   }
   if (flow.kind === "review") {
-    return <ReviewScreen entry={flow.entry} preview={flow.preview} onDiscard={() => discardReview(flow.entry)} onSaved={() => { markFlowComplete("meal"); closeFlow(); }} />;
+    return <ReviewScreen entry={flow.entry} preview={flow.preview} onDiscard={() => discardReview(flow.entry)} onSaved={finishMeal} />;
   }
   if (flow.kind === "failed") {
     return (
       <FailedScreen
         preview={flow.preview}
         onRetake={() => retry(flow.entry, flow.preview)}
-        onSaved={() => { markFlowComplete("meal"); closeFlow(); }}
+        onSaved={finishMeal}
         entryId={flow.entry.id}
       />
     );
@@ -239,155 +245,17 @@ export function NutritionView() {
 
   return (
     <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
-      <div style={{ padding: "22px 20px 24px" }}>
-        {/* Header brand + settings */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <BrandMark height={22} />
-          <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} transition={{ type: "spring", stiffness: 450, damping: 22 }}>
-            <Link data-track="nutrition.impostazioni" href="/settings" className="tap-target" aria-label="Impostazioni"><Avatar size={32} /></Link>
-          </motion.div>
-        </div>
-
-        <header className="screen-intro" style={{ marginTop: 14 }}>
-          <h1>Cosa mangiare oggi</h1>
-          <p>Strategia nutrizionale intorno al tuo allenamento.</p>
-        </header>
-
-        {fuelQuery.isError ? (
-          <div role="alert" style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 20, marginTop: 18, border: "var(--border-airbnb)", textAlign: "center" }}>
-            <p style={{ fontWeight: 700, fontSize: 16, margin: "0 0 6px" }}>Non riusciamo a caricare il carburante</p>
-            <p className="font-serif-italic" style={{ fontSize: 13.5, color: "var(--inchiostro-70)", margin: "0 0 16px" }}>
-              Si è verificato un problema di connessione con i dati di alimentazione.
-            </p>
-            <button data-track="nutrition.fuelquery-refetch"
-              type="button"
-              onClick={() => fuelQuery.refetch()}
-              className="tap-target"
-              style={{
-                background: "var(--inchiostro)",
-                color: "var(--crema)",
-                border: "none",
-                borderRadius: "var(--radius-pill)",
-                padding: "10px 20px",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Riprova
-            </button>
-          </div>
-        ) : fuelQuery.isLoading || !fuel ? (
-          <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 14 }}>
-            <div className="anim-clay-shimmer" style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", height: 110, border: "var(--border-airbnb)" }} />
-            <div className="anim-clay-shimmer" style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", height: 180, border: "var(--border-airbnb)" }} />
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 16 }}>
-            {/* What to eat, and when: the plates the backend sized, on the clock. */}
-            <FuelDayPlan
-              fuel={fuel}
-              status={statusQuery.data}
-              narrative={narrative}
-              training={training}
-              animate={animate}
-            />
-
-            {/* 6. DIARIO PASTI DEL GIORNO */}
-            <div style={{ marginTop: 8 }}>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-                <p className="font-mono" style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
-                  Pasti registrati oggi
-                </p>
-                <Link data-track="nutrition.body-fuel-diario" href="/body/fuel/diario" style={{ fontSize: 12, fontWeight: 600, color: "var(--rosso-avviso)", textDecoration: "none" }}>
-                  Diario completo →
-                </Link>
-              </div>
-
-              {/* Azioni rapide aggiunta pasto */}
-              <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-                <button data-track="nutrition.opencamera"
-                  type="button"
-                  onClick={openCamera}
-                  {...dis(logPhoto.isPending, "in_caricamento")}
-                  className="tap-target press-soft"
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 7,
-                    background: "var(--sabbia-chip)",
-                    color: "var(--inchiostro)",
-                    border: "var(--border-airbnb)",
-                    borderRadius: "var(--radius-pill)",
-                    padding: "11px 16px",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    boxShadow: "var(--shadow-airbnb-subtle)",
-                  }}
-                >
-                  <CameraIcon size={15} strokeWidth={2} />
-                  <span>Fotografa</span>
-                </button>
-                <button data-track="nutrition.setflow"
-                  type="button"
-                  onClick={() => setFlow({ kind: "compose" })}
-                  {...dis(describeMeal.isPending, "in_caricamento")}
-                  className="tap-target press-soft"
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 7,
-                    background: "var(--sabbia-chip)",
-                    color: "var(--inchiostro)",
-                    border: "var(--border-airbnb)",
-                    borderRadius: "var(--radius-pill)",
-                    padding: "11px 16px",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    boxShadow: "var(--shadow-airbnb-subtle)",
-                  }}
-                >
-                  <PencilIcon size={14} strokeWidth={2} />
-                  <span>Scrivi</span>
-                </button>
-              </div>
-
-              <MealList
-                entries={entries}
-                animate={animate}
-                onSelect={(entry) => setCorrecting(entry)}
-              />
-            </div>
-
-            {showEnergy && dayEnergy.data && (
-              <DayEnergyCard energy={dayEnergy.data} numbers={true} animate={animate} delayMs={280} />
-            )}
-
-            <FuelReminderCard animate={animate} delayMs={120} todayTarget={fuel.today} sessionClock={fuel.session_clock} preMeal={fuel.meals.find((meal) => meal.role === "pre") ?? null} />
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={onFileSelected}
-              style={{ display: "none" }}
-            />
-
-            {correcting && (
-              <FuelCorrectionSheet
-                entry={correcting}
-                onClose={() => setCorrecting(null)}
-              />
-            )}
-          </div>
-        )}
+      <div className="workspace-page">
+        <header className="workspace-heading"><div><h1>Nutrizione</h1><p>Indicazioni e registrazioni della tua giornata.</p></div></header>
+        <div className="nutrition-date"><button className="ux-button" aria-label="Giorno precedente" data-track="nutrition.previous-day" onClick={() => setDay(shiftDateKey(today, -1))}>‹</button><label className="ux-field">Giornata<input type="date" value={today} onChange={e => setDay(e.target.value)} data-track="nutrition.date" /></label><button className="ux-button" aria-label="Giorno successivo" data-track="nutrition.next-day" onClick={() => setDay(shiftDateKey(today, 1))}>›</button></div>
+        <p className="ux-muted">{formatFullDate(today)}{today === calendarToday ? " · Oggi" : ""}</p>
+        <nav className="section-nav" aria-label="Sezioni nutrizione"><a href={`/nutrition?date=${today}&view=plan`} aria-current={view === "plan" ? "page" : undefined} onClick={e => { e.preventDefault(); setView("plan"); }} data-track="nutrition.plan">Piano del giorno</a><a href={`/nutrition?date=${today}&view=diary`} aria-current={view === "diary" ? "page" : undefined} onClick={e => { e.preventDefault(); setView("diary"); }} data-track="nutrition.diary">Diario</a></nav>
+        <button className="ux-button ux-button-primary" data-track="nutrition.register-meal" onClick={() => setLogOpen(true)}>Registra pasto</button>
+        {mealError && <p className="ux-error" role="alert">{mealError.message || "La registrazione non è riuscita. I dati inseriti restano disponibili: riprova."}</p>}
+        {logOpen && <section className="meal-entry-picker" aria-label="Registra pasto"><div className="program-topline"><h2 className="ux-section-title">Pasto del {formatFullDate(logDate)}</h2><button className="ux-button" data-track="nutrition.close-registration" onClick={() => { setLogOpen(false); if (from) router.push(from); }}>Annulla</button></div><p className="ux-muted">Scegli come inserirlo. Potrai verificare porzioni e valori prima di confermare.</p><div className="ux-actions"><button className="ux-button" data-track="nutrition.photo" {...dis(logPhoto.isPending, "in_caricamento")} onClick={openCamera}><CameraIcon size={18} />Foto</button><button className="ux-button" data-track="nutrition.text-manual" onClick={() => setFlow({ kind: "compose" })}><PencilIcon size={18} />Testo o valori manuali</button></div></section>}
+        {view === "plan" ? fuelQuery.isError ? <div role="alert" className="ux-error"><p>Le indicazioni non sono disponibili. Puoi continuare a registrare i pasti nel Diario.</p><button className="ux-button" data-track="nutrition.retry-plan" {...dis(fuelQuery.isFetching, "in_caricamento")} onClick={() => fuelQuery.refetch()}>Riprova</button></div> : !fuel ? <Skeleton height={180} /> : <section className="nutrition-plan"><p className="ux-muted">Queste sono indicazioni per la giornata, non pasti già consumati. Gli orari degli allenamenti sono previsti.</p><FuelDayPlan fuel={fuel} status={statusQuery.data} narrative={narrative} training={training} animate={animate} /></section> : <section aria-label="Pasti registrati"><h2 className="ux-section-title">Pasti registrati</h2>{dayQuery.isPending ? <Skeleton height={100} /> : dayQuery.isError ? <div className="ux-error" role="alert"><p>Il diario non è disponibile.</p><button className="ux-button" data-track="nutrition.retry-diary" {...dis(dayQuery.isFetching, "in_caricamento")} onClick={() => dayQuery.refetch()}>Riprova</button></div> : entries.length ? <MealList entries={entries} animate={animate} onSelect={setCorrecting} /> : <div className="ux-empty"><h3>Nessun pasto registrato</h3><p>Questo diario mostra solo ciò che hai inserito. L’assenza di registrazioni non indica che tu non abbia mangiato.</p></div>}{showEnergy && dayEnergy.data && <DayEnergyCard energy={dayEnergy.data} numbers={true} animate={animate} delayMs={0} />}<div className="ux-actions"><Link className="ux-button" data-track="nutrition.diary-history" href={`/body/fuel/diario?from=${encodeURIComponent(`/nutrition?date=${today}&view=diary`)}`}>Storico delle registrazioni</Link></div></section>}
+        <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={onFileSelected} style={{ display: "none" }} />
+        {correcting && <FuelCorrectionSheet entry={correcting} onClose={() => setCorrecting(null)} />}
       </div>
     </PullToRefresh>
   );

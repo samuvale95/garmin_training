@@ -35,7 +35,7 @@ export interface CalendarAccess {
 /** Oggi/Settimana can show something useful with either an imported plan or just a
  * live Garmin connection (its calendar of already-scheduled workouts). Only redirect
  * to /import once neither is available. */
-export function useCalendarAccess(): CalendarAccess {
+export function useCalendarAccess({ redirectWhenEmpty = true }: { redirectWhenEmpty?: boolean } = {}): CalendarAccess {
   const router = useRouter();
   const mounted = useMounted();
   const { data: plan, isHydrated } = usePlanQuery();
@@ -50,8 +50,8 @@ export function useCalendarAccess(): CalendarAccess {
   const ready = mounted && ((isHydrated && plan != null) || status.isFetched);
 
   useEffect(() => {
-    if (ready && !plan && !garminConnected) router.replace("/import");
-  }, [ready, plan, garminConnected, router]);
+    if (redirectWhenEmpty && ready && !plan && !garminConnected) router.replace("/import");
+  }, [ready, plan, garminConnected, router, redirectWhenEmpty]);
 
   return { plan: plan ?? null, garminConnected, ready };
 }

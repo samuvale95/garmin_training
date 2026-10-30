@@ -350,6 +350,8 @@ class PlanListResponse(BaseModel):
 
 class PlanToggleActiveRequest(BaseModel):
     is_active: bool
+    validation_token: str | None = None
+    acknowledge_insufficient_data: bool = False
 
 
 class PlanResponse(BaseModel):
@@ -2841,3 +2843,18 @@ class WorkoutAnalysisResponse(BaseModel):
             mechanics_summary=res.mechanics_summary,
             vigilia_context=res.vigilia_context,
         )
+
+
+class ConfirmFoodRequest(BaseModel):
+    request_id: UUID
+    date: date_type
+    source: Literal["photo","text","manual"]
+    description: str | None = Field(default=None,max_length=1000)
+    kcal: float | None = Field(default=None,ge=0,allow_inf_nan=False)
+    carb_g: float | None = Field(default=None,ge=0,allow_inf_nan=False)
+    protein_g: float | None = Field(default=None,ge=0,allow_inf_nan=False)
+    fat_g: float | None = Field(default=None,ge=0,allow_inf_nan=False)
+    confidence: str | None = None
+    corrected: bool = True
+    portion: float = Field(default=1,gt=0,le=10)
+    thumbnail_b64: str | None = Field(default=None,max_length=280000)

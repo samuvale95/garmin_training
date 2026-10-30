@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { ContextLink } from "@/components/ContextLink";
 import { motion, useDragControls } from "framer-motion";
 import { Illustration } from "@/components/Illustration";
 import { SlideUp } from "@/components/motion/primitives";
 import { CheckIcon, LightningIcon } from "@/components/Icons";
 import { useMotionEnabled } from "@/lib/motion";
 import { sessionDetailLine } from "@/lib/format";
-import { classifySession, effectiveTitle, sessionDistanceKm, sessionDurationMinutes, type DisplaySession } from "@/lib/sessionVisuals";
+import { classifySession, effectiveTitle, sessionDistanceKm, sessionDurationMinutes, weekBounds, toDateKey, type DisplaySession } from "@/lib/sessionVisuals";
 import type { ScheduledWorkout } from "@/lib/types";
 
 export interface DayCardData {
@@ -369,9 +369,9 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
       }}
     >
       {href ? (
-        <Link data-track="week-cards.href" href={href} draggable={false} style={{ textDecoration: "none", color: "inherit" }} onPointerDown={onPrefetch}>
+        <ContextLink from={`/week?date=${toDateKey(weekBounds(new Date(`${card.session.date}T12:00:00`)).start)}`} data-track="week-cards.href" href={href} draggable={false} style={{ textDecoration: "none", color: "inherit" }} onPointerDown={onPrefetch}>
           {body}
-        </Link>
+        </ContextLink>
       ) : (
         body
       )}

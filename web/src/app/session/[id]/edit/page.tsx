@@ -1,12 +1,13 @@
 "use client";
 
+import { Suspense } from "react";
 import { useParams } from "next/navigation";
 import { WorkoutEditor } from "@/components/WorkoutEditor";
 import { SkeletonEditorForm } from "@/components/skeletons";
 import { usePlanQuery } from "@/lib/queries";
 import { useScreenReady } from "@/lib/useScreenReady";
 
-export default function EditSessionPage() {
+function EditSessionContent() {
   const params = useParams<{ id: string }>();
   const { isHydrated } = usePlanQuery();
   useScreenReady(isHydrated);
@@ -20,3 +21,5 @@ export default function EditSessionPage() {
   if (!isHydrated) return <SkeletonEditorForm />;
   return <WorkoutEditor mode="edit" sessionId={params.id} />;
 }
+
+export default function EditSessionPage() { return <Suspense fallback={<SkeletonEditorForm />}><EditSessionContent /></Suspense>; }

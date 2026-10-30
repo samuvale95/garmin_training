@@ -37,7 +37,7 @@ const AVAILABLE_SPORTS = [
 /** "Genera le prossime settimane" on Settimana: the server writes the window inside the
  * code's limits (see `training_plan/plan_generator.py`), sessions edited by hand stay.
  * Its state lives in the mutation cache (`useGenerationState`), not here. */
-export function PlanGenerateCard({ animate, delayMs = 0 }: { animate: boolean; delayMs?: number }) {
+export function PlanGenerateCard({ animate, delayMs = 0, planId }: { animate: boolean; delayMs?: number; planId?: string }) {
   const generate = useGeneratePlan();
   const generation = useGenerationState();
   const [confirming, setConfirming] = useState(false);
@@ -204,6 +204,7 @@ export function PlanGenerateCard({ animate, delayMs = 0 }: { animate: boolean; d
             onClick={() => {
               setConfirming(false);
               generate.mutate({
+                planId,
                 mode,
                 sports,
                 userPrompt: userPrompt.trim() || null,

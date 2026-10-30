@@ -3,9 +3,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ContextLink } from "@/components/ContextLink";
+import { WorkspaceHeading } from "@/components/Workspace";
 import { motion } from "framer-motion";
-import { Avatar } from "@/components/Avatar";
-import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { DayStateCard } from "@/components/DayStateCard";
 import { CheckInCard } from "@/components/CheckInCard";
@@ -18,8 +18,7 @@ import { ChevronRight, ArrowRight, ArrowUpRight, PlusIcon, TargetIcon, UtensilsI
 import { TodayHeroUnified } from "@/components/TodayHeroUnified";
 import { TodayVitalStrip } from "@/components/TodayVitalStrip";
 import { NowMealCard } from "@/components/NowMealCard";
-import { currentMoment, isUrgent, useClockMinutes } from "@/lib/fuelMoment";
-import { QuickMealModal } from "@/components/QuickMealModal";
+import { currentMoment, useClockMinutes } from "@/lib/fuelMoment";
 import { WeekStrip } from "@/components/WeekStrip";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { useMountOnce } from "@/lib/motion";
@@ -55,7 +54,7 @@ import { useScreenReady } from "@/lib/useScreenReady";
 
 export function TodayView() {
   const router = useRouter();
-  const access = useCalendarAccess();
+  const access = useCalendarAccess({ redirectWhenEmpty: false });
   const animate = useMountOnce("today");
   const today = new Date();
   const todayKey = toDateKey(today);
@@ -94,9 +93,6 @@ export function TodayView() {
   // to Garmin's cloud in over 24h: with no overnight data there is nothing to interpret,
   // and half this screen would be em dashes.
   const watchSync = useWatchSyncStatus();
-  useEffect(() => {
-    if (watchSync.blocking) router.replace("/watch-sync");
-  }, [watchSync.blocking, router]);
 
   // Today's state, and what it says about today's session. It sits on this screen as a
   // card rather than replacing it: the old behaviour hijacked Oggi with a full-screen
@@ -144,7 +140,8 @@ export function TodayView() {
   }, [access.ready, hasPlan, checkAdaptation]);
 
   // Quick 1-tap food / snack logging modal
-  const [quickMealOpen, setQuickMealOpen] = useState(false);
+  const openMeal = () => router.push(`/nutrition?date=${todayKey}&view=diary&log=1&from=%2Ftoday`);
+  const [selectedTodaySessionIdx, setSelectedTodaySessionIdx] = useState(0);
   const planOrLiveSessions = access.plan ? access.plan.sessions : workoutsToSessions(workoutsQuery.data?.workouts ?? []);
   // Same weight as the Nutrizione tab, so both read one cache entry and one answer.
   const manualWeight = usePassoStore((s) => s.manualWeight);
@@ -168,13 +165,13 @@ export function TodayView() {
     garminConnected: access.garminConnected,
     enabled: access.ready,
   });
-  // Ready also with neither plan nor Garmin: the guard is sending the user to /import.
+  // Ready also with neither plan nor Garmin: show the setup choices in place.
   useScreenReady(access.ready && !(liveMode && workoutsQuery.isPending), "/today");
 
-  if (!access.ready || (!access.plan && !access.garminConnected)) {
+  if (!access.ready) {
     return (
       <div style={{ padding: "22px 20px 12px" }}>
-        <TodayHeader onOpenQuickLog={() => setQuickMealOpen(true)} />
+        <TodayHeader onOpenQuickLog={openMeal} />
         <div style={{ marginTop: 18 }}>
           <WordIn active={animate} style={{ font: "600 34px/1.04 var(--font-sans)", letterSpacing: "-.035em" }}>Il tuo oggi</WordIn>
         </div>
@@ -185,8 +182,12 @@ export function TodayView() {
     );
   }
 
+  if (!access.plan && !access.garminConnected) return <div className="workspace-page">
+    <WorkspaceHeading title="Oggi" description={capitalize(formatFullDate(todayKey))} />
+    <div className="ux-empty"><h2>Il primo passo è il tuo programma</h2><p>Crea o importa gli allenamenti, oppure collega Garmin per ritrovare il calendario esistente.</p><div className="ux-actions"><Link className="ux-button ux-button-primary" href="/week/programs" data-track="today.empty-programs">Crea o importa un programma</Link><Link className="ux-button" href="/connect-garmin" data-track="today.empty-connect">Collega Garmin</Link></div></div>
+  </div>;
+
   const sessions: DisplaySession[] = access.plan ? access.plan.sessions : workoutsQuery.data?.workouts ?? [];
-  const [selectedTodaySessionIdx, setSelectedTodaySessionIdx] = useState(0);
 
   const todaySessions = sessions.filter((s) => s.date === todayKey);
   const todaySession = todaySessions[selectedTodaySessionIdx] ?? todaySessions[0] ?? null;
@@ -221,24 +222,17 @@ export function TodayView() {
       : "/week";
 
 
-  const pendingChanges = (diffQuery.data?.to_create.length ?? 0) + (diffQuery.data?.changed.length ?? 0);
+  const pendingChanges = (diffQuery.data?.to_create?.length ?? 0) + (diffQuery.data?.changed?.length ?? 0);
 
-  // What to eat right now. Urgent -- to eat now or within the hour, the meal before or
-  // after the session, or the session itself -- it goes straight under the session;
-  // otherwise it waits below the day's vitals. The screen's order follows the clock
-  // instead of being the same at 8 in the morning and at 9 in the evening.
+  // Meal content follows the clock; its position remains below the daily vitals.
   const mealMoment = fuelTargets.data ? currentMoment(fuelTargets.data, nowMinutes) : null;
-  const mealUrgent = !!mealMoment && isUrgent(mealMoment);
   const nowMealCard = fuelTargets.data && mealMoment && (
-    <NowMealCard fuel={fuelTargets.data} moment={mealMoment} onLog={() => setQuickMealOpen(true)} animate={animate} delayMs={110} />
+    <NowMealCard fuel={fuelTargets.data} moment={mealMoment} onLog={openMeal} animate={animate} delayMs={110} />
   );
   const readiness = bodyQuery.data?.readiness_score;
   const sleepMinutes = bodyQuery.data?.sleep?.total_minutes;
 
-  // The check-in and the technique analysis. Just after a session -- and until the
-  // check-in is answered -- they are the thing to do and sit above everything else;
-  // the next morning ("ieri") or once answered they wait further down.
-  const postSessionFirst = focus === "recupero" && checkInDay === "oggi" && !checkInOn(todayKey);
+  // Check-in and technique analysis follow the training overview.
   const postSession = (
     <>
       {checkInDay && (
@@ -308,15 +302,10 @@ export function TodayView() {
   return (
     <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
       <div style={{ padding: "22px 20px 12px" }}>
-        <TodayHeader onOpenQuickLog={() => setQuickMealOpen(true)} />
-
-        <header className="today-intro">
-          <h1>Il tuo oggi</h1>
-          <p>{capitalize(formatFullDate(todayKey))} · Un passo alla volta.</p>
-        </header>
-
-        {/* 0. APPENA FINITO L'ALLENAMENTO: com'è andata viene prima di tutto */}
-        {postSessionFirst && postSession}
+        <WorkspaceHeading title="Oggi" description={capitalize(formatFullDate(todayKey))}>
+          <TodayHeader onOpenQuickLog={openMeal} />
+        </WorkspaceHeading>
+        {watchSync.blocking && <p className="ux-error" role="status">Alcuni dati dell’orologio non sono aggiornati. <Link href="/watch-sync" data-track="today.stale-sync">Come aggiornarli</Link></p>}
 
         {/* 1. HERO ALLENAMENTO + BADGE PRONTEZZA UNIFICATI */}
         <TodayHeroUnified
@@ -332,14 +321,24 @@ export function TodayView() {
           onSelectSessionIndex={setSelectedTodaySessionIdx}
         />
 
-      {/* 1b. COSA MANGIARE ADESSO, quando è urgente */}
-      {mealUrgent && nowMealCard}
+      {todaySessions.length > 1 && <section className="today-sessions" aria-label="Tutti gli allenamenti di oggi">
+        <h2 className="ux-section-title">Le {todaySessions.length} sedute di oggi</h2>
+        {todaySessions.map((session, index) => {
+          const planned = access.plan?.sessions.find((item) => item === session);
+          const workout = workoutsQuery.data?.workouts.find((item) => item === session);
+          const href = planned?.id ? `/session/${encodeURIComponent(planned.id)}` : workout ? `/workout/${workout.scheduled_workout_id}?date=${workout.date}` : "/week";
+          const minutes = Math.round(sessionDurationMinutes(session));
+          return <ContextLink key={planned?.id ?? workout?.scheduled_workout_id ?? index} href={href} from="/today" className="today-session-link" data-track="today.day-session"><span>{effectiveTitle(session)}<small>{classifySession(session).label}{minutes > 0 ? ` · ${minutes} min` : ""}</small></span><ChevronRight size={18} /></ContextLink>;
+        })}
+      </section>}
+
+
 
       {/* 2. ADATTAMENTO DEL PIANO (Se richiesto) */}
       {hasPlan && <AdaptationCard animate={animate} delayMs={120} />}
 
-      {/* 3. CHECK-IN E ANALISI, qui quando non sono la cosa del momento */}
-      {!postSessionFirst && postSession}
+      {/* 3. CHECK-IN E ANALISI */}
+      {postSession}
 
       {/* 5. VITAL STRIP COMPATTA: Prontezza, Sonno, Carbo (0 tap) */}
       <TodayVitalStrip
@@ -351,20 +350,15 @@ export function TodayView() {
       />
 
       {/* 5b. COSA MANGIARE, quando non è urgente */}
-      {!mealUrgent && nowMealCard}
+      {nowMealCard}
 
-      {/* 6. STRISCIA 7 GIORNI (LUN-DOM): Panoramica settimana in 0 tap */}
+      <div className="ux-actions"><Link className="ux-button" href="/week" data-track="today.open-plan">Apri il calendario</Link><Link className="ux-button" href="/activities" data-track="today.open-activities">Attività svolte</Link></div>
+      <details className="ux-disclosure"><summary data-track="today.more">Riepilogo e prossimi allenamenti</summary>
+      {/* Compact secondary information remains accessible without crowding Today. */}
       <WeekStrip
         currentDateKey={todayKey}
         sessions={sessions}
         active={animate}
-      />
-
-      {/* 7. MODALE QUICK LOG PASTO / SNACK (1-tap da ovunque) */}
-      <QuickMealModal
-        isOpen={quickMealOpen}
-        onClose={() => setQuickMealOpen(false)}
-        todayDateKey={todayKey}
       />
 
       {/* 8. PROGRESSO E RECORD SETTIMANALI (Compatto) */}
@@ -387,7 +381,7 @@ export function TodayView() {
                 gap: 12,
               }}
             >
-              <Mascot state={progress.data.mascot.state} size={46} />
+              {progress.data.mascot && <Mascot state={progress.data.mascot.state} size={46} />}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontWeight: 600, fontSize: 14.5, margin: 0 }}>
                   {progress.data.streak} {progress.data.streak === 1 ? "settimana" : "settimane"} di fila
@@ -550,49 +544,15 @@ export function TodayView() {
           );
         })}
       </div>
+      </details>
+
+
     </div>
   </PullToRefresh>
   );
 }
 
-/** Brand mark, 1-tap quick food button, and the settings avatar */
+/** The daily shortcut; brand and profile belong to the shared workspace. */
 function TodayHeader({ onOpenQuickLog }: { onOpenQuickLog?: () => void }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <BrandMark height={22} />
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {onOpenQuickLog && (
-          <motion.button data-track="today.registra-cibo-o-snack"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.94 }}
-            onClick={onOpenQuickLog}
-            className="tap-target"
-            aria-label="Registra cibo o snack"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              background: "var(--crema-card)",
-              border: "var(--border-airbnb)",
-              boxShadow: "var(--shadow-airbnb-subtle)",
-              borderRadius: "var(--radius-pill)",
-              padding: "6px 12px",
-              cursor: "pointer",
-              color: "var(--inchiostro)",
-              fontSize: 12.5,
-              fontWeight: 600,
-            }}
-          >
-            <UtensilsIcon size={14} strokeWidth={2} />
-            <span>+ Cibo</span>
-          </motion.button>
-        )}
-        <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} transition={{ type: "spring", stiffness: 450, damping: 22 }}>
-          <Link data-track="today.impostazioni" href="/settings" aria-label="Impostazioni" className="tap-target" style={{ display: "block" }}>
-            <Avatar size={36} withStatusBadge={true} />
-          </Link>
-        </motion.div>
-      </div>
-    </div>
-  );
+  return <button className="ux-button" onClick={onOpenQuickLog} data-track="today.registra-cibo-o-snack"><UtensilsIcon size={15} /><span>Registra pasto</span></button>;
 }

@@ -502,6 +502,22 @@ export function useAddSession() {
   };
 }
 
+/** Awaited save for editors: navigation follows server acknowledgement. Publication is separate. */
+export function useSavePlanSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, session }: { id?: string; session: TrainingSession }) => id
+      ? apiPatch<TrainingSession>(`/plan/sessions/${id}`, contentOf(session))
+      : apiPost<TrainingSession>("/plan/sessions", { ...contentOf(session), id: crypto.randomUUID() }),
+    onSuccess: (saved) => {
+      if (!queryClient.getQueryData(PLAN_KEY)) applyPlanLocally(queryClient, { yamlText: "", sessions: [], filename: null, importedAt: new Date().toISOString() });
+      replaceSessionLocally(queryClient, saved.id!, () => saved);
+      queryClient.invalidateQueries({ queryKey: ["plan-list"] });
+      queryClient.invalidateQueries({ queryKey: ["plan-diff"] });
+    },
+  });
+}
+
 export function useRemoveSession() {
   const queryClient = useQueryClient();
   return (id: string) => {
@@ -1467,8 +1483,8 @@ export function usePlanListQuery() {
 export function useTogglePlanActive() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ planId, isActive }: { planId: string; isActive: boolean }) =>
-      apiPost<{ plan_id: string; is_active: boolean }>(`/plan/${planId}/toggle-active`, { is_active: isActive }),
+    mutationFn: ({ planId, isActive, validationToken, acknowledgeInsufficientData }: { planId: string; isActive: boolean; validationToken?: string; acknowledgeInsufficientData?: boolean }) =>
+      apiPost<{ plan_id: string; is_active: boolean }>(`/plan/${planId}/toggle-active`, { is_active: isActive, validation_token: validationToken, acknowledge_insufficient_data: acknowledgeInsufficientData }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: PLANS_LIST_KEY });
       const { plan } = await apiGet<{ plan: PlanState | null }>("/plan");
@@ -1522,8 +1538,10 @@ export function useGenerationState() {
   });
   const latest = mutations.at(-1) ?? null;
   const state = latest?.state;
+  const options = state?.variables as boolean | GeneratePlanOptions | undefined;
   return {
     status: state?.status ?? "idle",
+    planId: options && typeof options === "object" ? options.planId : undefined,
     startedAt: state?.submittedAt ?? 0,
     result: (state?.status === "success" ? state.data : null) as GeneratePlanResult | null,
     error: state?.status === "error" ? state.error : null,

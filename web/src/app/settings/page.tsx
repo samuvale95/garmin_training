@@ -188,7 +188,7 @@ export default function SettingsPage() {
 
       <SlideUp delayMs={110}>
         <Card>
-          <Link data-track="settings.settings-goal" href="/settings/goal" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+          <Link data-track="settings.settings-goal" href="/week/goals" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ flex: 1 }}>
               <span style={{ fontWeight: 600, fontSize: 14, display: "block" }}>Obiettivo</span>
               <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>

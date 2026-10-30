@@ -886,10 +886,11 @@ class GenerationResult:
     # against, for `plan_store.replace_unlocked(expected=...)` when it is accepted.
     proposed: list[TrainingSession] = field(default_factory=list)
     expected: tuple[date_type, date_type, dict[str, str]] | None = None
+    skeleton: dict | None = None
 
 
 def goal_from_dict(raw: dict | None) -> RaceGoal | None:
-    if not raw:
+    if not raw or raw.get("type", "race") != "race" or not raw.get("race_date") or not raw.get("distance_km"):
         return None
     return RaceGoal(
         race_date=date_type.fromisoformat(str(raw["race_date"])),
@@ -938,6 +939,9 @@ def _fallback_or_fail(user_id: str, window: Window) -> list[TrainingSession]:
     return sessions
 
 
+_USE_STORED_GOAL = object()
+
+
 def generate(
     user_id: str,
     today: date_type,
@@ -953,6 +957,8 @@ def generate(
     sports: list[str] | None = None,
     user_prompt: str | None = None,
     plan_id: str = "default",
+    goal_override: dict | None | object = _USE_STORED_GOAL,
+    context_sessions: list[dict] | None = None,
 ) -> GenerationResult:
     """Write the next weeks -- or, with `write=False`, only propose them (plan adaptation
     in proposal mode). `threshold_hr` is stored with the skeleton so a later change of
@@ -962,7 +968,7 @@ def generate(
 
     with one_at_a_time(user_id) if hold_lock else nullcontext():
         context, days = plan_rules.gather_context(user_id, today, threshold_available=threshold_available)
-        raw_goal = db.current_goal(user_id, plan_id=plan_id)
+        raw_goal = db.current_goal(user_id, plan_id=plan_id) if goal_override is _USE_STORED_GOAL else goal_override
         goal = goal_from_dict(raw_goal)
         start, end = window_dates(today, goal)
         if goal is not None and goal.race_date < start:
@@ -984,16 +990,15 @@ def generate(
                     goal=goal,
                 )
             )
-            db.save_skeleton(
-                user_id,
-                {
-                    "inputs": {"goal": raw_goal, "effective_level": context.effective_level},
-                    "weeks": [week.to_dict() for week in weeks],
-                },
-                plan_id=plan_id,
-            )
+            proposed_skeleton = {
+                "inputs": {"goal": raw_goal, "effective_level": context.effective_level},
+                "weeks": [week.to_dict() for week in weeks],
+            }
+            if write:
+                db.save_skeleton(user_id, proposed_skeleton, plan_id=plan_id)
         else:
             weeks = [SkeletonWeek.from_dict(week) for week in stored_skeleton["weeks"]]
+            proposed_skeleton = stored_skeleton
 
         # Everything `build_window` reads from the plan: this week before the window, and
         # the window. Snapshotted before reading, checked again at write time.
@@ -1005,6 +1010,11 @@ def generate(
             if mode == "augment":
                 # In augment mode, existing sessions within the window are protected as locked
                 stored = [{**s, "locked": True} for s in stored]
+            if context_sessions is not None:
+                others = context_sessions
+            else:
+                others = [s for s in plan_store.list_sessions(user_id, only_active=True) if s.get("plan_id", "default") != plan_id]
+            stored = [*stored, *[{**s, "locked": True} for s in others]]
             window = build_window(
                 today=today,
                 skeleton=weeks,
@@ -1043,6 +1053,7 @@ def generate(
                 skeleton_regenerated=regenerated,
                 proposed=[*sessions, *window.fixed],
                 expected=(*span, seen),
+                skeleton=proposed_skeleton,
             )
 
         for _ in range(MAX_REWRITES + 1):

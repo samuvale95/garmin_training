@@ -1,15 +1,16 @@
 "use client";
 
 import { dis } from "@/lib/disabled";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Reorder } from "framer-motion";
 import { PrimaryButton } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { checkMoveAfterwards } from "@/lib/moveWarnings";
-import { findPlanSession, useAddSession, useIsRewritten, useApplyDeletion, useInvalidateCalendarData, usePlanQuery, useRemoveSession, useStartSync, useSyncJobStatus, useUpdateSession, useWorkoutsForDate } from "@/lib/queries";
+import { findPlanSession, useSavePlanSession, useIsRewritten, useApplyDeletion, useInvalidateCalendarData, usePlanQuery, useRemoveSession, useStartSync, useSyncJobStatus, useWorkoutsForDate } from "@/lib/queries";
+import { safeReturnHref, withReturnTo } from "@/lib/navigation";
 import { ApiError } from "@/lib/apiClient";
-import { normalizeTitle, parseDateKey, shiftDateKey, toDateKey } from "@/lib/sessionVisuals";
+import { normalizeTitle, sessionDurationMinutes, parseDateKey, shiftDateKey, toDateKey } from "@/lib/sessionVisuals";
 import { capitalize, formatFullDate, formatPaceMinSec, formatShortDate, formatPaceRange, parsePaceMinSec, stepTypeHint, stepTypeLabel } from "@/lib/format";
 import { isRepeatBlock } from "@/lib/types";
 import type { ScheduledWorkout, SessionStep, Sport, Step, StepType, TrainingSession } from "@/lib/types";
@@ -108,6 +109,8 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   const garminSession = props.mode === "garmin" ? props.session : null;
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = safeReturnHref(searchParams.get("from"), "/week");
   const animate = useMountOnce(
     mode === "edit"
       ? `session-edit-${sessionParam}`
@@ -119,8 +122,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   // all (the whole point of "+" from Settimana is to start one from scratch) --
   // `addSession` below lazily creates an empty plan the first time it's called.
   const { data: plan } = usePlanQuery();
-  const updateSession = useUpdateSession();
-  const addSession = useAddSession();
+  const savePlanSession = useSavePlanSession();
   const removeSession = useRemoveSession();
   const invalidateCalendar = useInvalidateCalendarData();
   const { isRewritten, until: rewriteUntil } = useIsRewritten();
@@ -145,12 +147,14 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
    * identity below keeps pointing at the *old* day while the form holds the new one. */
   const originalDate = mode === "garmin" ? garminWorkout!.date : originalKey?.date ?? null;
 
-  const [date, setDate] = useState(existing?.date ?? toDateKey(new Date()));
-  const [sport, setSport] = useState<Sport>((existing?.sport as Sport) ?? "running");
-  const [priority, setPriority] = useState<"key" | "normal" | "optional">(() => (existing?.priority === "key" ? "key" : existing?.priority === "optional" ? "optional" : "normal"));
-  const [title, setTitle] = useState(existing?.title ?? "");
-  const [description, setDescription] = useState(existing?.description ?? "");
-  const [steps, setSteps] = useState<EditableItem[]>(() => toEditable(existing?.steps ?? []));
+  const editorStorageKey = `passo-editor:${mode}:${sessionParam ?? garminWorkout?.scheduled_workout_id ?? "new"}`;
+  const [restored] = useState(() => { try { return typeof window !== "undefined" ? JSON.parse(sessionStorage.getItem(editorStorageKey) ?? "null") as { date: string; sport: Sport; priority: "key"|"normal"|"optional"; title: string; description: string; steps: EditableItem[] } | null : null; } catch { return null; } });
+  const [date, setDate] = useState(restored?.date ?? existing?.date ?? (parseDateKey(searchParams.get("date") ?? "") ? searchParams.get("date")! : toDateKey(new Date())));
+  const [sport, setSport] = useState<Sport>(restored?.sport ?? (existing?.sport as Sport) ?? "running");
+  const [priority, setPriority] = useState<"key" | "normal" | "optional">(() => restored?.priority ?? (existing?.priority === "key" ? "key" : existing?.priority === "optional" ? "optional" : "normal"));
+  const [title, setTitle] = useState(restored?.title ?? existing?.title ?? "");
+  const [description, setDescription] = useState(restored?.description ?? existing?.description ?? "");
+  const [steps, setSteps] = useState<EditableItem[]>(() => restored?.steps ?? toEditable(existing?.steps ?? []));
   const [editingStep, setEditingStep] = useState<EditableStep | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -159,10 +163,10 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   /** Where "×"/"Annulla" go back to: the screen this editor was opened from. */
   const originHref =
     mode === "edit"
-      ? `/session/${sessionId}`
+      ? withReturnTo(`/session/${sessionId}`, returnTo)
       : mode === "garmin"
-        ? `/workout/${garminWorkout!.scheduled_workout_id}?date=${garminWorkout!.date}`
-        : "/week";
+        ? withReturnTo(`/workout/${garminWorkout!.scheduled_workout_id}?date=${garminWorkout!.date}`, returnTo)
+        : returnTo;
   /** Where a *successful* save lands. Not `originHref` in `garmin` mode: a replace on
    * Garmin is a delete plus a create (see `GarminSync.replace_session`), so the id in
    * that route no longer exists once the job is done.
@@ -189,7 +193,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   // Not on placeholder data either: that is the *previous* week's answer, kept on screen
   // while this one loads, and a session looked up in it would never be found.
   const calendarIdentityKnown =
-    mode !== "edit" || !originalKey || (workoutsQuery.isSuccess && !workoutsQuery.isPlaceholderData);
+    mode !== "garmin" || !!garminWorkout;
   // The lookup failed (timeout, Garmin down): without this the button sat on "Leggo il
   // calendario…" for good -- queries don't retry on their own -- and saving was impossible.
   const calendarLookupFailed = !calendarIdentityKnown && workoutsQuery.isError && !workoutsQuery.isFetching;
@@ -222,6 +226,22 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
     }
   }, [jobId, jobSucceeded, successHref, router, invalidateCalendar]);
 
+  const formSnapshot = JSON.stringify({ date, sport, priority, title, description, steps });
+  const initialSnapshot = useRef(formSnapshot);
+  const leavingAfterSave = useRef(false);
+  const dirty = formSnapshot !== initialSnapshot.current || !!restored;
+  useEffect(() => { if (!dirty || leavingAfterSave.current) return; try { sessionStorage.setItem(editorStorageKey, formSnapshot); } catch { /* Form remains usable if storage is unavailable. */ } }, [dirty, editorStorageKey, formSnapshot]);
+  function clearEditorDraft() { try { sessionStorage.removeItem(editorStorageKey); } catch {} }
+
+  useEffect(() => {
+    if (!dirty) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => { if (!leavingAfterSave.current) { event.preventDefault(); event.returnValue = ""; } };
+    const onLink = (event: MouseEvent) => { const anchor = (event.target as HTMLElement).closest("a[href]"); if (anchor && !leavingAfterSave.current && !window.confirm("Uscire senza salvare le modifiche?")) { event.preventDefault(); event.stopPropagation(); } };
+    window.addEventListener("beforeunload", beforeUnload); document.addEventListener("click", onLink, true);
+    return () => { window.removeEventListener("beforeunload", beforeUnload); document.removeEventListener("click", onLink, true); };
+  }, [dirty]);
+  function leaveEditor() { if (!dirty || window.confirm("Uscire senza salvare le modifiche?")) { leavingAfterSave.current = true; clearEditorDraft(); router.push(originHref); } }
+
   if (mode === "edit" && (!plan || !existing)) {
     return (
       <div style={{ padding: 22 }}>
@@ -231,7 +251,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   }
 
   const displayError = saveError ?? jobFailedMessage;
-  const isSaving = startSync.isPending || (!!jobId && !jobFailedMessage && !jobSucceeded);
+  const isSaving = savePlanSession.isPending || startSync.isPending || (!!jobId && !jobFailedMessage && !jobSucceeded);
   // A date field can be cleared, and an empty (or half-typed) day would reach the API as
   // an unparseable date and come back a 422 -- so it gates the save instead.
   const dayIsValid = parseDateKey(date) !== null;
@@ -279,14 +299,14 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       plan_id: existing?.plan_id,
     };
 
-    // `garmin` mode edits a workout that isn't in the local plan at all, so it writes
-    // nothing there -- the calendar is the only place this session lives.
-    if (mode === "create") {
-      addSession(session);
-    } else if (mode === "edit") {
-      updateSession(sessionId!, () => session);
-      // A new day is a move: check it like one (the sheet shows wherever the user is).
-      if (existing?.date && existing.date !== session.date) checkMoveAfterwards(sessionId!, existing.date, session.date);
+    if (mode !== "garmin") {
+      try {
+        const saved = await savePlanSession.mutateAsync({ id: mode === "edit" ? sessionId! : undefined, session });
+        clearEditorDraft();
+        leavingAfterSave.current = true;
+        router.push(mode === "edit" ? `${originHref}&saved=1` : withReturnTo(`/session/${saved.id}?saved=1`, returnTo));
+      } catch (err) { setSaveError(err instanceof Error ? err.message : "Salvataggio non riuscito. Le modifiche restano nel modulo."); }
+      return;
     }
 
     try {
@@ -395,7 +415,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <button data-track="workout-editor.chiudi"
           type="button"
-          onClick={() => router.push(originHref)}
+          onClick={leaveEditor}
           className="tap-target"
           aria-label="Chiudi"
           style={{
@@ -465,6 +485,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
         </div>
       )}
 
+      {restored && <p className="ux-notice" role="status">Modifiche non salvate recuperate da questo dispositivo. Controllale prima di salvare.</p>}
       <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--inchiostro)", letterSpacing: "-0.03em", marginTop: 18, marginBottom: 0 }}>
         {mode === "create" ? "Crea allenamento" : "Modifica allenamento"}
       </h1>
@@ -664,7 +685,8 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
         </p>
       )}
 
-      <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="editor-save-bar"><p className="ux-muted">{sessionDurationMinutes({ date, sport, title, description, steps: plainSteps() }) != null ? `${Math.round(sessionDurationMinutes({ date, sport, title, description, steps: plainSteps() })!)} min previsti` : "Durata non determinabile"} · {mode === "garmin" ? "Il salvataggio modifica il calendario Garmin." : "Salvato nell’app. L’invio a Garmin si conferma separatamente."}</p>
+      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
         <PrimaryButton data-track="workout-editor.handlesave"
           state={
             !dayIsValid ? "disabled" : calendarLookupFailed ? "idle" : isSaving || !calendarIdentityKnown ? "loading" : "idle"
@@ -677,18 +699,18 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
               ? "Calendario non raggiungibile · Riprova"
               : !calendarIdentityKnown
               ? "Leggo il calendario…"
-              : movedFrom
-                ? "Sposta sul calendario"
-                : "Salva sul calendario"}
+              : mode === "garmin" ? "Salva e invia a Garmin" : "Salva allenamento"}
         </PrimaryButton>
         <button data-track="workout-editor.router-push"
           type="button"
-          onClick={() => router.push(originHref)}
+          onClick={leaveEditor}
           className="tap-target"
           style={{ background: "none", border: "none", color: "var(--inchiostro-50)", fontSize: 13, cursor: "pointer" }}
         >
           Annulla
         </button>
+      </div>
+
       </div>
 
       {editingStep && (

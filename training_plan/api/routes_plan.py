@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 from fastapi.concurrency import run_in_threadpool
 
 from .. import checkin, db, history, levels, move_check, plan_adaptation, plan_generator, plan_rules, plan_store, race_prediction, readiness, service
-from .. import goal_fit, llm
+from .. import goal_fit, llm, programs
 from ..parser import parse_plan_document, serialize_plan
 from . import garmin_session, schemas
 from .auth import current_user_id
@@ -81,7 +81,10 @@ async def toggle_plan_active(
     user_id: str = Depends(current_user_id),
 ) -> schemas.PlanResponse:
     def run() -> schemas.PlanResponse:
-        db.set_plan_active(user_id, plan_id, payload.is_active)
+        try:
+            programs.toggle_program(user_id,plan_id,payload.is_active,payload.validation_token,payload.acknowledge_insufficient_data)
+        except programs.PlanningError as exc:
+            return _error(exc.status,"validation_failed",str(exc),[str(d) for d in (exc.details or [])])
         plan = db.get_plan(user_id, plan_id=plan_id)
         if not plan:
             raise HTTPException(status_code=404, detail=f"Piano {plan_id} non trovato")
@@ -93,56 +96,8 @@ async def toggle_plan_active(
 
 @router.put("/plan", response_model=schemas.PlanOut)
 async def save_plan(payload: schemas.PlanIn, user_id: str = Depends(current_user_id)) -> schemas.PlanOut:
-    """Import a plan with replace, merge, or new_plan mode."""
-
-    def write() -> schemas.PlanOut:
-        import inspect
-        from uuid import uuid4
-
-        plan_id = payload.plan_id or "default"
-        if payload.mode == "new_plan" and plan_id == "default":
-            plan_id = f"piano-{uuid4().hex[:8]}"
-
-        plan_sports = payload.sports
-        if not plan_sports:
-            plan_sports = list(dict.fromkeys(s.sport for s in payload.sessions)) or ["running"]
-
-        sig_save = inspect.signature(db.save_plan)
-        save_kw = {
-            "user_id": user_id,
-            "yaml_text": payload.yaml_text,
-            "filename": payload.filename,
-            "imported_at": payload.imported_at,
-            "goal": payload.goal.model_dump(mode="json") if payload.goal else None,
-        }
-        if "plan_id" in sig_save.parameters and plan_id != "default":
-            save_kw["plan_id"] = plan_id
-        if "name" in sig_save.parameters and payload.plan_name:
-            save_kw["name"] = payload.plan_name
-        if "sports" in sig_save.parameters and payload.sports:
-            save_kw["sports"] = plan_sports
-        if "is_active" in sig_save.parameters:
-            save_kw["is_active"] = True
-
-        plan = db.save_plan(**save_kw)
-        if payload.is_import:
-            sessions_data = [s.model_dump(mode="json") for s in payload.sessions]
-            sig_imp = inspect.signature(plan_store.import_sessions)
-            imp_kw = {}
-            if "plan_id" in sig_imp.parameters and plan_id != "default":
-                imp_kw["plan_id"] = plan_id
-            if "mode" in sig_imp.parameters and payload.mode != "replace":
-                imp_kw["mode"] = payload.mode
-            if imp_kw:
-                plan_store.import_sessions(user_id, sessions_data, **imp_kw)
-            else:
-                plan_store.import_sessions(user_id, sessions_data)
-
-        sig_list = inspect.signature(plan_store.list_sessions)
-        list_kw = {"plan_id": plan_id} if "plan_id" in sig_list.parameters and plan_id != "default" else {}
-        return schemas.PlanOut.from_model(plan, plan_store.list_sessions(user_id, **list_kw))
-
-    return await run_in_threadpool(write)
+    """Old whole-plan writes are not safe with reviewable independent programs."""
+    return _error(409,"validation_failed","Salvataggio precedente non supportato: usa Piano → Programmi per rivedere le modifiche e Piano → Obiettivi per il risultato desiderato.")
 
 
 @router.delete("/plan", response_model=schemas.DeletePlanResponse)
@@ -180,17 +135,6 @@ async def create_session(
 
     result = await run_in_threadpool(write)
 
-    # Immediately push to Garmin if connected
-    def _sync_create_to_garmin():
-        try:
-            from ..models import TrainingSession as ModelTrainingSession
-            model_sess = payload.to_model()
-            garmin_session.run(user_id, lambda sync: sync.create_and_schedule(model_sess))
-            invalidate_calendar(user_id)
-        except Exception:
-            pass
-
-    background_tasks.add_task(_sync_create_to_garmin)
     return result
 
 
@@ -201,14 +145,6 @@ async def update_session(
     background_tasks: BackgroundTasks = BackgroundTasks(),
     user_id: str = Depends(current_user_id),
 ) -> schemas.TrainingSessionOut:
-    # Read before-state to know previous date/title
-    previous = None
-    try:
-        stored = plan_store.list_sessions(user_id)
-        previous = next((s for s in stored if s["id"] == str(session_id)), None)
-    except Exception:
-        pass
-
     def write() -> schemas.TrainingSessionOut:
         try:
             updated = plan_store.update_session(user_id, str(session_id), payload.changes(), by_user=True)
@@ -218,45 +154,6 @@ async def update_session(
 
     result = await run_in_threadpool(write)
 
-    # Immediately synchronize update with Garmin Connect
-    def _sync_update_to_garmin():
-        try:
-            if not previous:
-                return
-            prev_date = date.fromisoformat(previous["date"])
-            new_date = result.date
-            title = previous["title"].strip().lower()
-
-            def _push(sync):
-                from ..garmin_sync import session_key, ChangedSession
-                # Find workout on Garmin calendar around prev_date or new_date
-                start = min(prev_date, new_date) - timedelta(days=2)
-                end = max(prev_date, new_date) + timedelta(days=2)
-                workouts = sync.list_scheduled_workouts(start, end)
-                target_w = None
-                for w in workouts:
-                    if w.title.strip().lower() == title:
-                        target_w = w
-                        break
-
-                if target_w:
-                    # If steps or title changed, replace; if only date moved, reschedule
-                    steps_changed = payload.steps is not None or payload.title is not None
-                    if not steps_changed and prev_date != new_date:
-                        sync.reschedule_workout(target_w, new_date)
-                    else:
-                        sync.delete_workout(target_w)
-                        sync.create_and_schedule(result.to_model())
-                else:
-                    # Workout wasn't on Garmin yet, create and schedule it
-                    sync.create_and_schedule(result.to_model())
-
-            garmin_session.run(user_id, _push)
-            invalidate_calendar(user_id)
-        except Exception:
-            pass
-
-    background_tasks.add_task(_sync_update_to_garmin)
     return result
 
 
@@ -275,34 +172,6 @@ async def toggle_session_short_variant(
 
     result = await run_in_threadpool(write)
 
-    # Immediately synchronize update with Garmin Connect (reschedule with effective steps)
-    def _sync_short_to_garmin():
-        try:
-            sess_model = result.to_model()
-            target_date = sess_model.date
-            title = sess_model.title.strip().lower()
-
-            def _push(sync):
-                start = target_date - timedelta(days=2)
-                end = target_date + timedelta(days=2)
-                workouts = sync.list_scheduled_workouts(start, end)
-                target_w = None
-                for w in workouts:
-                    if w.title.strip().lower() == title or (
-                        sess_model.short_variant and w.title.strip().lower() == sess_model.short_variant.title.strip().lower()
-                    ):
-                        target_w = w
-                        break
-                if target_w:
-                    sync.delete_workout(target_w)
-                sync.create_and_schedule(sess_model)
-
-            garmin_session.run(user_id, _push)
-            invalidate_calendar(user_id)
-        except Exception:
-            pass
-
-    background_tasks.add_task(_sync_short_to_garmin)
     return result
 
 
@@ -312,13 +181,6 @@ async def delete_session(
     background_tasks: BackgroundTasks = BackgroundTasks(),
     user_id: str = Depends(current_user_id),
 ) -> schemas.DeletePlanResponse:
-    target_to_delete = None
-    try:
-        stored = plan_store.list_sessions(user_id)
-        target_to_delete = next((s for s in stored if s["id"] == str(session_id)), None)
-    except Exception:
-        pass
-
     def write() -> None:
         try:
             plan_store.delete_session(user_id, str(session_id), by_user=True)
@@ -327,27 +189,6 @@ async def delete_session(
 
     await run_in_threadpool(write)
 
-    # Delete from Garmin calendar if present
-    def _sync_delete_to_garmin():
-        try:
-            if not target_to_delete:
-                return
-            sess_date = date.fromisoformat(target_to_delete["date"])
-            title = target_to_delete["title"].strip().lower()
-
-            def _del(sync):
-                workouts = sync.list_scheduled_workouts(sess_date, sess_date)
-                for w in workouts:
-                    if w.title.strip().lower() == title:
-                        sync.delete_workout(w)
-                        break
-
-            garmin_session.run(user_id, _del)
-            invalidate_calendar(user_id)
-        except Exception:
-            pass
-
-    background_tasks.add_task(_sync_delete_to_garmin)
     return schemas.DeletePlanResponse(ok=True)
 
 
@@ -591,39 +432,7 @@ async def generate_plan(
     """Write the next weeks: the model composes inside the code's limits, the code checks,
     and sessions edited by hand stay (see `plan_generator.py`). Blocks until done --
     usually one model call, bounded at a few."""
-    payload = payload or schemas.GeneratePlanRequest()
-
-    def run() -> schemas.GeneratePlanResponse | JSONResponse:
-        state = coach_state(user_id)
-        profile = state[1].profile if state and state[1] else None
-        import inspect
-
-        sig_gen = inspect.signature(plan_generator.generate)
-        gen_kw: dict[str, Any] = {
-            "profile": profile,
-            "threshold_available": state is not None,
-            "regenerate_skeleton": payload.regenerate_skeleton,
-            "threshold_hr": state[0].threshold_hr if state else None,
-        }
-        if "mode" in sig_gen.parameters and payload.mode != "rebuild":
-            gen_kw["mode"] = payload.mode
-        if "sports" in sig_gen.parameters and payload.sports != ["running"]:
-            gen_kw["sports"] = payload.sports
-        if "user_prompt" in sig_gen.parameters and payload.user_prompt:
-            gen_kw["user_prompt"] = payload.user_prompt
-        if "plan_id" in sig_gen.parameters and payload.plan_id != "default":
-            gen_kw["plan_id"] = payload.plan_id
-
-        try:
-            result = plan_generator.generate(user_id, date.today(), **gen_kw)
-        except plan_generator.GenerationInProgress:
-            return _error(409, "validation_failed", "Sto già scrivendo il piano: aspetta che finisca.")
-        except plan_generator.GenerationFailed as exc:
-            return _error(422, "validation_failed", "Non riesco a scrivere un piano dentro i limiti.", exc.errors)
-        return schemas.GeneratePlanResponse.from_model(result)
-
-    return await run_in_threadpool(run)
-
+    return _error(409,"validation_failed","Generazione da rivedere: crea una bozza in Piano → Programmi prima di attivare.")
 
 @router.get("/plan/skeleton", response_model=schemas.SkeletonResponse)
 async def get_skeleton(plan_id: str = "default", user_id: str = Depends(current_user_id)) -> schemas.SkeletonResponse:
@@ -699,12 +508,7 @@ async def get_goal(user_id: str = Depends(current_user_id)) -> schemas.GoalRespo
 
 @router.put("/goal", response_model=schemas.GoalResponse)
 async def set_goal(payload: schemas.SetGoalRequest, user_id: str = Depends(current_user_id)) -> schemas.GoalResponse:
-    raw = payload.goal.model_dump(mode="json") if payload.goal else None
-    saved = await run_in_threadpool(db.set_standalone_goal, user_id, raw)
-    if not saved:
-        return schemas.GoalResponse(goal=None)
-    goal = schemas.RaceGoalIn.model_validate(saved).to_model()
-    return schemas.GoalResponse(goal=schemas.RaceGoalOut.from_model(goal))
+    return _error(409,"validation_failed","Modifica gli obiettivi in Piano → Obiettivi per conservare versioni e valutazioni.")
 
 
 @router.post("/plan/parse", response_model=schemas.ParsePlanResponse)

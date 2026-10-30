@@ -2,13 +2,13 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { PlanNavigation, WorkspaceHeading } from "@/components/Workspace";
+import { dis } from "@/lib/disabled";
 import { motion } from "framer-motion";
-import { BrandMark } from "@/components/motion/BrandMark";
 import { BarGrow, SlideUp } from "@/components/motion/primitives";
 import { ChevronLeft, ChevronRight, PlusIcon, ArrowRight } from "@/components/Icons";
 import { DraggableWeekCard, RestCard, type DayCardData } from "@/components/WeekCards";
-import { PlanGenerateCard } from "@/components/PlanGenerateCard";
 import { OffPlanCard, offPlanActivities } from "@/components/OffPlanCard";
 import { useMotionEnabled, useMountOnce } from "@/lib/motion";
 import { useMoveSession } from "@/lib/moveWarnings";
@@ -16,8 +16,6 @@ import { PullToRefresh } from "@/components/PullToRefresh";
 import { useCalendarAccess } from "@/lib/guards";
 import {
   useActivities,
-  useDeletePlanById,
-  usePlanListQuery,
   usePrefetchWeeks,
   usePrefetchWorkoutSession,
   useRefreshServerData,
@@ -26,7 +24,6 @@ import {
   useStravaStatus,
   useIsRewritten,
   useStoredActivities,
-  useTogglePlanActive,
   useWeekWorkouts,
 } from "@/lib/queries";
 import { SkeletonDayCards } from "@/components/skeletons";
@@ -61,16 +58,18 @@ function haptic(pattern: number | number[]) {
 }
 
 export function WeekPageContent() {
-  const access = useCalendarAccess();
+  const access = useCalendarAccess({ redirectWhenEmpty: false });
   const animate = useMountOnce("week");
   const { reduced } = useMotionEnabled();
   // `?date=` opens on the week containing that day instead of the current one -- how the
-  // editor comes back after a save, since the day it saved on may not be in this week at
-  // all (the day is editable: see WorkoutEditor's DayField). Read once, as the initial
-  // offset: from there on the ‹ › buttons own which week is shown, so paging away from
-  // the week we landed on doesn't fight with the URL that got us here.
-  const focusDate = useSearchParams().get("date");
-  const [offset, setOffset] = useState(() => (focusDate ? weekOffsetFromToday(focusDate) : 0));
+  // editor comes back after a save. Paging updates the same URL state, so detail links,
+  // reloads and browser history all retain the selected week.
+  const calendarParams = useSearchParams();
+  const focusDate = calendarParams.get("date");
+  const calendarView = calendarParams.get("view") === "list" ? "list" : "columns";
+  const router = useRouter();
+  const rawOffset = focusDate ? weekOffsetFromToday(focusDate) : 0;
+  const offset = Number.isFinite(rawOffset) ? rawOffset : 0;
   // -1 / +1: which side the day list should enter from after a week change.
   const [direction, setDirection] = useState(0);
   const liveMode = !access.plan && access.garminConnected;
@@ -194,8 +193,10 @@ export function WeekPageContent() {
 
   const pageWeek = useCallback((delta: number) => {
     setDirection(delta);
-    setOffset((o) => o + delta);
-  }, []);
+    const date = new Date();
+    date.setDate(date.getDate() + (offset + delta) * 7);
+    router.replace(`/week?date=${toDateKey(weekBounds(date).start)}`, { scroll: false });
+  }, [offset, router]);
 
   // One non-passive touch listener owns both gestures the list has to arbitrate.
   //
@@ -251,7 +252,7 @@ export function WeekPageContent() {
 
   function goToCurrentWeek() {
     setDirection(offset > 0 ? -1 : 1);
-    setOffset(0);
+    router.replace("/week", { scroll: false });
   }
 
   // Same rule as Oggi: while we don't yet know whether there's a plan or a Garmin
@@ -262,7 +263,7 @@ export function WeekPageContent() {
   // Ready also with neither plan nor Garmin: the guard is sending the user to /import.
   useScreenReady(access.ready && !(liveMode && workoutsQuery.isPending), "/week");
 
-  if (!access.ready || (!access.plan && !access.garminConnected)) {
+  if (!access.ready) {
     return (
       <div>
         <WeekHeader start={start} end={end} animate={animate} offset={offset} onPrev={() => pageWeek(-1)} onNext={() => pageWeek(1)} onToday={goToCurrentWeek} />
@@ -272,6 +273,11 @@ export function WeekPageContent() {
       </div>
     );
   }
+
+  if (!access.plan && !access.garminConnected) return <div className="workspace-page">
+    <WorkspaceHeading title="Piano" description="Organizza i tuoi prossimi allenamenti." /><PlanNavigation />
+    <div className="ux-empty"><h2>Costruisci la tua settimana</h2><p>Importa un programma, genera le prossime sedute oppure collega Garmin per consultare il calendario.</p><div className="ux-actions"><Link className="ux-button ux-button-primary" href="/week/programs" data-track="week.empty-programs">Crea o importa un programma</Link><Link className="ux-button" href="/connect-garmin" data-track="week.empty-connect">Collega Garmin</Link></div></div>
+  </div>;
 
   const days = Array.from({ length: 7 }).map((_, i) => {
     const date = new Date(start);
@@ -345,6 +351,8 @@ export function WeekPageContent() {
       </div>
 
       <div style={{ padding: "0 20px 12px" }}>
+        <div className="calendar-view-switch" role="group" aria-label="Vista calendario"><button className="ux-button" aria-pressed={calendarView === "columns"} data-track="week.columns" onClick={() => router.replace(`/week?date=${focusDate ?? todayKey}&view=columns`, { scroll: false })}>Settimana</button><button className="ux-button" aria-pressed={calendarView === "list"} data-track="week.list" onClick={() => router.replace(`/week?date=${focusDate ?? todayKey}&view=list`, { scroll: false })}>Elenco</button></div>
+        {rescheduleWorkout.isError && <p className="ux-error" role="alert">Lo spostamento su Garmin non è riuscito. Riprova.</p>}
         {!showProgress && (
           <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "8px 0 0" }}>
             {summaryText}
@@ -364,8 +372,7 @@ export function WeekPageContent() {
 
         {/* Only on this week: generation always starts tomorrow, so offering it while
             paging through past or later weeks would promise a window it won't write. */}
-        <PlanSelectorBar />
-        {offset === 0 && <PlanGenerateCard animate={animate} delayMs={160} />}
+
 
         {offset <= 0 && (
           <Link data-track="week.summary-monday-startkey" href={`/summary?monday=${startKey}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12.5, fontWeight: 600, color: "var(--inchiostro-70)", marginTop: 10 }}>
@@ -380,7 +387,7 @@ export function WeekPageContent() {
               ? `Sto riscrivendo i giorni fino a ${formatShortDate(rewriteUntil)}: potrai spostarli appena ho finito.`
               : carried
                 ? "Rilascia sul giorno in cui spostarla."
-                : "Tieni premuta una seduta per spostarla di giorno."}
+                : "Apri una seduta per i dettagli, oppure scegli Sposta per cambiare giorno."}
           </p>
         )}
 
@@ -402,7 +409,8 @@ export function WeekPageContent() {
           ) : (
             <div
               key={offset}
-              className={[weekInClass, carried ? "week-list--dragging" : ""].filter(Boolean).join(" ")}
+              data-view={calendarView}
+              className={["calendar-days", weekInClass, carried ? "week-list--dragging" : ""].filter(Boolean).join(" ")}
               style={{
                 position: "relative",
                 display: "flex",
@@ -413,7 +421,7 @@ export function WeekPageContent() {
             >
               {/* The thread the seven days hang off. Each day's number sits on its own
                   crema disc, so the line passes behind them rather than through them. */}
-              <span aria-hidden="true" style={{ position: "absolute", left: 17.5, top: 22, bottom: 22, width: 1, background: "var(--sabbia-bordo)" }} />
+              <span className="calendar-thread" aria-hidden="true" style={{ position: "absolute", left: 17.5, top: 22, bottom: 22, width: 1, background: "var(--sabbia-bordo)" }} />
 
               {days.map((day, i) => {
                 const isToday = day.key === todayKey;
@@ -423,6 +431,8 @@ export function WeekPageContent() {
                 return (
                   <div
                     key={day.key}
+                    className="calendar-day"
+                    data-today={isToday || undefined}
                     ref={(el) => {
                       // Cleared on unmount rather than left behind: paging through
                       // weeks would otherwise pile up detached rows that the drop test
@@ -472,8 +482,8 @@ export function WeekPageContent() {
                         <RestCard animate={animate} delayMs={i * 70} withIllustration={i === firstRestIndex} />
                       ) : (
                         day.cards.map((card, j) => (
+                          <div key={card.id}>
                           <DraggableWeekCard
-                            key={card.id}
                             card={card}
                             animate={animate}
                             delayMs={i * 70 + j * 40}
@@ -484,6 +494,13 @@ export function WeekPageContent() {
                             onPrefetch={card.workout ? () => prefetchWorkoutSession(card.workout!) : undefined}
                             emphasis={j === 0 && day.key === nextDayKey ? (isToday ? "oggi" : "prossimo") : null}
                           />
+                          <MoveSessionControl card={card} blocked={isRewritten(card.session.date) || rescheduleWorkout.isPending} onMove={(date) => {
+                            if (isRewritten(date) || isRewritten(card.session.date)) return false;
+                            if (card.planId) moveSession(card.planId, card.session.date, date);
+                            else if (card.workout) rescheduleWorkout.mutate({ workout: card.workout, newDate: date });
+                            return true;
+                          }} />
+                          </div>
                         ))
                       )}
                       {day.offPlan.map((activity, j) => (
@@ -540,19 +557,10 @@ interface WeekHeaderProps {
 function WeekHeaderRow({ start, end, offset, onPrev, onNext, onToday }: WeekHeaderProps) {
   return (
     <>
-      <div className="screen-brand-row">
-        <BrandMark height={22} />
-        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.94 }}>
-          <Link data-track="week.week-new" href="/week/new" className="tap-target add-workout-link" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <PlusIcon size={13} strokeWidth={2.5} />
-            <span>Allenamento</span>
-          </Link>
-        </motion.div>
-      </div>
-      <header className="screen-intro">
-        <h1>La tua settimana</h1>
-        <p>Trova il ritmo, un giorno alla volta.</p>
-      </header>
+      <WorkspaceHeading title="Piano">
+        <details className="calendar-add"><summary className="ux-button" data-track="week.add"><PlusIcon size={14} />Aggiungi</summary><div className="calendar-add-menu"><Link data-track="week.week-new" href="/week/new" className="ux-button">Allenamento singolo<small>Una seduta in un giorno preciso</small></Link><Link data-track="week.new-program" href="/week/programs/new" className="ux-button">Programma di allenamento<small>Più settimane verso un obiettivo</small></Link></div></details>
+      </WorkspaceHeading>
+      <PlanNavigation />
       <div className="week-picker">
         <NavButton label="Settimana precedente" onClick={onPrev}>
           <ChevronLeft size={16} strokeWidth={2.4} />
@@ -600,8 +608,8 @@ function NavButton({ label, onClick, children }: { label: string; onClick: () =>
       whileHover={{ scale: 1.15 }}
       transition={{ type: "spring", stiffness: 500, damping: 22 }}
       style={{
-        width: 32,
-        height: 32,
+        width: 44,
+        height: 44,
         borderRadius: "50%",
         background: "var(--sabbia-chip)",
         color: "var(--inchiostro)",
@@ -620,142 +628,23 @@ function NavButton({ label, onClick, children }: { label: string; onClick: () =>
   );
 }
 
-function PlanSelectorBar() {
-  const { data: planList } = usePlanListQuery();
-  const toggleActive = useTogglePlanActive();
-  const deletePlan = useDeletePlanById();
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  if (!planList || planList.plans.length === 0) return null;
-
-  return (
-    <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", borderRadius: "var(--radius-card)", boxShadow: "var(--shadow-airbnb-subtle)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--inchiostro-50)" }}>
-          {planList.plans.length === 1 ? "Piano attivo" : `Piani allenamento (${planList.active_plan_ids.length} di ${planList.plans.length} attivi)`}
-        </span>
-        <Link href="/import" style={{ fontSize: 11.5, color: "var(--corallo)", textDecoration: "none", fontWeight: 700 }}>
-          + Aggiungi / Unisci
-        </Link>
-      </div>
-
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-        {planList.plans.map((p) => {
-          const isActive = p.is_active;
-          const isDeleting = confirmDeleteId === p.id;
-
-          if (isDeleting) {
-            return (
-              <div
-                key={p.id}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "4px 8px",
-                  borderRadius: "var(--radius-pill)",
-                  background: "var(--rosa-avviso)",
-                  border: "1px solid var(--rosso-forte)",
-                }}
-              >
-                <span style={{ fontSize: 11.5, color: "var(--rosso-forte)", fontWeight: 600 }}>Eliminare {p.name}?</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    deletePlan.mutate(p.id);
-                    setConfirmDeleteId(null);
-                  }}
-                  style={{
-                    background: "var(--rosso-forte)",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "var(--radius-pill)",
-                    padding: "2px 8px",
-                    fontSize: 10.5,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  Sì
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmDeleteId(null)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--inchiostro-50)",
-                    fontSize: 10.5,
-                    cursor: "pointer",
-                  }}
-                >
-                  No
-                </button>
-              </div>
-            );
-          }
-
-          return (
-            <div
-              key={p.id}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                borderRadius: "var(--radius-pill)",
-                border: isActive ? "1.5px solid var(--inchiostro)" : "1px dashed var(--sabbia-bordo)",
-                background: isActive ? "var(--sabbia-chip)" : "transparent",
-                color: isActive ? "var(--inchiostro)" : "var(--inchiostro-50)",
-                padding: "2px 4px 2px 8px",
-                gap: 4,
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => toggleActive.mutate({ planId: p.id, isActive: !isActive })}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  color: "inherit",
-                  fontSize: 12,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                  padding: "2px 0",
-                }}
-              >
-                <span style={{ fontWeight: 700, color: isActive ? "var(--verde-tratto-scuro)" : "var(--inchiostro-35)" }}>
-                  {isActive ? "●" : "○"}
-                </span>
-                <span style={{ fontWeight: 600 }}>{p.name}</span>
-                <span className="font-mono" style={{ fontSize: 10.5, opacity: 0.7 }}>
-                  ({p.sports.join(", ")})
-                </span>
-              </button>
-
-              {planList.plans.length > 1 && (
-                <button
-                  type="button"
-                  title={`Elimina piano ${p.name}`}
-                  onClick={() => setConfirmDeleteId(p.id)}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    color: "var(--inchiostro-35)",
-                    cursor: "pointer",
-                    fontSize: 13,
-                    lineHeight: 1,
-                    padding: "2px 4px",
-                    borderRadius: "50%",
-                  }}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+function MoveSessionControl({ card, blocked, onMove }: { card: DayCardData; blocked: boolean; onMove: (date: string) => boolean }) {
+  const [date, setDate] = useState(card.session.date);
+  const [error, setError] = useState(false);
+  const detail = useRef<HTMLDetailsElement>(null);
+  return <details className="week-move" ref={detail}>
+    <summary data-track="week.move-open">Sposta <span className="sr-only">{card.session.title}</span></summary>
+    <form onSubmit={(event) => {
+      event.preventDefault();
+      if (blocked || !date || date === card.session.date) return;
+      if (!onMove(date)) { setError(true); return; }
+      setError(false);
+      if (detail.current) detail.current.open = false;
+    }}>
+      <label className="ux-field">Nuovo giorno<input type="date" required value={date} onChange={(event) => setDate(event.target.value)} data-track="week.move-date" /></label>
+      <button type="submit" className="ux-button" data-track="week.move-confirm" {...dis(blocked || !date || date === card.session.date, blocked ? "in_caricamento" : "scegli_un_altro_giorno")}>Sposta seduta</button>
+    </form>
+    {error && <p role="alert" className="ux-error">Il piano di quel giorno è in aggiornamento. Riprova al termine.</p>}
+  </details>;
 }

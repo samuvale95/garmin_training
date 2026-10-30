@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ContextLink } from "@/components/ContextLink";
 import { ArrowUpRight, CheckIcon } from "@/components/Icons";
 import { Illustration } from "@/components/Illustration";
 import { TiltCard } from "@/components/motion/TiltCard";
@@ -246,7 +247,7 @@ export function TodayHeroUnified({
         </div>
 
         {/* Bottom Action Row */}
-        <Link data-track="today-hero-unified.herohref"
+        <ContextLink from="/today" data-track="today-hero-unified.herohref"
           href={heroHref}
           className="tap-target"
           style={{
@@ -278,7 +279,7 @@ export function TodayHeroUnified({
           >
             <ArrowUpRight size={14} />
           </span>
-        </Link>
+        </ContextLink>
       </TiltCard>
     </SlideUp>
   );

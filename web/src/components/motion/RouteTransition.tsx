@@ -11,7 +11,7 @@ const STILL_ZONE_PATHS = ["/diff", "/confirm-deletions", "/rate-limit"];
 
 // Oggi / Settimana / Corpo -- the three routes that share the (tabs) layout and its
 // TabBar. Switching between them is a cross-fade + slight rise, never a directional push.
-const TAB_GROUP_PATHS = ["/today", "/week", "/body"];
+const TAB_GROUP_PATHS = ["/today", "/week", "/week/programs", "/week/goals", "/activities", "/body", "/nutrition"];
 
 const TAB_FLAVOR_PATHS = [...TAB_GROUP_PATHS, "/watch-sync"];
 

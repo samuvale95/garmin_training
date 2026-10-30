@@ -52,6 +52,11 @@ CREATE INDEX IF NOT EXISTS idx_food_entry_user_date ON food_entry(user_id, date)
 ALTER TABLE food_entry ADD COLUMN IF NOT EXISTS thumbnail BYTEA;
 ALTER TABLE food_entry ADD COLUMN IF NOT EXISTS portion DOUBLE PRECISION NOT NULL DEFAULT 1;
 
+CREATE TABLE IF NOT EXISTS food_confirmation (
+ user_id TEXT NOT NULL,request_id UUID NOT NULL,entry_id BIGINT NOT NULL,
+ payload_hash TEXT NOT NULL,PRIMARY KEY(user_id,request_id)
+);
+
 CREATE TABLE IF NOT EXISTS user_plan (
   user_id      TEXT PRIMARY KEY,
   yaml_text    TEXT NOT NULL,
@@ -694,8 +699,10 @@ def current_goal(user_id: str, plan_id: str | None = None) -> dict[str, Any] | N
             if plan_id is not None:
                 cur.execute("SELECT goal FROM user_training_plan WHERE user_id = %s AND id = %s", (user_id, plan_id))
                 row = cur.fetchone()
-                if row and row["goal"]:
+                if row:
                     return row["goal"]
+                # An explicit unknown program must not borrow another program’s goal.
+                return None
             else:
                 cur.execute(
                     "SELECT goal FROM user_training_plan WHERE user_id = %s AND is_active = TRUE AND goal IS NOT NULL ORDER BY (id = 'default') DESC LIMIT 1",
@@ -789,3 +796,36 @@ def invalidate_narrative_cache(namespaces: list[str], user_id: str) -> None:
             )
     except Exception:
         pass
+
+
+def confirm_food_entry(*,user_id: str,request_id: str,date: str,source: str,description=None,
+                       kcal=None,carb_g=None,protein_g=None,fat_g=None,confidence=None,
+                       corrected=True,portion=1.0,thumbnail=None) -> FoodEntry:
+    """One confirmed row per user/request even after a lost response or double tap."""
+    import hashlib
+    import json
+    payload_hash=hashlib.sha256(json.dumps([date,source,description,kcal,carb_g,protein_g,fat_g,
+                                           confidence,corrected,portion,
+                                           hashlib.sha256(thumbnail).hexdigest() if thumbnail else None],sort_keys=True).encode()).hexdigest()
+    with connect() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+        # Stable per-request advisory lock serializes only confirmation retries.
+        lock=int(hashlib.sha256((user_id+request_id).encode()).hexdigest()[:15],16)
+        cur.execute("SELECT pg_advisory_xact_lock(%s)",[lock])
+        cur.execute("SELECT entry_id,payload_hash FROM food_confirmation WHERE user_id=%s AND request_id=%s",[user_id,request_id])
+        previous=cur.fetchone()
+        if previous:
+            if previous["payload_hash"]!=payload_hash:
+                raise ValueError("La stessa conferma contiene dati differenti: ricarica prima di riprovare")
+            cur.execute("SELECT * FROM food_entry WHERE user_id=%s AND id=%s",[user_id,previous["entry_id"]])
+            row=cur.fetchone()
+            if row is None: raise ValueError("La registrazione confermata è stata eliminata")
+            return FoodEntry.from_row(row)
+        cur.execute("""INSERT INTO food_entry(user_id,date,logged_at,source,description,kcal,carb_g,
+          protein_g,fat_g,confidence,corrected,portion,thumbnail)
+          VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
+          [user_id,date,datetime.now(timezone.utc).isoformat(),source,description,kcal,carb_g,
+           protein_g,fat_g,confidence,corrected,portion,thumbnail])
+        row=cur.fetchone()
+        cur.execute("INSERT INTO food_confirmation(user_id,request_id,entry_id,payload_hash) VALUES(%s,%s,%s,%s)",
+                    [user_id,request_id,row["id"],payload_hash])
+        return FoodEntry.from_row(row)

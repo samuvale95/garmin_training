@@ -270,10 +270,10 @@ def storage(monkeypatch):
     monkeypatch.setattr(
         plan_rules, "gather_context", lambda user_id, today, threshold_available: (RuleContext(3, 181.0, 120.0, today), [])
     )
-    monkeypatch.setattr(db, "current_goal", lambda user_id: None)
-    monkeypatch.setattr(db, "get_skeleton", lambda user_id: state["skeleton"])
-    monkeypatch.setattr(db, "save_skeleton", lambda user_id, skeleton: state.update(skeleton=skeleton))
-    monkeypatch.setattr(plan_store, "list_sessions", lambda user_id: state["stored"])
+    monkeypatch.setattr(db, "current_goal", lambda user_id, **kw: None)
+    monkeypatch.setattr(db, "get_skeleton", lambda user_id, **kw: state["skeleton"])
+    monkeypatch.setattr(db, "save_skeleton", lambda user_id, skeleton, **kw: state.update(skeleton=skeleton))
+    monkeypatch.setattr(plan_store, "list_sessions", lambda user_id, **kw: state["stored"])
     monkeypatch.setattr(llm, "configured", lambda: state["configured"])
 
     state["snapshots"] = [{}]  # one per call; the last repeats
@@ -282,7 +282,7 @@ def storage(monkeypatch):
     def snapshot(user_id, start, end):
         return state["snapshots"][0] if len(state["snapshots"]) == 1 else state["snapshots"].pop(0)
 
-    def replace(user_id, start, end, sessions, origin, expected=None):
+    def replace(user_id, start, end, sessions, origin, expected=None, **kw):
         if state["changed"]:
             state["changed"] -= 1
             raise plan_store.PlanChanged(user_id)

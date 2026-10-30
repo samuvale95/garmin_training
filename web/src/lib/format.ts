@@ -136,6 +136,7 @@ const STEP_HINTS_IT: Record<StepType, string> = {
 };
 
 export function stepTypeLabel(type: StepType): string {
+  if (!type) return "Passo";
   return STEP_LABELS_IT[type] ?? type;
 }
 

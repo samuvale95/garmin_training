@@ -1,12 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { Fragment, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Avatar } from "@/components/Avatar";
 import { HrvCard, readinessBand, SleepCard } from "@/components/BodyCards";
-import { BrandMark } from "@/components/motion/BrandMark";
 import { Illustration } from "@/components/Illustration";
 import { ProgressRing, SlideUp } from "@/components/motion/primitives";
 import { TiltCard } from "@/components/motion/TiltCard";
@@ -18,7 +15,7 @@ import { PullToRefresh } from "@/components/PullToRefresh";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import { useAerobicEfficiency, useBodyToday, useFuelTargets, usePersonalCorrelations, usePlanQuery, usePrefetchFuelNarrative, useRefreshServerData, useWeekWorkouts } from "@/lib/queries";
-import { useWatchSyncStatus } from "@/lib/watchSync";
+import { lastSyncLabel, missingDataNote, useWatchSyncStatus } from "@/lib/watchSync";
 import { shiftDateKey, toDateKey, workoutsToSessions } from "@/lib/sessionVisuals";
 import { formatFullDate } from "@/lib/format";
 import { usePassoStore } from "@/lib/store";
@@ -39,7 +36,6 @@ function fuelSubtitle(tomorrow: DayTarget): string {
 }
 
 export function BodyView() {
-  const router = useRouter();
   const [activeSubTab, setActiveSubTab] = useState<"oggi" | "trend">("oggi");
   const access = useCalendarAccess();
   const refreshMutation = useRefreshServerData();
@@ -66,12 +62,7 @@ export function BodyView() {
   const fuel = fuelQuery.data;
   const fuelDegraded = fuel?.weight_source === "reference" && sessions.length === 0;
 
-  // Same substitution as Oggi: with a watch that hasn't synced in over 24h this screen
-  // is nothing but em dashes, so screen 19 takes its place (see useWatchSyncStatus).
   const watchSync = useWatchSyncStatus();
-  useEffect(() => {
-    if (watchSync.blocking) router.replace("/watch-sync");
-  }, [watchSync.blocking, router]);
 
   const tomorrowKey = shiftDateKey(todayKey, 1);
   const tomorrowSession = (plan?.sessions ?? sessions).find((s) => s.date === tomorrowKey) ?? null;
@@ -191,15 +182,8 @@ export function BodyView() {
   return (
     <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
       <div style={{ padding: "22px 20px 12px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <BrandMark height={22} />
-        <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} transition={{ type: "spring", stiffness: 450, damping: 22 }}>
-          <Link data-track="body.impostazioni" href="/settings" className="tap-target" aria-label="Impostazioni"><Avatar size={32} /></Link>
-        </motion.div>
-      </div>
-
-      <header className="screen-intro">
-        <h1>Come stai oggi?</h1>
+            <header className="screen-intro">
+        <h1>Recupero</h1>
         <p>{data ? formatFullDate(data.date) : "Recupero, energia e allenamento."}</p>
         {data?.has_overnight_data && activeSubTab === "oggi" && (
           <FocusChip focus={focus} />
@@ -220,6 +204,7 @@ export function BodyView() {
         >
           <button data-track="body.setactivesubtab"
             type="button"
+            aria-pressed={activeSubTab === "oggi"}
             onClick={() => setActiveSubTab("oggi")}
             style={{
               flex: 1,
@@ -240,7 +225,7 @@ export function BodyView() {
               gap: 6,
             }}
           >
-            <span>Recupero Oggi</span>
+            <span>Oggi</span>
             {activeSubTab === "oggi" && (
               <motion.div
                 layoutId="body-subtab-indicator"
@@ -259,6 +244,7 @@ export function BodyView() {
 
           <button data-track="body.setactivesubtab-2"
             type="button"
+            aria-pressed={activeSubTab === "trend"}
             onClick={() => setActiveSubTab("trend")}
             style={{
               flex: 1,
@@ -279,7 +265,7 @@ export function BodyView() {
               gap: 6,
             }}
           >
-            <span>Trend & Fisiologia</span>
+            <span>Tendenze</span>
             {activeSubTab === "trend" && (
               <motion.div
                 layoutId="body-subtab-indicator"
@@ -298,6 +284,8 @@ export function BodyView() {
         </div>
       </div>
 
+      {watchSync.ready && watchSync.blocking && <aside className="ux-notice" role="status"><strong>Dati da aggiornare</strong><p>{missingDataNote(watchSync.missing)} Ultima acquisizione: {lastSyncLabel(watchSync.lastSyncedAt)}. I dati disponibili restano consultabili.</p><Link href="/watch-sync?from=%2Fbody" className="ux-button" data-track="recovery.connection-help">Controlla connessione</Link></aside>}
+      {data && <p className="ux-muted">Fonte: Garmin · rilevazione {formatFullDate(data.date)}. I valori mancanti sono indicati con —.</p>}
       {isLoading ? (
         <div style={{ marginTop: 24, marginBottom: 24 }}>
           <div
@@ -345,7 +333,7 @@ export function BodyView() {
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <NavRow href="/body/load" label="Carico & forma" hint="Quanto stai caricando nelle ultime 4 settimane" icon={<TrendUpIcon size={16} />} tint="var(--azzurro)" ink="var(--azzurro-testo)" />
-              <NavRow href="/coach" label="Tecnica e passo" hint="Cadenza, dinamica e ritmi delle tue corse" icon={<RunnerIcon size={16} />} tint="var(--verde)" ink="var(--verde-tratto-scuro)" />
+              <NavRow href="/activities?view=trend" label="Analisi delle attività" hint="Cadenza, dinamica e ritmi delle tue corse" icon={<RunnerIcon size={16} />} tint="var(--verde)" ink="var(--verde-tratto-scuro)" />
             </div>
           </div>
 
@@ -445,7 +433,7 @@ function BodyTodaySections({
       <>
         <SlideUp active={animate} delayMs={150} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 12 }}>
           <p className="font-serif-italic" style={{ fontSize: 16, margin: 0 }}>
-            L&apos;orologio non ha ancora sincronizzato la notte.
+            I dati della notte non sono ancora disponibili. Puoi aggiornare i dati o controllare la connessione Garmin.
           </p>
         </SlideUp>
         {nutrition}
