@@ -102,8 +102,6 @@ export function FuelReminderCard({
             fontSize: 12,
             fontWeight: 700,
             margin: 0,
-            textTransform: "uppercase",
-            letterSpacing: ".05em",
             color: "var(--inchiostro-50)",
           }}
         >
@@ -113,7 +111,7 @@ export function FuelReminderCard({
         {!mounted || notifStatus.permission === "default" ? (
           <span
             style={{
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
               padding: "3px 9px",
               borderRadius: "var(--radius-pill)",
@@ -126,7 +124,7 @@ export function FuelReminderCard({
         ) : notifStatus.permission === "granted" ? (
           <span
             style={{
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
               padding: "3px 9px",
               borderRadius: "var(--radius-pill)",
@@ -143,7 +141,7 @@ export function FuelReminderCard({
         ) : (
           <span
             style={{
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
               padding: "3px 9px",
               borderRadius: "var(--radius-pill)",
@@ -169,7 +167,7 @@ export function FuelReminderCard({
         {preMeal ? (
           <div style={{ background: "var(--giallo)", padding: 12, borderRadius: "var(--radius-card)" }}>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--giallo-testo)", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--giallo-testo)", display: "inline-flex", alignItems: "center", gap: 4 }}>
                 <UtensilsIcon size={11} strokeWidth={2.2} />
                 <span>Prima</span>
               </span>
@@ -181,7 +179,7 @@ export function FuelReminderCard({
               ~{preMeal.carb_g} g carbo
             </p>
             {snackFoods && (
-              <span style={{ fontSize: 10.5, color: "var(--inchiostro-70)", lineHeight: 1.3, display: "block" }}>
+              <span style={{ fontSize: 12, color: "var(--inchiostro-70)", lineHeight: 1.3, display: "block" }}>
                 {snackFoods.charAt(0).toUpperCase() + snackFoods.slice(1)}
               </span>
             )}
@@ -193,7 +191,7 @@ export function FuelReminderCard({
         {/* Hydration block */}
         <div style={{ background: "var(--azzurro)", padding: 12, borderRadius: "var(--radius-card)" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--azzurro-testo)", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--azzurro-testo)", display: "inline-flex", alignItems: "center", gap: 4 }}>
               <DropletIcon size={11} strokeWidth={2.2} />
               <span>Acqua (−45&apos;)</span>
             </span>
@@ -204,7 +202,7 @@ export function FuelReminderCard({
           <p className="font-mono" style={{ fontSize: 18, fontWeight: 800, margin: "6px 0 2px", color: "var(--azzurro-testo)" }}>
             ~{hydrationMl} ml
           </p>
-          <span style={{ fontSize: 10.5, color: "var(--inchiostro-70)", lineHeight: 1.3, display: "block" }}>
+          <span style={{ fontSize: 12, color: "var(--inchiostro-70)", lineHeight: 1.3, display: "block" }}>
             1–2 bicchieri d&apos;acqua a piccoli sorsi per non appesantire lo stomaco.
           </span>
         </div>
@@ -239,7 +237,7 @@ export function FuelReminderCard({
             <p style={{ fontSize: 12.5, fontWeight: 700, color: "#b91c1c", margin: "0 0 4px" }}>
               Le notifiche risultano bloccate dal browser o dal sistema operativo
             </p>
-            <p style={{ fontSize: 11.5, color: "var(--inchiostro-70)", margin: 0, lineHeight: 1.4 }}>
+            <p style={{ fontSize: 12.5, color: "var(--inchiostro-70)", margin: 0, lineHeight: 1.4 }}>
               Per riattivarle: tocca l&apos;icona delle impostazioni del sito (il lucchetto o levetta a sinistra dell&apos;URL nella barra del browser), vai su <strong>Permessi / Notifiche</strong> e seleziona <strong>Consenti</strong>. Poi ricarica la pagina.
             </p>
           </div>
@@ -266,7 +264,7 @@ export function FuelReminderCard({
               <BellIcon size={14} strokeWidth={2.2} />
               <span>Consenti le notifiche</span>
             </button>
-            <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: 0 }}>
+            <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
               (Se stai usando un iPhone / Safari, aggiungi l&apos;app alla schermata Home con <em>Condividi → Aggiungi alla schermata Home</em> per ricevere le notifiche push).
             </p>
           </div>
@@ -274,7 +272,7 @@ export function FuelReminderCard({
       </div>
 
       {schedulingFeedback && (
-        <p className="font-mono" style={{ fontSize: 11.5, color: "#047857", marginTop: 10, margin: "10px 0 0", display: "inline-flex", alignItems: "center", gap: 4 }}>
+        <p className="font-mono" style={{ fontSize: 12.5, color: "#047857", marginTop: 10, margin: "10px 0 0", display: "inline-flex", alignItems: "center", gap: 4 }}>
           <CheckIcon size={13} strokeWidth={2.4} />
           <span>{schedulingFeedback}</span>
         </p>

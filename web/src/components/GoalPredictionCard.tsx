@@ -70,7 +70,7 @@ export function GoalPredictionCard({
           padding: "18px 18px 16px",
         }}
       >
-        <p className="font-mono" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: tone.text, margin: 0 }}>
+        <p className="font-mono" style={{ fontSize: 12, fontWeight: 700, color: tone.text, margin: 0 }}>
           Confidenza sull&apos;obiettivo{p.weeks_left > 0 ? ` · ${p.weeks_left} settimane` : ""}
         </p>
         <p style={{ fontWeight: 700, fontSize: 22, lineHeight: 1.15, letterSpacing: "-.01em", margin: "5px 0 0" }}>{p.headline}</p>
@@ -83,12 +83,12 @@ export function GoalPredictionCard({
         {predicted && (
           <div style={{ display: "flex", alignItems: "flex-end", flexWrap: "wrap", gap: "6px 18px", marginTop: 14 }}>
             <div>
-              <p style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: 0 }}>previsto oggi</p>
+              <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: 0 }}>previsto oggi</p>
               <p className="font-mono" style={{ fontSize: predicted.length > 9 ? 22 : 30, fontWeight: 700, letterSpacing: "-.02em", margin: "2px 0 0" }}>{predicted}</p>
             </div>
             {p.target_time_formatted && (
               <div>
-                <p style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: 0 }}>obiettivo</p>
+                <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: 0 }}>obiettivo</p>
                 <p className="font-mono" style={{ fontSize: 18, fontWeight: 600, margin: "2px 0 0", color: "var(--inchiostro-70)" }}>{p.target_time_formatted}</p>
               </div>
             )}
@@ -102,7 +102,7 @@ export function GoalPredictionCard({
 
         <p style={{ fontSize: 14, lineHeight: 1.4, color: "var(--inchiostro-70)", margin: "12px 0 0" }}>{narrative || p.summary}</p>
         {p.prediction_basis && (
-          <p style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "8px 0 0" }}>
+          <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "8px 0 0" }}>
             Stima {p.prediction_basis}
             {p.predicted_pace_formatted ? ` · passo medio ${p.predicted_pace_formatted}` : ""}
           </p>
@@ -171,12 +171,12 @@ function DriverTile({ status, label, value, children }: { status: SignalStatus |
         padding: "10px 11px",
       }}
     >
-      <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: flagged ? style.text : "var(--inchiostro-70)" }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, fontWeight: 600, color: flagged ? style.text : "var(--inchiostro-70)" }}>
         <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: "50%", background: style.stroke }} />
         {label}
       </span>
       <p className="font-mono" style={{ fontSize: 17, fontWeight: 700, margin: "5px 0 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</p>
-      <p style={{ fontSize: 11, color: flagged ? style.text : "var(--inchiostro-50)", margin: "3px 0 0", lineHeight: 1.25 }}>{children}</p>
+      <p style={{ fontSize: 12, color: flagged ? style.text : "var(--inchiostro-50)", margin: "3px 0 0", lineHeight: 1.25 }}>{children}</p>
     </div>
   );
 }

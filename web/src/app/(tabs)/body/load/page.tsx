@@ -171,7 +171,7 @@ export default function LoadPage() {
           <PageHeader backHref="/body" />
           <BrandMark height={22} />
         </div>
-        <span style={{ fontSize: 11, color: "var(--inchiostro-35)", fontWeight: 500 }}>
+        <span style={{ fontSize: 12, color: "var(--inchiostro-35)", fontWeight: 500 }}>
           {weeks.length > 0 ? `carico · ${weeks.length} settimane` : "carico"}
         </span>
       </div>
@@ -189,7 +189,7 @@ export default function LoadPage() {
               the calendar, not a verdict on the shape above it -- the two are computed
               from different things and are allowed to disagree. */}
           {plan?.goal && plan.goal.phase !== "gara passata" && (
-            <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>
+            <p className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>
               {goalTitle(plan.goal)} {countdownLabel(plan.goal)}
               {plan.goal.phase && ` · ${plan.goal.phase}`}
             </p>
@@ -226,14 +226,14 @@ export default function LoadPage() {
                   <p
                     key={week.week_start}
                     className="font-mono"
-                    style={{ flex: 1, textAlign: "center", fontSize: 11, color: week.in_progress ? "var(--inchiostro)" : "var(--inchiostro-50)", fontWeight: week.in_progress ? 700 : 400, margin: 0 }}
+                    style={{ flex: 1, textAlign: "center", fontSize: 12, color: week.in_progress ? "var(--inchiostro)" : "var(--inchiostro-50)", fontWeight: week.in_progress ? 700 : 400, margin: 0 }}
                   >
                     {weekNumber}
                   </p>
                 );
               })}
             </div>
-            <p style={{ fontSize: 11, color: "var(--inchiostro-35)", marginTop: 10 }}>
+            <p style={{ fontSize: 12, color: "var(--inchiostro-35)", marginTop: 10 }}>
               Due scale diverse: il carico è il punteggio di Garmin, il previsto sono i km del piano. Ogni
               serie è alta rispetto alla propria settimana migliore.
             </p>
@@ -246,19 +246,19 @@ export default function LoadPage() {
 
           <div style={{ display: "flex", gap: 9, marginTop: 12 }}>
             <SlideUp active={animate} delayMs={250} style={{ flex: 1, background: "var(--verde)", color: "var(--verde-testo)", borderRadius: "var(--radius-card)", padding: 14 }}>
-              <p style={{ fontSize: 11, textTransform: "uppercase", margin: "0 0 4px" }}>Stato</p>
+              <p style={{ fontSize: 12, margin: "0 0 4px" }}>Stato</p>
               <p style={{ font: "600 18px/1 var(--font-sans)", margin: 0 }}>{loadState(data?.acute_chronic_ratio ?? null).label}</p>
-              <p style={{ fontSize: 11, margin: "6px 0 0" }}>{loadState(data?.acute_chronic_ratio ?? null).caption}</p>
+              <p style={{ fontSize: 12, margin: "6px 0 0" }}>{loadState(data?.acute_chronic_ratio ?? null).caption}</p>
             </SlideUp>
             <SlideUp active={animate} delayMs={280} style={{ flex: 1, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14 }}>
-              <p style={{ fontSize: 11, textTransform: "uppercase", margin: "0 0 4px", color: "var(--inchiostro-50)" }}>VO₂ max</p>
+              <p style={{ fontSize: 12, margin: "0 0 4px", color: "var(--inchiostro-50)" }}>VO₂ max</p>
               <p className="font-mono" style={{ fontSize: 20, margin: 0 }}>{data?.vo2max ?? "—"}</p>
             </SlideUp>
           </div>
 
           <SlideUp active={animate} delayMs={320} style={{ background: "var(--giallo)", color: "var(--giallo-testo)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 9 }}>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-              <p style={{ fontSize: 11, textTransform: "uppercase", margin: 0 }}>Acuto su cronico</p>
+              <p style={{ fontSize: 12, margin: 0 }}>Acuto su cronico</p>
               <p className="font-mono" style={{ fontSize: 18, margin: 0 }}>{data?.acute_chronic_ratio?.toFixed(2) ?? "—"}</p>
             </div>
             {data?.acute_chronic_ratio != null && (
@@ -306,7 +306,7 @@ export default function LoadPage() {
 
 function Legend({ color, label }: { color: string; label: string }) {
   return (
-    <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--inchiostro-50)" }}>
+    <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--inchiostro-50)" }}>
       <span style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
       {label}
     </span>

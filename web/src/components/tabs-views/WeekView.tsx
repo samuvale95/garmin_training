@@ -5,12 +5,11 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PlanNavigation, WorkspaceHeading } from "@/components/Workspace";
 import { dis } from "@/lib/disabled";
-import { motion } from "framer-motion";
-import { BarGrow, SlideUp } from "@/components/motion/primitives";
-import { ChevronLeft, ChevronRight, PlusIcon, ArrowRight } from "@/components/Icons";
+import { ChevronLeft, ChevronRight, PlusIcon } from "@/components/Icons";
+import { EmptyState, Notice } from "@/components/ui";
 import { DraggableWeekCard, RestCard, type DayCardData } from "@/components/WeekCards";
 import { OffPlanCard, offPlanActivities } from "@/components/OffPlanCard";
-import { useMotionEnabled, useMountOnce } from "@/lib/motion";
+import { useMotionEnabled } from "@/lib/motion";
 import { useMoveSession } from "@/lib/moveWarnings";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { useCalendarAccess } from "@/lib/guards";
@@ -27,9 +26,9 @@ import {
   useWeekWorkouts,
 } from "@/lib/queries";
 import { SkeletonDayCards } from "@/components/skeletons";
-import { sessionDistanceKm, toDateKey, weekBounds, weekOffsetFromToday } from "@/lib/sessionVisuals";
+import { sessionDistanceKm, sessionDurationMinutes, toDateKey, weekBounds, weekOffsetFromToday } from "@/lib/sessionVisuals";
 import type { TrainingSession } from "@/lib/types";
-import { formatShortDate } from "@/lib/format";
+import { formatMinutes, formatShortDate } from "@/lib/format";
 import { useScreenReady } from "@/lib/useScreenReady";
 
 function formatWeekRange(start: Date, end: Date): string {
@@ -38,13 +37,6 @@ function formatWeekRange(start: Date, end: Date): string {
   if (startMonth === endMonth) return `${start.getDate()} – ${end.getDate()} ${endMonth}`;
   return `${start.getDate()} ${startMonth} – ${end.getDate()} ${endMonth}`;
 }
-
-/** How far a horizontal swipe has to travel before the list claims the gesture from
- * the browser, how much straighter than tall it has to be to count as horizontal at
- * all, and how far it has to go in total to actually change week. */
-const SWIPE_LOCK_PX = 18;
-const SWIPE_STRAIGHTNESS = 1.4;
-const SWIPE_MIN_PX = 52;
 
 /** Distance from the viewport edge at which carrying a card starts scrolling the page,
  * and the fastest it scrolls (px per frame) once the finger is right at the edge. */
@@ -59,8 +51,7 @@ function haptic(pattern: number | number[]) {
 
 export function WeekPageContent() {
   const access = useCalendarAccess({ redirectWhenEmpty: false });
-  const animate = useMountOnce("week");
-  const { reduced } = useMotionEnabled();
+    const { reduced } = useMotionEnabled();
   // `?date=` opens on the week containing that day instead of the current one -- how the
   // editor comes back after a save. Paging updates the same URL state, so detail links,
   // reloads and browser history all retain the selected week.
@@ -140,7 +131,6 @@ export function WeekPageContent() {
   const carriedRef = useRef(false);
   const hoverKeyRef = useRef<string | null>(null);
   const pointerPageY = useRef<number | null>(null);
-  const swipe = useRef<{ x: number; y: number; at: number; locked: boolean } | null>(null);
   const swipeHandled = useRef(false);
 
   const dayKeyAtPageY = useCallback((pageY: number): string | null => {
@@ -255,29 +245,49 @@ export function WeekPageContent() {
     router.replace("/week", { scroll: false });
   }
 
-  // Same rule as Oggi: while we don't yet know whether there's a plan or a Garmin
-  // connection, show this week's frame with empty day cards -- never a blank screen.
-  // Above the early return below: a hook after it would run on some renders and not
-  // others (first render is always "not ready"), which React rejects outright.
   const refreshMutation = useRefreshServerData();
-  // Ready also with neither plan nor Garmin: the guard is sending the user to /import.
+  // Ready also with neither plan nor Garmin: the empty state below offers the choices.
   useScreenReady(access.ready && !(liveMode && workoutsQuery.isPending), "/week");
+
+  const header = (
+    <>
+      <WorkspaceHeading title="Piano">
+        <AddMenu />
+      </WorkspaceHeading>
+      <PlanNavigation />
+      <WeekNav start={start} end={end} offset={offset} onPrev={() => pageWeek(-1)} onNext={() => pageWeek(1)} onToday={goToCurrentWeek} />
+    </>
+  );
 
   if (!access.ready) {
     return (
-      <div>
-        <WeekHeader start={start} end={end} animate={animate} offset={offset} onPrev={() => pageWeek(-1)} onNext={() => pageWeek(1)} onToday={goToCurrentWeek} />
-        <div style={{ padding: "16px 20px 12px" }}>
-          <SkeletonDayCards />
-        </div>
+      <div className="page">
+        {header}
+        <SkeletonDayCards />
       </div>
     );
   }
 
-  if (!access.plan && !access.garminConnected) return <div className="workspace-page">
-    <WorkspaceHeading title="Piano" description="Organizza i tuoi prossimi allenamenti." /><PlanNavigation />
-    <div className="ux-empty"><h2>Costruisci la tua settimana</h2><p>Importa un programma, genera le prossime sedute oppure collega Garmin per consultare il calendario.</p><div className="ux-actions"><Link className="ux-button ux-button-primary" href="/week/programs" data-track="week.empty-programs">Crea o importa un programma</Link><Link className="ux-button" href="/connect-garmin" data-track="week.empty-connect">Collega Garmin</Link></div></div>
-  </div>;
+  if (!access.plan && !access.garminConnected) {
+    return (
+      <div className="page">
+        <WorkspaceHeading title="Piano" />
+        <PlanNavigation />
+        <EmptyState
+          title="Costruisci la tua settimana"
+          actions={
+            <>
+              <Link className="btn" data-variant="primary" href="/week/programs/new" data-track="week.empty-programs">Nuovo programma</Link>
+              <Link className="btn" href="/week/new?from=%2Fweek" data-track="week.empty-single">Allenamento singolo</Link>
+              <Link className="btn" href="/connect-garmin" data-track="week.empty-connect">Collega Garmin</Link>
+            </>
+          }
+        >
+          Crea un programma con AI, importa un file oppure collega Garmin per consultare il calendario che hai già.
+        </EmptyState>
+      </div>
+    );
+  }
 
   const days = Array.from({ length: 7 }).map((_, i) => {
     const date = new Date(start);
@@ -301,14 +311,9 @@ export function WeekPageContent() {
 
   const weekSessions = days.flatMap((d) => d.cards.map((c) => c.session));
   const weekKm = weekSessions.reduce((sum, s) => sum + sessionDistanceKm(s), 0);
+  const weekMinutes = weekSessions.reduce((sum, s) => sum + sessionDurationMinutes(s), 0);
   const doneKm = (activitiesQuery.data?.activities ?? []).reduce((sum, a) => sum + (a.distance_km ?? 0), 0);
   const progressFraction = weekKm > 0 ? Math.min(1, doneKm / weekKm) : 0;
-
-  const summaryText = liveMode
-    ? `${weekSessions.length} sedute (calendario Garmin)`
-    : showProgress
-      ? `${doneKm.toFixed(0)} / ${weekKm.toFixed(0)} km · ${weekSessions.length} sedute`
-      : `${weekKm.toFixed(0)} km · ${weekSessions.length} sedute`;
 
   // The session the week is waiting on: today's, unless it is already done, else the
   // next one this week. Only on the current week -- elsewhere nothing is "next".
@@ -317,77 +322,53 @@ export function WeekPageContent() {
     offset === 0
       ? days.find((d) => d.cards.length > 0 && (doneToday ? d.key > todayKey : d.key >= todayKey))?.key ?? null
       : null;
-
-  const firstRestIndex = days.findIndex((d) => d.cards.length === 0 && d.offPlan.length === 0);
   const weekInClass = reduced || direction === 0 ? undefined : "anim-week-in";
 
   return (
     <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
-      <div>
-      {/* Not sticky: pinned, its opaque crema block (title + the light round buttons)
-          scrolled over the day cards and swallowed whatever line was passing under it.
-          Oggi's header scrolls away too -- the two tabs now behave the same. */}
-      <div style={{ padding: "22px 20px 0" }}>
-        <WeekHeaderRow
-          start={start}
-          end={end}
-          animate={animate}
-          offset={offset}
-          onPrev={() => pageWeek(-1)}
-          onNext={() => pageWeek(1)}
-          onToday={goToCurrentWeek}
-        />
+      <div className="page">
+        {header}
 
-        {showProgress && (
-          <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <BarGrow value={progressFraction} height={4} active={animate} />
-            </div>
-            <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", flex: "none" }}>
-              {summaryText}
-            </span>
+        <div className="week-summary">
+          <span>
+            <strong className="figure">{weekSessions.length}</strong> {weekSessions.length === 1 ? "seduta" : "sedute"}
+            {weekMinutes > 0 && <> · <span className="figure">{formatMinutes(weekMinutes)}</span> previste</>}
+            {liveMode && " · calendario Garmin"}
+          </span>
+          {showProgress && weekKm > 0 && (
+            <>
+              <span className="week-progress" role="img" aria-label={`Corsa: ${doneKm.toFixed(0)} km svolti su ${weekKm.toFixed(0)} previsti`}>
+                <span style={{ width: `${progressFraction * 100}%` }} />
+              </span>
+              <span className="figure">{doneKm.toFixed(0)} / {weekKm.toFixed(0)} km di corsa e bici</span>
+            </>
+          )}
+          {offset <= 0 && (
+            <Link data-track="week.summary-monday-startkey" href={`/summary?monday=${startKey}&from=%2Fweek`} className="section-link">
+              Resoconto della settimana
+            </Link>
+          )}
+          <span className="calendar-view-switch subnav" role="group" aria-label="Vista calendario" style={{ margin: "0 0 0 auto" }}>
+            <button type="button" aria-pressed={calendarView === "columns"} data-track="week.columns" onClick={() => router.replace(`/week?date=${focusDate ?? todayKey}&view=columns`, { scroll: false })}>Colonne</button>
+            <button type="button" aria-pressed={calendarView === "list"} data-track="week.list" onClick={() => router.replace(`/week?date=${focusDate ?? todayKey}&view=list`, { scroll: false })}>Elenco</button>
+          </span>
+        </div>
+
+        {rescheduleWorkout.isError && <p className="ux-error" role="alert">Lo spostamento su Garmin non è riuscito. La seduta è rimasta nel giorno originale: riprova.</p>}
+        {liveMode && (
+          <div style={{ marginBottom: 16 }}>
+            <Notice tone="neutral" title="Calendario Garmin" action={<Link className="btn" data-size="sm" href="/week/programs/new?source=import" data-track="week.import">Importa un programma</Link>}>
+              Importa o crea un programma per vedere fasi e ritmi di ogni seduta.
+            </Notice>
           </div>
         )}
-      </div>
-
-      <div style={{ padding: "0 20px 12px" }}>
-        <div className="calendar-view-switch" role="group" aria-label="Vista calendario"><button className="ux-button" aria-pressed={calendarView === "columns"} data-track="week.columns" onClick={() => router.replace(`/week?date=${focusDate ?? todayKey}&view=columns`, { scroll: false })}>Settimana</button><button className="ux-button" aria-pressed={calendarView === "list"} data-track="week.list" onClick={() => router.replace(`/week?date=${focusDate ?? todayKey}&view=list`, { scroll: false })}>Elenco</button></div>
-        {rescheduleWorkout.isError && <p className="ux-error" role="alert">Lo spostamento su Garmin non è riuscito. Riprova.</p>}
-        {!showProgress && (
-          <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "8px 0 0" }}>
-            {summaryText}
-          </p>
-        )}
-
-        {liveMode && (
-          <Link data-track="week.import" href="/import" style={{ textDecoration: "none", color: "inherit" }}>
-            <SlideUp active={animate} delayMs={140} className="press-soft" style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
-              <p className="font-serif-italic" style={{ fontSize: 14, margin: 0, flex: 1 }}>
-                Importa un piano per vedere step e passi di ogni seduta.
-              </p>
-              <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
-            </SlideUp>
-          </Link>
-        )}
-
-        {/* Only on this week: generation always starts tomorrow, so offering it while
-            paging through past or later weeks would promise a window it won't write. */}
-
-
-        {offset <= 0 && (
-          <Link data-track="week.summary-monday-startkey" href={`/summary?monday=${startKey}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12.5, fontWeight: 600, color: "var(--inchiostro-70)", marginTop: 10 }}>
-            <span>Resoconto della settimana</span>
-            <ArrowRight size={13} />
-          </Link>
-        )}
-
         {weekSessions.length > 0 && (
-          <p style={{ fontSize: 11.5, color: carried ? "var(--rosso-avviso)" : "var(--inchiostro-35)", margin: "10px 0 0", transition: "color 160ms var(--ease)" }}>
+          <p className="muted" style={{ margin: "0 0 12px", fontSize: "var(--text-sm)", color: carried ? "var(--accent-ink)" : undefined }} aria-live="polite">
             {rewriting
               ? `Sto riscrivendo i giorni fino a ${formatShortDate(rewriteUntil)}: potrai spostarli appena ho finito.`
               : carried
                 ? "Rilascia sul giorno in cui spostarla."
-                : "Apri una seduta per i dettagli, oppure scegli Sposta per cambiare giorno."}
+                : "Apri una seduta per i dettagli. Per cambiarle giorno usa Sposta, oppure tienila premuta e trascinala."}
           </p>
         )}
 
@@ -400,7 +381,6 @@ export function WeekPageContent() {
             event.preventDefault();
             event.stopPropagation();
           }}
-          style={{ marginTop: 14 }}
         >
           {/* In live mode the days come from Garmin, so before that answer lands every
               day would read as "Riposo" -- a wrong statement, not a loading state. */}
@@ -411,111 +391,70 @@ export function WeekPageContent() {
               key={offset}
               data-view={calendarView}
               className={["calendar-days", weekInClass, carried ? "week-list--dragging" : ""].filter(Boolean).join(" ")}
-              style={{
-                position: "relative",
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                ...(weekInClass ? ({ ["--from-x" as string]: `${direction > 0 ? 24 : -24}px` } as React.CSSProperties) : null),
-              }}
+              style={weekInClass ? ({ ["--from-x" as string]: `${direction > 0 ? 24 : -24}px` } as React.CSSProperties) : undefined}
             >
-              {/* The thread the seven days hang off. Each day's number sits on its own
-                  crema disc, so the line passes behind them rather than through them. */}
-              <span className="calendar-thread" aria-hidden="true" style={{ position: "absolute", left: 17.5, top: 22, bottom: 22, width: 1, background: "var(--sabbia-bordo)" }} />
-
-              {days.map((day, i) => {
+              {days.map((day) => {
                 const isToday = day.key === todayKey;
                 const isPast = day.key < todayKey;
                 const match = stravaMatches.data?.matches[day.key];
                 const isDropTarget = !!carried && hoverDayKey === day.key && carried.session.date !== day.key;
                 return (
-                  <div
+                  <section
                     key={day.key}
                     className="calendar-day"
+                    aria-label={day.date.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}
                     data-today={isToday || undefined}
+                    data-past={(isPast && !carried) || undefined}
+                    data-drop={isDropTarget || undefined}
                     ref={(el) => {
-                      // Cleared on unmount rather than left behind: paging through
-                      // weeks would otherwise pile up detached rows that the drop test
-                      // still walks on every drag frame.
-                      if (el) dayRowRefs.current.set(day.key, el);
+                      // Cleared on unmount: paging through weeks would otherwise pile up
+                      // detached rows that the drop test still walks on every drag frame.
+                      if (el) dayRowRefs.current.set(day.key, el as unknown as HTMLDivElement);
                       else dayRowRefs.current.delete(day.key);
                     }}
-                    style={{ display: "flex", gap: 10, position: "relative" }}
                   >
-                    <div className="font-mono" style={{ width: 36, paddingTop: 12, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flex: "none" }}>
-                      <span style={{ fontSize: 10, letterSpacing: ".04em", textTransform: "uppercase", color: isToday ? "var(--inchiostro-70)" : "var(--inchiostro-35)" }}>
-                        {day.date.toLocaleDateString("it-IT", { weekday: "short" }).replace(".", "")}
-                      </span>
-                      <span
-                        style={{
-                          width: 26,
-                          height: 26,
-                          borderRadius: "50%",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 13,
-                          fontWeight: 500,
-                          background: isDropTarget ? "var(--corallo)" : isToday ? "var(--inchiostro)" : "var(--crema)",
-                          color: isDropTarget ? "var(--corallo-testo)" : isToday ? "var(--crema)" : "var(--inchiostro)",
-                          transition: "background 160ms var(--ease), color 160ms var(--ease)",
-                        }}
-                      >
-                        {day.date.getDate()}
-                      </span>
+                    <div className="calendar-day-date" aria-hidden="true">
+                      <span>{day.date.toLocaleDateString("it-IT", { weekday: "short" }).replace(".", "")}</span>
+                      <b>{day.date.getDate()}</b>
                     </div>
-                    <div
-                      className={isDropTarget ? "day-drop-target" : undefined}
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 8,
-                        // Days already behind stay readable but step back: what is left
-                        // of the week is what can still be acted on.
-                        opacity: isPast && !carried ? 0.62 : 1,
-                        transition: "opacity 160ms var(--ease)",
-                      }}
-                    >
+                    <div className="calendar-day-items">
                       {day.cards.length === 0 && day.offPlan.length === 0 ? (
-                        <RestCard animate={animate} delayMs={i * 70} withIllustration={i === firstRestIndex} />
+                        <RestCard animate={false} delayMs={0} withIllustration={false} />
                       ) : (
                         day.cards.map((card, j) => (
                           <div key={card.id}>
-                          <DraggableWeekCard
-                            card={card}
-                            animate={animate}
-                            delayMs={i * 70 + j * 40}
-                            matchKm={j === 0 && match?.matched ? match.distance_km ?? null : null}
-                            onDragStateChange={(dragging) => handleDragStateChange(card, dragging)}
-                            onDragOver={handleDragOver}
-                            onDrop={handleCardDrop}
-                            onPrefetch={card.workout ? () => prefetchWorkoutSession(card.workout!) : undefined}
-                            emphasis={j === 0 && day.key === nextDayKey ? (isToday ? "oggi" : "prossimo") : null}
-                          />
-                          <MoveSessionControl card={card} blocked={isRewritten(card.session.date) || rescheduleWorkout.isPending} onMove={(date) => {
-                            if (isRewritten(date) || isRewritten(card.session.date)) return false;
-                            if (card.planId) moveSession(card.planId, card.session.date, date);
-                            else if (card.workout) rescheduleWorkout.mutate({ workout: card.workout, newDate: date });
-                            return true;
-                          }} />
+                            <DraggableWeekCard
+                              card={card}
+                              animate={false}
+                              delayMs={0}
+                              matchKm={j === 0 && match?.matched ? match.distance_km ?? null : null}
+                              onDragStateChange={(dragging) => handleDragStateChange(card, dragging)}
+                              onDragOver={handleDragOver}
+                              onDrop={handleCardDrop}
+                              onPrefetch={card.workout ? () => prefetchWorkoutSession(card.workout!) : undefined}
+                              emphasis={j === 0 && day.key === nextDayKey ? (isToday ? "oggi" : "prossimo") : null}
+                            />
+                            <MoveSessionControl card={card} blocked={isRewritten(card.session.date) || rescheduleWorkout.isPending} onMove={(date) => {
+                              if (isRewritten(date) || isRewritten(card.session.date)) return false;
+                              if (card.planId) moveSession(card.planId, card.session.date, date);
+                              else if (card.workout) rescheduleWorkout.mutate({ workout: card.workout, newDate: date });
+                              return true;
+                            }} />
                           </div>
                         ))
                       )}
-                      {day.offPlan.map((activity, j) => (
-                        <OffPlanCard key={activity.activity_id} activity={activity} animate={animate} delayMs={i * 70 + (day.cards.length + j) * 40} />
+                      {day.offPlan.map((activity) => (
+                        <OffPlanCard key={activity.activity_id} activity={activity} animate={false} delayMs={0} />
                       ))}
                     </div>
-                  </div>
+                  </section>
                 );
               })}
             </div>
           )}
         </div>
       </div>
-    </div>
-  </PullToRefresh>
+    </PullToRefresh>
   );
 }
 
@@ -533,108 +472,65 @@ export function WeekView() {
 function WeekFallback() {
   const { start, end } = weekBounds(new Date());
   return (
-    <div>
-      <WeekHeader start={start} end={end} animate={false} offset={0} onPrev={() => {}} onNext={() => {}} onToday={() => {}} />
-      <div style={{ padding: "16px 20px 12px" }}>
-        <SkeletonDayCards />
-      </div>
-    </div>
-  );
-}
-
-interface WeekHeaderProps {
-  start: Date;
-  end: Date;
-  animate: boolean;
-  offset: number;
-  onPrev: () => void;
-  onNext: () => void;
-  onToday: () => void;
-}
-
-/** Brand mark, week paging, "add workout", the week range -- rendered the same whether
- * or not the week's data has arrived. */
-function WeekHeaderRow({ start, end, offset, onPrev, onNext, onToday }: WeekHeaderProps) {
-  return (
-    <>
-      <WorkspaceHeading title="Piano">
-        <details className="calendar-add"><summary className="ux-button" data-track="week.add"><PlusIcon size={14} />Aggiungi</summary><div className="calendar-add-menu"><Link data-track="week.week-new" href="/week/new" className="ux-button">Allenamento singolo<small>Una seduta in un giorno preciso</small></Link><Link data-track="week.new-program" href="/week/programs/new" className="ux-button">Programma di allenamento<small>Più settimane verso un obiettivo</small></Link></div></details>
-      </WorkspaceHeading>
+    <div className="page">
+      <WorkspaceHeading title="Piano" />
       <PlanNavigation />
-      <div className="week-picker">
-        <NavButton label="Settimana precedente" onClick={onPrev}>
-          <ChevronLeft size={16} strokeWidth={2.4} />
-        </NavButton>
-        <div className="week-picker-label" aria-live="polite" aria-atomic="true">
-          <span>{formatWeekRange(start, end)}</span>
-          <span className="week-picker-caption">{start.getFullYear()}{start.getFullYear() !== end.getFullYear() ? ` – ${end.getFullYear()}` : ""}</span>
-        </div>
-        <NavButton label="Settimana successiva" onClick={onNext}>
-          <ChevronRight size={16} strokeWidth={2.4} />
-        </NavButton>
-      </div>
-      {offset !== 0 && (
-        <motion.button data-track="week.ontoday"
-          type="button"
-          onClick={onToday}
-          whileTap={{ scale: 0.95 }}
-          whileHover={{ scale: 1.03 }}
-          transition={{ type: "spring", stiffness: 400, damping: 25 }}
-          className="tap-target week-reset"
-        >
-          Torna a questa settimana
-        </motion.button>
-      )}
-    </>
-  );
-}
-
-/** The same header inside its container, for the loading state. */
-function WeekHeader(props: WeekHeaderProps) {
-  return (
-    <div style={{ padding: "22px 20px 0" }}>
-      <WeekHeaderRow {...props} />
+      <WeekNav start={start} end={end} offset={0} onPrev={() => {}} onNext={() => {}} onToday={() => {}} />
+      <SkeletonDayCards />
     </div>
   );
 }
 
-function NavButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+/** "Aggiungi": a single workout or a whole program, each with what it means. */
+function AddMenu() {
   return (
-    <motion.button data-track="week.onclick"
-      className="tap-target"
-      aria-label={label}
-      onClick={onClick}
-      whileTap={{ scale: 0.84 }}
-      whileHover={{ scale: 1.15 }}
-      transition={{ type: "spring", stiffness: 500, damping: 22 }}
-      style={{
-        width: 44,
-        height: 44,
-        borderRadius: "50%",
-        background: "var(--sabbia-chip)",
-        color: "var(--inchiostro)",
-        border: "none",
-        fontSize: 16,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: "pointer",
-        flex: "none",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-      }}
-    >
-      {children}
-    </motion.button>
+    <details className="menu">
+      <summary className="btn" data-variant="primary" data-track="week.add">
+        <PlusIcon size={14} aria-hidden="true" />
+        Aggiungi
+      </summary>
+      <div className="menu-panel">
+        <Link data-track="week.week-new" href="/week/new?from=%2Fweek">
+          Allenamento singolo
+          <small>Una seduta in un giorno preciso</small>
+        </Link>
+        <Link data-track="week.new-program" href="/week/programs/new">
+          Programma di allenamento
+          <small>Più settimane verso un obiettivo</small>
+        </Link>
+      </div>
+    </details>
   );
 }
 
+function WeekNav({ start, end, offset, onPrev, onNext, onToday }: { start: Date; end: Date; offset: number; onPrev: () => void; onNext: () => void; onToday: () => void }) {
+  return (
+    <div className="week-nav">
+      <button type="button" className="icon-btn" aria-label="Settimana precedente" onClick={onPrev} data-track="week.prev">
+        <ChevronLeft size={18} strokeWidth={2.2} aria-hidden="true" />
+      </button>
+      <button type="button" className="icon-btn" aria-label="Settimana successiva" onClick={onNext} data-track="week.next">
+        <ChevronRight size={18} strokeWidth={2.2} aria-hidden="true" />
+      </button>
+      <p className="week-nav-range" aria-live="polite" aria-atomic="true" style={{ margin: 0 }}>
+        {formatWeekRange(start, end)}
+        <small>
+          {offset === 0 ? "Questa settimana" : offset === 1 ? "La prossima settimana" : offset === -1 ? "La settimana scorsa" : `${start.getFullYear()}`}
+        </small>
+      </p>
+      <button type="button" className="btn" data-size="sm" onClick={onToday} data-track="week.ontoday" {...dis(offset === 0, "gia_in_settimana")}>
+        Oggi
+      </button>
+    </div>
+  );
+}
 
 function MoveSessionControl({ card, blocked, onMove }: { card: DayCardData; blocked: boolean; onMove: (date: string) => boolean }) {
   const [date, setDate] = useState(card.session.date);
   const [error, setError] = useState(false);
   const detail = useRef<HTMLDetailsElement>(null);
   return <details className="week-move" ref={detail}>
-    <summary data-track="week.move-open">Sposta <span className="sr-only">{card.session.title}</span></summary>
+    <summary data-track="week.move-open">Sposta<span className="sr-only"> {card.session.title}</span></summary>
     <form onSubmit={(event) => {
       event.preventDefault();
       if (blocked || !date || date === card.session.date) return;
@@ -642,8 +538,8 @@ function MoveSessionControl({ card, blocked, onMove }: { card: DayCardData; bloc
       setError(false);
       if (detail.current) detail.current.open = false;
     }}>
-      <label className="ux-field">Nuovo giorno<input type="date" required value={date} onChange={(event) => setDate(event.target.value)} data-track="week.move-date" /></label>
-      <button type="submit" className="ux-button" data-track="week.move-confirm" {...dis(blocked || !date || date === card.session.date, blocked ? "in_caricamento" : "scegli_un_altro_giorno")}>Sposta seduta</button>
+      <label className="field">Nuovo giorno<input type="date" required value={date} onChange={(event) => setDate(event.target.value)} data-track="week.move-date" /></label>
+      <button type="submit" className="btn" data-track="week.move-confirm" {...dis(blocked || !date || date === card.session.date, blocked ? "in_caricamento" : "scegli_un_altro_giorno")}>Sposta seduta</button>
     </form>
     {error && <p role="alert" className="ux-error">Il piano di quel giorno è in aggiornamento. Riprova al termine.</p>}
   </details>;

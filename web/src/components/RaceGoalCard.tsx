@@ -55,11 +55,11 @@ export function RaceGoalCard({
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                <span className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+                <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
                   {past ? "gara corsa" : "obiettivo"}
                 </span>
                 {goal.phase && !past && (
-                  <span style={{ background: "var(--sabbia-chip)", color: "var(--inchiostro-70)", borderRadius: "var(--radius-pill)", padding: "4px 10px", fontSize: 11, fontWeight: 600 }}>
+                  <span style={{ background: "var(--sabbia-chip)", color: "var(--inchiostro-70)", borderRadius: "var(--radius-pill)", padding: "4px 10px", fontSize: 12, fontWeight: 600 }}>
                     {goal.phase}
                   </span>
                 )}
@@ -74,7 +74,7 @@ export function RaceGoalCard({
                 </span>
               </div>
 
-              <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>
+              <p className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>
                 {formatFullDate(goal.race_date)} · {distanceLabel(goal.distance_km)}
                 {goal.target_time_seconds != null && ` · ${formatTargetTime(goal.target_time_seconds)}`}
                 {pace != null && ` (${formatPaceSecPerKm(pace)}/km)`}
@@ -130,7 +130,7 @@ function MissingGoalCard({ sessions, animate, delayMs }: { sessions: number; ani
         >
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <span className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+              <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
                 manca l&apos;obiettivo
               </span>
 

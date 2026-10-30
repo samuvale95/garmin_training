@@ -142,7 +142,7 @@ export function PortionPicker({ value, onChange, disabled }: { value: number; on
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--inchiostro-50)" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
           Quantità Porzione
         </span>
         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro)" }}>
@@ -280,7 +280,7 @@ function digitsOnly(raw: string): string {
 function MacroField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div style={{ flex: 1, background: "var(--crema-card)", borderRadius: "var(--radius-chip)", padding: 12 }}>
-      <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "0 0 4px" }}>{label}</p>
+      <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "0 0 4px" }}>{label}</p>
       <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
         <input
           inputMode="numeric"

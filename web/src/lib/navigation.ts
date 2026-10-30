@@ -6,8 +6,36 @@ export const PRIMARY_NAV = [
   { href: "/nutrition", label: "Nutrizione", icon: "M18 2v6a3 3 0 0 1-6 0V2M15 11v11M5 2v10a4 4 0 0 0 4 4v6M9 2v6" },
 ] as const;
 
+export type PrimaryHref = (typeof PRIMARY_NAV)[number]["href"];
+
+/** Which destination owns a route, so details and flows keep their section lit:
+ * a session belongs to Piano, an analysis to Attività, the fuel pages to Nutrizione.
+ * Null for the profile area and for screens outside the five destinations. */
+export function sectionOf(pathname: string): PrimaryHref | null {
+  const starts = (prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
+  if (starts("/today")) return "/today";
+  if (starts("/body/fuel")) return "/nutrition";
+  if (starts("/nutrition")) return "/nutrition";
+  if (starts("/body/conflict")) return "/today";
+  if (starts("/body")) return "/body";
+  if (starts("/activities") || starts("/coach") || starts("/summary") || starts("/progress")) return "/activities";
+  if (starts("/week") || starts("/session") || starts("/workout") || starts("/import") || starts("/diff") || starts("/sync") || starts("/confirm-deletions") || starts("/settings/goal")) return "/week";
+  return null;
+}
+
 export function isPrimaryActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return sectionOf(pathname) === href;
+}
+
+/** The five destinations themselves (and their sub-sections): these show the mobile
+ * top bar and bottom bar. Everything else is a detail or a flow with its own way back. */
+export function isPrimaryRoute(pathname: string): boolean {
+  return ["/today", "/week", "/week/programs", "/week/goals", "/activities", "/body", "/body/load", "/nutrition", "/settings"].includes(pathname);
+}
+
+/** Entry and connection screens that run before or outside the app's frame. */
+export function isBareRoute(pathname: string): boolean {
+  return pathname === "/" || pathname === "/login" || pathname.startsWith("/connect-garmin") || pathname.startsWith("/connect-strava");
 }
 
 /** Only local workspace pages can be return destinations. */

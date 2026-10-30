@@ -79,7 +79,7 @@ function ResultScreenInner() {
         }}
       >
         <div style={{ flex: 1, minWidth: 0, position: "relative", zIndex: 2 }}>
-          <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", margin: 0 }}>scritte sul calendario</p>
+          <p style={{ fontSize: 12, fontWeight: 600, margin: 0 }}>scritte sul calendario</p>
           <WordIn active={animate} delayMs={300} style={{ font: "600 52px/1 var(--font-sans)", letterSpacing: "-.045em", marginTop: 8 }}>
             {succeeded}
             <span style={{ fontSize: 24, opacity: 0.5 }}>/{total}</span>
@@ -102,7 +102,7 @@ function ResultScreenInner() {
             <div key={i} style={{ borderLeft: "3px solid var(--corallo)", paddingLeft: 10 }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
                 <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 2px" }}>{item.title}</p>
-                <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>{formatShortDate(item.date)}</span>
+                <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{formatShortDate(item.date)}</span>
               </div>
               <p style={{ fontSize: 12, color: "var(--inchiostro-70)", margin: 0 }}>{item.error ?? "Motivo non specificato."}</p>
             </div>
@@ -139,7 +139,7 @@ function Metric({ label, value }: { label: string; value: number | string }) {
   return (
     <div style={{ flex: 1, background: "var(--sabbia-chip)", borderRadius: "var(--radius-chip)", padding: "10px 12px" }}>
       <p className="font-mono" style={{ fontSize: 16, fontWeight: 500, margin: "0 0 2px" }}>{value}</p>
-      <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: 0 }}>{label}</p>
+      <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>{label}</p>
     </div>
   );
 }

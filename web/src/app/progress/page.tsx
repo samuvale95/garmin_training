@@ -38,7 +38,7 @@ export default function ProgressPage() {
         <>
           <SlideUp active={animate} delayMs={80} style={{ background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card-lg)", padding: 20, display: "flex", gap: 14, alignItems: "center" }}>
             <div style={{ flex: 1 }}>
-              <p className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-su-scuro)", margin: 0 }}>
+              <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: 0 }}>
                 serie
               </p>
               <p style={{ font: "600 40px/1 var(--font-sans)", letterSpacing: "-.03em", margin: "8px 0 0" }}>
@@ -82,7 +82,7 @@ export default function ProgressPage() {
                 ))}
               </ul>
             )}
-            <p className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "10px 0 0" }}>
+            <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "10px 0 0" }}>
               {data.total_points} punti nelle ultime 52 settimane
             </p>
           </SlideUp>
@@ -116,7 +116,7 @@ function BadgeCard({ badge, animate, delayMs }: { badge: Badge; animate: boolean
     >
       <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>{badge.title}</p>
       <p style={{ fontSize: 12, lineHeight: 1.35, margin: "4px 0 0", opacity: 0.8 }}>{badge.description}</p>
-      <p className="font-mono" style={{ fontSize: 11, margin: "8px 0 0", opacity: 0.75 }}>
+      <p className="font-mono" style={{ fontSize: 12, margin: "8px 0 0", opacity: 0.75 }}>
         {badge.earned ? (badge.earned_on ? formatFullDate(badge.earned_on) : "raggiunto") : `${badge.progress}/${badge.target}`}
       </p>
     </SlideUp>

@@ -1,26 +1,19 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ContextLink } from "@/components/ContextLink";
 import { WorkspaceHeading } from "@/components/Workspace";
-import { motion } from "framer-motion";
 import { Illustration } from "@/components/Illustration";
-import { DayStateCard } from "@/components/DayStateCard";
 import { CheckInCard } from "@/components/CheckInCard";
 import { AdaptationCard } from "@/components/AdaptationCard";
-import { Mascot, Tokens } from "@/components/ProgressBits";
-import { RaceGoalCard } from "@/components/RaceGoalCard";
-import { TiltCard } from "@/components/motion/TiltCard";
-import { BarGrow, PulseRing, SlideUp, StatusDot, WordIn } from "@/components/motion/primitives";
-import { ChevronRight, ArrowRight, ArrowUpRight, PlusIcon, TargetIcon, UtensilsIcon } from "@/components/Icons";
-import { TodayHeroUnified } from "@/components/TodayHeroUnified";
-import { TodayVitalStrip } from "@/components/TodayVitalStrip";
 import { NowMealCard } from "@/components/NowMealCard";
-import { currentMoment, useClockMinutes } from "@/lib/fuelMoment";
-import { WeekStrip } from "@/components/WeekStrip";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { Skeleton } from "@/components/motion/primitives";
+import { CheckIcon, UtensilsIcon } from "@/components/Icons";
+import { Badge, DateLead, EmptyState, Notice, RowLink, Section, SectionLink, SportMark, Stat, WeekRhythm } from "@/components/ui";
+import { currentMoment, useClockMinutes } from "@/lib/fuelMoment";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import {
@@ -28,30 +21,46 @@ import {
   useBodyToday,
   useCheckAdaptation,
   useCheckIns,
+  useDayVerdict,
   useFuelStatus,
   useFuelTargets,
-  useProgress,
-  useRefreshServerData,
-  useWeekSummary,
-  useDayVerdict,
-  useDayVerdictNarrative,
   usePlanDiff,
   useRaceGoal,
+  useRefreshServerData,
   useStravaActivityMatches,
   useStravaStatus,
   useWeekWorkouts,
-  useGoalPrediction,
 } from "@/lib/queries";
 import { useWatchSyncStatus } from "@/lib/watchSync";
-import { useGoalSessions } from "@/lib/goalSessions";
-import { SkeletonTodayHero } from "@/components/skeletons";
 import { usePassoStore } from "@/lib/store";
 import { useTrainingSlot } from "@/lib/trainingHabits";
 import { EVENING_MINUTES, useDayFocus } from "@/lib/dayFocus";
-import { classifySession, effectiveDescription, effectiveSteps, effectiveTitle, sessionDistanceKm, sessionDurationMinutes, shiftDateKey, toDateKey, weekBounds, workoutsToSessions, type DisplaySession } from "@/lib/sessionVisuals";
-import { capitalize, formatFullDate, groupSteps, numberToItalianWords, relativeDayLabel, stepGroupLine } from "@/lib/format";
+import {
+  classifySession,
+  effectiveSteps,
+  effectiveTitle,
+  sessionDistanceKm,
+  sessionDurationMinutes,
+  shiftDateKey,
+  toDateKey,
+  weekBounds,
+  workoutsToSessions,
+  type DisplaySession,
+} from "@/lib/sessionVisuals";
+import { capitalize, formatFullDate, formatMinutes, groupSteps, relativeDayLabel, stepGroupLine } from "@/lib/format";
+import { countdownLabel, goalTitle } from "@/lib/raceGoal";
 import { useScreenReady } from "@/lib/useScreenReady";
+import type { DayVerdict, ScheduledWorkout, TrainingSession } from "@/lib/types";
 
+const VERDICT_BADGE: Record<string, { tone: "ok" | "warn" | "danger"; label: string }> = {
+  pronto: { tone: "ok", label: "Corpo pronto" },
+  cauto: { tone: "warn", label: "Con cautela" },
+  scarico: { tone: "danger", label: "Corpo scarico" },
+};
+
+/** Oggi answers one question -- what do I do now -- in a fixed order: the next session,
+ * the other sessions of the day, how the body is, the next meal, then tomorrow. The
+ * order never shuffles with the clock; only the content of each block follows it. */
 export function TodayView() {
   const router = useRouter();
   const access = useCalendarAccess({ redirectWhenEmpty: false });
@@ -59,55 +68,29 @@ export function TodayView() {
   const today = new Date();
   const todayKey = toDateKey(today);
   const { start, end } = weekBounds(today);
-  const liveMode = !access.plan && access.garminConnected;
   const startKey = toDateKey(start);
   const endKey = toDateKey(end);
+  const liveMode = !access.plan && access.garminConnected;
   const workoutsQuery = useWeekWorkouts(today, liveMode);
-  // Same cache entry /diff uses, so tapping through to it costs no new request.
   const diffQuery = usePlanDiff(access.plan?.sessions ?? null);
   const bodyQuery = useBodyToday();
 
-  // "Svolto" indicators for the hero card + rest-of-week list, same batch pattern as
-  // Week -- one request for the whole visible week, not one per session.
   const stravaStatus = useStravaStatus();
   const planSessionsThisWeek = access.plan ? access.plan.sessions.filter((s) => s.date >= startKey && s.date <= endKey) : [];
   const stravaEnabled = !!access.plan && !!stravaStatus.data?.connected && planSessionsThisWeek.length > 0;
   const stravaMatches = useStravaActivityMatches(planSessionsThisWeek, stravaEnabled);
 
   const avvisamiSeIlCorpoNonRegge = usePassoStore((s) => s.prefs.avvisamiSeIlCorpoNonRegge);
-
-  // The race this account trains for, in the plan or standalone -- see useRaceGoal --
-  // and the sessions it is read against, the same ones (and the same cached request) as
-  // the goal screen: they count the sessions ahead for the "per che gara?" prompt, and
-  // feed the goal-confidence band shown on the race card.
   const { goal } = useRaceGoal(access.plan, access.ready);
-  const goalSessions = useGoalSessions({ plan: access.plan, goal, todayKey, liveMode });
-  const raceAhead = !!goal && goal.race_date >= todayKey;
-  const goalPrediction = useGoalPrediction(
-    goalSessions.sessions,
-    goal,
-    access.ready && raceAhead && (!liveMode || goalSessions.workoutsQuery.isSuccess)
-  );
-
-  // "19 L'orologio non ha ancora parlato" replaces Today when the watch hasn't pushed
-  // to Garmin's cloud in over 24h: with no overnight data there is nothing to interpret,
-  // and half this screen would be em dashes.
   const watchSync = useWatchSyncStatus();
 
-  // Today's state, and what it says about today's session. It sits on this screen as a
-  // card rather than replacing it: the old behaviour hijacked Oggi with a full-screen
-  // "il corpo dice no" the moment readiness dipped, which is a lot of authority for one
-  // low number -- and it only ever looked at *tomorrow*. The card says the same thing
-  // where the user is already looking, and the verdict screen is one tap behind it.
-  // The "avvisami se il corpo non regge" preference now decides whether it appears.
   const verdictSession = access.plan?.sessions.find((s) => s.date === todayKey) ?? null;
   const wantsVerdict = avvisamiSeIlCorpoNonRegge && !watchSync.blocking && access.ready;
   const verdictQuery = useDayVerdict(verdictSession, goal, wantsVerdict);
-  const verdictNarrative = useDayVerdictNarrative(verdictSession, goal, wantsVerdict && !!verdictQuery.data);
 
-  // The check-in: asked after training today, or the next morning for yesterday's
-  // session if it went unanswered (see `CheckInCard`). "Trained" is a completed activity
-  // when the watch is connected, a planned session otherwise.
+  // The check-in: after training today, or the next morning for yesterday's session if
+  // it went unanswered (see CheckInCard). "Trained" is a completed activity when the
+  // watch is connected, a planned session otherwise.
   const yesterdayKey = shiftDateKey(todayKey, -1);
   const recentActivities = useActivities(yesterdayKey, todayKey, access.ready && access.garminConnected);
   const recentCheckIns = useCheckIns(yesterdayKey, todayKey, access.ready);
@@ -125,39 +108,21 @@ export function TodayView() {
         ? "ieri"
         : null;
 
-  // Monday to Wednesday, the week just finished: the server's default week is exactly
-  // that, so no date is sent.
-  const earlyInWeek = (today.getDay() + 6) % 7 <= 2;
-  const lastWeek = useWeekSummary(null, access.ready && earlyInWeek);
-  const progress = useProgress(access.ready);
-
-  // Adaptation: once a day from here (and after every check-in, see CheckInCard). Only
-  // with a plan -- there is nothing to adapt on a Garmin-calendar-only account.
+  // Adaptation: once a day from here (and after every check-in). Only with a plan.
   const checkAdaptation = useCheckAdaptation();
   const hasPlan = !!access.plan;
   useEffect(() => {
     if (access.ready && hasPlan) checkAdaptation();
   }, [access.ready, hasPlan, checkAdaptation]);
 
-  // Quick 1-tap food / snack logging modal
   const openMeal = () => router.push(`/nutrition?date=${todayKey}&view=diary&log=1&from=%2Ftoday`);
-  const [selectedTodaySessionIdx, setSelectedTodaySessionIdx] = useState(0);
   const planOrLiveSessions = access.plan ? access.plan.sessions : workoutsToSessions(workoutsQuery.data?.workouts ?? []);
-  // Same weight as the Nutrizione tab, so both read one cache entry and one answer.
   const manualWeight = usePassoStore((s) => s.manualWeight);
   const training = useTrainingSlot(todayKey, access.ready);
   const fuelStatus = useFuelStatus(todayKey, manualWeight?.weightKg, access.ready);
   const fuelTargets = useFuelTargets(todayKey, planOrLiveSessions, manualWeight?.weightKg, access.ready && training.ready, training.slot);
-
-  // Until we know whether there's a plan or a live Garmin connection there is nothing
-  // real to show -- but "nothing real" used to mean `return null`, i.e. an empty screen
-  // for as long as the Garmin status check took. Render the header and the shapes.
-  // Above the early return below: a hook after it would run on some renders and not
-  // others (first render is always "not ready"), which React rejects outright.
   const refreshMutation = useRefreshServerData();
-  // The clock the home screen reorders itself by (see the meal card below).
   const nowMinutes = useClockMinutes();
-  // After a session, its check-in and analysis lead the screen (see dayFocus).
   const { focus } = useDayFocus({
     todayKey,
     sessionToday: planOrLiveSessions.some((s) => s.date === todayKey),
@@ -165,394 +130,322 @@ export function TodayView() {
     garminConnected: access.garminConnected,
     enabled: access.ready,
   });
-  // Ready also with neither plan nor Garmin: show the setup choices in place.
   useScreenReady(access.ready && !(liveMode && workoutsQuery.isPending), "/today");
 
+  const heading = (
+    <WorkspaceHeading title="Oggi" description={capitalize(formatFullDate(todayKey))}>
+      <button className="btn" onClick={openMeal} data-track="today.registra-cibo-o-snack">
+        <UtensilsIcon size={16} aria-hidden="true" />
+        Registra pasto
+      </button>
+    </WorkspaceHeading>
+  );
+
   if (!access.ready) {
+    // No date yet: this branch is also the prerendered HTML, and the build day is not
+    // today. The date appears with the data, on the client.
     return (
-      <div style={{ padding: "22px 20px 12px" }}>
-        <TodayHeader onOpenQuickLog={openMeal} />
-        <div style={{ marginTop: 18 }}>
-          <WordIn active={animate} style={{ font: "600 34px/1.04 var(--font-sans)", letterSpacing: "-.035em" }}>Il tuo oggi</WordIn>
-        </div>
-        <div style={{ marginTop: 16 }}>
-          <SkeletonTodayHero />
-        </div>
+      <div className="page">
+        <WorkspaceHeading title="Oggi" />
+        <Skeleton height={260} radius={22} />
       </div>
     );
   }
 
-  if (!access.plan && !access.garminConnected) return <div className="workspace-page">
-    <WorkspaceHeading title="Oggi" description={capitalize(formatFullDate(todayKey))} />
-    <div className="ux-empty"><h2>Il primo passo è il tuo programma</h2><p>Crea o importa gli allenamenti, oppure collega Garmin per ritrovare il calendario esistente.</p><div className="ux-actions"><Link className="ux-button ux-button-primary" href="/week/programs" data-track="today.empty-programs">Crea o importa un programma</Link><Link className="ux-button" href="/connect-garmin" data-track="today.empty-connect">Collega Garmin</Link></div></div>
-  </div>;
+  if (!access.plan && !access.garminConnected) {
+    return (
+      <div className="page" data-width="reading">
+        {heading}
+        <EmptyState
+          title="Il primo passo è il tuo programma"
+          actions={
+            <>
+              <Link className="btn" data-variant="primary" href="/week/programs" data-track="today.empty-programs">Crea o importa un programma</Link>
+              <Link className="btn" href="/connect-garmin" data-track="today.empty-connect">Collega Garmin</Link>
+            </>
+          }
+        >
+          Crea o importa gli allenamenti, oppure collega Garmin per ritrovare il calendario che hai già.
+        </EmptyState>
+      </div>
+    );
+  }
 
   const sessions: DisplaySession[] = access.plan ? access.plan.sessions : workoutsQuery.data?.workouts ?? [];
-
   const todaySessions = sessions.filter((s) => s.date === todayKey);
-  const todaySession = todaySessions[selectedTodaySessionIdx] ?? todaySessions[0] ?? null;
-  const weekSessions = sessions.filter((s) => s.date >= toDateKey(start) && s.date <= toDateKey(end));
-  const weekKm = weekSessions.reduce((sum, s) => sum + sessionDistanceKm(s), 0);
-
-  const restOfWeek = sessions
-    .filter((s) => s.date > todayKey && s.date <= toDateKey(end))
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(0, 5);
-  const remainingKm = restOfWeek.reduce((sum, s) => sum + sessionDistanceKm(s), 0);
-
-  // When today is a rest day, preview the next upcoming session instead of just
-  // saying "nothing today" -- matches the design's "domani · martedì 11" hero card.
-  // In the evening, once today's session is behind (done, or a rest day), the card
-  // looks ahead to the next one: that is the session there is still something to do for.
   const nextSession = sessions.filter((s) => s.date > todayKey).sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
   const evening = nowMinutes != null && nowMinutes >= EVENING_MINUTES;
   const lookAhead = focus === "domani" || (focus === "recupero" && evening);
-  const heroSession = lookAhead ? nextSession ?? todaySession : todaySession ?? nextSession;
-  const heroSteps = heroSession ? effectiveSteps(heroSession) : [];
-  const heroGroups = heroSteps.length > 0 ? groupSteps(heroSteps).filter((g) => g.kind === "interval" || g.kind === "warmup" || g.kind === "cooldown") : [];
-  const heroMainGroup = heroGroups.find((g) => g.kind === "interval") ?? heroGroups[0] ?? null;
+  const heroSession = lookAhead ? nextSession ?? todaySessions[0] ?? null : todaySessions[0] ?? nextSession;
+  const otherToday = todaySessions.filter((s) => s !== heroSession);
 
-  const heroMatch = heroSession ? stravaMatches.data?.matches[heroSession.date] : undefined;
-  const heroPlanSession = access.plan?.sessions.find((session) => session === heroSession);
-  const heroWorkout = workoutsQuery.data?.workouts.find((session) => session === heroSession);
-  const heroHref = heroPlanSession?.id
-    ? `/session/${encodeURIComponent(heroPlanSession.id)}`
-    : heroWorkout
-      ? `/workout/${heroWorkout.scheduled_workout_id}?date=${heroWorkout.date}`
-      : "/week";
-
+  const hrefFor = (session: DisplaySession) => {
+    const planned = access.plan?.sessions.find((item) => item === session) as TrainingSession | undefined;
+    if (planned?.id) return `/session/${encodeURIComponent(planned.id)}`;
+    const workout = workoutsQuery.data?.workouts.find((item) => item === session) as ScheduledWorkout | undefined;
+    return workout ? `/workout/${workout.scheduled_workout_id}?date=${workout.date}` : "/week";
+  };
+  const doneOn = (session: DisplaySession) =>
+    !!stravaMatches.data?.matches[session.date]?.matched || (session.date === todayKey && todaySessions.length === 1 && trainedOn(todayKey));
 
   const pendingChanges = (diffQuery.data?.to_create?.length ?? 0) + (diffQuery.data?.changed?.length ?? 0);
-
-  // Meal content follows the clock; its position remains below the daily vitals.
   const mealMoment = fuelTargets.data ? currentMoment(fuelTargets.data, nowMinutes) : null;
-  const nowMealCard = fuelTargets.data && mealMoment && (
-    <NowMealCard fuel={fuelTargets.data} moment={mealMoment} onLog={openMeal} animate={animate} delayMs={110} />
-  );
   const readiness = bodyQuery.data?.readiness_score;
   const sleepMinutes = bodyQuery.data?.sleep?.total_minutes;
+  const carbLogged = fuelStatus.data?.totals?.carb_g;
+  const carbTarget = fuelTargets.data?.today?.carb_g;
 
-  // Check-in and technique analysis follow the training overview.
-  const postSession = (
-    <>
-      {checkInDay && (
-        <CheckInCard
-          key={checkInDay === "oggi" ? todayKey : yesterdayKey}
-          date={checkInDay === "oggi" ? todayKey : yesterdayKey}
-          dayLabel={checkInDay}
-          trained={trainedOn(checkInDay === "oggi" ? todayKey : yesterdayKey)}
-          existing={checkInOn(checkInDay === "oggi" ? todayKey : yesterdayKey)}
-          animate={animate}
-          delayMs={130}
-        />
-      )}
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    return d;
+  });
+  const doneKeys = new Set(Object.entries(stravaMatches.data?.matches ?? {}).filter(([, m]) => m.matched).map(([k]) => k));
+  if (trainedOn(todayKey)) doneKeys.add(todayKey);
 
-      {trainedOn(todayKey) && (
-        <SlideUp active={animate} delayMs={140} style={{ marginTop: 10 }}>
-          <Link data-track="today.coach"
-            href="/coach"
-            className="press-soft"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              background: "var(--crema-card)",
-              border: "1px solid var(--border-airbnb)",
-              boxShadow: "var(--shadow-airbnb-subtle)",
-              borderRadius: "var(--radius-card)",
-              padding: "12px 16px",
-              textDecoration: "none",
-              color: "inherit",
-            }}
-          >
-            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: "50%", background: "var(--sabbia-chip)", color: "var(--inchiostro)", flex: "none" }}>
-              <TargetIcon size={16} strokeWidth={2} />
-            </span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--inchiostro)" }}>
-                  Analisi Tecnica della corsa
-                </span>
-                <span
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: ".04em",
-                    background: "var(--azzurro)",
-                    color: "var(--azzurro-testo)",
-                    padding: "2px 6px",
-                    borderRadius: "var(--radius-pill)",
-                  }}
-                >
-                  Nuova
-                </span>
-              </div>
-              <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>
-                Contatto al suolo, cadenza e split del ritmo analizzati dal coach.
-              </p>
-            </div>
-            <ChevronRight size={16} style={{ color: "var(--inchiostro-50)", flex: "none" }} />
-          </Link>
-        </SlideUp>
-      )}
-    </>
-  );
+  const tomorrowKey = shiftDateKey(todayKey, 1);
+  const tomorrowSessions = sessions.filter((s) => s.date === tomorrowKey);
 
   return (
     <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
-      <div style={{ padding: "22px 20px 12px" }}>
-        <WorkspaceHeading title="Oggi" description={capitalize(formatFullDate(todayKey))}>
-          <TodayHeader onOpenQuickLog={openMeal} />
-        </WorkspaceHeading>
-        {watchSync.blocking && <p className="ux-error" role="status">Alcuni dati dell’orologio non sono aggiornati. <Link href="/watch-sync" data-track="today.stale-sync">Come aggiornarli</Link></p>}
+      <div className="page">
+        {heading}
 
-        {/* 1. HERO ALLENAMENTO + BADGE PRONTEZZA UNIFICATI */}
-        <TodayHeroUnified
-          heroSession={heroSession}
-          heroMainGroup={heroMainGroup}
-          heroMatch={heroMatch}
-          heroHref={heroHref}
-          verdict={heroSession?.date === todayKey || !todaySession ? verdictQuery.data : null}
-          today={today}
-          animate={animate}
-          todaySessions={todaySessions}
-          selectedSessionIndex={selectedTodaySessionIdx}
-          onSelectSessionIndex={setSelectedTodaySessionIdx}
-        />
+        {watchSync.blocking && (
+          <div style={{ marginBottom: 16 }}>
+            <Notice tone="warn" title="Alcuni dati dell’orologio non sono aggiornati">
+              Il piano resta consultabile. <Link href="/watch-sync?from=%2Ftoday" data-track="today.stale-sync">Come aggiornarli</Link>
+            </Notice>
+          </div>
+        )}
 
-      {todaySessions.length > 1 && <section className="today-sessions" aria-label="Tutti gli allenamenti di oggi">
-        <h2 className="ux-section-title">Le {todaySessions.length} sedute di oggi</h2>
-        {todaySessions.map((session, index) => {
-          const planned = access.plan?.sessions.find((item) => item === session);
-          const workout = workoutsQuery.data?.workouts.find((item) => item === session);
-          const href = planned?.id ? `/session/${encodeURIComponent(planned.id)}` : workout ? `/workout/${workout.scheduled_workout_id}?date=${workout.date}` : "/week";
-          const minutes = Math.round(sessionDurationMinutes(session));
-          return <ContextLink key={planned?.id ?? workout?.scheduled_workout_id ?? index} href={href} from="/today" className="today-session-link" data-track="today.day-session"><span>{effectiveTitle(session)}<small>{classifySession(session).label}{minutes > 0 ? ` · ${minutes} min` : ""}</small></span><ChevronRight size={18} /></ContextLink>;
-        })}
-      </section>}
-
-
-
-      {/* 2. ADATTAMENTO DEL PIANO (Se richiesto) */}
-      {hasPlan && <AdaptationCard animate={animate} delayMs={120} />}
-
-      {/* 3. CHECK-IN E ANALISI */}
-      {postSession}
-
-      {/* 5. VITAL STRIP COMPATTA: Prontezza, Sonno, Carbo (0 tap) */}
-      <TodayVitalStrip
-        readinessScore={readiness}
-        sleepMinutes={sleepMinutes}
-        carbLoggedG={fuelStatus.data?.totals?.carb_g ?? 0}
-        carbTargetG={fuelTargets.data?.today?.carb_g}
-        active={animate}
-      />
-
-      {/* 5b. COSA MANGIARE, quando non è urgente */}
-      {nowMealCard}
-
-      <div className="ux-actions"><Link className="ux-button" href="/week" data-track="today.open-plan">Apri il calendario</Link><Link className="ux-button" href="/activities" data-track="today.open-activities">Attività svolte</Link></div>
-      <details className="ux-disclosure"><summary data-track="today.more">Riepilogo e prossimi allenamenti</summary>
-      {/* Compact secondary information remains accessible without crowding Today. */}
-      <WeekStrip
-        currentDateKey={todayKey}
-        sessions={sessions}
-        active={animate}
-      />
-
-      {/* 8. PROGRESSO E RECORD SETTIMANALI (Compatto) */}
-      {progress.data && (
-        <Link data-track="today.progress" href="/progress" style={{ textDecoration: "none", color: "inherit" }}>
-          <SlideUp active={animate} delayMs={160}>
-            <motion.div
-              whileHover={{ y: -2, scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 400, damping: 25 }}
-              style={{
-                background: "var(--crema-card)",
-                border: "var(--border-airbnb)",
-                boxShadow: "var(--shadow-airbnb-subtle)",
-                borderRadius: "var(--radius-card)",
-                padding: "12px 16px",
-                marginTop: 12,
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              {progress.data.mascot && <Mascot state={progress.data.mascot.state} size={46} />}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontWeight: 600, fontSize: 14.5, margin: 0 }}>
-                  {progress.data.streak} {progress.data.streak === 1 ? "settimana" : "settimane"} di fila
-                </p>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                  <Tokens tokens={progress.data.tokens} max={progress.data.max_tokens} />
-                  <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
-                    {progress.data.week_points} pt questa settimana
-                  </span>
-                </div>
-              </div>
-              <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
-            </motion.div>
-          </SlideUp>
-        </Link>
-      )}
-
-      {earlyInWeek && lastWeek.data && lastWeek.data.done_sessions + lastWeek.data.planned_sessions > 0 && (
-        <Link data-track="today.summary" href="/summary" style={{ textDecoration: "none", color: "inherit" }}>
-          <SlideUp active={animate} delayMs={170}>
-            <motion.div
-              whileHover={{ y: -2, scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 400, damping: 25 }}
-              style={{
-                background: "var(--sabbia)",
-                border: "var(--border-airbnb)",
-                boxShadow: "var(--shadow-airbnb-subtle)",
-                borderRadius: "var(--radius-card)",
-                padding: 13,
-                marginTop: 10,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <p style={{ font: "500 11px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>La settimana scorsa</p>
-                <p style={{ fontSize: 13.5, margin: "2px 0 0" }}>{lastWeek.data.headline}</p>
-              </div>
-              <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
-            </motion.div>
-          </SlideUp>
-        </Link>
-      )}
-
-      {/* Without a race this asks for one */}
-      <RaceGoalCard
-        goal={goal}
-        upcomingSessions={goalSessions.sessions.filter((s) => s.date >= todayKey).length}
-        prediction={raceAhead ? goalPrediction.data : undefined}
-        animate={animate}
-        delayMs={180}
-      />
-
-      {liveMode ? (
-        <Link data-track="today.import" href="/import" style={{ textDecoration: "none", color: "inherit" }}>
-          <SlideUp active={animate} delayMs={200} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
-            <p className="font-serif-italic" style={{ fontSize: 15, margin: 0, flex: 1 }}>
-              Questo è il calendario Garmin. Importa un piano per i dettagli di ogni seduta.
-            </p>
-            <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
-          </SlideUp>
-        </Link>
-      ) : pendingChanges > 0 ? (
-        <Link data-track="today.diff" href="/diff" style={{ textDecoration: "none", color: "inherit" }}>
-          <SlideUp active={animate} delayMs={200} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
-            <PulseRing size={8} />
-            <div style={{ flex: 1 }}>
-              <p style={{ fontWeight: 600, fontSize: 15, margin: "0 0 2px" }}>
-                {capitalize(numberToItalianWords(pendingChanges))} {pendingChanges === 1 ? "differenza" : "differenze"}
-              </p>
-              <p className="font-serif-italic" style={{ fontSize: 14, margin: 0 }}>Il file non combacia col calendario.</p>
+        <div className="split">
+          <div className="stack-lg">
+            <div className="stack">
+              <SessionHero
+                session={heroSession}
+                isToday={heroSession?.date === todayKey}
+                href={heroSession ? hrefFor(heroSession) : "/week"}
+                done={heroSession ? doneOn(heroSession) : false}
+                verdict={heroSession?.date === todayKey ? verdictQuery.data ?? null : null}
+                today={today}
+                animate={animate}
+              />
+              {hasPlan && <AdaptationCard animate={animate} delayMs={0} />}
             </div>
-            <span
-              aria-hidden="true"
-              style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--inchiostro)", color: "var(--crema)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}
-            >
-              <ArrowRight size={16} strokeWidth={2.4} />
-            </span>
-          </SlideUp>
-        </Link>
-      ) : (
-        <SlideUp active={animate} delayMs={200} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 4px", marginTop: 10 }}>
-          <StatusDot kind="active" size={7} />
-          <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>in pari col calendario</span>
-        </SlideUp>
-      )}
 
-      {/* The list always gets its title -- it's what separates it from the card above.
-          Only the total is conditional: Garmin's calendar entries carry no distance, so
-          in live mode the km would read "0 km", a wrong statement rather than a missing
-          one. */}
-      {restOfWeek.length > 0 && (
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 20, padding: "0 2px 6px" }}>
-          <span style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)" }}>resto della settimana</span>
-          {remainingKm > 0 && (
-            <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-35)" }}>{remainingKm.toFixed(1).replace(".0", "")} km</span>
-          )}
-        </div>
-      )}
-      <div style={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 2 }}>
-        {restOfWeek.map((session, i) => {
-          const visual = classifySession(session);
-          const km = sessionDistanceKm(session);
-          const duration = sessionDurationMinutes(session);
-          const match = stravaMatches.data?.matches[session.date];
-          const isDurationBased = km === 0 && duration > 0;
+            {otherToday.length > 0 && (
+              <Section title={`Altre sedute di oggi`} id="today-others">
+                <ul className="list">
+                  {otherToday.map((session, i) => {
+                    const minutes = Math.round(sessionDurationMinutes(session));
+                    return (
+                      <li key={i}>
+                        <RowLink
+                          href={hrefFor(session)}
+                          from="/today"
+                          track="today.day-session"
+                          lead={<SportMark session={session} />}
+                          title={effectiveTitle(session)}
+                          meta={[classifySession(session).label, minutes > 0 ? formatMinutes(minutes) : null].filter(Boolean).join(" · ")}
+                          end={doneOn(session) ? <Badge tone="ok"><CheckIcon size={12} aria-hidden="true" />Svolto</Badge> : <Badge>Programmato</Badge>}
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Section>
+            )}
 
-          return (
-            <SlideUp
-              key={`${session.date}-${i}`}
-              active={animate}
-              delayMs={220 + i * 30}
-              row
-            >
-              <motion.div
-                whileHover={{ x: 5 }}
-                transition={{ type: "spring", stiffness: 450, damping: 26 }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "7px 4px",
-                  borderRadius: "var(--radius-sm)",
-                  borderTop: "1px solid var(--sabbia-bordo)",
-                }}
-              >
-                <span style={{ font: "500 11px var(--font-sans)", color: "var(--inchiostro-35)", width: 34, flex: "none" }}>
-                  {new Date(session.date).toLocaleDateString("it-IT", { weekday: "short" })}
-                </span>
-                <span style={{ font: "500 13.5px var(--font-sans)", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {effectiveTitle(session)}
-                </span>
-                {match?.matched && match.distance_km != null ? (
-                  <span className="font-mono" style={{ fontSize: 11, color: "var(--verde-tratto-scuro)", width: 60, textAlign: "right", flex: "none" }}>
-                    svolto {match.distance_km.toFixed(0)}
-                  </span>
-                ) : km > 0 ? (
-                  <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", width: 44, textAlign: "right", flex: "none" }}>
-                    {km.toFixed(0)} km
-                  </span>
-                ) : isDurationBased ? (
-                  <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", width: 44, textAlign: "right", flex: "none" }}>
-                    {Math.round(duration)}&apos;
-                  </span>
-                ) : null}
-                <div style={{ width: 70, height: 4, flex: "none" }}>
-                  <BarGrow
-                    value={km > 0 ? Math.min(1, km / 20) : isDurationBased ? Math.min(1, duration / 60) : 0}
-                    height={4}
-                    color={visual.background}
-                    trackColor="var(--sabbia-chip)"
-                    active={animate}
-                    delayMs={250 + i * 30}
+            {checkInDay && (
+              <CheckInCard
+                key={checkInDay === "oggi" ? todayKey : yesterdayKey}
+                date={checkInDay === "oggi" ? todayKey : yesterdayKey}
+                dayLabel={checkInDay}
+                trained={trainedOn(checkInDay === "oggi" ? todayKey : yesterdayKey)}
+                existing={checkInOn(checkInDay === "oggi" ? todayKey : yesterdayKey)}
+                animate={animate}
+                delayMs={0}
+              />
+            )}
+
+            {liveMode ? (
+              <Notice tone="neutral" title="Stai vedendo il calendario Garmin" action={<Link className="btn" data-size="sm" href="/week/programs/new?source=import" data-track="today.import">Importa un programma</Link>}>
+                Importa o crea un programma per vedere fasi, ritmi e obiettivo di ogni seduta.
+              </Notice>
+            ) : pendingChanges > 0 ? (
+              <ul className="list">
+                <li>
+                  <RowLink
+                    href="/diff"
+                    from="/today"
+                    track="today.diff"
+                    title={`${pendingChanges} ${pendingChanges === 1 ? "modifica da inviare" : "modifiche da inviare"} a Garmin`}
+                    meta="Salvate nell’app, non ancora sull’orologio. Controlla prima di inviare."
+                    end={<Badge tone="warn">Da inviare</Badge>}
                   />
+                </li>
+              </ul>
+            ) : null}
+          </div>
+
+          <aside className="stack-lg" aria-label="Recupero, alimentazione e prossimi giorni">
+            <Section title="Come stai" id="today-body" action={<SectionLink href="/body" track="today.body">Recupero</SectionLink>}>
+              <div className="card">
+                <div className="stats">
+                  <Stat value={readiness != null ? Math.round(readiness) : "—"} unit={readiness != null ? "/100" : undefined} label="Prontezza" note={readiness == null ? "Non disponibile" : undefined} />
+                  <Stat value={sleepMinutes != null ? formatMinutes(sleepMinutes) : "—"} label="Sonno" note={sleepMinutes == null ? "Non disponibile" : undefined} />
                 </div>
-              </motion.div>
-            </SlideUp>
-          );
-        })}
+              </div>
+            </Section>
+
+            <Section title="Alimentazione" id="today-fuel" action={<SectionLink href={`/nutrition?date=${todayKey}`} track="today.nutrition">Nutrizione</SectionLink>}>
+              <div className="stack">
+                {fuelTargets.data && mealMoment ? (
+                  <NowMealCard fuel={fuelTargets.data} moment={mealMoment} onLog={openMeal} animate={animate} delayMs={0} />
+                ) : fuelTargets.isPending && access.ready ? (
+                  <Skeleton height={96} radius={16} />
+                ) : (
+                  <ul className="list">
+                    <li>
+                      <RowLink href={`/nutrition?date=${todayKey}&view=diary`} track="today.nutrition-fallback" title="Diario di oggi" meta="Le indicazioni non sono disponibili ora: puoi comunque registrare i pasti." />
+                    </li>
+                  </ul>
+                )}
+                {carbTarget && (
+                  <p className="muted" style={{ margin: 0, fontSize: "var(--text-sm)" }}>
+                    Carboidrati registrati oggi: <span className="figure">{carbLogged != null ? `${Math.round(carbLogged)} g` : "nessuna registrazione"}</span> su{" "}
+                    <span className="figure">{carbTarget[0]}–{carbTarget[1]} g</span> indicati.
+                  </p>
+                )}
+              </div>
+            </Section>
+
+            <Section title="Questa settimana" id="today-week" action={<SectionLink href="/week" track="today.open-plan">Piano</SectionLink>}>
+              <div className="card">
+                <WeekRhythm
+                  days={weekDays}
+                  sessions={sessions.filter((s) => s.date >= startKey && s.date <= endKey)}
+                  todayKey={todayKey}
+                  doneKeys={doneKeys}
+                  hrefFor={(key) => `/week?date=${key}`}
+                  label="Sedute della settimana, un giorno per colonna"
+                />
+              </div>
+              {tomorrowSessions.length > 0 && heroSession?.date !== tomorrowKey && (
+                <ul className="list" style={{ marginTop: 12 }}>
+                  {tomorrowSessions.map((session, i) => (
+                    <li key={i}>
+                      <RowLink
+                        href={hrefFor(session)}
+                        from="/today"
+                        track="today.tomorrow"
+                        lead={<DateLead date={session.date} />}
+                        title={`Domani: ${effectiveTitle(session)}`}
+                        meta={[classifySession(session).label, sessionDurationMinutes(session) > 0 ? formatMinutes(sessionDurationMinutes(session)) : null].filter(Boolean).join(" · ")}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Section>
+
+            {goal && (
+              <ul className="list">
+                <li>
+                  <RowLink href="/week/goals" track="today.goal" title={goalTitle(goal)} meta={`Obiettivo · ${countdownLabel(goal)}`} />
+                </li>
+              </ul>
+            )}
+          </aside>
+        </div>
       </div>
-      </details>
-
-
-    </div>
-  </PullToRefresh>
+    </PullToRefresh>
   );
 }
 
-/** The daily shortcut; brand and profile belong to the shared workspace. */
-function TodayHeader({ onOpenQuickLog }: { onOpenQuickLog?: () => void }) {
-  return <button className="ux-button" onClick={onOpenQuickLog} data-track="today.registra-cibo-o-snack"><UtensilsIcon size={15} /><span>Registra pasto</span></button>;
+/** The one dominant surface of Oggi: what is planned next, how long, what it asks, and
+ * the single action that opens it. A rest day says so and dates the next session. */
+function SessionHero({
+  session,
+  isToday,
+  href,
+  done,
+  verdict,
+  today,
+  animate,
+}: {
+  session: DisplaySession | null;
+  isToday: boolean;
+  href: string;
+  done: boolean;
+  verdict: DayVerdict | null;
+  today: Date;
+  animate: boolean;
+}) {
+  if (!session) {
+    return (
+      <article className="hero">
+        <p className="hero-kicker">Nessuna seduta in programma</p>
+        <h2 className="hero-title">Giorno di riposo</h2>
+        <p className="hero-text">Non ci sono allenamenti nei prossimi giorni del calendario. Puoi aggiungerne uno o costruire un programma.</p>
+        <div className="hero-actions">
+          <Link className="btn" data-variant="primary" href="/week/new?from=%2Ftoday" data-track="today.add-session">Aggiungi allenamento</Link>
+          <Link className="btn" href="/week/programs" data-track="today.programs">Programmi</Link>
+        </div>
+        <div className="hero-art"><Illustration name="riposo" width={150} height={160} position="relative" active={animate} /></div>
+      </article>
+    );
+  }
+
+  const visual = classifySession(session);
+  const minutes = Math.round(sessionDurationMinutes(session));
+  const km = sessionDistanceKm(session);
+  const steps = effectiveSteps(session);
+  const groups = steps.length > 0 ? groupSteps(steps) : [];
+  const main = groups.find((g) => g.kind === "interval") ?? null;
+  const badge = verdict && verdict.has_data ? VERDICT_BADGE[verdict.state] : undefined;
+  const when = isToday ? "Oggi" : capitalize(relativeDayLabel(session.date, today));
+  const restToday = !isToday;
+
+  return (
+    <article className="hero" data-sport style={{ "--sport": visual.accent } as CSSProperties} aria-labelledby="today-hero-title">
+      <div className="hero-kicker">
+        <span className="sport-tag" style={{ "--sport": visual.accent } as CSSProperties}>
+          <SportMark session={session} />
+          {visual.label}
+        </span>
+        <span aria-hidden="true">·</span>
+        <span>{restToday ? `${when}, ${formatFullDate(session.date)}` : when}</span>
+        {done ? <Badge tone="ok"><CheckIcon size={12} aria-hidden="true" />Svolto</Badge> : null}
+        {session.is_short_active && <Badge tone="accent">Versione breve</Badge>}
+        {badge && (
+          <Link href="/body/stato?from=%2Ftoday" data-track="today.verdict" style={{ textDecoration: "none" }}>
+            <Badge tone={badge.tone}>{badge.label}</Badge>
+          </Link>
+        )}
+      </div>
+      {restToday && <p className="hero-text" style={{ marginTop: 6 }}>Oggi è un giorno di riposo. La prossima seduta:</p>}
+      <h2 className="hero-title" id="today-hero-title" style={{ paddingRight: 0 }}>{effectiveTitle(session)}</h2>
+
+      <div className="hero-figures">
+        {minutes > 0 && <Stat value={formatMinutes(minutes)} label="Durata prevista" />}
+        {km > 0 && <Stat value={km.toLocaleString("it-IT", { maximumFractionDigits: 1 })} unit="km" label="Distanza stimata" />}
+        {main && <Stat value={<span style={{ fontSize: "var(--text-lg)" }}>{stepGroupLine(main)}</span>} label="Parte principale" />}
+      </div>
+
+      {verdict?.headline && badge && badge.tone !== "ok" && <p className="hero-text">{verdict.headline}</p>}
+
+      <div className="hero-actions">
+        <ContextLink className="btn" data-variant="primary" href={href} from="/today" data-track="today.open-session">
+          {done ? "Apri il resoconto" : "Apri allenamento"}
+        </ContextLink>
+      </div>
+      {visual.illustration && (
+        <div className="hero-art" aria-hidden="true">
+          <Illustration name={visual.illustration} width={150} height={160} position="relative" active={animate} priority />
+        </div>
+      )}
+    </article>
+  );
 }

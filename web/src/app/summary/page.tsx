@@ -98,7 +98,7 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
           </p>
         )}
         {!data.complete && (
-          <p className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-su-scuro)", margin: "12px 0 0" }}>
+          <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: "12px 0 0" }}>
             settimana in corso
           </p>
         )}
@@ -141,7 +141,7 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
                 Dolore {pain.area ? `(${pain.area})` : ""} {formatWeekday(pain.date)}
               </p>
             ))}
-            <p className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "8px 0 0" }}>
+            <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "8px 0 0" }}>
               {data.checkin_days} {data.checkin_days === 1 ? "giorno" : "giorni"} con check-in
             </p>
           </>
@@ -199,7 +199,7 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
 function Figure({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
   return (
     <div style={{ flex: 1, background: accent ? "var(--corallo)" : "var(--crema-card)", color: accent ? "var(--corallo-testo)" : undefined, border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 13 }}>
-      <p style={{ font: "500 11px var(--font-sans)", opacity: 0.7, margin: 0 }}>{label}</p>
+      <p style={{ font: "500 12px var(--font-sans)", opacity: 0.7, margin: 0 }}>{label}</p>
       <p style={{ font: "600 24px/1 var(--font-sans)", letterSpacing: "-.03em", margin: "8px 0 0" }}>{value}</p>
     </div>
   );

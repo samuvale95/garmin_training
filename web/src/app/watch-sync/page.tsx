@@ -90,7 +90,7 @@ export default function WatchSyncPage() {
             style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--azzurro-tratto)", flex: "none" }}
           />
           <span
-            style={{ font: "500 11.5px var(--font-sans)", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}
+            style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)" }}
             aria-live="polite"
           >
             {rechecking ? "controllo in corso" : "in attesa dell'orologio"}
@@ -125,7 +125,7 @@ export default function WatchSyncPage() {
           {/* Fixed 144: keeps the copy clear of the figure, which is anchored to the
               right edge and bleeds past it on wider screens rather than moving. */}
           <div style={{ position: "relative", zIndex: 1, width: 144 }}>
-            <p style={{ font: "500 11px var(--font-sans)", letterSpacing: ".1em", textTransform: "uppercase", opacity: 0.6, margin: 0 }}>
+            <p style={{ font: "500 12px var(--font-sans)", opacity: 0.6, margin: 0 }}>
               ultimo sync
             </p>
             <p style={{ font: "600 22px/1.1 var(--font-sans)", letterSpacing: "-.02em", margin: "4px 0 0" }}>

@@ -64,7 +64,7 @@ page.on('request', async req => {
   } else { unknown.add(path); status = 404; data = { category: 'server_error', message: 'Fixture non disponibile', details: [] }; }
   return req.respond({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': origin }, body: JSON.stringify(data) });
 });
-const go = async path => { await page.goto(origin + path, { waitUntil: 'networkidle0', timeout: 60000 }); await page.waitForSelector('.workspace, .page-back', { timeout: 15000 }); };
+const go = async path => { await page.goto(origin + path, { waitUntil: 'networkidle0', timeout: 60000 }); await page.waitForSelector('.frame, .page-back', { timeout: 15000 }); };
 const screenshot = async (name) => {
   // Allow the existing entry animations to settle before visual inspection.
   await new Promise(resolve => setTimeout(resolve, 800));
@@ -76,7 +76,7 @@ const noOverflow = async () => assert(await page.evaluate(() => document.documen
 try {
   await go('/activities');
   await page.waitForSelector('.activity-row');
-  assert.equal(await page.$$eval('.primary-nav-link', els => els.length), 5);
+  assert.equal(await page.$$eval('.bottombar .nav-link', els => els.length), 5);
   assert.equal(await page.$$eval('.activity-row', els => els.length), 2);
   await page.type('input[type=search]', 'Bici', { delay: 100 });
   await page.waitForFunction(() => document.querySelector('input[type=search]').value === 'Bici' && document.querySelectorAll('.activity-row').length === 1);
@@ -102,7 +102,7 @@ try {
   await page.waitForSelector('.page-back');
   assert(new URL(page.url()).searchParams.get('from') === `/week?date=${nextMonday}`);
   await click('.page-back');
-  await page.waitForSelector('.section-nav');
+  await page.waitForSelector('.subnav');
   assert.equal(new URL(page.url()).searchParams.get('date'), nextMonday);
   const movedDate = shift(nextMonday, 1);
   await click('.week-move summary');
@@ -123,7 +123,7 @@ try {
   await screenshot('programs-mobile');
   await page.setViewport({ width: 1440, height: 1000 });
   await screenshot('programs-desktop');
-  assert(await page.evaluate(() => document.querySelector('main').getBoundingClientRect().left >= document.querySelector('.primary-nav').getBoundingClientRect().right), 'sidebar overlaps content');
+  assert(await page.evaluate(() => document.querySelector('main').getBoundingClientRect().left >= document.querySelector('.sidebar').getBoundingClientRect().right), 'sidebar overlaps content');
   await page.select('[data-track="programs.generation-target"]', 'strength');
   await click('[data-track="plan-generate-card.setconfirming-2"]');
   await click('[data-track="plan-generate-card.button"]');

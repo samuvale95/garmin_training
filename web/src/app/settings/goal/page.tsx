@@ -167,7 +167,7 @@ export default function RaceGoalSettingsPage() {
           )}
           {fitQuery.data ? (
             <>
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: "24px 0 0" }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)", margin: "24px 0 0" }}>
                 Il piano che hai già
               </p>
               <GoalFitBlock fit={fitQuery.data} narrative={fitNarrative.data?.text} animate={animate} delayMs={240} />
@@ -220,11 +220,11 @@ function GoalSummary({ goal, animate, onEdit }: { goal: RaceGoal; animate: boole
     <>
       <SlideUp active={animate} delayMs={100} style={{ position: "relative", overflow: "hidden", background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card-lg)", padding: 22, marginTop: 18 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-          <span className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-su-scuro)" }}>
+          <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)" }}>
             {goal.phase === "gara passata" ? "gara corsa" : "obiettivo"}
           </span>
           {goal.phase && goal.phase !== "gara passata" && (
-            <span style={{ background: "rgba(246,238,218,.12)", borderRadius: "var(--radius-pill)", padding: "4px 11px", fontSize: 11, fontWeight: 600 }}>{goal.phase}</span>
+            <span style={{ background: "rgba(246,238,218,.12)", borderRadius: "var(--radius-pill)", padding: "4px 11px", fontSize: 12, fontWeight: 600 }}>{goal.phase}</span>
           )}
         </div>
 
@@ -271,7 +271,7 @@ function GoalSummary({ goal, animate, onEdit }: { goal: RaceGoal; animate: boole
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 10 }}>
-      <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "0 0 4px" }}>{label}</p>
+      <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "0 0 4px" }}>{label}</p>
       {children}
     </div>
   );

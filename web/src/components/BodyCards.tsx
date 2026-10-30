@@ -70,7 +70,7 @@ export function StatusPill({ status, children }: { status: SignalStatus; childre
         color: style.text,
         borderRadius: "var(--radius-pill)",
         padding: "3px 9px",
-        fontSize: 11.5,
+        fontSize: 12.5,
         fontWeight: 700,
         whiteSpace: "nowrap",
       }}
@@ -169,10 +169,10 @@ export function SleepCard({
                   borderLeft: `3px solid ${phase.color}`,
                 }}
               >
-                <p style={{ fontSize: 11.5, fontWeight: 600, margin: 0, color: off ? STATUS_STYLE.attenzione.text : "var(--inchiostro-70)" }}>{phase.label}</p>
+                <p style={{ fontSize: 12.5, fontWeight: 600, margin: 0, color: off ? STATUS_STYLE.attenzione.text : "var(--inchiostro-70)" }}>{phase.label}</p>
                 <p className="font-mono" style={{ fontSize: 15, fontWeight: 600, margin: "2px 0 0" }}>
                   {formatMinutes(minutes)}
-                  <span style={{ fontSize: 11, fontWeight: 400, color: off ? STATUS_STYLE.attenzione.text : "var(--inchiostro-50)" }}>
+                  <span style={{ fontSize: 12, fontWeight: 400, color: off ? STATUS_STYLE.attenzione.text : "var(--inchiostro-50)" }}>
                     {" "}· {pct}%{off ? (phase.key === "awake_minutes" ? " alto" : " basso") : ""}
                   </span>
                 </p>
@@ -215,7 +215,7 @@ export function SleepPhaseLegend({ sleep }: { sleep: SleepPhases }) {
             <p className="font-serif-italic" style={{ fontSize: 13.5, color: "var(--inchiostro-70)", margin: "6px 0 0", lineHeight: 1.35 }}>
               {PHASE_MEANING[phase.key as string]}
             </p>
-            <p className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-35)", margin: "5px 0 0" }}>
+            <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-35)", margin: "5px 0 0" }}>
               di solito {phase.share}
             </p>
           </motion.div>
@@ -358,7 +358,7 @@ export function HrvCard({
               style={{
                 flex: 1,
                 textAlign: "center",
-                fontSize: 10,
+                fontSize: 12,
                 color: i === points.length - 1 ? "var(--inchiostro)" : "var(--inchiostro-35)",
                 fontWeight: i === points.length - 1 ? 700 : 400,
               }}
@@ -440,14 +440,14 @@ export function ReadinessMeaning({ score, href }: { score: number; href?: string
   const text = `${score} su 100 · prontezza ${band.label}`;
   if (!href) {
     return (
-      <p className="font-mono" style={{ fontSize: 11.5, margin: 0, opacity: 0.75 }}>
+      <p className="font-mono" style={{ fontSize: 12.5, margin: 0, opacity: 0.75 }}>
         {text}
       </p>
     );
   }
   return (
     <Link data-track="body-cards.href" href={href} style={{ textDecoration: "none", color: "inherit" }}>
-      <span className="font-mono" style={{ fontSize: 11.5, opacity: 0.75, borderBottom: "1px dotted currentColor" }}>
+      <span className="font-mono" style={{ fontSize: 12.5, opacity: 0.75, borderBottom: "1px dotted currentColor" }}>
         {text} · cos&apos;è
       </span>
     </Link>

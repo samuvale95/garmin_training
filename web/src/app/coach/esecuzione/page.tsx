@@ -89,7 +89,7 @@ export default function ExecutionPage() {
             delayMs={80}
             style={{ background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card-lg)", padding: 22, marginTop: 18 }}
           >
-            <p className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-su-scuro)", margin: 0 }}>
+            <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: 0 }}>
               {formatShortDate(data.block.from_date)} – {formatShortDate(data.block.to_date)} · {data.block.sessions} sedute
             </p>
             <p style={{ font: "600 34px/1 var(--font-sans)", letterSpacing: "-.03em", margin: "12px 0 0" }}>
@@ -107,7 +107,7 @@ export default function ExecutionPage() {
           <DistributionBar block={data.block} animate={animate} />
 
           <div style={{ marginTop: 22 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
               Cosa dicono i dati
             </span>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
@@ -118,7 +118,7 @@ export default function ExecutionPage() {
           </div>
 
           <SlideUp active={animate} delayMs={380} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14 }}>
-            <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
+            <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
               le tue zone
             </p>
             <p className="font-mono" style={{ fontSize: 14, margin: "8px 0 0" }}>{data.zones.describe}</p>
@@ -130,7 +130,7 @@ export default function ExecutionPage() {
 
           {data.sessions.length > 0 && (
             <div style={{ marginTop: 22 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
                 Seduta per seduta
               </span>
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>

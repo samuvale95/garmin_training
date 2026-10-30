@@ -30,7 +30,7 @@ const POLARIZED_EASY_SHARE = 0.8;
 
 function Swatch({ color, children }: { color: string; children: React.ReactNode }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--inchiostro-70)" }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--inchiostro-70)" }}>
       <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 2, background: color, flex: "none" }} />
       {children}
     </span>
@@ -54,10 +54,10 @@ export function DistributionBar({ block, animate }: { block: BlockDistribution; 
   return (
     <SlideUp active={animate} delayMs={140} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 18, marginTop: 12 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-        <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
+        <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
           distribuzione del tempo
         </p>
-        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-35)" }}>
+        <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-35)" }}>
           {formatMinutes(Math.round((block.zones.easy_seconds + block.zones.grey_seconds + block.zones.hard_seconds) / 60))}
         </span>
       </div>
@@ -79,7 +79,7 @@ export function DistributionBar({ block, animate }: { block: BlockDistribution; 
               }}
             >
               {segment.share >= 0.12 && (
-                <span className="font-mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--inchiostro)" }}>
+                <span className="font-mono" style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro)" }}>
                   {Math.round(segment.share * 100)}%
                 </span>
               )}
@@ -99,7 +99,7 @@ export function DistributionBar({ block, animate }: { block: BlockDistribution; 
         />
       </div>
 
-      <p className="font-mono" style={{ fontSize: 10.5, color: "var(--inchiostro-35)", margin: "8px 0 0", textAlign: "right" }}>
+      <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-35)", margin: "8px 0 0", textAlign: "right" }}>
         ┆ riferimento 80%
       </p>
 
@@ -145,7 +145,7 @@ export function FindingCard({ finding, animate, delayMs }: { finding: Finding; a
             color: evidence.color,
             borderRadius: "var(--radius-pill)",
             padding: "3px 10px",
-            fontSize: 10,
+            fontSize: 12,
             fontWeight: 700,
             flex: "none",
             whiteSpace: "nowrap",
@@ -192,7 +192,7 @@ export function SessionExecutionRow({
         <p style={{ fontWeight: 600, fontSize: 14.5, margin: 0, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {execution.title}
         </p>
-        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", flex: "none" }}>
+        <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", flex: "none" }}>
           {formatShortDate(execution.date)}
         </span>
       </div>
@@ -205,12 +205,12 @@ export function SessionExecutionRow({
 
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 9 }}>
         {execution.honoured === false && (
-          <span style={{ background: "var(--giallo)", color: "var(--giallo-testo)", borderRadius: "var(--radius-pill)", padding: "2px 9px", fontSize: 10, fontWeight: 700, flex: "none" }}>
+          <span style={{ background: "var(--giallo)", color: "var(--giallo-testo)", borderRadius: "var(--radius-pill)", padding: "2px 9px", fontSize: 12, fontWeight: 700, flex: "none" }}>
             troppo dura
           </span>
         )}
         {execution.honoured === true && (
-          <span style={{ background: "var(--verde)", color: "var(--verde-testo)", borderRadius: "var(--radius-pill)", padding: "2px 9px", fontSize: 10, fontWeight: 700, flex: "none" }}>
+          <span style={{ background: "var(--verde)", color: "var(--verde-testo)", borderRadius: "var(--radius-pill)", padding: "2px 9px", fontSize: 12, fontWeight: 700, flex: "none" }}>
             ok
           </span>
         )}
@@ -221,7 +221,7 @@ export function SessionExecutionRow({
               color: execution.hr_quality === "bassa" ? "var(--rosso-testo)" : "var(--giallo-testo)",
               borderRadius: "var(--radius-pill)",
               padding: "2px 8px",
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: 600,
               flex: "none",
             }}

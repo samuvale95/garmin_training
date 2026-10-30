@@ -74,7 +74,7 @@ export function TodayHeroUnified({
       >
         {/* Top bar: Subtitle date on left, Readiness/Verdict badge on right */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
-          <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: 0, letterSpacing: ".02em" }}>
+          <p className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: 0, letterSpacing: ".02em" }}>
             {heroSession ? `${relativeDayLabel(heroSession.date, today)} · ${formatFullDate(heroSession.date)}` : "Oggi"}
           </p>
 
@@ -89,7 +89,7 @@ export function TodayHeroUnified({
                   color: badge.color,
                   borderRadius: "var(--radius-pill)",
                   padding: "3px 9px",
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: 600,
                 }}
               >
@@ -113,7 +113,7 @@ export function TodayHeroUnified({
                   onClick={() => onSelectSessionIndex(idx)}
                   className="press-soft"
                   style={{
-                    fontSize: 11.5,
+                    fontSize: 12.5,
                     padding: "3px 9px",
                     borderRadius: "var(--radius-pill)",
                     border: active ? "1.5px solid var(--inchiostro)" : "1px solid var(--sabbia-bordo)",
@@ -139,10 +139,8 @@ export function TodayHeroUnified({
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                   <span
                     style={{
-                      fontSize: 10.5,
+                      fontSize: 12,
                       fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: ".06em",
                       background: "var(--sabbia-chip)",
                       color: "var(--inchiostro-70)",
                       padding: "2px 7px",
@@ -152,7 +150,7 @@ export function TodayHeroUnified({
                     {heroSession.sport === "cycling" ? "Bici" : heroSession.sport === "calisthenics" ? "Calisthenics" : heroSession.sport === "strength_training" ? "Forza" : "Corsa"}
                   </span>
                   {durationMin > 0 && (
-                    <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
+                    <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
                       ~{durationMin} min
                     </span>
                   )}
@@ -178,7 +176,7 @@ export function TodayHeroUnified({
                         borderRadius: "var(--radius-pill)",
                       }}
                     >
-                      <span style={{ fontSize: 11, fontWeight: 700, color: heroSession.is_short_active ? "var(--corallo-testo)" : "var(--inchiostro-70)" }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: heroSession.is_short_active ? "var(--corallo-testo)" : "var(--inchiostro-70)" }}>
                         {heroSession.is_short_active ? "⚡ Salva-tempo attiva" : "⚡ Poco tempo? Disponibile variante corta"}
                       </span>
                     </div>
@@ -199,7 +197,7 @@ export function TodayHeroUnified({
                           border: "none",
                           borderRadius: "var(--radius-pill)",
                           padding: "2px 8px",
-                          fontSize: 10.5,
+                          fontSize: 12,
                           fontWeight: 700,
                           cursor: "pointer",
                         }}
@@ -211,10 +209,10 @@ export function TodayHeroUnified({
                 )}
                 {heroMatch?.matched && heroMatch.distance_km != null && (
                   <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, background: "var(--sabbia)", padding: "3px 8px", borderRadius: 8 }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, color: "var(--verde-tratto-scuro)", fontWeight: 600 }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, color: "var(--verde-tratto-scuro)", fontWeight: 600 }}>
                       <CheckIcon size={12} strokeWidth={2.8} /> Strava
                     </span>
-                    <span className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-70)" }}>
+                    <span className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-70)" }}>
                       {heroMatch.distance_km.toFixed(1)} km svolti
                     </span>
                   </div>

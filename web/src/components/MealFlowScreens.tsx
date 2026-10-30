@@ -38,7 +38,7 @@ function ModeTab({ active, onClick, children }: { active: boolean; onClick: () =
 export function ReviewMacroField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div style={{ flex: 1, background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14 }}>
-      <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "0 0 6px" }}>{label}</p>
+      <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "0 0 6px" }}>{label}</p>
       <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
         <input
           inputMode="numeric"
@@ -135,7 +135,7 @@ export function ComposeScreen({
                 color: "var(--inchiostro)",
               }}
             />
-            <p className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-35)", margin: "10px 0 0", textAlign: "right" }}>
+            <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-35)", margin: "10px 0 0", textAlign: "right" }}>
               {text.length}/400
             </p>
           </div>
@@ -152,7 +152,7 @@ export function ComposeScreen({
           </p>
 
           <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 16 }}>
-            <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "0 0 4px" }}>descrizione</p>
+            <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "0 0 4px" }}>descrizione</p>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -343,7 +343,7 @@ export function ReviewScreen({ entry, preview, onDiscard, onSaved }: { entry: Fo
           <img src={preview.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
           <>
-            <p className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-su-scuro)", margin: 0 }}>
+            <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: 0 }}>
               hai scritto
             </p>
             <p style={{ fontSize: 17, lineHeight: 1.4, margin: "8px 0 0", paddingRight: 90 }}>{preview.text}</p>
@@ -359,7 +359,7 @@ export function ReviewScreen({ entry, preview, onDiscard, onSaved }: { entry: Fo
       </div>
 
       <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 14 }}>
-        <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "0 0 4px" }}>descrizione</p>
+        <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "0 0 4px" }}>descrizione</p>
         <input
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -430,7 +430,7 @@ export function FailedScreen({ entryId, preview, onRetake, onSaved }: { entryId:
 
   return (
     <div style={{ minHeight: "100dvh", background: "var(--rosa-avviso)", padding: "22px 20px 28px", display: "flex", flexDirection: "column" }}>
-      <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--rosso-avviso)", margin: 0 }}>Stima non riuscita</p>
+      <p style={{ fontSize: 12, fontWeight: 700, color: "var(--rosso-avviso)", margin: 0 }}>Stima non riuscita</p>
       <p style={{ font: "700 30px/1.1 var(--font-sans)", color: "var(--rosso-testo)", margin: "10px 0 0" }}>
         {preview.kind === "photo" ? (
           <>

@@ -26,17 +26,19 @@ export interface SessionVisual {
   label: string;
   background: string;
   foreground: string;
+  /** The saturated sport color: stripes, bars and marks, never text on its own. */
+  accent: string;
   illustration: IllustrationName | null;
 }
 
 const VISUALS: Record<SessionKind, Omit<SessionVisual, "kind">> = {
-  riposo: { label: "Riposo", background: "var(--sabbia)", foreground: "var(--inchiostro-70)", illustration: "riposo" },
-  ripetute: { label: "Ripetute", background: "var(--corallo)", foreground: "var(--corallo-testo)", illustration: "corsa" },
-  fondo_lento: { label: "Fondo lento", background: "var(--azzurro)", foreground: "var(--azzurro-testo)", illustration: "fondo_lento" },
-  forza: { label: "Forza", background: "var(--lilla)", foreground: "var(--lilla-testo)", illustration: "forza" },
-  calisthenics: { label: "Calisthenics", background: "rgba(168, 85, 247, 0.15)", foreground: "#7E22CE", illustration: "forza" },
-  bici: { label: "Bici", background: "var(--verde)", foreground: "var(--verde-testo)", illustration: "bici" },
-  lungo: { label: "Lungo", background: "var(--verde)", foreground: "var(--verde-testo)", illustration: "corsa" },
+  riposo: { label: "Riposo", background: "var(--sport-rest-soft)", foreground: "var(--ink-2)", accent: "var(--sport-rest)", illustration: "riposo" },
+  ripetute: { label: "Ripetute", background: "var(--sport-run-soft)", foreground: "var(--accent-ink)", accent: "var(--sport-run)", illustration: "corsa" },
+  fondo_lento: { label: "Fondo lento", background: "var(--sport-easy-soft)", foreground: "var(--azzurro-testo)", accent: "var(--sport-easy)", illustration: "fondo_lento" },
+  forza: { label: "Forza", background: "var(--sport-strength-soft)", foreground: "var(--giallo-testo)", accent: "var(--sport-strength)", illustration: "forza" },
+  calisthenics: { label: "Calisthenics", background: "var(--sport-cali-soft)", foreground: "var(--lilla-testo)", accent: "var(--sport-cali)", illustration: "forza" },
+  bici: { label: "Bici", background: "var(--sport-bike-soft)", foreground: "#0f4440", accent: "var(--sport-bike)", illustration: "bici" },
+  lungo: { label: "Lungo", background: "var(--sport-long-soft)", foreground: "var(--verde-testo)", accent: "var(--sport-long)", illustration: "corsa" },
 };
 
 /** Returns effective steps honoring is_short_active. */

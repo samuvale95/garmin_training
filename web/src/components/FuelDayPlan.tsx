@@ -76,14 +76,14 @@ function SessionStrip({ fuel, training, animate }: { fuel: FuelTargets; training
     <SlideUp active={animate} delayMs={40}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <div style={{ minWidth: 0 }}>
-          <p className="font-mono" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
+          <p className="font-mono" style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)", margin: 0 }}>
             Oggi
           </p>
           <p style={{ fontSize: 15, fontWeight: 700, margin: "2px 0 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</p>
         </div>
         {carbs && (
           <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <p className="font-mono" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
+            <p className="font-mono" style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)", margin: 0 }}>
               Carboidrati
             </p>
             <p className="font-mono" style={{ fontSize: 14, fontWeight: 700, margin: "2px 0 0" }}>{carbs}</p>
@@ -96,12 +96,12 @@ function SessionStrip({ fuel, training, animate }: { fuel: FuelTargets; training
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, margin: "0 0 6px" }}>
             <p style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro-70)", margin: 0 }}>Quando ti alleni oggi?</p>
             {training.source === "abitudine" && (
-              <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--verde-testo)", background: "var(--verde)", borderRadius: "var(--radius-pill)", padding: "2px 8px" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--verde-testo)", background: "var(--verde)", borderRadius: "var(--radius-pill)", padding: "2px 8px" }}>
                 automatico
               </span>
             )}
             {training.source === "oggi" && (
-              <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "2px 8px" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "2px 8px" }}>
                 solo per oggi
               </span>
             )}
@@ -140,7 +140,7 @@ function SessionStrip({ fuel, training, animate }: { fuel: FuelTargets; training
                 >
                   <span>{SLOT_LABEL[slot]}</span>
                   {active && fuel.session_clock && (
-                    <span className="font-mono" style={{ fontSize: 10.5, color: "var(--inchiostro-50)" }}>{fuel.session_clock}</span>
+                    <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{fuel.session_clock}</span>
                   )}
                 </button>
               );
@@ -196,7 +196,7 @@ function NextMealHero({
         </p>
         {after && (
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,.12)" }}>
-            <p className="font-mono" style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--inchiostro-su-scuro)", margin: 0 }}>
+            <p className="font-mono" style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-su-scuro)", margin: 0 }}>
               Dopo · alle {after.clock}
             </p>
             <p style={{ fontSize: 16, fontWeight: 600, margin: "6px 0 0" }}>{after.name}</p>
@@ -230,7 +230,7 @@ function NextMealHero({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <HeroOverline accent={moment.now}>{when}</HeroOverline>
         {roleLabel && (
-          <span style={{ fontSize: 11, fontWeight: 700, background: "var(--corallo-accent)", color: "#fff", borderRadius: "var(--radius-pill)", padding: "3px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 12, fontWeight: 700, background: "var(--corallo-accent)", color: "#fff", borderRadius: "var(--radius-pill)", padding: "3px 10px", whiteSpace: "nowrap" }}>
             {roleLabel}
           </span>
         )}
@@ -281,10 +281,8 @@ function HeroOverline({ children, accent = false }: { children: ReactNode; accen
         display: "inline-flex",
         alignItems: "center",
         gap: 7,
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 700,
-        letterSpacing: ".07em",
-        textTransform: "uppercase",
         color: accent ? "#ff8fa6" : "var(--inchiostro-su-scuro)",
       }}
     >
@@ -319,7 +317,7 @@ function DayTimeline({
 
   return (
     <SlideUp active={animate} delayMs={140}>
-      <p className="font-mono" style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: "8px 0 10px 2px" }}>
+      <p className="font-mono" style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)", margin: "8px 0 10px 2px" }}>
         La giornata
       </p>
       <ol style={{ listStyle: "none", padding: 0, margin: 0, position: "relative" }}>
@@ -381,9 +379,9 @@ function MealRowItem({ meal, focus, past }: { meal: MealSlot; focus: boolean; pa
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
           <span style={{ fontSize: 14.5, fontWeight: 700 }}>
             {meal.name}
-            {meal.role === "pre" && <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--corallo-accent)", marginLeft: 6 }}>{meal.timing}</span>}
+            {meal.role === "pre" && <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--corallo-accent)", marginLeft: 6 }}>{meal.timing}</span>}
           </span>
-          <span className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", whiteSpace: "nowrap" }}>
+          <span className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-50)", whiteSpace: "nowrap" }}>
             {meal.carb_g} g C
           </span>
         </div>
@@ -414,7 +412,7 @@ function SessionRow({ fuel, past }: { fuel: FuelTargets; past: boolean }) {
       <div style={{ flex: 1, minWidth: 0, marginLeft: 8, border: "1.5px dashed var(--corallo-accent)", borderRadius: 16, padding: "10px 13px" }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: "var(--corallo-testo)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
-          {minutes && <span className="font-mono" style={{ fontSize: 11.5, color: "var(--corallo-testo)", whiteSpace: "nowrap" }}>{minutes}</span>}
+          {minutes && <span className="font-mono" style={{ fontSize: 12.5, color: "var(--corallo-testo)", whiteSpace: "nowrap" }}>{minutes}</span>}
         </div>
         <p style={{ fontSize: 13, lineHeight: 1.35, color: "var(--corallo-testo)", margin: "4px 0 0" }}>
           {during
@@ -444,7 +442,7 @@ function TomorrowNote({ fuel, narrative, animate }: { fuel: FuelTargets; narrati
       }}
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-        <span className="font-mono" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: hard ? "var(--corallo-testo)" : "var(--inchiostro-50)" }}>
+        <span className="font-mono" style={{ fontSize: 12, fontWeight: 700, color: hard ? "var(--corallo-testo)" : "var(--inchiostro-50)" }}>
           Domani · {title}
         </span>
         {t.carb_g && (
@@ -467,7 +465,7 @@ function DayProgress({ status, animate }: { status: FuelStatus; animate: boolean
   const flagged = status.lines.find((line) => line.flagged);
   return (
     <SlideUp active={animate} delayMs={240} style={{ background: "var(--crema-card)", border: "var(--border-airbnb)", borderRadius: 18, padding: "14px 16px" }}>
-      <p className="font-mono" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: "0 0 10px" }}>
+      <p className="font-mono" style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)", margin: "0 0 10px" }}>
         Finora oggi
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

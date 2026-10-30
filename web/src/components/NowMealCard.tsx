@@ -81,13 +81,13 @@ export function NowMealCard({
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
           <span
             className="font-mono"
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10.5, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: dark ? "#ff8fa6" : "var(--corallo-accent)" }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: dark ? "#ff8fa6" : "var(--corallo-accent)" }}
           >
             {urgent && <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />}
             {overline}
           </span>
           {badge && (
-            <span style={{ fontSize: 10.5, fontWeight: 700, background: "var(--corallo-accent)", color: "#fff", borderRadius: "var(--radius-pill)", padding: "2px 9px", whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, background: "var(--corallo-accent)", color: "#fff", borderRadius: "var(--radius-pill)", padding: "2px 9px", whiteSpace: "nowrap" }}>
               {badge}
             </span>
           )}

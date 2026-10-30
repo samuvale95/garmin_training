@@ -79,12 +79,10 @@ export function MoveWarningSheet() {
                     display: "inline-block",
                     background: "var(--corallo)",
                     color: "var(--corallo-testo)",
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: 700,
                     padding: "2px 8px",
                     borderRadius: "var(--radius-pill)",
-                    textTransform: "uppercase",
-                    letterSpacing: ".05em",
                     marginBottom: 6,
                   }}
                 >
@@ -97,12 +95,10 @@ export function MoveWarningSheet() {
                     display: "inline-block",
                     background: "var(--giallo)",
                     color: "var(--giallo-testo)",
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: 700,
                     padding: "2px 8px",
                     borderRadius: "var(--radius-pill)",
-                    textTransform: "uppercase",
-                    letterSpacing: ".05em",
                     marginBottom: 6,
                   }}
                 >
@@ -110,7 +106,7 @@ export function MoveWarningSheet() {
                 </span>
               )}
               <p style={{ fontSize: 14, lineHeight: 1.45, margin: 0 }}>{warning.message}</p>
-              <p className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>
+              <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>
                 {EVIDENCE_LABELS[warning.evidence]}
               </p>
             </li>

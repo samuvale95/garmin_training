@@ -48,12 +48,12 @@ export function DayStateCard({ verdict, narrative, animate, delayMs = 0 }: { ver
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
             <StatusDot kind={style.dot} size={8} />
-            <span className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", opacity: 0.75 }}>
+            <span className="font-mono" style={{ fontSize: 12, opacity: 0.75 }}>
               stato del giorno
             </span>
           </span>
           {verdict.action && (
-            <span style={{ background: "rgba(28,26,22,.1)", borderRadius: "var(--radius-pill)", padding: "4px 10px", fontSize: 11, fontWeight: 600 }}>
+            <span style={{ background: "rgba(28,26,22,.1)", borderRadius: "var(--radius-pill)", padding: "4px 10px", fontSize: 12, fontWeight: 600 }}>
               {ACTION_LABEL[verdict.action]}
             </span>
           )}
@@ -66,7 +66,7 @@ export function DayStateCard({ verdict, narrative, animate, delayMs = 0 }: { ver
           </p>
         )}
         {verdict.signals.length > 0 && (
-          <p className="font-mono" style={{ fontSize: 11, margin: "8px 0 0", opacity: 0.75 }}>
+          <p className="font-mono" style={{ fontSize: 12, margin: "8px 0 0", opacity: 0.75 }}>
             {verdict.signals.map((s) => s.label.toLowerCase()).join(" · ")}
           </p>
         )}

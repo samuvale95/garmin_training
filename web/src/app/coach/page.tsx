@@ -186,7 +186,7 @@ export default function CoachPage() {
 
               {form.metrics.length > 0 && (
                 <div style={{ marginTop: 22 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
                     Le misure, una per una
                   </span>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
@@ -247,14 +247,14 @@ function ActivityPicker({
                 minWidth: 118,
               }}
             >
-              <span className="font-mono" style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", opacity: 0.7, display: "block" }}>
+              <span className="font-mono" style={{ fontSize: 12, opacity: 0.7, display: "block" }}>
                 {formatShortDate(activity.date)} · {SPORT_LABELS[activity.sport] ?? activity.sport}
               </span>
               <span style={{ fontSize: 13.5, fontWeight: 600, display: "block", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 150 }}>
                 {activity.title || "Attività"}
               </span>
               {activity.distance_km != null && (
-                <span className="font-mono" style={{ fontSize: 11, opacity: 0.7, display: "block", marginTop: 2 }}>
+                <span className="font-mono" style={{ fontSize: 12, opacity: 0.7, display: "block", marginTop: 2 }}>
                   {activity.distance_km} km
                 </span>
               )}
@@ -270,7 +270,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ flex: 1, background: "var(--crema-card)", borderRadius: "var(--radius-chip)", padding: 12 }}>
       <p className="font-mono" style={{ fontSize: 15, margin: 0 }}>{value}</p>
-      <p style={{ fontSize: 10, color: "var(--inchiostro-50)", margin: "3px 0 0" }}>{label}</p>
+      <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "3px 0 0" }}>{label}</p>
     </div>
   );
 }

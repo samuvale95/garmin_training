@@ -176,7 +176,7 @@ export function QuickMealModal({
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <div>
-              <p className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
+              <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
                 1-tap quick log
               </p>
               <h2 style={{ font: "600 20px/1.2 var(--font-sans)", margin: "4px 0 0" }}>Registra Pasto o Snack</h2>
@@ -316,10 +316,10 @@ export function QuickMealModal({
                         {snack.name}
                       </span>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span className="font-mono" style={{ fontSize: 11, color: "var(--corallo-accent)", fontWeight: 600 }}>
+                        <span className="font-mono" style={{ fontSize: 12, color: "var(--corallo-accent)", fontWeight: 600 }}>
                           {snack.carbs}g carbo
                         </span>
-                        <span className="font-mono" style={{ fontSize: 10.5, color: "var(--inchiostro-50)" }}>
+                        <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
                           {snack.kcal} kcal
                         </span>
                       </div>
@@ -375,19 +375,19 @@ export function QuickMealModal({
                           <span className="font-mono" style={{ fontSize: 15, fontWeight: 700, color: "var(--corallo)" }}>
                             {carbs}g
                           </span>
-                          <span style={{ display: "block", fontSize: 10, color: "var(--inchiostro-50)" }}>Carbo</span>
+                          <span style={{ display: "block", fontSize: 12, color: "var(--inchiostro-50)" }}>Carbo</span>
                         </div>
                         <div style={{ textAlign: "center" }}>
                           <span className="font-mono" style={{ fontSize: 15, fontWeight: 600 }}>
                             {protein}g
                           </span>
-                          <span style={{ display: "block", fontSize: 10, color: "var(--inchiostro-50)" }}>Proteine</span>
+                          <span style={{ display: "block", fontSize: 12, color: "var(--inchiostro-50)" }}>Proteine</span>
                         </div>
                         <div style={{ textAlign: "center" }}>
                           <span className="font-mono" style={{ fontSize: 15, fontWeight: 600 }}>
                             {kcal}
                           </span>
-                          <span style={{ display: "block", fontSize: 10, color: "var(--inchiostro-50)" }}>kcal</span>
+                          <span style={{ display: "block", fontSize: 12, color: "var(--inchiostro-50)" }}>kcal</span>
                         </div>
                       </div>
                     );

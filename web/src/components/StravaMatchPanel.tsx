@@ -45,7 +45,7 @@ export function StravaMatchPanel({
             boxShadow: "var(--shadow-airbnb-subtle)",
           }}
         >
-          <p style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--inchiostro-50)", margin: "0 0 6px" }}>
+          <p style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro-50)", margin: "0 0 6px" }}>
             Pianificato
           </p>
           <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, color: "var(--inchiostro)", margin: 0 }}>
@@ -67,7 +67,7 @@ export function StravaMatchPanel({
             boxShadow: "0 4px 14px rgba(232, 93, 78, 0.22)",
           }}
         >
-          <p style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", opacity: 0.85, margin: "0 0 6px" }}>
+          <p style={{ fontSize: 12, fontWeight: 600, opacity: 0.85, margin: "0 0 6px" }}>
             Svolto
           </p>
           <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>
@@ -172,7 +172,7 @@ function StravaRow({ label, children }: { label: string; children: React.ReactNo
         boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
       }}
     >
-      <p style={{ fontSize: 11.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--inchiostro-50)", margin: "0 0 4px" }}>
+      <p style={{ fontSize: 12.5, fontWeight: 600, color: "var(--inchiostro-50)", margin: "0 0 4px" }}>
         {label}
       </p>
       <p className="font-mono" style={{ fontSize: 13.5, fontWeight: 500, color: "var(--inchiostro)", margin: 0 }}>

@@ -247,7 +247,7 @@ function GenerateSummary({ result, onClose }: { result: GeneratePlanResult; onCl
       <ul style={{ listStyle: "none", padding: 0, margin: "10px 0 0", display: "flex", flexDirection: "column", gap: 8 }}>
         {result.weeks.map((week) => (
           <li key={week.skeleton.monday} style={{ fontSize: 13, lineHeight: 1.45, color: "var(--inchiostro-70)" }}>
-            <span className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)" }}>
+            <span className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-50)" }}>
               {week.target_minutes}&apos; · {formatFullDate(week.first_day)}
             </span>
             <br />

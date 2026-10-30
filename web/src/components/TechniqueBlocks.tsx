@@ -35,7 +35,7 @@ function VerdictChip({ verdict }: { verdict: FormVerdict }) {
         color: style.color,
         borderRadius: "var(--radius-pill)",
         padding: "3px 10px",
-        fontSize: 10.5,
+        fontSize: 12,
         fontWeight: 700,
         flex: "none",
         whiteSpace: "nowrap",
@@ -58,7 +58,7 @@ export function MetricRow({ metric, animate, delayMs }: { metric: FormMetric; an
         <span className="font-mono" style={{ fontSize: 21, fontWeight: 500, letterSpacing: "-.02em" }}>
           {metric.display}
         </span>
-        <span className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-35)" }}>
+        <span className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-35)" }}>
           rif. {metric.reference}
         </span>
       </div>
@@ -80,7 +80,7 @@ export function PacingBlock({ pacing, animate, delayMs }: { pacing: PacingRead; 
   return (
     <SlideUp active={animate} delayMs={delayMs} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 18, marginTop: 12 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-        <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
+        <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
           come l&apos;hai distribuita
         </p>
         <VerdictChip verdict={pacing.verdict} />
@@ -103,7 +103,7 @@ export function PacingBlock({ pacing, animate, delayMs }: { pacing: PacingRead; 
 function Half({ label, pace }: { label: string; pace: number | null }) {
   return (
     <div style={{ flex: 1, background: "var(--crema-card)", borderRadius: "var(--radius-chip)", padding: "12px 14px" }}>
-      <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: 0 }}>{label}</p>
+      <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>{label}</p>
       <p className="font-mono" style={{ fontSize: 18, fontWeight: 500, letterSpacing: "-.02em", margin: "5px 0 0" }}>
         {formatPaceOrDash(pace)}
       </p>
@@ -121,7 +121,7 @@ export function FocusBlock({ form, animate, narrativeText }: { form: ActivityFor
       delayMs={100}
       style={{ background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card-lg)", padding: 22, marginTop: 18 }}
     >
-      <p className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-su-scuro)", margin: 0 }}>
+      <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: 0 }}>
         il tuo allenatore
       </p>
       <p style={{ font: "600 24px/1.15 var(--font-sans)", letterSpacing: "-.02em", margin: "10px 0 0" }}>{form.headline}</p>
@@ -213,7 +213,7 @@ function TrendTile({ trend, animate, delayMs }: { trend: MetricTrend; animate: b
             <span className="font-mono" style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.02em" }}>
               {trend.current}
             </span>
-            <span style={{ fontSize: 11.5, color: "var(--inchiostro-50)" }}>{trend.unit}</span>
+            <span style={{ fontSize: 12.5, color: "var(--inchiostro-50)" }}>{trend.unit}</span>
             {trend.direction !== "stabile" && (
               <span className="font-mono" style={{ fontSize: 12.5, fontWeight: 700, color }}>
                 {signed} {trend.unit}
@@ -236,10 +236,10 @@ export function TrendSection({ trends, sessionsRead, animate }: { trends: Metric
   return (
     <div style={{ marginTop: 22 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
           Come stai cambiando
         </span>
-        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
+        <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
           {sessionsRead} sedute
         </span>
       </div>
@@ -250,7 +250,7 @@ export function TrendSection({ trends, sessionsRead, animate }: { trends: Metric
         ))}
       </div>
 
-      <p style={{ fontSize: 11.5, color: "var(--inchiostro-35)", margin: "12px 0 0", lineHeight: 1.45 }}>
+      <p style={{ fontSize: 12.5, color: "var(--inchiostro-35)", margin: "12px 0 0", lineHeight: 1.45 }}>
         Ogni riga confronta l&apos;ultima seduta con la media di quelle prima. Sotto il 3% di
         differenza non è un cambiamento: è il rumore di terreno, scarpe e come stava
         l&apos;orologio al polso.

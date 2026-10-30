@@ -71,7 +71,7 @@ export default function FuelDiaryPage() {
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/body/fuel" />
         <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Diario pasti</h1>
-        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "6px 12px" }}>
+        <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "6px 12px" }}>
           {days.length} giorni
         </span>
       </div>
@@ -215,7 +215,7 @@ function DaySection({
             {mainSession && (
               <span
                 style={{
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: 600,
                   padding: "2px 8px",
                   borderRadius: "var(--radius-pill)",
@@ -228,7 +228,7 @@ function DaySection({
             )}
           </div>
           {carbTarget && (
-            <p style={{ margin: "2px 0 0", fontSize: 11, color: inTarget ? "var(--verde-testo)" : "var(--inchiostro-50)" }}>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: inTarget ? "var(--verde-testo)" : "var(--inchiostro-50)" }}>
               Target: {carbTarget[0]}–{carbTarget[1]} g C {inTarget ? "· raggiunto" : ""}
             </p>
           )}
@@ -238,7 +238,7 @@ function DaySection({
           <span className="font-mono" style={{ fontSize: 12, fontWeight: 600, color: inTarget ? "var(--verde-tratto-scuro)" : "var(--inchiostro)" }}>
             {Math.round(totals.carb)} g C
           </span>
-          <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", display: "block" }}>
+          <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", display: "block" }}>
             {Math.round(totals.protein)} g P{totals.kcal > 0 && ` · ${Math.round(totals.kcal)} kcal`}
           </span>
         </div>

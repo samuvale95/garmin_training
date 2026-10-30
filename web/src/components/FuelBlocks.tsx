@@ -16,7 +16,7 @@ export function MealList({ entries, animate, onSelect }: { entries: FoodEntry[];
   return (
     <div style={{ marginTop: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
           Pasti registrati ({entries.length})
         </span>
       </div>
@@ -57,12 +57,12 @@ export function MealRow({ entry, onSelect }: { entry: FoodEntry; onSelect: (e: F
         <p style={{ fontWeight: 600, fontSize: 13.5, margin: "0 0 2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--inchiostro)" }}>
           {entry.description ?? "Pasto"}
         </p>
-        <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: 0 }}>
+        <p className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: 0 }}>
           {entry.carb_g != null ? Math.round(entry.carb_g) : "—"} g C · {entry.protein_g != null ? Math.round(entry.protein_g) : "—"} g P
           {entry.portion !== 1 && ` · porzione ${portionLabel(entry.portion)}`}
         </p>
       </div>
-      <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", flexShrink: 0 }}>
+      <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", flexShrink: 0 }}>
         {formatClockTime(entry.logged_at)}
       </span>
     </button>

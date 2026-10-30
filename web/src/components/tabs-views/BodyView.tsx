@@ -2,16 +2,14 @@
 
 import Link from "next/link";
 import { Fragment, useState, type ReactNode } from "react";
-import { motion } from "framer-motion";
 import { HrvCard, readinessBand, SleepCard } from "@/components/BodyCards";
-import { Illustration } from "@/components/Illustration";
 import { ProgressRing, SlideUp } from "@/components/motion/primitives";
-import { TiltCard } from "@/components/motion/TiltCard";
-import { AlertTriangleIcon, BatteryIcon, CheckIcon, ChevronRight, HeartIcon, LightningIcon, MoonIcon, PulseIcon, RunnerIcon, SunIcon, TrendUpIcon } from "@/components/Icons";
+import { AlertTriangleIcon, BatteryIcon, CheckIcon, HeartIcon, LightningIcon, MoonIcon, PulseIcon } from "@/components/Icons";
 import { PersonalCorrelationsCard } from "@/components/PersonalCorrelationsCard";
 import { AerobicEfficiencyCard } from "@/components/AerobicEfficiencyCard";
 import { LoadingIndicator3D } from "@/components/LoadingIndicator3D";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { Badge, EmptyState, Notice, RowLink, Section } from "@/components/ui";
 import { useMountOnce } from "@/lib/motion";
 import { useCalendarAccess } from "@/lib/guards";
 import { useAerobicEfficiency, useBodyToday, useFuelTargets, usePersonalCorrelations, usePlanQuery, usePrefetchFuelNarrative, useRefreshServerData, useWeekWorkouts } from "@/lib/queries";
@@ -20,7 +18,7 @@ import { shiftDateKey, toDateKey, workoutsToSessions } from "@/lib/sessionVisual
 import { formatFullDate } from "@/lib/format";
 import { usePassoStore } from "@/lib/store";
 import { useTrainingSlot } from "@/lib/trainingHabits";
-import { FOCUS_LINE, useDayFocus, type DayFocus } from "@/lib/dayFocus";
+import { useDayFocus, type DayFocus } from "@/lib/dayFocus";
 import { bodySignals, readinessStatus, STATUS_STYLE, type BodySignal, type SignalKey, type SignalStatus } from "@/lib/bodySignals";
 import type { BodySnapshot, DayTarget } from "@/lib/types";
 import { useScreenReady } from "@/lib/useScreenReady";
@@ -80,307 +78,106 @@ export function BodyView() {
   // Tomorrow's fuel: the dark card when tomorrow is a hard day (tonight's carbohydrates
   // are the point), a plain one otherwise -- the same block either way, louder only when
   // there is something to act on.
+  // Nutrition has one home; here only a pointer to tomorrow's fuel, when it matters.
   const fuelMatters = !!fuel && (fuel.tomorrow.load === "duro" || fuel.tomorrow.load === "molto_lungo");
-  const nutritionSection = (
-    <div style={{ marginTop: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, padding: "0 4px" }}>
-        <p
-          className="font-mono"
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: ".06em",
-            textTransform: "uppercase",
-            color: "var(--inchiostro-50)",
-            margin: 0,
-          }}
-        >
-          Nutrizione & Carburante
-        </p>
-        <Link data-track="body.nutrition"
-          href="/nutrition"
-          style={{ fontSize: 12, fontWeight: 600, color: "var(--rosso-avviso)", textDecoration: "none" }}
-        >
-          Vai alla scheda Nutrizione →
-        </Link>
-      </div>
-
-      {fuelQuery.isLoading ? (
-        <div
-          className="anim-clay-shimmer"
-          style={{
-            background: "var(--crema-card)",
-            borderRadius: "var(--radius-card-lg)",
-            border: "var(--border-airbnb)",
-            boxShadow: "var(--shadow-airbnb-subtle)",
-            padding: 16,
-            minHeight: 80,
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-          }}
-        >
-          <div style={{ width: 120, height: 14, background: "var(--sabbia-chip)", borderRadius: 6 }} />
-          <div style={{ width: "60%", height: 18, background: "var(--sabbia)", borderRadius: 6 }} />
-        </div>
-      ) : fuelDegraded ? (
-        <SlideUp active={animate} delayMs={380}>
-          <NavRow href="/nutrition" label="Strategia Nutrizionale Completa" />
-        </SlideUp>
-      ) : fuel ? (
-        <SlideUp active={animate} delayMs={220}>
-          <TiltCard
-            maxTilt={3.5}
-            style={{
-              background: fuelMatters ? "var(--inchiostro)" : "var(--crema-card)",
-              color: fuelMatters ? "var(--crema)" : "var(--inchiostro)",
-              border: fuelMatters ? "none" : "var(--border-airbnb)",
-              boxShadow: fuelMatters ? "var(--shadow-airbnb-card)" : "var(--shadow-airbnb-subtle)",
-              borderRadius: "var(--radius-card-lg)",
-              padding: "16px 18px",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <Link data-track="body.nutrition-2"
-              href="/nutrition"
-              className="tap-target"
-              onPointerDown={() => prefetchNarrative(todayKey, sessions, manualWeight?.weightKg)}
-              style={{ display: "block", color: "inherit", textDecoration: "none", position: "relative", zIndex: 2 }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 13, background: fuelMatters ? "rgba(255,255,255,0.12)" : "var(--sabbia-chip)", padding: "2px 8px", borderRadius: "var(--radius-pill)", fontWeight: 600 }}>
-                      {fuelSubtitle(fuel.tomorrow)}
-                    </span>
-                  </div>
-
-                  {fuel.tomorrow.carb_g && (
-                    <p className="font-mono" style={{ fontSize: 24, fontWeight: 600, color: fuelMatters ? "var(--corallo)" : "var(--corallo-accent)", margin: "8px 0 2px" }}>
-                      {fuel.tomorrow.carb_g[0]}–{fuel.tomorrow.carb_g[1]}{" "}
-                      <span style={{ fontSize: 13, fontWeight: 400, color: "inherit" }}>g carboidrati</span>
-                    </p>
-                  )}
-                  <p className="font-serif-italic" style={{ fontSize: 13, color: fuelMatters ? "var(--inchiostro-su-scuro)" : "var(--inchiostro-70)", margin: 0, lineHeight: 1.35 }}>
-                    {fuel.advice}
-                  </p>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                  <Illustration name="fuel" width={52} height={52} position="relative" active={animate} delayMs={260} />
-                  <ChevronRight size={16} style={{ color: "inherit", opacity: 0.6 }} />
-                </div>
-              </div>
-            </Link>
-          </TiltCard>
-        </SlideUp>
-      ) : null}
-    </div>
-  );
+  const nutritionSection = fuel && !fuelDegraded ? (
+    <Section title="Alimentazione" id="body-fuel">
+      <ul className="list">
+        <li>
+          <RowLink
+            href={`/nutrition?date=${todayKey}`}
+            track="body.nutrition"
+            title={capitalizeFirst(fuelSubtitle(fuel.tomorrow))}
+            meta={fuel.tomorrow.carb_g ? `${fuel.tomorrow.carb_g[0]}–${fuel.tomorrow.carb_g[1]} g di carboidrati indicati per domani` : "Indicazioni nella sezione Nutrizione"}
+            end={fuelMatters ? <Badge tone="accent">Da preparare</Badge> : undefined}
+          />
+        </li>
+      </ul>
+    </Section>
+  ) : null;
+  void prefetchNarrative;
 
   return (
     <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
-      <div style={{ padding: "22px 20px 12px" }}>
-            <header className="screen-intro">
-        <h1>Recupero</h1>
-        <p>{data ? formatFullDate(data.date) : "Recupero, energia e allenamento."}</p>
-        {data?.has_overnight_data && activeSubTab === "oggi" && (
-          <FocusChip focus={focus} />
-        )}
-      </header>
-
-      {/* SELETTORE A PILLOLE: OGGI VS TREND (Stile Airbnb) */}
-      <div style={{ marginTop: 18, marginBottom: 16 }}>
-        <div
-          style={{
-            display: "flex",
-            background: "var(--sabbia)",
-            padding: 4,
-            borderRadius: "var(--radius-pill)",
-            position: "relative",
-            border: "var(--border-airbnb)",
-          }}
-        >
-          <button data-track="body.setactivesubtab"
-            type="button"
-            aria-pressed={activeSubTab === "oggi"}
-            onClick={() => setActiveSubTab("oggi")}
-            style={{
-              flex: 1,
-              position: "relative",
-              border: "none",
-              background: "transparent",
-              padding: "9px 12px",
-              borderRadius: "var(--radius-pill)",
-              fontSize: 13.5,
-              fontWeight: activeSubTab === "oggi" ? 700 : 500,
-              color: activeSubTab === "oggi" ? "var(--inchiostro)" : "var(--inchiostro-50)",
-              cursor: "pointer",
-              transition: "color 0.2s ease",
-              zIndex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
-            }}
-          >
-            <span>Oggi</span>
-            {activeSubTab === "oggi" && (
-              <motion.div
-                layoutId="body-subtab-indicator"
-                transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: "var(--crema)",
-                  borderRadius: "var(--radius-pill)",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                  zIndex: -1,
-                }}
-              />
-            )}
-          </button>
-
-          <button data-track="body.setactivesubtab-2"
-            type="button"
-            aria-pressed={activeSubTab === "trend"}
-            onClick={() => setActiveSubTab("trend")}
-            style={{
-              flex: 1,
-              position: "relative",
-              border: "none",
-              background: "transparent",
-              padding: "9px 12px",
-              borderRadius: "var(--radius-pill)",
-              fontSize: 13.5,
-              fontWeight: activeSubTab === "trend" ? 700 : 500,
-              color: activeSubTab === "trend" ? "var(--inchiostro)" : "var(--inchiostro-50)",
-              cursor: "pointer",
-              transition: "color 0.2s ease",
-              zIndex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
-            }}
-          >
-            <span>Tendenze</span>
-            {activeSubTab === "trend" && (
-              <motion.div
-                layoutId="body-subtab-indicator"
-                transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: "var(--crema)",
-                  borderRadius: "var(--radius-pill)",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                  zIndex: -1,
-                }}
-              />
-            )}
-          </button>
-        </div>
-      </div>
-
-      {watchSync.ready && watchSync.blocking && <aside className="ux-notice" role="status"><strong>Dati da aggiornare</strong><p>{missingDataNote(watchSync.missing)} Ultima acquisizione: {lastSyncLabel(watchSync.lastSyncedAt)}. I dati disponibili restano consultabili.</p><Link href="/watch-sync?from=%2Fbody" className="ux-button" data-track="recovery.connection-help">Controlla connessione</Link></aside>}
-      {data && <p className="ux-muted">Fonte: Garmin · rilevazione {formatFullDate(data.date)}. I valori mancanti sono indicati con —.</p>}
-      {isLoading ? (
-        <div style={{ marginTop: 24, marginBottom: 24 }}>
-          <div
-            style={{
-              background: "var(--crema-card)",
-              borderRadius: 24,
-              border: "var(--border-airbnb)",
-              boxShadow: "var(--shadow-airbnb-subtle)",
-              padding: "24px 16px",
-            }}
-          >
-            <LoadingIndicator3D
-              label="Analizzo lo stato del corpo..."
-              sublabel="Lettura HRV, prontezza e parametri vitali"
-              size={84}
-              minHeight={200}
-            />
-          </div>
-        </div>
-      ) : activeSubTab === "oggi" ? (
-        /* VISTA 1: RECUPERO & STATO DI OGGI, nell'ordine che conta adesso */
-        <BodyTodaySections data={data} focus={focus} tomorrowTitle={tomorrowSession?.title ?? null} animate={animate} nutrition={nutritionSection} />
-      ) : (
-        /* VISTA 2: TREND, APPROFONDIMENTI & FISIOLOGIA A MEDIO/LUNGO TERMINE */
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: "easeOut" }}
-          style={{ display: "flex", flexDirection: "column", gap: 16 }}
-        >
-          {/* NAVIGAZIONE APPROFONDIMENTI RAPIDI */}
+      <div className="page">
+        <header className="page-head">
           <div>
-            <p
-              className="font-mono"
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: ".06em",
-                textTransform: "uppercase",
-                color: "var(--inchiostro-50)",
-                margin: "0 0 8px 4px",
-              }}
-            >
-              Panoramiche
+            <h1 className="page-title">Recupero</h1>
+            <p className="page-sub">
+              {data ? `Dati Garmin di ${formatFullDate(data.date)}` : "Sonno, prontezza, energia e carico."}
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <NavRow href="/body/load" label="Carico & forma" hint="Quanto stai caricando nelle ultime 4 settimane" icon={<TrendUpIcon size={16} />} tint="var(--azzurro)" ink="var(--azzurro-testo)" />
-              <NavRow href="/activities?view=trend" label="Analisi delle attività" hint="Cadenza, dinamica e ritmi delle tue corse" icon={<RunnerIcon size={16} />} tint="var(--verde)" ink="var(--verde-tratto-scuro)" />
-            </div>
           </div>
+        </header>
 
-          {/* EFFICIENZA AEROBICA & DECOUPLING */}
-          {aerobicEfficiency && (
-            <div>
-              <p
-                className="font-mono"
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: ".06em",
-                  textTransform: "uppercase",
-                  color: "var(--inchiostro-50)",
-                  margin: "0 0 8px 4px",
-                }}
-              >
-                Efficienza Aerobica
-              </p>
-              <AerobicEfficiencyCard data={aerobicEfficiency} animate={animate} />
-            </div>
-          )}
+        <nav className="subnav" aria-label="Sezioni del recupero">
+          <button type="button" aria-pressed={activeSubTab === "oggi"} onClick={() => setActiveSubTab("oggi")} data-track="body.setactivesubtab">Oggi</button>
+          <button type="button" aria-pressed={activeSubTab === "trend"} onClick={() => setActiveSubTab("trend")} data-track="body.setactivesubtab-2">Tendenze</button>
+        </nav>
 
-          {/* CORRELAZIONI BIOMETRICHE A 90 GIORNI */}
-          {correlations && (
-            <div>
-              <p
-                className="font-mono"
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: ".06em",
-                  textTransform: "uppercase",
-                  color: "var(--inchiostro-50)",
-                  margin: "0 0 8px 4px",
-                }}
-              >
-                Correlazioni a 90 Giorni
-              </p>
-              <PersonalCorrelationsCard data={correlations} animate={animate} delayMs={150} />
+        {watchSync.ready && watchSync.blocking && (
+          <div style={{ marginBottom: 16 }}>
+            <Notice
+              tone="warn"
+              title="Dati da aggiornare"
+              action={<Link href="/watch-sync?from=%2Fbody" className="btn" data-size="sm" data-track="recovery.connection-help">Controlla connessione</Link>}
+            >
+              {missingDataNote(watchSync.missing)} Ultima acquisizione: {lastSyncLabel(watchSync.lastSyncedAt)}. I dati disponibili restano consultabili.
+            </Notice>
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="card">
+            <LoadingIndicator3D label="Leggo i dati della notte…" sublabel="HRV, prontezza e parametri vitali" size={72} minHeight={180} />
+          </div>
+        ) : activeSubTab === "oggi" ? (
+          <div className="split">
+            <div className="stack-lg">
+              <BodyTodaySections data={data} focus={focus} tomorrowTitle={tomorrowSession?.title ?? null} animate={animate} nutrition={null} />
             </div>
-          )}
-        </motion.div>
-      )}
-    </div>
+            <aside className="stack-lg" aria-label="Approfondimenti">
+              <Section title="Approfondimenti" id="body-more">
+                <ul className="list">
+                  <li><RowLink href="/body/prontezza?from=%2Fbody" track="body.prontezza-row" title="Da cosa nasce la prontezza" meta="I fattori che la compongono, uno per uno" /></li>
+                  <li><RowLink href="/body/load" track="body.load" title="Carico e forma" meta="Ultime 4 settimane: carico acuto, cronico e bilancio" /></li>
+                  <li><RowLink href="/body/stato?from=%2Fbody" track="body.stato" title="Stato di oggi rispetto al piano" meta="Cosa dicono i dati sulla seduta di oggi" /></li>
+                </ul>
+              </Section>
+              {nutritionSection}
+            </aside>
+          </div>
+        ) : (
+          <div className="stack-lg">
+            <Section title="Panoramiche" id="body-overviews">
+              <ul className="list">
+                <li><RowLink href="/body/load" track="body.href" title="Carico e forma" meta="Quanto stai caricando nelle ultime 4 settimane" /></li>
+                <li><RowLink href="/activities?view=trend" track="body.href-2" title="Andamento delle attività" meta="Cadenza, dinamica e ritmi delle tue corse" /></li>
+              </ul>
+            </Section>
+            {aerobicEfficiency && (
+              <Section title="Efficienza aerobica" id="body-ae">
+                <AerobicEfficiencyCard data={aerobicEfficiency} animate={animate} />
+              </Section>
+            )}
+            {correlations && (
+              <Section title="Correlazioni degli ultimi 90 giorni" id="body-corr">
+                <PersonalCorrelationsCard data={correlations} animate={animate} delayMs={0} />
+              </Section>
+            )}
+            {!aerobicEfficiency && !correlations && (
+              <EmptyState title="Servono più giorni di dati">
+                Le tendenze compaiono dopo alcune settimane di attività e notti registrate dall’orologio.
+              </EmptyState>
+            )}
+          </div>
+        )}
+      </div>
     </PullToRefresh>
   );
+}
+
+function capitalizeFirst(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 const SIGNAL_ICON: Record<SignalKey, (props: { size?: number }) => ReactNode> = {
@@ -452,38 +249,28 @@ function BodyTodaySections({
   const okSignals = summarized.filter((s) => s.status === "ok");
 
   const readiness = (
-    <SlideUp active={animate} delayMs={150} style={{ marginTop: 12 }}>
-      <TiltCard
-        maxTilt={4.5}
-        style={{
-          background: `linear-gradient(160deg, ${tone.bg} 0%, var(--crema-card) 72%)`,
-          color: "var(--inchiostro)",
-          border: `1.5px solid ${tone.edge}`,
-          boxShadow: "var(--shadow-airbnb-subtle)",
-          borderRadius: "var(--radius-card-lg)",
-          padding: "18px 16px 16px",
-        }}
-      >
+    <SlideUp active={animate} delayMs={0}>
+      <div className="hero" style={{ borderTop: `6px solid ${tone.stroke}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <ProgressRing value={(score ?? 0) / 100} size={92} strokeWidth={9} trackColor="rgba(255,255,255,0.7)" color={tone.stroke}>
             <div style={{ textAlign: "center", lineHeight: 1 }}>
               <p className="font-mono" style={{ fontSize: 26, fontWeight: 700, margin: 0, color: "var(--inchiostro)" }}>{score ?? "—"}</p>
-              <p className="font-mono" style={{ fontSize: 10, margin: "3px 0 0", color: "var(--inchiostro-50)" }}>su 100</p>
+              <p className="font-mono" style={{ fontSize: 12, margin: "3px 0 0", color: "var(--inchiostro-50)" }}>su 100</p>
             </div>
           </ProgressRing>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <p className="font-mono" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: tone.text, margin: 0 }}>
+            <p style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: tone.text, margin: 0 }}>
               {focus === "prontezza" ? "Prontezza" : "Prontezza di stamattina"}
               {score != null && ` · ${readinessBand(score).label}`}
             </p>
-            <p style={{ fontWeight: 700, fontSize: 21, lineHeight: 1.15, letterSpacing: "-.01em", margin: "4px 0 0" }}>
+            <p className="display" style={{ fontWeight: 700, fontSize: "var(--text-2xl)", lineHeight: 1.1, margin: "4px 0 0" }}>
               {readinessHeadline(status, focus)}
             </p>
             {data.readiness_message && (
               <p style={{ fontSize: 13.5, color: "var(--inchiostro-70)", margin: "4px 0 0", lineHeight: 1.3 }}>{data.readiness_message}</p>
             )}
-            <Link data-track="body.prontezza" href="/body/prontezza" style={{ display: "inline-block", fontSize: 12, fontWeight: 600, color: tone.text, marginTop: 6, textDecoration: "none" }}>
-              Da cosa nasce →
+            <Link data-track="body.prontezza" href="/body/prontezza?from=%2Fbody" className="section-link">
+              Da cosa nasce
             </Link>
           </div>
         </div>
@@ -521,7 +308,7 @@ function BodyTodaySections({
               color: STATUS_STYLE.attenzione.text,
               padding: "3px 8px",
               borderRadius: 6,
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 600,
               marginTop: 10,
             }}
@@ -531,7 +318,7 @@ function BodyTodaySections({
             {data.overnight_reliability_note && <span style={{ fontWeight: 400, opacity: 0.85 }}>· {data.overnight_reliability_note}</span>}
           </div>
         )}
-      </TiltCard>
+      </div>
     </SlideUp>
   );
 
@@ -540,7 +327,7 @@ function BodyTodaySections({
   const stress = byKey("stress");
   const rhrNorm = data.rhr_norm?.has_personal_norm ? data.rhr_norm : null;
   const vitals = (
-    <div style={{ marginTop: 18 }}>
+    <div>
       <SectionLabel>{focus === "prontezza" ? "Parametri vitali" : "Come stai adesso"}</SectionLabel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
         <MetricTile signal={heart} fallbackLabel="Cuore a riposo" icon={HeartIcon}>
@@ -559,14 +346,14 @@ function BodyTodaySections({
   );
 
   const night = (
-    <div style={{ marginTop: 18 }}>
+    <div>
       <SectionLabel>{focus === "prontezza" ? "La notte" : "La notte scorsa"}</SectionLabel>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {data.sleep ? (
           <SleepCard sleep={data.sleep} animate={animate} delayMs={240} signal={byKey("sonno")} />
         ) : (
           <SlideUp active={animate} delayMs={240} style={{ background: "var(--azzurro)", color: "var(--azzurro-testo)", borderRadius: "var(--radius-card)", padding: 16 }}>
-            <p className="font-mono" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", margin: 0 }}>Sonno</p>
+            <p className="font-mono" style={{ fontSize: 12, margin: 0 }}>Sonno</p>
             <p style={{ fontSize: 13, margin: "8px 0 0" }}>Non disponibile</p>
           </SlideUp>
         )}
@@ -578,61 +365,25 @@ function BodyTodaySections({
   // Dark only when it carries a warning: "the plan can stay as it is" is reassurance,
   // not news, and should not outshout the numbers above it.
   const tomorrow = (
-    <SlideUp
-      active={animate}
-      delayMs={focus === "prontezza" ? 360 : 150}
-      style={{
-        background: careful ? "var(--inchiostro)" : "var(--crema-card)",
-        color: careful ? "var(--crema)" : "var(--inchiostro)",
-        border: careful ? "none" : "var(--border-airbnb)",
-        boxShadow: careful ? "var(--shadow-airbnb-card)" : "var(--shadow-airbnb-subtle)",
-        borderRadius: "var(--radius-card)",
-        padding: "16px 18px",
-        marginTop: 18,
-        display: "flex",
-        gap: 12,
-        alignItems: "flex-start",
-      }}
+    <Notice
+      tone={careful ? "warn" : "ok"}
+      title={tomorrowTitle ? `Domani: ${tomorrowTitle.toLowerCase()}` : "Domani: riposo"}
     >
-      <span
-        aria-hidden="true"
-        style={{
-          width: 32,
-          height: 32,
-          flex: "none",
-          borderRadius: "50%",
-          display: "grid",
-          placeItems: "center",
-          background: careful ? "rgba(255,255,255,0.12)" : STATUS_STYLE.ok.bg,
-          color: careful ? "var(--corallo)" : STATUS_STYLE.ok.stroke,
-        }}
-      >
-        {careful ? <AlertTriangleIcon size={16} strokeWidth={2.2} /> : <CheckIcon size={16} strokeWidth={2.6} />}
-      </span>
-      <div style={{ minWidth: 0 }}>
-        <p style={{ fontWeight: 700, fontSize: 15, margin: "0 0 3px" }}>
-          {tomorrowTitle ? `Domani: ${tomorrowTitle.toLowerCase()}` : "Domani: riposo"}
-        </p>
-        <p style={{ fontSize: 13.5, lineHeight: 1.35, margin: 0, color: careful ? "var(--inchiostro-su-scuro)" : "var(--inchiostro-70)" }}>
-          {!tomorrowTitle
-            ? careful
-              ? "Il riposo arriva al momento giusto."
-              : "Recupera e goditi la giornata."
-            : careful
-              ? "I numeri di oggi consigliano prudenza: valuta di alleggerire."
-              : "I numeri sono buoni: il piano può restare com'è."}
-        </p>
-      </div>
-    </SlideUp>
+      {!tomorrowTitle
+        ? careful
+          ? "Il riposo arriva al momento giusto."
+          : "Recupera e goditi la giornata."
+        : careful
+          ? "I valori di oggi consigliano prudenza: valuta di alleggerire. È un’indicazione, non una diagnosi."
+          : "I valori sono nella norma: il piano può restare com’è."}
+    </Notice>
   );
 
   const blocks = { readiness, vitals, night, tomorrow, nutrition };
-  const order: Record<DayFocus, (keyof typeof blocks)[]> = {
-    prontezza: ["readiness", "vitals", "night", "tomorrow", "nutrition"],
-    recupero: ["vitals", "tomorrow", "nutrition", "readiness", "night"],
-    domani: ["tomorrow", "nutrition", "vitals", "readiness", "night"],
-  };
-  return <>{order[focus].map((name) => <Fragment key={name}>{blocks[name]}</Fragment>)}</>;
+  // A stable order: the summary first, then the numbers, the night, tomorrow. The
+  // moment of the day changes the words inside each block, never where it sits.
+  const order: (keyof typeof blocks)[] = ["readiness", "vitals", "night", "tomorrow", "nutrition"];
+  return <>{order.map((name) => <Fragment key={name}>{blocks[name]}</Fragment>)}</>;
 }
 
 /** One out-of-range number inside the readiness card: what it is, how much, and what is
@@ -642,66 +393,23 @@ function SignalChip({ signal }: { signal: BodySignal }) {
   const Icon = SIGNAL_ICON[signal.key];
   return (
     <div style={{ minWidth: 0, background: style.bg, color: style.text, borderRadius: "var(--radius-sm)", padding: "8px 10px" }}>
-      <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600 }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, fontWeight: 600 }}>
         <span aria-hidden="true" style={{ color: style.stroke, display: "inline-flex" }}><Icon size={13} /></span>
         <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{signal.label}</span>
       </span>
       <span style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
         <span className="font-mono" style={{ fontSize: 15, fontWeight: 700, color: "var(--inchiostro)" }}>
           {signal.value}
-          {signal.unit && <span style={{ fontSize: 10.5, fontWeight: 400 }}> {signal.unit}</span>}
+          {signal.unit && <span style={{ fontSize: 12, fontWeight: 400 }}> {signal.unit}</span>}
         </span>
-        <span style={{ fontSize: 11.5, fontWeight: 700 }}>{signal.verdict}</span>
+        <span style={{ fontSize: 12.5, fontWeight: 700 }}>{signal.verdict}</span>
       </span>
     </div>
   );
 }
 
-const FOCUS_ICON: Record<DayFocus, ReactNode> = {
-  prontezza: <SunIcon size={13} />,
-  recupero: <RunnerIcon size={13} />,
-  domani: <MoonIcon size={13} />,
-};
-
-/** Which moment of the day the screen is ordered for, as a chip rather than a sentence. */
-function FocusChip({ focus }: { focus: DayFocus }) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        marginTop: 8,
-        padding: "4px 10px",
-        borderRadius: "var(--radius-pill)",
-        background: focus === "domani" ? "var(--lilla)" : focus === "recupero" ? "var(--verde)" : "var(--giallo)",
-        color: focus === "domani" ? "var(--lilla-testo)" : focus === "recupero" ? "var(--verde-testo)" : "var(--giallo-testo)",
-        fontSize: 12,
-        fontWeight: 700,
-      }}
-    >
-      {FOCUS_ICON[focus]}
-      {FOCUS_LINE[focus]}
-    </span>
-  );
-}
-
 function SectionLabel({ children }: { children: ReactNode }) {
-  return (
-    <p
-      className="font-mono"
-      style={{
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: ".06em",
-        textTransform: "uppercase",
-        color: "var(--inchiostro-50)",
-        margin: "0 0 8px 4px",
-      }}
-    >
-      {children}
-    </p>
-  );
+  return <h2 className="section-title" style={{ marginBottom: 10 }}>{children}</h2>;
 }
 
 /** A vital as a tile coloured by its verdict: plain card when fine, amber or coral
@@ -721,9 +429,7 @@ function MetricTile({
   const style = STATUS_STYLE[status];
   const flagged = status !== "ok";
   return (
-    <motion.div
-      whileHover={{ y: -2.5, scale: 1.02 }}
-      transition={{ type: "spring", stiffness: 420, damping: 24 }}
+    <div
       style={{
         minWidth: 0,
         background: flagged ? style.bg : "var(--crema-card)",
@@ -737,17 +443,17 @@ function MetricTile({
     >
       <span style={{ display: "flex", alignItems: "flex-start", gap: 5, color: flagged ? style.text : "var(--inchiostro-70)" }}>
         <span aria-hidden="true" style={{ color: style.stroke, display: "inline-flex", marginTop: 1 }}><Icon size={13} /></span>
-        <span style={{ fontSize: 11.5, fontWeight: 600, lineHeight: 1.2 }}>{signal?.label ?? fallbackLabel}</span>
+        <span style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.2 }}>{signal?.label ?? fallbackLabel}</span>
       </span>
       <p className="font-mono" style={{ fontSize: 22, fontWeight: 600, margin: "6px 0 0", letterSpacing: "-.02em" }}>
         {signal?.value ?? "—"}
-        {signal?.unit && <span style={{ fontSize: 11, fontWeight: 400, color: "var(--inchiostro-50)" }}> {signal.unit}</span>}
+        {signal?.unit && <span style={{ fontSize: 12, fontWeight: 400, color: "var(--inchiostro-50)" }}> {signal.unit}</span>}
       </p>
       {children}
       {signal && (
-        <p style={{ fontSize: 11.5, fontWeight: 700, color: flagged ? style.text : STATUS_STYLE.ok.stroke, margin: "6px 0 0", lineHeight: 1.2 }}>{signal.verdict}</p>
+        <p style={{ fontSize: 12.5, fontWeight: 700, color: flagged ? style.text : STATUS_STYLE.ok.stroke, margin: "6px 0 0", lineHeight: 1.2 }}>{signal.verdict}</p>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -772,40 +478,5 @@ function RangeGauge({ value, low, high, color }: { value: number; low: number; h
       <div style={{ position: "absolute", top: 0, bottom: 0, left: `${at(low)}%`, width: `${at(high) - at(low)}%`, background: STATUS_STYLE.ok.edge, borderRadius: 100 }} />
       <div style={{ position: "absolute", top: -3, left: `calc(${at(value)}% - 5.5px)`, width: 11, height: 11, borderRadius: "50%", background: color, border: "2px solid var(--crema-card)" }} />
     </div>
-  );
-}
-
-function NavRow({
-  href,
-  label,
-  hint,
-  icon,
-  tint,
-  ink,
-}: {
-  href: string;
-  label: string;
-  hint?: string;
-  icon?: ReactNode;
-  tint?: string;
-  ink?: string;
-}) {
-  return (
-    <motion.div whileHover={{ x: 4, scale: 1.01 }} whileTap={{ scale: 0.98 }} transition={{ type: "spring", stiffness: 450, damping: 26 }}>
-      <Link data-track="body.href" href={href} className="body-nav-row tap-target">
-        <span style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-          {icon && (
-            <span aria-hidden="true" style={{ width: 34, height: 34, flex: "none", borderRadius: "50%", display: "grid", placeItems: "center", background: tint, color: ink }}>
-              {icon}
-            </span>
-          )}
-          <span style={{ minWidth: 0 }}>
-            <span style={{ display: "block", fontSize: 14.5, fontWeight: 600 }}>{label}</span>
-            {hint && <span style={{ display: "block", fontSize: 12, color: "var(--inchiostro-50)", marginTop: 2 }}>{hint}</span>}
-          </span>
-        </span>
-        <ChevronRight size={16} style={{ color: "var(--inchiostro-50)", flex: "none" }} />
-      </Link>
-    </motion.div>
   );
 }

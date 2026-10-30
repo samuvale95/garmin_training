@@ -52,7 +52,7 @@ export function AdaptationCard({ animate, delayMs = 0 }: { animate: boolean; del
         <ul style={{ listStyle: "none", padding: 0, margin: "12px 0 0", display: "flex", flexDirection: "column", gap: 8 }}>
           {adaptation.changes.map((change) => (
             <li key={change.date} style={{ fontSize: 13, lineHeight: 1.4 }}>
-              <span className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)" }}>
+              <span className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-50)" }}>
                 {formatFullDate(change.date)}
               </span>
               <br />

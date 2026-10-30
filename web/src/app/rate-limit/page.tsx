@@ -62,7 +62,7 @@ export default function RateLimitPage() {
           <PageHeader color="var(--rosso-forte)" />
           <BrandMark height={22} color="var(--rosso-forte)" forceStatic stillZone />
         </div>
-        <span style={{ fontSize: 11, color: "var(--rosa-testo-50)" }}>fermo · non insisto</span>
+        <span style={{ fontSize: 12, color: "var(--rosa-testo-50)" }}>fermo · non insisto</span>
       </div>
 
       <h1 style={{ font: "600 26px/1.1 var(--font-sans)", color: "var(--rosso-testo)", letterSpacing: "-.03em", margin: "20px 0 16px" }}>
@@ -70,7 +70,7 @@ export default function RateLimitPage() {
       </h1>
 
       <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 20 }}>
-        <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".1em", color: "var(--inchiostro-50)", margin: "0 0 10px" }}>
+        <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "0 0 10px" }}>
           Riprovo tra
         </p>
         <p className="font-mono" style={{ fontSize: 50, margin: "0 0 14px", letterSpacing: "-.02em" }}>
@@ -112,7 +112,7 @@ export default function RateLimitPage() {
               }}
             />
             {retryError && (
-              <p style={{ fontSize: 11, color: "var(--rosso-forte)", margin: "6px 0 0" }} role="alert">{retryError}</p>
+              <p style={{ fontSize: 12, color: "var(--rosso-forte)", margin: "6px 0 0" }} role="alert">{retryError}</p>
             )}
           </div>
         ) : (

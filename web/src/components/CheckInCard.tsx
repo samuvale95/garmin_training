@@ -107,14 +107,14 @@ export function CheckInCard({
               <span style={{ fontSize: 12, color: "var(--inchiostro-70)", fontWeight: 500 }}>
                 {primaryShoe.name}
               </span>
-              <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
+              <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
                 ({Math.round(primaryShoe.distance_km)} km)
               </span>
             </div>
             <Link data-track="check-in-card.shoes-from-today"
               href="/shoes?from=/today"
               style={{
-                fontSize: 11.5,
+                fontSize: 12.5,
                 fontWeight: 600,
                 color: "var(--inchiostro-70)",
                 textDecoration: "none",

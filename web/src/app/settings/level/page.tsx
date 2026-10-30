@@ -45,7 +45,7 @@ export default function LevelSettingsPage() {
             delayMs={80}
             style={{ background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card-lg)", padding: 22 }}
           >
-            <p className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-su-scuro)", margin: 0 }}>
+            <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: 0 }}>
               livello {data.level} di 3
             </p>
             <p style={{ font: "600 34px/1 var(--font-sans)", letterSpacing: "-.03em", margin: "12px 0 0" }}>{data.level_name}</p>
@@ -93,7 +93,7 @@ function StateNote({ level }: { level: AthleteLevel }) {
 function CriteriaList({ animate, title, criteria }: { animate: boolean; title: string; criteria: LevelCriterion[] }) {
   return (
     <div style={{ marginTop: 22 }}>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
         {title}
       </span>
       {criteria.map((criterion, i) => (

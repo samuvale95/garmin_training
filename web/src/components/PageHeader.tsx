@@ -11,7 +11,8 @@ interface PageHeaderProps { backHref?: string; color?: string }
 function BackLink({ backHref, color = "var(--inchiostro)", contextual = false }: PageHeaderProps & { contextual?: boolean }) {
   const router = useRouter();
   const href = backHref ?? "/today";
-  return <Link href={href} className="page-back ux-back" style={{ color }} aria-label={backHref ? "Indietro" : "Torna a Oggi"} data-track="page-header.back" onClick={(event) => {
+  void color;
+  return <Link href={href} className="page-back" aria-label={backHref ? "Indietro" : "Torna a Oggi"} data-track="page-header.back" onClick={(event) => {
     if (!contextual || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     try {
       const record = JSON.parse(sessionStorage.getItem(RETURN_HISTORY_KEY) ?? "null");
@@ -21,7 +22,7 @@ function BackLink({ backHref, color = "var(--inchiostro)", contextual = false }:
       }
     } catch { /* Direct links retain the safe fallback. */ }
   }}>
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" /></svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" /></svg>
     <span>{backHref ? "Indietro" : "Oggi"}</span>
   </Link>;
 }

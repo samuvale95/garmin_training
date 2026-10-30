@@ -117,7 +117,7 @@ export default function ConnectGarminPage() {
 function Field({ label, value, onChange, type, placeholder }: { label: string; value: string; onChange: (v: string) => void; type: string; placeholder?: string }) {
   return (
     <label style={{ display: "block" }}>
-      <span style={{ display: "block", fontSize: 11, fontWeight: 500, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--inchiostro-50)", marginBottom: 8 }}>
+      <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)", marginBottom: 8 }}>
         {label}
       </span>
       <input
@@ -144,7 +144,7 @@ function WarningCard({ title, children }: { title: string; children: React.React
   return (
     <div style={{ flex: 1, background: "var(--sabbia)", borderRadius: "var(--radius-chip)", padding: 12 }}>
       <p style={{ fontSize: 12, fontWeight: 600, margin: "0 0 4px" }}>{title}</p>
-      <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: 0, lineHeight: 1.4 }}>{children}</p>
+      <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0, lineHeight: 1.4 }}>{children}</p>
     </div>
   );
 }

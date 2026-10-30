@@ -38,7 +38,7 @@ export function GoalFitBlock({ fit, narrative, animate, delayMs = 0 }: { fit: Go
         delayMs={delayMs}
         style={{ background: style.background, color: style.color, borderRadius: "var(--radius-card-lg)", padding: 20, marginTop: 12 }}
       >
-        <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", opacity: 0.75, margin: 0 }}>
+        <p className="font-mono" style={{ fontSize: 12, opacity: 0.75, margin: 0 }}>
           {style.overline}
         </p>
         <p style={{ font: "600 19px/1.25 var(--font-sans)", letterSpacing: "-.01em", margin: "8px 0 0" }}>{fit.headline}</p>
@@ -80,11 +80,11 @@ export function GoalFitBlock({ fit, narrative, animate, delayMs = 0 }: { fit: Go
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                   <p style={{ fontWeight: 600, fontSize: 14.5, margin: 0 }}>{observation.label}</p>
-                  <span style={{ background: severity.background, color: severity.color, borderRadius: "var(--radius-pill)", padding: "3px 10px", fontSize: 10.5, fontWeight: 700, flex: "none" }}>
+                  <span style={{ background: severity.background, color: severity.color, borderRadius: "var(--radius-pill)", padding: "3px 10px", fontSize: 12, fontWeight: 700, flex: "none" }}>
                     {severity.label}
                   </span>
                 </div>
-                <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "5px 0 0", lineHeight: 1.4 }}>
+                <p className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "5px 0 0", lineHeight: 1.4 }}>
                   {observation.detail}
                 </p>
               </SlideUp>

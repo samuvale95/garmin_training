@@ -99,12 +99,12 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
         }}
       >
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-          <p style={{ fontSize: 13, fontWeight: 700, margin: 0, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--inchiostro-50)" }}>
+          <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: "var(--inchiostro-50)" }}>
             Fitness, Fatica & Forma
           </p>
           <span
             style={{
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
               padding: "3px 9px",
               borderRadius: "var(--radius-pill)",
@@ -119,27 +119,27 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
         {/* 3 Metric Columns */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, margin: "14px 0" }}>
           <div style={{ background: "var(--azzurro)", padding: 12, borderRadius: "var(--radius-card)" }}>
-            <span style={{ fontSize: 11, color: "var(--azzurro-testo)", fontWeight: 700, textTransform: "uppercase" }}>Fitness (CTL)</span>
+            <span style={{ fontSize: 12, color: "var(--azzurro-testo)", fontWeight: 700, }}>Fitness (CTL)</span>
             <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 2px", color: "var(--azzurro-testo)" }}>
               {current.ctl.toFixed(0)}
             </p>
-            <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>media 42 giorni</span>
+            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>media 42 giorni</span>
           </div>
 
           <div style={{ background: "var(--giallo)", padding: 12, borderRadius: "var(--radius-card)" }}>
-            <span style={{ fontSize: 11, color: "var(--giallo-testo)", fontWeight: 700, textTransform: "uppercase" }}>Fatica (ATL)</span>
+            <span style={{ fontSize: 12, color: "var(--giallo-testo)", fontWeight: 700, }}>Fatica (ATL)</span>
             <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 2px", color: "var(--giallo-testo)" }}>
               {current.atl.toFixed(0)}
             </p>
-            <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>media 7 giorni</span>
+            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>media 7 giorni</span>
           </div>
 
           <div style={{ background: current.tsb >= 0 ? "var(--verde)" : "var(--rosa-avviso)", padding: 12, borderRadius: "var(--radius-card)" }}>
-            <span style={{ fontSize: 11, color: current.tsb >= 0 ? "var(--verde-testo)" : "var(--rosso-testo)", fontWeight: 700, textTransform: "uppercase" }}>Forma (TSB)</span>
+            <span style={{ fontSize: 12, color: current.tsb >= 0 ? "var(--verde-testo)" : "var(--rosso-testo)", fontWeight: 700, }}>Forma (TSB)</span>
             <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 2px", color: current.tsb >= 0 ? "var(--verde-testo)" : "var(--rosso-testo)" }}>
               {current.tsb > 0 ? `+${current.tsb.toFixed(0)}` : current.tsb.toFixed(0)}
             </p>
-            <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>CTL − ATL</span>
+            <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>CTL − ATL</span>
           </div>
         </div>
 
@@ -172,7 +172,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
                   border: "none",
                   borderRadius: "var(--radius-pill)",
                   padding: "3px 10px",
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: 600,
                   cursor: "pointer",
                 }}
@@ -188,7 +188,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
                   border: "none",
                   borderRadius: "var(--radius-pill)",
                   padding: "3px 10px",
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: 600,
                   cursor: "pointer",
                 }}
@@ -197,7 +197,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
               </button>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 10, color: "var(--inchiostro-50)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: "var(--inchiostro-50)" }}>
               {activeTab === "all" && (
                 <>
                   <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -297,7 +297,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
             </svg>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 10, color: "var(--inchiostro-35)", fontFamily: "monospace" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 12, color: "var(--inchiostro-35)", fontFamily: "monospace" }}>
             <span>{chart.dates[0]}</span>
             <span>{chart.dates[1]}</span>
             <span>{chart.dates[2]}</span>
@@ -319,7 +319,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
           }}
         >
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em", display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 5 }}>
               <FlagIcon size={13} strokeWidth={2.2} />
               <span>Proiezione Gara · {assessment.race_name}</span>
             </span>
@@ -334,7 +334,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
             </p>
             <div>
               <p style={{ fontWeight: 700, fontSize: 15, margin: 0 }}>{assessment.verdict}</p>
-              <span style={{ fontSize: 11, opacity: 0.85 }}>TSB stimato al via</span>
+              <span style={{ fontSize: 12, opacity: 0.85 }}>TSB stimato al via</span>
             </div>
           </div>
 

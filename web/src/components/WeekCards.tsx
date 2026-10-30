@@ -3,9 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ContextLink } from "@/components/ContextLink";
 import { motion, useDragControls } from "framer-motion";
-import { Illustration } from "@/components/Illustration";
-import { SlideUp } from "@/components/motion/primitives";
-import { CheckIcon, LightningIcon } from "@/components/Icons";
+import { CheckIcon } from "@/components/Icons";
 import { useMotionEnabled } from "@/lib/motion";
 import { sessionDetailLine } from "@/lib/format";
 import { classifySession, effectiveTitle, sessionDistanceKm, sessionDurationMinutes, weekBounds, toDateKey, type DisplaySession } from "@/lib/sessionVisuals";
@@ -39,42 +37,9 @@ function haptic(pattern: number | number[]) {
  * illustration, which drowned out the days that actually carry a session. The
  * illustration is kept for the first rest day of the week only -- one drawing per
  * screen, the way every other screen uses them. */
-export function RestCard({ animate, delayMs, withIllustration }: { animate: boolean; delayMs: number; withIllustration: boolean }) {
-  const visual = classifySession(null);
-  return (
-    <SlideUp
-      active={animate}
-      delayMs={delayMs}
-      row
-    >
-      <motion.div
-        whileHover={{ y: -2, scale: 1.01 }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
-        style={{
-          background: visual.background,
-          color: visual.foreground,
-          borderRadius: "var(--radius-card)",
-          padding: withIllustration ? "14px 64px 14px 16px" : "14px 16px",
-          minHeight: withIllustration ? 70 : 54,
-          position: "relative",
-          overflow: "hidden",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          boxShadow: "var(--shadow-airbnb-subtle)",
-          border: "var(--border-airbnb)",
-        }}
-      >
-        <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Riposo</p>
-        <p className="font-serif-italic" style={{ fontSize: 13.5, margin: 0, opacity: 0.8 }}>
-          e va bene così
-        </p>
-        {withIllustration && visual.illustration && (
-          <Illustration name={visual.illustration} width={56} height={62} breathe={false} active={animate} delayMs={200 + delayMs} />
-        )}
-      </motion.div>
-    </SlideUp>
-  );
+// Props kept for call-site compatibility; a rest day is now one quiet line.
+export function RestCard({}: { animate: boolean; delayMs: number; withIllustration: boolean }) {
+  return <p className="calendar-day-rest">Riposo</p>;
 }
 
 // ---- session card ----------------------------------------------------------------------------
@@ -120,7 +85,8 @@ type Phase = "idle" | "pressing" | "dragging";
  * identity changes, so nothing remounts it to reset its dragged position -- the
  * snap-back has to be explicit. On a real move the card's `key` lives under a different
  * day row after the state update and this instance unmounts anyway. */
-export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragStateChange, onDragOver, onDrop, onPrefetch, emphasis = null }: DraggableWeekCardProps) {
+// `animate`/`delayMs` are accepted for call-site compatibility; cards no longer enter one by one.
+export function DraggableWeekCard({ card, matchKm, onDragStateChange, onDragOver, onDrop, onPrefetch, emphasis = null }: DraggableWeekCardProps) {
   const { reduced } = useMotionEnabled();
   const dragControls = useDragControls();
   const [phase, setPhase] = useState<Phase>("idle");
@@ -131,9 +97,7 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
 
   const visual = classifySession(card.session);
   const km = sessionDistanceKm(card.session);
-  const isHeavy = km >= 14 || card.session.title.toLowerCase().includes("lungo") || card.session.title.toLowerCase().includes("ripetute");
-  const height = 62 + Math.min(18, km * 1.0);
-  const detail = sessionDetailLine(card.session) || visual.label;
+    const detail = sessionDetailLine(card.session) || visual.label;
 
   const clearPress = useCallback(() => {
     if (pressTimer.current !== null) {
@@ -199,119 +163,27 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
   }
 
   const lifted = phase === "dragging";
+  const minutes = Math.round(sessionDurationMinutes(card.session));
+  const meta = [visual.label, minutes > 0 ? `${minutes} min` : null, km > 0 ? `${km.toLocaleString("it-IT", { maximumFractionDigits: 1 })} km` : null].filter(Boolean).join(" · ");
   const body = (
-    <SlideUp
-      active={animate}
-      delayMs={delayMs}
-      row
-      style={{
-        background: "var(--crema-card)",
-        border: emphasis ? "2px solid var(--inchiostro)" : isHeavy ? "1.5px solid rgba(255, 111, 89, 0.3)" : "var(--border-airbnb)",
-        boxShadow: emphasis ? "var(--shadow-airbnb-card)" : "var(--shadow-airbnb-subtle)",
-        color: "var(--inchiostro)",
-        borderRadius: "var(--radius-card)",
-        padding: "11px 16px",
-        minHeight: height,
-        transition: "box-shadow 0.25s var(--ease), border-color 0.2s ease, transform 0.2s var(--ease)",
-        position: "relative",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-        {emphasis && (
-          <span
-            className="font-mono"
-            style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-pill)", padding: "2px 8px" }}
-          >
-            {emphasis}
-          </span>
+    <div className="session-card" data-emphasis={emphasis ?? undefined} style={{ "--sport": visual.accent } as React.CSSProperties}>
+      <span className="session-card-body">
+        <span className="session-card-top">
+          {emphasis && <span className="badge" data-tone="ink">{emphasis === "oggi" ? "Oggi" : "Prossima"}</span>}
+          {card.session.priority === "key" && <span className="badge" data-tone="warn">Seduta chiave</span>}
+          {card.session.is_short_active ? (
+            <span className="badge" data-tone="accent">Versione breve</span>
+          ) : card.session.short_variant ? (
+            <span className="badge">Breve disponibile</span>
+          ) : null}
+        </span>
+        <span className="session-card-title">{effectiveTitle(card.session)}</span>
+        <span className="session-card-meta">{detail && detail !== visual.label && !meta.includes(detail) ? `${meta} · ${detail}` : meta}</span>
+        {matchKm != null && (
+          <span className="session-card-done"><CheckIcon size={13} strokeWidth={2.6} aria-hidden="true" /> Svolto, {matchKm.toLocaleString("it-IT", { maximumFractionDigits: 1 })} km</span>
         )}
-        <span className="session-kind" style={{ background: visual.background, color: visual.foreground }}>{visual.label}</span>
-        {card.session.priority === "key" && (
-          <span
-            className="font-mono"
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              background: "rgba(245, 158, 11, 0.15)",
-              color: "var(--giallo-testo)",
-              borderRadius: "var(--radius-pill)",
-              padding: "2px 7px",
-            }}
-          >
-            ★ Chiave
-          </span>
-        )}
-        {card.session.is_short_active ? (
-          <span
-            className="font-mono"
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              background: "rgba(232, 93, 78, 0.15)",
-              color: "var(--corallo-testo)",
-              borderRadius: "var(--radius-pill)",
-              padding: "2px 7px",
-            }}
-          >
-            ⚡ Ridotta
-          </span>
-        ) : card.session.short_variant ? (
-          <span
-            className="font-mono"
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              background: "var(--sabbia-chip)",
-              color: "var(--inchiostro-50)",
-              borderRadius: "var(--radius-pill)",
-              padding: "2px 7px",
-            }}
-          >
-            ⚡ Opzione 30&apos;
-          </span>
-        ) : null}
-        {isHeavy && (
-          <span
-            className="font-mono"
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              background: "var(--corallo-chiaro)",
-              border: "1px solid rgba(217, 45, 85, 0.2)",
-              color: "var(--corallo-testo)",
-              borderRadius: "var(--radius-pill)",
-              padding: "2px 7px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 3,
-            }}
-          >
-            <LightningIcon size={10} strokeWidth={2.2} style={{ color: "var(--corallo-accent)" }} />
-            <span>Carb-up</span>
-          </span>
-        )}
-      </div>
-      <p style={{ fontSize: 14.5, fontWeight: 600, margin: "2px 0 0", paddingRight: 56, letterSpacing: "-.01em" }}>
-        {effectiveTitle(card.session)}
-      </p>
-      <p className="font-serif-italic" style={{ fontSize: 12.5, margin: "2px 0 0", color: "var(--inchiostro-70)", paddingRight: 56 }}>
-        {detail}
-      </p>
-      {matchKm != null ? (
-        <p className="font-mono" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, margin: "3px 0 0", color: "var(--verde-tratto-scuro)", fontWeight: 600, paddingRight: 56 }}>
-          <CheckIcon size={12} strokeWidth={2.8} /> svolto {matchKm.toFixed(1)} km
-        </p>
-      ) : km === 0 && (card.session.sport === "calisthenics" || card.session.sport === "strength_training") ? (
-        <p className="font-mono" style={{ fontSize: 11, margin: "3px 0 0", color: "var(--inchiostro-50)" }}>
-          ~{Math.round(sessionDurationMinutes(card.session))} min stimati
-        </p>
-      ) : null}
-      {visual.illustration && <Illustration name={visual.illustration} width={48} height={54} breathe={false} active={animate} delayMs={200 + delayMs} />}
-    </SlideUp>
+      </span>
+    </div>
   );
 
   const href =
@@ -338,10 +210,9 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
         reduced
           ? undefined
           : lifted
-            ? { scale: 1.035, y: -4, boxShadow: "0 18px 34px rgba(28,26,22,.26)" }
-            : { scale: phase === "pressing" ? 0.985 : 1, y: 0, boxShadow: "var(--shadow-airbnb-subtle)" }
+            ? { scale: 1.035, y: -4, boxShadow: "var(--shadow-float)" }
+            : { scale: phase === "pressing" ? 0.985 : 1, y: 0, boxShadow: "0 0 0 0 rgba(0,0,0,0)" }
       }
-      whileHover={reduced || lifted ? undefined : { y: -2.5, scale: 1.012, boxShadow: "var(--shadow-airbnb-hover)" }}
       whileTap={reduced || lifted ? undefined : { scale: 0.985 }}
       transition={{ type: "spring", stiffness: 400, damping: 26 }}
       onPointerDown={handlePointerDown}
@@ -361,7 +232,7 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
       style={{
         position: "relative",
         zIndex: lifted ? 30 : "auto",
-        borderRadius: "var(--radius-card)",
+        borderRadius: "var(--radius-control)",
         touchAction: "manipulation",
         WebkitUserSelect: "none",
         userSelect: "none",
@@ -375,26 +246,8 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
       ) : (
         body
       )}
-      <span
-        aria-hidden="true"
-        className="week-card__grip"
-        style={{
-          position: "absolute",
-          top: 12,
-          right: 14,
-          display: "flex",
-          flexDirection: "column",
-          gap: 3,
-          opacity: lifted ? 0.9 : 0.4,
-          transition: "opacity 160ms var(--ease)",
-        }}
-      >
-        {[0, 1, 2].map((i) => (
-          <span key={i} style={{ display: "flex", gap: 3 }}>
-            <span style={{ width: 3, height: 3, borderRadius: "50%", background: visual.foreground }} />
-            <span style={{ width: 3, height: 3, borderRadius: "50%", background: visual.foreground }} />
-          </span>
-        ))}
+      <span aria-hidden="true" className="session-card-grip" title="Tieni premuto per trascinare">
+        {Array.from({ length: 6 }).map((_, i) => <i key={i} />)}
       </span>
     </motion.div>
   );

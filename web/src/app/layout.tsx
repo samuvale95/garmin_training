@@ -1,20 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans, DM_Mono } from "next/font/google";
+import { Archivo } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate } from "@/components/AuthGate";
 
-const plusJakarta = Plus_Jakarta_Sans({
-  variable: "--font-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const dmMono = DM_Mono({
-  variable: "--font-dm-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
+// One family, two voices: the width axis expands titles and figures, body text stays
+// at normal width (see globals.css).
+const archivo = Archivo({
+  variable: "--font-archivo",
+  subsets: ["latin", "latin-ext"],
+  axes: ["wdth"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -39,17 +36,19 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#ffffff",
+  themeColor: "#f3f2ee",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="it" className={`${plusJakarta.variable} ${dmMono.variable}`}>
+    <html lang="it" className={archivo.variable}>
       <body>
         <Providers>
-          <AppShell>
-            <AuthGate>{children}</AuthGate>
-          </AppShell>
+          {/* The gate wraps the frame: navigation reads account data (the avatar) and
+              must not ask for it before there is a session. */}
+          <AuthGate>
+            <AppShell>{children}</AppShell>
+          </AuthGate>
         </Providers>
       </body>
     </html>

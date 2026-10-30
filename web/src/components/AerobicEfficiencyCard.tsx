@@ -116,8 +116,6 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
             fontSize: 12,
             fontWeight: 700,
             margin: "0 0 8px",
-            textTransform: "uppercase",
-            letterSpacing: ".05em",
             color: "var(--inchiostro-50)",
           }}
         >
@@ -155,8 +153,6 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
                 fontSize: 12,
                 fontWeight: 700,
                 margin: 0,
-                textTransform: "uppercase",
-                letterSpacing: ".05em",
                 color: "var(--verde-testo)",
               }}
             >
@@ -169,7 +165,7 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 5,
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: 700,
                 padding: "3px 10px",
                 borderRadius: "var(--radius-pill)",
@@ -230,25 +226,25 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, margin: "14px 0" }}>
             {/* EF attuale */}
             <div style={{ background: "var(--azzurro)", padding: 12, borderRadius: "var(--radius-card)", border: "var(--border-airbnb)" }}>
-              <span style={{ fontSize: 11, color: "var(--azzurro-testo)", fontWeight: 700, textTransform: "uppercase" }}>
+              <span style={{ fontSize: 12, color: "var(--azzurro-testo)", fontWeight: 700, }}>
                 EF attuale
               </span>
               <p className="font-mono" style={{ fontSize: 22, fontWeight: 700, margin: "4px 0 2px", color: "var(--inchiostro)" }}>
                 {(trend.current_ef * 1000).toFixed(1)}
               </p>
-              <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>m/s per bpm × 10³</span>
+              <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>m/s per bpm × 10³</span>
             </div>
 
             {/* Variazione 4 settimane */}
             <div style={{ background: trendConfig.bg, padding: 12, borderRadius: "var(--radius-card)", border: trendConfig.border }}>
-              <span style={{ fontSize: 11, color: trendConfig.color, fontWeight: 700, textTransform: "uppercase" }}>
+              <span style={{ fontSize: 12, color: trendConfig.color, fontWeight: 700, }}>
                 Δ 4 settimane
               </span>
               <p className="font-mono" style={{ fontSize: 22, fontWeight: 700, margin: "4px 0 2px", color: trendConfig.color }}>
                 {trend.change_pct > 0 ? "+" : ""}
                 {trend.change_pct.toFixed(1)}%
               </p>
-              <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>rispetto a 4 sett. fa</span>
+              <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>rispetto a 4 sett. fa</span>
             </div>
 
             {/* Decoupling ultimo lungo */}
@@ -266,9 +262,8 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
             >
               <span
                 style={{
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: 700,
-                  textTransform: "uppercase",
                   color: recentDecoupling
                     ? recentDecoupling.decoupling_pct < 5
                       ? "var(--verde-testo)"
@@ -293,7 +288,7 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
               >
                 {recentDecoupling ? `${recentDecoupling.decoupling_pct.toFixed(1)}%` : "—"}
               </p>
-              <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>
+              <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
                 {recentDecoupling ? (recentDecoupling.decoupling_pct < 5 ? "cuore stabile (<5%)" : "deriva alta (>5%)") : "nessun lungo"}
               </span>
             </div>
@@ -325,7 +320,7 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro-70)" }}>Andamento EF</span>
-            <div style={{ display: "flex", gap: 10, fontSize: 10, color: "var(--inchiostro-50)" }}>
+            <div style={{ display: "flex", gap: 10, fontSize: 12, color: "var(--inchiostro-50)" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <span style={{ width: 8, height: 2.5, background: "var(--azzurro-tratto)" }} /> EF
               </span>
@@ -364,7 +359,7 @@ export function AerobicEfficiencyCard({ data, animate = true, level: levelProp }
               display: "flex",
               justifyContent: "space-between",
               marginTop: 4,
-              fontSize: 10,
+              fontSize: 12,
               color: "var(--inchiostro-35)",
               fontFamily: "monospace",
             }}

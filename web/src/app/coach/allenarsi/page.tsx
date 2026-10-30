@@ -72,7 +72,7 @@ export default function CoachTrainingPage() {
             delayMs={80}
             style={{ background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card-lg)", padding: 22, marginTop: 18 }}
           >
-            <p className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-su-scuro)", margin: 0 }}>
+            <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: 0 }}>
               {formatShortDate(data.block.from_date)} – {formatShortDate(data.block.to_date)} ·{" "}
               {data.block.sessions} corse
             </p>
@@ -97,7 +97,7 @@ export default function CoachTrainingPage() {
           )}
 
           <div style={{ marginTop: 22 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
               Cosa dicono i dati
             </span>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
@@ -109,7 +109,7 @@ export default function CoachTrainingPage() {
 
           {data.prescriptions.length > 0 && (
             <div style={{ marginTop: 26 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
                 Cosa fare, in ordine
               </span>
               <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "6px 0 0", lineHeight: 1.45 }}>
@@ -134,7 +134,7 @@ export default function CoachTrainingPage() {
           <SensitivityTable rows={data.sensitivity} animate={animate} delayMs={480} />
 
           <SlideUp active={animate} delayMs={520} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14 }}>
-            <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
+            <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
               le tue zone
             </p>
             <p className="font-mono" style={{ fontSize: 14, margin: "8px 0 0" }}>{data.zones.describe}</p>
