@@ -23,7 +23,7 @@ from .. import goal_fit, llm, programs
 from ..parser import parse_plan_document, serialize_plan
 from . import garmin_session, schemas
 from .auth import current_user_id
-from .cache import TTL_GOAL_FIT_NARRATIVE, TTL_PLAN_DIFF, cache, invalidate_calendar
+from .cache import TTL_GOAL_FIT_NARRATIVE, TTL_PLAN_DIFF, cache
 from .routes_coach import _zones, coach_state
 from .jobs import job_store
 
@@ -391,25 +391,10 @@ async def answer_adaptation(
 
     result = await run_in_threadpool(run)
 
-    # When adaptation is accepted or undone, immediately sync plan window to Garmin Connect
-    if action in ("accept", "undo") and isinstance(result, schemas.AdaptationResponse):
-        def _sync_adaptation_to_garmin():
-            try:
-                def _push(sync):
-                    from .. import plan_store
-                    stored = plan_store.list_sessions(user_id)
-                    today = date.today()
-                    for s in stored:
-                        if today.isoformat() <= s["date"] <= (today + timedelta(days=14)).isoformat():
-                            model_sess = schemas.TrainingSessionIn.model_validate(s).to_model()
-                            sync.create_and_schedule(model_sess)
-
-                garmin_session.run(user_id, _push)
-                invalidate_calendar(user_id)
-            except Exception:
-                pass
-
-        background_tasks.add_task(_sync_adaptation_to_garmin)
+    # Garmin follows on its own: this route is a plan write, so `garmin_push` reconciles
+    # the calendar after it (app.py's middleware). The block that used to sit here
+    # uploaded every session of the next 14 days without removing what was already
+    # scheduled, so each accepted or undone adaptation duplicated two weeks of workouts.
 
     return result
 

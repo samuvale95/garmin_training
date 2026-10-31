@@ -20,6 +20,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date as date_type
 
+from .. import garmin_push
 from ..garmin_sync import ChangedSession, GarminRateLimitError, GarminSync, GarminSyncError
 from ..models import TrainingSession
 from .cache import invalidate_calendar
@@ -184,6 +185,12 @@ class SyncJobStore:
                 # Whatever happened -- done, cancelled halfway, or an item that failed --
                 # the Garmin calendar may have changed, so every cached view of it is stale.
                 invalidate_calendar(user_id)
+                try:
+                    garmin_push.forget_links_on(
+                        user_id, [c.session.date for c in changed] + [s.date for s in to_create]
+                    )
+                except Exception:  # noqa: BLE001 - only a duplicate-avoidance step
+                    logger.warning("could not reset Garmin links after a manual sync", exc_info=True)
 
     def request_cancel(self, user_id: str, job_id: str) -> bool:
         with self._lock:

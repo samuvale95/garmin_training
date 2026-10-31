@@ -71,13 +71,14 @@ app.add_middleware(
 
 
 # Writes that change the plan -- an edit, a move, a deletion, a short variant, a new or
-# reactivated program, an applied adaptation. After any of them succeeds the Garmin
+# reactivated program, an applied adaptation (including one applied automatically by
+# the check Oggi runs on open). After any of them succeeds the Garmin
 # calendar is brought in line in the background (`garmin_push`), so nobody has to
 # remember a sync screen. Everything else under /plan (diff, sync, validate, parse,
 # previews) is read-like and left alone.
 _PLAN_WRITES = re.compile(
     r"^/plan(/sessions(/[^/]+(/toggle-short)?)?|/[^/]+/toggle-active|/[^/]+|/adaptation/[^/]+/[^/]+"
-    r"|/generate|/move-decisions|/drafts/[^/]+/activate)?$"
+    r"|/adaptation/check|/generate|/move-decisions|/drafts/[^/]+/activate)?$"
 )
 # Single-segment paths under /plan that read or preview rather than change the plan
 # (`DELETE /plan/{plan_id}` is the one single-segment write the pattern is there for).

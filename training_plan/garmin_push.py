@@ -346,6 +346,19 @@ def pull_moves(user_id: str, calendar: list[ScheduledWorkout]) -> int:
     return moved
 
 
+def forget_links_on(user_id: str, days: list[date_type]) -> None:
+    """The manual sync screen just replaced workouts on these days behind our back: the
+    remembered ids now point at deleted workouts. Forgetting them makes the next
+    reconcile adopt whatever is there by (date, title) instead of uploading a second copy."""
+    if not days:
+        return
+    with db.connect() as conn:
+        conn.execute(
+            "DELETE FROM garmin_link WHERE user_id = %s AND garmin_date = ANY(%s)",
+            [user_id, sorted(set(days))],
+        )
+
+
 def mark_pending(user_id: str, session_ids: list[str]) -> None:
     """An edit just happened: show these as on their way before the push even starts."""
     for sid in session_ids:
