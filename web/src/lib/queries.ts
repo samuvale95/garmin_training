@@ -300,7 +300,9 @@ function persistPlanToServer(queryClient: ReturnType<typeof useQueryClient>, pla
       if (!plan.goal && current.goal) return; // a goal was set locally since this request went out
       applyPlanLocally(queryClient, { ...current, goal: saved.goal });
     })
-    .catch(() => {});
+    // Said out loud rather than swallowed: a refused write looked saved until the next
+    // load quietly brought the old plan back.
+    .catch(() => reportSaveFailed());
 }
 
 function writePlan(queryClient: ReturnType<typeof useQueryClient>, next: PlanState | null): void {
@@ -421,7 +423,7 @@ export function useSetRaceGoal() {
       : null;
     apiPut<{ goal: RaceGoal | null }>("/goal", { goal: goalPayload })
       .then((saved) => queryClient.setQueryData(STANDALONE_GOAL_KEY, saved))
-      .catch(() => {});
+      .catch(() => reportSaveFailed());
   };
 }
 

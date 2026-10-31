@@ -12,6 +12,7 @@ tolerable for now, same as before.
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 import uuid
@@ -28,6 +29,8 @@ from .user_tokenstore import materialized_garmin_tokenstore
 # (the sync-result screen polls until `status != "running"`, then stops). Without this
 # the store grew for the life of the process, holding on to every session ever synced.
 FINISHED_JOB_RETENTION_SECONDS = 60 * 60
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -122,9 +125,29 @@ class SyncJobStore:
         # (inside the `with`) rather than once per item, matching `garmin_session.run`'s
         # per-request granularity would mean checking the token out and back in per
         # workout for no benefit here: this thread is the only thing touching it.
+        try:
+            self._run_logged_in(user_id, job, changed, to_create, prompt_mfa)
+        except Exception as exc:  # noqa: BLE001 - anything else must still end the job
+            # Without this an unexpected error (a tokenstore read, a network failure
+            # outside an item) killed the thread and left the job "running" forever:
+            # the sync screen spun with no way out.
+            logger.exception("sync job %s crashed", job.job_id)
+            with self._lock:
+                running = job.status == "running"
+            if running:
+                self._finish(job, "failed", str(exc), "server_error")
+
+    def _run_logged_in(
+        self,
+        user_id: str,
+        job: SyncJob,
+        changed: list[ChangedSession],
+        to_create: list[TrainingSession],
+        prompt_mfa: Callable[[], str] | None,
+    ) -> None:
         with materialized_garmin_tokenstore(user_id) as tmp_dir:
+            sync = GarminSync(tokenstore=str(tmp_dir), prompt_mfa=prompt_mfa)
             try:
-                sync = GarminSync(tokenstore=str(tmp_dir), prompt_mfa=prompt_mfa)
                 sync.login()
             except GarminRateLimitError as exc:
                 self._finish(job, "failed", str(exc), "rate_limited")

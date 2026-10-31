@@ -7,6 +7,7 @@ import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persist
 import { useState } from "react";
 import { isTransientError } from "@/lib/apiClient";
 import { ServerWaking } from "@/components/ServerWaking";
+import { SaveFailedToast } from "@/components/SaveFailedToast";
 
 /** Every answer this app shows comes from Garmin or Strava over the network, and none
  * of it changes second to second: a calendar only changes when this app writes to it,
@@ -108,6 +109,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
       <ServerWaking />
+      <SaveFailedToast />
       {children}
       {process.env.NODE_ENV === "development" && <ReactQueryDevtools initialIsOpen={false} />}
     </PersistQueryClientProvider>

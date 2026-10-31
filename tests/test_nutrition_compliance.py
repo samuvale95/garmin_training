@@ -75,4 +75,5 @@ def test_the_longest_session_of_the_day_sizes_the_fuel():
     sessions = [run(TOMORROW, 40, "Corsa costante 40'"), run(TOMORROW, 150, "Lungo")]
     fuelling = nutrition.daily_fuelling(DAY, sessions, weight_kg=70)
     assert fuelling.tomorrow.session_title == "Lungo"
-    assert fuelling.tomorrow.load == "duro"
+    # 150 minutes is past VERY_LONG_MINUTES: the long run, not the 40-minute one, sizes the day.
+    assert fuelling.tomorrow.load == "molto_lungo"

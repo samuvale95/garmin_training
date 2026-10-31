@@ -84,12 +84,9 @@ export default function RaceGoalSettingsPage() {
   const predictionNarrative = useGoalPredictionNarrative(sessions, goal, !!goal && !editing && !!predictionQuery.data);
 
   function startEdit() {
-    setName(goal?.name ?? "");
-    setRaceDate(goal?.race_date ?? "");
-    setDistanceKm(goal ? String(goal.distance_km) : "");
-    setTargetTime(goal?.target_time_seconds != null ? formatTargetTime(goal.target_time_seconds) : "");
-    setError(null);
-    setEditing(true);
+    // Goals are created and changed in Piano → Obiettivi now: the old in-place form saved
+    // through `PUT /goal`, which the server refuses, so every edit was silently lost.
+    router.push("/week/goals?from=%2Fsettings%2Fgoal");
   }
 
   function save() {

@@ -123,8 +123,9 @@ export default function ExecutionPage() {
             </p>
             <p className="font-mono" style={{ fontSize: 14, margin: "8px 0 0" }}>{data.zones.describe}</p>
             <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "8px 0 0", lineHeight: 1.4 }}>
-              Ricavate dalla soglia del lattato che Garmin stima dalle tue sedute
-              ({data.zones.threshold_hr} bpm), non da una formula sull&apos;età.
+              {data.zones.source === "stimato"
+                ? <>Garmin non ha una soglia sul tuo account: questa ({data.zones.threshold_hr} bpm) è stimata dalle tue corse più impegnative, escluse quelle con il battito inaffidabile. Una gara o un test la rendono più precisa.</>
+                : <>Ricavate dalla soglia del lattato che Garmin stima dalle tue sedute ({data.zones.threshold_hr} bpm), non da una formula sull&apos;età.</>}
             </p>
           </SlideUp>
 

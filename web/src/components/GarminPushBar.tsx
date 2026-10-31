@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { SlideUp, StatusDot } from "@/components/motion/primitives";
-import { SAVE_FAILED_EVENT, useGarminPushStatus, useRetryGarminPush } from "@/lib/queries";
+import { useGarminPushStatus, useRetryGarminPush } from "@/lib/queries";
 import { dis } from "@/lib/disabled";
 
 /** One line that answers "is my plan on the watch?": on its way, all there, or what did
@@ -12,14 +12,8 @@ import { dis } from "@/lib/disabled";
 export function GarminPushBar({ animate, delayMs = 0 }: { animate: boolean; delayMs?: number }) {
   const status = useGarminPushStatus();
   const retry = useRetryGarminPush();
-  const [saveFailed, setSaveFailed] = useState(false);
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    const onFail = () => setSaveFailed(true);
-    window.addEventListener(SAVE_FAILED_EVENT, onFail);
-    return () => window.removeEventListener(SAVE_FAILED_EVENT, onFail);
-  }, []);
 
   const data = status.data;
   const failed = data?.sessions.filter((s) => s.status === "failed") ?? [];
@@ -27,14 +21,6 @@ export function GarminPushBar({ animate, delayMs = 0 }: { animate: boolean; dela
 
   return (
     <SlideUp active={animate} delayMs={delayMs} style={{ marginTop: 12 }}>
-      {saveFailed && (
-        <p role="alert" className="ux-error" style={{ margin: "0 0 8px" }}>
-          Una modifica non è stata salvata: controlla la connessione e riprova.{" "}
-          <button type="button" data-track="today.save-failed-dismiss" onClick={() => setSaveFailed(false)} style={{ all: "unset", cursor: "pointer", textDecoration: "underline" }}>
-            Ok
-          </button>
-        </p>
-      )}
       {!data ? null : failed.length > 0 ? (
         <div
           role="alert"

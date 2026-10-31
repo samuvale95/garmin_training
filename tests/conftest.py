@@ -31,6 +31,17 @@ from training_plan.api.cache import cache
 
 
 @pytest.fixture(autouse=True)
+def no_cache_snapshots(monkeypatch):
+    """The Postgres copies behind stale-while-revalidate outlive a test: one test's
+    answer would be served to the next. Tests that exercise them patch these back."""
+    from training_plan.api import cache as cache_module
+
+    monkeypatch.setattr(cache_module, "_load_snapshot", lambda *a: None)
+    monkeypatch.setattr(cache_module, "_save_snapshot", lambda *a: None)
+    monkeypatch.setattr(cache_module, "_drop_snapshots", lambda *a: None)
+
+
+@pytest.fixture(autouse=True)
 def cold_server_state():
     cache.clear()
     cache.invalidate_user("test-user")

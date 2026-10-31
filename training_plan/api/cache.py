@@ -368,6 +368,7 @@ class TTLCache:
     def clear(self) -> None:
         with self._lock:
             self._entries.clear()
+            self._stored.clear()
 
     def _lookup(self, namespace: str, user_id: str, key: Hashable) -> tuple[Any] | None:
         """`(value,)` on a live hit, `None` on a miss -- wrapped in a tuple so a cached

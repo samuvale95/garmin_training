@@ -8,6 +8,7 @@ for the actual logic they call.
 from __future__ import annotations
 
 import os
+import time
 import re
 import threading
 
@@ -48,6 +49,13 @@ from .routes_diagnostics import router as diagnostics_router
 # .env file are silently invisible to the server, only to shells that happen to
 # export them some other way.
 load_dotenv()
+
+# Every "today" in this codebase is `date.today()`, i.e. the process's local date, and the
+# host runs in UTC: between midnight and 1-2 am in Italy the server still thought it was
+# yesterday -- Oggi, check-ins, nutrition and the Garmin push window all on the wrong day.
+# The users are in one time zone, so the process adopts it. PASSO_TZ overrides.
+os.environ["TZ"] = os.getenv("PASSO_TZ", "Europe/Rome")
+time.tzset()
 
 app = FastAPI(title="Passo training API")
 

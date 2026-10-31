@@ -252,7 +252,7 @@ export default function DayStatePage() {
           {!goal && (access.plan || access.garminConnected) && (
             <SlideUp active={animate} delayMs={300} style={{ marginTop: 12 }}>
               <Link data-track="body.stato.settings-goal"
-                href="/settings/goal"
+                href="/week/goals"
                 className="press-soft"
                 style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--sabbia)", border: "1px dashed var(--inchiostro-35)", borderRadius: "var(--radius-card)", padding: "15px 18px", textDecoration: "none", color: "inherit" }}
               >
