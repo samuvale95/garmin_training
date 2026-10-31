@@ -20,6 +20,7 @@ import { TodayVitalStrip } from "@/components/TodayVitalStrip";
 import { NowMealCard } from "@/components/NowMealCard";
 import { currentMoment, isUrgent, useClockMinutes } from "@/lib/fuelMoment";
 import { BigEffortCard, bigEffort } from "@/components/BigEffortCard";
+import { GarminPushBar } from "@/components/GarminPushBar";
 import { WeekStrip } from "@/components/WeekStrip";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { useMountOnce } from "@/lib/motion";
@@ -36,7 +37,6 @@ import {
   useWeekSummary,
   useDayVerdict,
   useDayVerdictNarrative,
-  usePlanDiff,
   useRaceGoal,
   useStravaActivityMatches,
   useStravaStatus,
@@ -65,7 +65,6 @@ export function TodayView() {
   const endKey = toDateKey(end);
   const workoutsQuery = useWeekWorkouts(today, liveMode);
   // Same cache entry /diff uses, so tapping through to it costs no new request.
-  const diffQuery = usePlanDiff(access.plan?.sessions ?? null);
   const bodyQuery = useBodyToday();
 
   // "Svolto" indicators for the hero card + rest-of-week list, same batch pattern as
@@ -223,7 +222,6 @@ export function TodayView() {
       : "/week";
 
 
-  const pendingChanges = (diffQuery.data?.to_create?.length ?? 0) + (diffQuery.data?.changed?.length ?? 0);
 
   // Meal content follows the clock; its position remains below the daily vitals.
   const mealMoment = fuelTargets.data ? currentMoment(fuelTargets.data, nowMinutes) : null;
@@ -465,30 +463,9 @@ export function TodayView() {
             <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
           </SlideUp>
         </Link>
-      ) : pendingChanges > 0 ? (
-        <Link data-track="today.diff" href="/diff" style={{ textDecoration: "none", color: "inherit" }}>
-          <SlideUp active={animate} delayMs={200} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
-            <PulseRing size={8} />
-            <div style={{ flex: 1 }}>
-              <p style={{ fontWeight: 600, fontSize: 15, margin: "0 0 2px" }}>
-                {capitalize(numberToItalianWords(pendingChanges))} {pendingChanges === 1 ? "differenza" : "differenze"}
-              </p>
-              <p className="font-serif-italic" style={{ fontSize: 14, margin: 0 }}>Il file non combacia col calendario.</p>
-            </div>
-            <span
-              aria-hidden="true"
-              style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--inchiostro)", color: "var(--crema)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}
-            >
-              <ArrowRight size={16} strokeWidth={2.4} />
-            </span>
-          </SlideUp>
-        </Link>
-      ) : (
-        <SlideUp active={animate} delayMs={200} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 4px", marginTop: 10 }}>
-          <StatusDot kind="active" size={7} />
-          <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>in pari col calendario</span>
-        </SlideUp>
-      )}
+      ) : access.garminConnected ? (
+        <GarminPushBar animate={animate} delayMs={200} />
+      ) : null}
 
       {/* The list always gets its title -- it's what separates it from the card above.
           Only the total is conditional: Garmin's calendar entries carry no distance, so

@@ -8,19 +8,21 @@ for the actual logic they call.
 from __future__ import annotations
 
 import os
+import re
+import threading
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .. import admins, checkin, db, history, interactions, move_check, plan_adaptation, plan_store, programs
+from .. import admins, checkin, db, garmin_push, history, interactions, move_check, plan_adaptation, plan_store, programs
 from ..agents import store as agent_store
 from ..garmin_sync import GarminRateLimitError, GarminSyncError
 from ..parser import TrainingPlanValidationError
 from ..strava_sync import StravaAuthError
-from . import schemas, user_tokenstore
-from .auth import AuthError, current_user_id
+from . import garmin_session, schemas, user_tokenstore
+from .auth import AuthError, current_claims, current_user_id
 from .cache import cache
 from .routes_body import router as body_router
 from .routes_checkin import router as checkin_router
@@ -59,6 +61,44 @@ app.add_middleware(
 )
 
 
+# Writes that change the plan -- an edit, a move, a deletion, a short variant, a new or
+# reactivated program, an applied adaptation. After any of them succeeds the Garmin
+# calendar is brought in line in the background (`garmin_push`), so nobody has to
+# remember a sync screen. Everything else under /plan (diff, sync, validate, parse,
+# previews) is read-like and left alone.
+_PLAN_WRITES = re.compile(
+    r"^/plan(/sessions(/[^/]+(/toggle-short)?)?|/[^/]+/toggle-active|/[^/]+|/adaptation/[^/]+/[^/]+"
+    r"|/generate|/move-decisions|/drafts/[^/]+/activate)?$"
+)
+# Single-segment paths under /plan that read or preview rather than change the plan
+# (`DELETE /plan/{plan_id}` is the one single-segment write the pattern is there for).
+_PLAN_READS = {"diff", "sync", "validate", "parse", "move-check", "constraints", "drafts", "skeleton",
+               "export", "goal-fit", "goal-prediction"}
+
+
+def _is_plan_write(method: str, path: str) -> bool:
+    if method not in ("POST", "PUT", "PATCH", "DELETE") or not _PLAN_WRITES.match(path):
+        return False
+    parts = path.strip("/").split("/")
+    return not (len(parts) == 2 and parts[1] in _PLAN_READS)
+
+
+@app.middleware("http")
+async def _push_plan_to_garmin(request: Request, call_next):
+    response = await call_next(request)
+    if 200 <= response.status_code < 300 and _is_plan_write(request.method, request.url.path):
+        try:
+            user_id = current_claims(authorization=request.headers.get("authorization"))["sub"]
+        except Exception:  # noqa: BLE001 - no user, nothing to push for
+            return response
+        threading.Thread(
+            target=garmin_push.run_for,
+            args=(user_id, lambda work: garmin_session.run(user_id, work)),
+            daemon=True,
+        ).start()
+    return response
+
+
 @app.on_event("startup")
 def _ensure_schema() -> None:
     """Create the food-log and credential tables if this is a fresh database.
@@ -78,6 +118,7 @@ def _ensure_schema() -> None:
     interactions.ensure_schema()
     agent_store.ensure_schema()
     admins.ensure_schema()
+    garmin_push.ensure_schema()
     # Raw interaction events live 60 days; trimming at startup is enough for a one-person app.
     try:
         interactions.purge_old()

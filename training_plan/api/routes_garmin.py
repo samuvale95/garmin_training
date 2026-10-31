@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import threading
+import time
 from datetime import date
 
 from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
-from .. import service
+from .. import garmin_push, service
 from ..garmin_sync import ScheduledWorkout
 from .auth import current_user_id
 from . import garmin_session, schemas
@@ -240,3 +242,40 @@ async def reschedule_workout(
     result = await run_in_threadpool(lambda: garmin_session.run(user_id, _run))
     invalidate_calendar(user_id)
     return schemas.RescheduleResultOut.from_model(result)
+
+
+# ---- automatic push of the plan to the Garmin calendar (see garmin_push) ----------------------
+
+# How often opening the app may start a retry of what is pending or failed. The status
+# read itself is one query; the retry is what costs Garmin calls.
+PUSH_RETRY_EVERY_S = 5 * 60
+_last_kick: dict[str, float] = {}
+
+
+def _kick(user_id: str, *, force: bool = False) -> bool:
+    now = time.monotonic()
+    if not force and now - _last_kick.get(user_id, 0.0) < PUSH_RETRY_EVERY_S:
+        return False
+    _last_kick[user_id] = now
+    threading.Thread(
+        target=garmin_push.run_for,
+        args=(user_id, lambda work: garmin_session.run(user_id, work)),
+        daemon=True,
+    ).start()
+    return True
+
+
+@router.get("/garmin/push/status")
+async def push_status(user_id: str = Depends(current_user_id)) -> dict:
+    """Which plan sessions are on Garmin, on their way, or failed (with why)."""
+    result = await run_in_threadpool(garmin_push.status, user_id)
+    if not result["running"] and (result["counts"]["pending"] or result["counts"]["failed"]):
+        result["running"] = _kick(user_id)
+    return result
+
+
+@router.post("/garmin/push/run")
+async def push_run(user_id: str = Depends(current_user_id)) -> dict:
+    """The 'retry now' button: push whatever differs, without waiting for the next edit."""
+    started = _kick(user_id, force=True)
+    return {"started": started}
