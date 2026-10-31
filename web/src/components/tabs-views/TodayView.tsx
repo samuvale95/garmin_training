@@ -18,7 +18,8 @@ import { ChevronRight, ArrowRight, ArrowUpRight, PlusIcon, TargetIcon, UtensilsI
 import { TodayHeroUnified } from "@/components/TodayHeroUnified";
 import { TodayVitalStrip } from "@/components/TodayVitalStrip";
 import { NowMealCard } from "@/components/NowMealCard";
-import { currentMoment, useClockMinutes } from "@/lib/fuelMoment";
+import { currentMoment, isUrgent, useClockMinutes } from "@/lib/fuelMoment";
+import { BigEffortCard, bigEffort } from "@/components/BigEffortCard";
 import { WeekStrip } from "@/components/WeekStrip";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { useMountOnce } from "@/lib/motion";
@@ -226,9 +227,25 @@ export function TodayView() {
 
   // Meal content follows the clock; its position remains below the daily vitals.
   const mealMoment = fuelTargets.data ? currentMoment(fuelTargets.data, nowMinutes) : null;
+  // The full meal card only around meal time (now, within the hour, or the meals tied to
+  // the session); the rest of the day it shrinks to one line, so someone opening the app
+  // for today's workout is not handed lunch at four in the afternoon.
+  const nextMeal = mealMoment?.kind === "meal" ? mealMoment.meal : null;
   const nowMealCard = fuelTargets.data && mealMoment && (
-    <NowMealCard fuel={fuelTargets.data} moment={mealMoment} onLog={openMeal} animate={animate} delayMs={110} />
+    isUrgent(mealMoment) ? (
+      <NowMealCard fuel={fuelTargets.data} moment={mealMoment} onLog={openMeal} animate={animate} delayMs={110} />
+    ) : nextMeal ? (
+      <Link href="/nutrition" data-track="today.next-meal" className="today-session-link" style={{ marginTop: 10 }}>
+        <span>
+          Prossimo pasto alle {nextMeal.clock}
+          <small>{nextMeal.name}</small>
+        </span>
+        <ChevronRight size={18} />
+      </Link>
+    ) : null
   );
+  // A long run or a race yesterday or today: its analysis is what to look at.
+  const effort = bigEffort(recentActivities.data?.activities);
   const readiness = bodyQuery.data?.readiness_score;
   const sleepMinutes = bodyQuery.data?.sleep?.total_minutes;
 
@@ -320,6 +337,8 @@ export function TodayView() {
           selectedSessionIndex={selectedTodaySessionIdx}
           onSelectSessionIndex={setSelectedTodaySessionIdx}
         />
+
+      {effort && <BigEffortCard activity={effort} dayLabel={effort.date === todayKey ? "oggi" : "ieri"} animate={animate} />}
 
       {todaySessions.length > 1 && <section className="today-sessions" aria-label="Tutti gli allenamenti di oggi">
         <h2 className="ux-section-title">Le {todaySessions.length} sedute di oggi</h2>

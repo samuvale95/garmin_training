@@ -53,7 +53,12 @@ export default function CoachPage() {
   const animate = useMountOnce("coach");
   const today = toDateKey(new Date());
   const activitiesQuery = useActivities(shiftDateKey(today, -LOOKBACK_DAYS), today);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  // `/coach?activity=<id>` (from the home's long-run card) opens on that activity.
+  const [selectedId, setSelectedId] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    const requested = Number(new URLSearchParams(window.location.search).get("activity"));
+    return Number.isFinite(requested) && requested > 0 ? requested : null;
+  });
 
   const readable = useMemo(
     () =>
