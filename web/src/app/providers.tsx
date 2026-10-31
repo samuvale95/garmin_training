@@ -5,6 +5,8 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { useState } from "react";
+import { isTransientError } from "@/lib/apiClient";
+import { ServerWaking } from "@/components/ServerWaking";
 
 /** Every answer this app shows comes from Garmin or Strava over the network, and none
  * of it changes second to second: a calendar only changes when this app writes to it,
@@ -46,7 +48,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
           queries: {
             staleTime: STALE_TIME,
             gcTime: GC_TIME,
-            retry: 0,
+            // Only what a sleeping or restarting server causes is retried (see
+            // isTransientError); a real error still shows at once, as before.
+            retry: (failureCount, error) => failureCount < 3 && isTransientError(error),
+            retryDelay: (attempt) => [2_000, 5_000, 10_000][attempt] ?? 10_000,
             refetchOnWindowFocus: false,
           },
         },
@@ -98,6 +103,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+      <ServerWaking />
       {children}
       {process.env.NODE_ENV === "development" && <ReactQueryDevtools initialIsOpen={false} />}
     </PersistQueryClientProvider>

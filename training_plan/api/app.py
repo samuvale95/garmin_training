@@ -23,6 +23,7 @@ from ..parser import TrainingPlanValidationError
 from ..strava_sync import StravaAuthError
 from . import garmin_session, schemas, user_tokenstore
 from .auth import AuthError, current_claims, current_user_id
+from . import cache as cache_module
 from .cache import cache
 from .routes_body import router as body_router
 from .routes_checkin import router as checkin_router
@@ -119,6 +120,7 @@ def _ensure_schema() -> None:
     agent_store.ensure_schema()
     admins.ensure_schema()
     garmin_push.ensure_schema()
+    cache_module.ensure_schema()
     # Raw interaction events live 60 days; trimming at startup is enough for a one-person app.
     try:
         interactions.purge_old()

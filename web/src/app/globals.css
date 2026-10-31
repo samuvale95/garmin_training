@@ -1011,3 +1011,16 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .goal-evaluation h4 { margin:0 0 8px; }
 .goal-evaluation > div { margin:14px 0; font-size:13px; }
 @media(min-width:900px) { .program-source-grid { grid-template-columns:1fr 1fr; }.goal-facts { grid-template-columns:1fr 1fr; }.program-steps li { font-size:13px; } }
+
+/* Route loading screens wait before appearing: a tab or detail page that arrives within
+   the delay never flashes a loader, which on a fast navigation read as a full reload. */
+@keyframes passo-appear-late {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.appear-late {
+  animation: passo-appear-late 180ms ease-out 450ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .appear-late { animation-duration: 1ms; }
+}

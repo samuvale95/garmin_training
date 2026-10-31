@@ -192,3 +192,29 @@ export function apiUrl(path: string): string {
   }
   return new URL(path, API_BASE_URL).toString();
 }
+
+/** Whether a failed request is worth repeating by itself: the server was asleep or briefly
+ * unreachable, not wrong. The free hosting tier sleeps after 15 idle minutes and takes
+ * 30-60 s to wake, longer than one request's timeout, so the first screen after a pause
+ * used to fail almost entirely with errors that a second attempt would not have had. */
+export function isTransientError(error: unknown): boolean {
+  if (error instanceof ApiError) return error.status === 502 || error.status === 503 || error.status === 504;
+  if (error instanceof DOMException) return error.name === "TimeoutError";
+  // fetch rejects with a TypeError when the connection itself fails.
+  return error instanceof TypeError;
+}
+
+/** Starts waking the server the moment the app opens, before any screen asks for data,
+ * and resolves when it answers. Long timeout on purpose: this is the one request that is
+ * expected to wait out a cold start. */
+export async function wakeServer(timeoutMs = 90_000): Promise<boolean> {
+  try {
+    const response = await fetch(new URL("/health", API_BASE_URL), {
+      cache: "no-store",
+      signal: requestSignal(undefined, timeoutMs),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}

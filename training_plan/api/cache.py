@@ -24,6 +24,8 @@ across a factory call, only around the store and the in-flight table.
 from __future__ import annotations
 
 import json
+import logging
+import pickle
 import threading
 import time
 from concurrent.futures import Future
@@ -34,6 +36,90 @@ from typing import Any, TypeVar
 from .. import db
 
 T = TypeVar("T")
+
+logger = logging.getLogger(__name__)
+
+# Stale-while-revalidate. For these namespaces an expired answer is still served -- at
+# once -- while a fresh one is fetched in the background, and the answer is also kept in
+# Postgres so a server that was asleep (Render's free tier sleeps after 15 idle minutes,
+# and loses this whole in-memory cache) answers from the last copy instead of making the
+# user wait for eleven Garmin calls. All are read-only snapshots of things that change
+# slowly (overnight wellness, the activity list, device, shoes); the calendar namespaces
+# are deliberately not here: after an edit the calendar must be exactly right, and those
+# entries are dropped outright (`invalidate_calendar`).
+SWR_NAMESPACES = frozenset({
+    "body:today", "body:load", "garmin:body_metrics", "garmin:activities", "garmin:device",
+    "garmin:profile", "garmin:day-energy", "strava:shoes", "strava:athlete", "strava:matches",
+    "strava:match", "coach:zones", "coach:technique", "coach:workout_analysis", "coach:trend",
+    "coach:execution", "profile:level", "nutrition:targets",
+})
+# Older than this an answer is not shown even as a placeholder: it would mislead.
+MAX_STALE_S = 24 * 60 * 60
+
+SNAPSHOT_SCHEMA = """
+CREATE TABLE IF NOT EXISTS api_cache_snapshot (
+    namespace  TEXT NOT NULL,
+    user_id    TEXT NOT NULL,
+    cache_key  TEXT NOT NULL,
+    value      BYTEA NOT NULL,
+    stored_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (namespace, user_id, cache_key)
+);
+"""
+
+
+def ensure_schema() -> None:
+    with db.connect() as conn:
+        conn.execute(SNAPSHOT_SCHEMA)
+
+
+def _key_text(key: Hashable) -> str:
+    return json.dumps(key, default=str, sort_keys=True)
+
+
+def _load_snapshot(namespace: str, user_id: str, key: Hashable) -> tuple[Any, float] | None:
+    """(value, age in seconds) from Postgres, or None. Any failure is just a miss."""
+    try:
+        with db.connect() as conn:
+            row = conn.execute(
+                "SELECT value, extract(epoch FROM now() - stored_at) FROM api_cache_snapshot "
+                "WHERE namespace = %s AND user_id = %s AND cache_key = %s",
+                [namespace, user_id, _key_text(key)],
+            ).fetchone()
+        if row is None or float(row[1]) > MAX_STALE_S:
+            return None
+        return pickle.loads(bytes(row[0])), float(row[1])  # noqa: S301 - our own rows only
+    except Exception:  # noqa: BLE001
+        logger.debug("cache snapshot read failed", exc_info=True)
+        return None
+
+
+def _save_snapshot(namespace: str, user_id: str, key: Hashable, value: Any) -> None:
+    try:
+        blob = pickle.dumps(value)
+        with db.connect() as conn:
+            conn.execute(
+                "INSERT INTO api_cache_snapshot (namespace, user_id, cache_key, value, stored_at) "
+                "VALUES (%s, %s, %s, %s, now()) ON CONFLICT (namespace, user_id, cache_key) "
+                "DO UPDATE SET value = EXCLUDED.value, stored_at = now()",
+                [namespace, user_id, _key_text(key), blob],
+            )
+    except Exception:  # noqa: BLE001 - the snapshot is a speed-up, never a requirement
+        logger.debug("cache snapshot write failed", exc_info=True)
+
+
+def _drop_snapshots(namespaces: Iterable[str] | None, user_id: str) -> None:
+    try:
+        with db.connect() as conn:
+            if namespaces is None:
+                conn.execute("DELETE FROM api_cache_snapshot WHERE user_id = %s", [user_id])
+            else:
+                conn.execute(
+                    "DELETE FROM api_cache_snapshot WHERE user_id = %s AND namespace = ANY(%s)",
+                    [user_id, list(namespaces)],
+                )
+    except Exception:  # noqa: BLE001
+        logger.debug("cache snapshot invalidation failed", exc_info=True)
 
 # How long each kind of answer stays good. Chosen from how fast the underlying thing
 # actually changes: the calendar only changes when this app writes to it, a workout's
@@ -130,6 +216,8 @@ class TTLCache:
         self._entries: dict[tuple[str, str, Hashable], tuple[float, Any]] = {}
         self._lock = threading.Lock()
         self._inflight: dict[tuple[str, str, Hashable], Future] = {}
+        # When each entry was stored, for the stale-while-revalidate age limit.
+        self._stored: dict[tuple[str, str, Hashable], float] = {}
 
     def get_or_call(
         self,
@@ -161,6 +249,11 @@ class TTLCache:
             hit = self._lookup(namespace, user_id, key)
             if hit is not None:
                 return hit[0]
+            if namespace in SWR_NAMESPACES:
+                stale = self._stale(namespace, user_id, key)
+                if stale is not None:
+                    self._refresh_in_background(namespace, user_id, key, ttl, factory)
+                    return stale[0]
 
             # Cross-process persistent check for expensive AI narratives
             if is_narrative_ns:
@@ -212,6 +305,9 @@ class TTLCache:
         value = factory()
         with self._lock:
             self._entries[(namespace, user_id, key)] = (time.monotonic() + ttl, value)
+            self._stored[(namespace, user_id, key)] = time.monotonic()
+        if namespace in SWR_NAMESPACES:
+            threading.Thread(target=_save_snapshot, args=(namespace, user_id, key, value), daemon=True).start()
 
         # Cross-process persistent write for expensive AI narratives
         if is_narrative_ns and hasattr(value, "model_dump"):
@@ -233,6 +329,7 @@ class TTLCache:
         """
         with self._lock:
             self._entries[(namespace, user_id, key)] = (time.monotonic() + ttl, value)
+            self._stored[(namespace, user_id, key)] = time.monotonic()
 
     def invalidate(self, namespaces: Iterable[str], user_id: str) -> None:
         """Drop this user's entries in these namespaces (used after a write)."""
@@ -240,6 +337,9 @@ class TTLCache:
         with self._lock:
             for entry_key in [k for k in self._entries if k[0] in targets and k[1] == user_id]:
                 del self._entries[entry_key]
+                self._stored.pop(entry_key, None)
+        if targets & SWR_NAMESPACES:
+            _drop_snapshots(targets & SWR_NAMESPACES, user_id)
         narrative_targets = [ns for ns in targets if "narrative" in ns]
         if narrative_targets:
             db.invalidate_narrative_cache(narrative_targets, user_id)
@@ -251,6 +351,8 @@ class TTLCache:
         with self._lock:
             for entry_key in [k for k in self._entries if k[1] == user_id]:
                 del self._entries[entry_key]
+                self._stored.pop(entry_key, None)
+        _drop_snapshots(None, user_id)
         db.invalidate_narrative_cache(
             [
                 "body:readiness-narrative",
@@ -276,9 +378,51 @@ class TTLCache:
                 return None
             expires_at, value = entry
             if expires_at <= time.monotonic():
-                del self._entries[(namespace, user_id, key)]
+                # Kept for stale-while-revalidate; `_stale` decides whether it may serve.
+                if namespace not in SWR_NAMESPACES:
+                    del self._entries[(namespace, user_id, key)]
+                    self._stored.pop((namespace, user_id, key), None)
                 return None
             return (value,)
+
+    def _stale(self, namespace: str, user_id: str, key: Hashable) -> tuple[Any] | None:
+        """An expired-but-recent answer from memory, else from the Postgres snapshot."""
+        entry_key = (namespace, user_id, key)
+        with self._lock:
+            entry = self._entries.get(entry_key)
+            stored = self._stored.get(entry_key)
+            if entry is not None and stored is not None and time.monotonic() - stored <= MAX_STALE_S:
+                return (entry[1],)
+        snapshot = _load_snapshot(namespace, user_id, key)
+        if snapshot is None:
+            return None
+        value, age = snapshot
+        with self._lock:
+            # Expired already (it is a snapshot): the refresh that follows replaces it.
+            self._entries[entry_key] = (time.monotonic() - 1, value)
+            self._stored[entry_key] = time.monotonic() - age
+        return (value,)
+
+    def _refresh_in_background(
+        self, namespace: str, user_id: str, key: Hashable, ttl: float, factory: Callable[[], Any]
+    ) -> None:
+        entry_key = (namespace, user_id, key)
+        with self._lock:
+            if entry_key in self._inflight:
+                return
+            flight = self._inflight[entry_key] = Future()
+
+        def work() -> None:
+            try:
+                flight.set_result(self._compute(namespace, user_id, key, ttl, factory, False))
+            except BaseException as exc:  # noqa: BLE001 - the stale answer stays; next read retries
+                flight.set_exception(exc)
+                logger.info("background refresh of %s failed: %s", namespace, exc)
+            finally:
+                with self._lock:
+                    self._inflight.pop(entry_key, None)
+
+        threading.Thread(target=work, daemon=True).start()
 
 
 cache = TTLCache()
