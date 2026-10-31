@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { SlideUp } from "@/components/motion/primitives";
+import { RaceAnalysisCard } from "@/components/RaceAnalysisCard";
 import type { CausalFinding, StreamBreakpoint, WorkoutAnalysis, WorkoutSegment } from "@/lib/types";
 
 const CATEGORY_STYLE: Record<
@@ -127,6 +128,10 @@ export function WorkoutAnalysisSection({
         </div>
       </SlideUp>
 
+      {analysis.race_analysis && (
+        <RaceAnalysisCard race={analysis.race_analysis} reliability={analysis.hr_reliability} animate={animate} />
+      )}
+
       {/* Breakpoints / Chronological Events Timeline */}
       {hasAnomalies && (
         <div style={{ marginTop: 18 }}>
@@ -177,7 +182,8 @@ export function WorkoutAnalysisSection({
       )}
 
       {/* Mechanics Evolution: Splits per 5km */}
-      {analysis.segments && analysis.segments.length > 0 && (
+      {/* The race analysis has its own 5 km blocks; showing these too would say it twice. */}
+      {!analysis.race_analysis && analysis.segments && analysis.segments.length > 0 && (
         <div style={{ marginTop: 20 }}>
           <button
             type="button"

@@ -1229,4 +1229,72 @@ export interface WorkoutAnalysis {
   segments: WorkoutSegment[];
   mechanics_summary: Record<string, unknown>;
   vigilia_context: Record<string, unknown>;
+  hr_reliability?: HrReliability | null;
+  race_analysis?: RaceAnalysis | null;
+}
+
+export interface HrReliability {
+  verdict: "affidabile" | "dubbia" | "inaffidabile";
+  unreliable_from_s: number | null;
+  unreliable_from_km: number | null;
+  locked_share: number;
+  dropout_share: number;
+  reasons: string[];
+  hr_source: "chest_strap" | "wrist" | "unknown" | null;
+  steps: {
+    time_s: number;
+    distance_km: number | null;
+    hr_before: number;
+    hr_after: number;
+    cadence_after: number | null;
+    pace_change_pct: number;
+    locked_to_cadence: boolean;
+  }[];
+}
+
+export type RaceSection =
+  | "insights" | "halves" | "fade" | "splits_5k" | "consistency" | "decoupling"
+  | "km_splits" | "mechanics" | "terrain" | "patterns";
+
+export interface RaceSplit {
+  pace_sec: number | null;
+  pace: string;
+  hr: number | null;
+  cadence: number | null;
+  stride_m: number | null;
+  gain_m: number;
+  vs_avg_pct: number | null;
+}
+
+export interface RaceAnalysis {
+  level: 1 | 2 | 3;
+  visible_sections: RaceSection[];
+  is_marathon: boolean;
+  distance_km: number;
+  time: string;
+  avg_pace: string;
+  insights: { tone: "good" | "warn" | "bad" | "neutral"; title: string; text: string }[];
+  halves: {
+    first_time: string; second_time: string; first_pace: string; second_pace: string;
+    difference_s: number; split_pct: number; kind: "negativo" | "pari" | "positivo" | "crollo";
+  };
+  splits_5k: (RaceSplit & { label: string; start_km: number; end_km: number; time: string })[];
+  km_splits: (RaceSplit & { km: number; gap_pace: string })[];
+  consistency: {
+    cv_pct: number; rating: string; fastest_km: number; fastest_pace: string; slowest_km: number; slowest_pace: string;
+  } | null;
+  fade: { from_km: number; before_pace: string; after_pace: string; change_pct: number; kind: "muro" | "calo" | "tenuta" } | null;
+  decoupling:
+    | { available: true; pct: number; rating: string; hr_first: number; hr_second: number }
+    | { available: false; reason: string };
+  mechanics: {
+    cadence_start: number; cadence_end: number; cadence_change_pct: number;
+    stride_start_m: number; stride_end_m: number; stride_change_pct: number;
+    speed_follows_cadence: number | null; speed_follows_stride: number | null;
+  } | null;
+  terrain: { gain_m: number; seconds_per_grade_pct: number | null; flat: boolean } | null;
+  patterns: {
+    stops: { km: number; seconds: number }[]; stopped_s: number;
+    fast_kms: number[]; slow_kms: number[]; hr_follows_pace: number | null;
+  };
 }
