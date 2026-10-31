@@ -38,6 +38,7 @@ from .routes_energy import router as energy_router
 from .routes_events import router as events_router
 from .routes_agents import cron_router as agents_cron_router
 from .routes_agents import router as agents_router
+from .routes_diagnostics import router as diagnostics_router
 
 # The CLI (cli.py) calls this too, but `uvicorn training_plan.api:app` never goes
 # through cli.py -- without this, GARMIN_EMAIL/GARMIN_PASSWORD/STRAVA_* in a local
@@ -161,6 +162,8 @@ app.include_router(events_router, tags=["events"], dependencies=_auth_gate)
 app.include_router(agents_router, tags=["agents"], dependencies=_auth_gate)
 # Not JWT-gated: the scheduler has no user session. Guarded by AGENTS_CRON_SECRET instead.
 app.include_router(agents_cron_router, tags=["agents"])
+# Not JWT-gated either: read-only summaries for maintenance, behind PASSO_DIAGNOSTICS_TOKEN.
+app.include_router(diagnostics_router, tags=["diagnostics"])
 
 
 @app.get("/health")
