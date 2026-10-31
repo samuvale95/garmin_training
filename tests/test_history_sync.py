@@ -113,11 +113,15 @@ def test_a_strava_failure_does_not_undo_the_garmin_half(monkeypatch):
         def get_activity_streams(self, activity_id):
             return None
 
+        def get_activity_hr_source(self, activity_id):
+            return None
+
     monkeypatch.setattr(backfill, "GarminSync", FakeGarmin)
     monkeypatch.setattr(
         backfill, "backfill_garmin_activities", lambda *a, **kw: backfill.BackfillReport(activities_written=3)
     )
     monkeypatch.setattr(history, "activities_needing_stream", lambda *a: [])
+    monkeypatch.setattr(history, "activities_needing_hr_source", lambda *a: [])
     monkeypatch.setattr(backfill, "backfill_streams", lambda *a, **kw: backfill.BackfillReport())
 
     def strava_down(*a, **kw):

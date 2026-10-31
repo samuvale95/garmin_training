@@ -70,6 +70,7 @@ class BackfillReport:
     days_failed: int = 0
     activities_written: int = 0
     streams_written: int = 0
+    hr_sources_written: int = 0
     stream_packed_bytes: int = 0
     stream_raw_bytes: int = 0
     stopped_early: str | None = None
@@ -81,6 +82,7 @@ class BackfillReport:
         self.days_failed += other.days_failed
         self.activities_written += other.activities_written
         self.streams_written += other.streams_written
+        self.hr_sources_written += other.hr_sources_written
         self.stream_packed_bytes += other.stream_packed_bytes
         self.stream_raw_bytes += other.stream_raw_bytes
         self.stopped_early = self.stopped_early or other.stopped_early
@@ -477,6 +479,38 @@ def backfill_streams(
     return report
 
 
+def backfill_hr_sources(
+    user_id: str,
+    *,
+    activity_ids: list[int],
+    fetch: Callable[[int], str | None],
+    pause_s: float,
+) -> BackfillReport:
+    """Which sensor recorded each Garmin activity's heart rate, chest strap or wrist.
+
+    What lets a heart-rate anomaly be blamed on the optical sensor, or not: the same
+    pattern on strap-recorded runs means it is not the watch. An answer the summary does
+    not give is stored as `unknown`, so it is not asked for again on every sync.
+    """
+    report = BackfillReport()
+    for activity_id in activity_ids:
+        try:
+            source = _with_retry(lambda: fetch(activity_id), f"hr source {activity_id}")
+        except GarminRateLimitError as error:
+            logger.warning("rate limit reading hr source %s; stopping this run", activity_id)
+            report.stopped_early = str(error)
+            break
+        except Exception as error:  # noqa: BLE001 - one unreadable activity is not a failed run
+            logger.warning("hr source failed for %s", activity_id, exc_info=True)
+            report.errors.append(f"hr_source {activity_id}: {type(error).__name__}")
+            time.sleep(pause_s)
+            continue
+        if _write_with_retry(lambda: history.save_hr_source(user_id, activity_id, source or "unknown")):
+            report.hr_sources_written += 1
+        time.sleep(pause_s)
+    return report
+
+
 # ---- the whole thing ----------------------------------------------------------------------
 
 
@@ -528,6 +562,17 @@ def run(
                     fetch=sync.get_activity_streams,
                     pause_s=GARMIN_DETAIL_PAUSE_S,
                     on_progress=progress("garmin_streams"),
+                )
+            )
+        if streams and not report.stopped_early:
+            report.merge(
+                backfill_hr_sources(
+                    user_id,
+                    activity_ids=history.activities_needing_hr_source(
+                        user_id, last - timedelta(days=days), last
+                    ),
+                    fetch=sync.get_activity_hr_source,
+                    pause_s=GARMIN_DETAIL_PAUSE_S,
                 )
             )
 

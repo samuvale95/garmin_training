@@ -904,6 +904,23 @@ class GarminSync:
             raise GarminSyncError(f"Could not read Garmin activity {activity_id}: {exc}") from exc
         return parse_activity_streams(details)
 
+    def get_activity_hr_source(self, activity_id: int) -> str | None:
+        """Where this activity's heart rate came from: `chest_strap`, `wrist` or None.
+
+        One summary call per activity -- the details payload the streams come from does
+        not list the paired sensors.
+        """
+        try:
+            summary = self.client.get_activity(str(activity_id))
+        except GarminConnectTooManyRequestsError as exc:
+            raise GarminRateLimitError(
+                f"Garmin rate-limited this IP (HTTP 429) reading activity {activity_id}: {exc}",
+                retry_after_seconds=RATE_LIMIT_COOLDOWN_SECONDS,
+            ) from exc
+        except Exception as exc:  # noqa: BLE001 - surfaced as a clean per-activity error
+            raise GarminSyncError(f"Could not read Garmin activity {activity_id}: {exc}") from exc
+        return parse_hr_source(summary)
+
     def select_workouts(
         self,
         workouts: list[ScheduledWorkout],
@@ -1234,7 +1251,39 @@ _DETAIL_CHANNELS = {
     "directHeartRate": "heartrate",
     "directSpeed": "velocity_smooth",
     "sumDuration": "time",
+    # Steps per minute, both legs: what the cadence-lock check compares heart rate with.
+    "directDoubleCadence": "cadence",
+    "sumDistance": "distance",
+    "directElevation": "altitude",
 }
+
+
+# The fields a paired sensor's type can sit under in `metadataDTO.sensors`: ANT+ and
+# Bluetooth report it separately.
+_SENSOR_TYPE_FIELDS = ("antplusDeviceType", "bleDeviceType", "sensorType", "localDeviceType")
+
+
+def parse_hr_source(summary: object) -> str | None:
+    """`chest_strap` when an external heart-rate sensor was paired, `wrist` when the
+    activity lists its sensors and none of them is one, None when it cannot be told.
+
+    The summary payload is undocumented. A sensor list that is missing altogether is
+    None, not `wrist`: guessing the optical sensor would put a strap-recorded run on the
+    wrong side of the very comparison this is for.
+    """
+    if not isinstance(summary, dict):
+        return None
+    metadata = summary.get("metadataDTO")
+    sensors = metadata.get("sensors") if isinstance(metadata, dict) else None
+    if not isinstance(sensors, list):
+        return None
+    for sensor in sensors:
+        if not isinstance(sensor, dict):
+            continue
+        kinds = " ".join(str(sensor.get(field) or "") for field in _SENSOR_TYPE_FIELDS).upper()
+        if "HEART_RATE" in kinds and "WRIST" not in kinds:
+            return "chest_strap"
+    return "wrist"
 
 
 def parse_activity_streams(details: object) -> dict[str, list] | None:
