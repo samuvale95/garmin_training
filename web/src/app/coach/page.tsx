@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+
+const noSubscribe = () => () => {};
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton, SlideUp } from "@/components/motion/primitives";
@@ -53,12 +55,15 @@ export default function CoachPage() {
   const animate = useMountOnce("coach");
   const today = toDateKey(new Date());
   const activitiesQuery = useActivities(shiftDateKey(today, -LOOKBACK_DAYS), today);
-  // `/coach?activity=<id>` (from the home's long-run card) opens on that activity.
-  const [selectedId, setSelectedId] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null;
-    const requested = Number(new URLSearchParams(window.location.search).get("activity"));
-    return Number.isFinite(requested) && requested > 0 ? requested : null;
-  });
+  // `/coach?activity=<id>` (from the home's long-run card) opens on that activity. Read
+  // through useSyncExternalStore so the server render (no URL) and the hydration agree.
+  const requested = useSyncExternalStore(
+    noSubscribe,
+    () => Number(new URLSearchParams(window.location.search).get("activity")) || 0,
+    () => 0
+  );
+  const [picked, setSelectedId] = useState<number | null>(null);
+  const selectedId = picked ?? (requested > 0 ? requested : null);
 
   const readable = useMemo(
     () =>
@@ -86,6 +91,53 @@ export default function CoachPage() {
   const isAnalyzable = form ? (form.sport === "running" || form.sport.includes("run") || form.sport === "cycling" || form.sport.includes("bike")) : true;
   const analysisQuery = useWorkoutAnalysis(activityId, isAnalyzable);
   const analysisNarrativeQuery = useWorkoutAnalysisNarrative(activityId, isAnalyzable && !!analysisQuery.data);
+  // A long run or a race leads with its own analysis; the general guides and an empty
+  // "no technique data" block would only push it down the page.
+  const leadWithAnalysis = !!analysisQuery.data?.race_analysis;
+  const guides = (
+    <>
+          {/* The block-level read sits above the per-session one on purpose: a single
+                session's form metrics are interesting, but the distribution across eight
+                weeks is the thing that actually changes how someone trains. */}
+            {/* The diagnosis-and-prescription screen leads: it is the only one here that
+                goes from a measurement to a session in the plan, and it needs no imported
+                plan to work. */}
+            <SlideUp active={animate} delayMs={30} style={{ marginTop: 18 }}>
+              <Link data-track="coach.coach-allenarsi"
+                href="/coach/allenarsi"
+                className="press-soft"
+                style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card)", padding: "16px 18px", textDecoration: "none" }}
+              >
+                <div style={{ flex: 1 }}>
+                  <p style={{ font: "600 15.5px/1.2 var(--font-sans)", margin: 0 }}>Come ti alleni</p>
+                  <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-su-scuro)", margin: "6px 0 0", lineHeight: 1.35 }}>
+                    Un anno di corse contro il riferimento della ricerca, e le sedute che
+                    cambierebbero il quadro.
+                  </p>
+                </div>
+                <ChevronRight size={18} style={{ color: "var(--crema)", flex: "none" }} />
+              </Link>
+            </SlideUp>
+  
+            <SlideUp active={animate} delayMs={40} style={{ marginTop: 10 }}>
+              <Link data-track="coach.coach-esecuzione"
+                href="/coach/esecuzione"
+                className="press-soft"
+                style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "15px 18px", textDecoration: "none", color: "inherit" }}
+              >
+                <div style={{ flex: 1 }}>
+                  <p style={{ font: "600 15.5px/1.2 var(--font-sans)", margin: 0 }}>Come ti alleni davvero</p>
+                  <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-70)", margin: "6px 0 0", lineHeight: 1.35 }}>
+                    Otto settimane di sedute lette secondo per secondo, contro quello che il piano
+                    chiedeva e contro il riferimento della ricerca.
+                  </p>
+                </div>
+                <ChevronRight size={18} style={{ color: "var(--inchiostro-50)", flex: "none" }} />
+              </Link>
+            </SlideUp>
+  
+      </>
+  );
 
   return (
     <div style={{ padding: "22px 20px 40px" }}>
@@ -103,45 +155,7 @@ export default function CoachPage() {
         <EmptyState />
       ) : (
         <>
-          {/* The block-level read sits above the per-session one on purpose: a single
-              session's form metrics are interesting, but the distribution across eight
-              weeks is the thing that actually changes how someone trains. */}
-          {/* The diagnosis-and-prescription screen leads: it is the only one here that
-              goes from a measurement to a session in the plan, and it needs no imported
-              plan to work. */}
-          <SlideUp active={animate} delayMs={30} style={{ marginTop: 18 }}>
-            <Link data-track="coach.coach-allenarsi"
-              href="/coach/allenarsi"
-              className="press-soft"
-              style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card)", padding: "16px 18px", textDecoration: "none" }}
-            >
-              <div style={{ flex: 1 }}>
-                <p style={{ font: "600 15.5px/1.2 var(--font-sans)", margin: 0 }}>Come ti alleni</p>
-                <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-su-scuro)", margin: "6px 0 0", lineHeight: 1.35 }}>
-                  Un anno di corse contro il riferimento della ricerca, e le sedute che
-                  cambierebbero il quadro.
-                </p>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--crema)", flex: "none" }} />
-            </Link>
-          </SlideUp>
-
-          <SlideUp active={animate} delayMs={40} style={{ marginTop: 10 }}>
-            <Link data-track="coach.coach-esecuzione"
-              href="/coach/esecuzione"
-              className="press-soft"
-              style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: "15px 18px", textDecoration: "none", color: "inherit" }}
-            >
-              <div style={{ flex: 1 }}>
-                <p style={{ font: "600 15.5px/1.2 var(--font-sans)", margin: 0 }}>Come ti alleni davvero</p>
-                <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-70)", margin: "6px 0 0", lineHeight: 1.35 }}>
-                  Otto settimane di sedute lette secondo per secondo, contro quello che il piano
-                  chiedeva e contro il riferimento della ricerca.
-                </p>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--inchiostro-50)", flex: "none" }} />
-            </Link>
-          </SlideUp>
+          {!leadWithAnalysis && guides}
 
           <ActivityPicker activities={readable} selectedId={activityId} onSelect={setSelectedId} animate={animate} />
 
@@ -152,15 +166,23 @@ export default function CoachPage() {
             </div>
           ) : (
             <>
-              <FocusBlock form={form} animate={animate} narrativeText={narrativeQuery.data?.text} />
+              {leadWithAnalysis && analysisQuery.data && (
+                <WorkoutAnalysisSection
+                  analysis={analysisQuery.data}
+                  narrativeText={analysisNarrativeQuery.data?.text}
+                  animate={animate}
+                />
+              )}
 
-              <SlideUp active={animate} delayMs={160} style={{ display: "flex", gap: 9, marginTop: 12 }}>
+              {!(leadWithAnalysis && !form.has_metrics) && <FocusBlock form={form} animate={animate} narrativeText={narrativeQuery.data?.text} />}
+
+              {!leadWithAnalysis && <SlideUp active={animate} delayMs={160} style={{ display: "flex", gap: 9, marginTop: 12 }}>
                 <Stat label="distanza" value={form.distance_km != null ? `${form.distance_km} km` : "—"} />
                 <Stat label="ritmo medio" value={formatPaceOrDash(form.average_pace_sec_per_km)} />
                 <Stat label="cuore" value={form.average_heart_rate != null ? `${form.average_heart_rate} bpm` : "—"} />
-              </SlideUp>
+              </SlideUp>}
 
-              {!form.has_metrics && (
+              {!form.has_metrics && !leadWithAnalysis && (
                 <SlideUp active={animate} delayMs={200} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 18, marginTop: 12 }}>
                   <p style={{ fontWeight: 600, fontSize: 15, margin: 0 }}>Per questa seduta non c&apos;è niente da leggere</p>
                   <p className="font-serif-italic" style={{ fontSize: 14.5, color: "var(--inchiostro-70)", margin: "8px 0 0", lineHeight: 1.35 }}>
@@ -181,7 +203,7 @@ export default function CoachPage() {
                 />
               )}
 
-              {analysisQuery.data && (
+              {analysisQuery.data && !leadWithAnalysis && (
                 <WorkoutAnalysisSection
                   analysis={analysisQuery.data}
                   narrativeText={analysisNarrativeQuery.data?.text}
@@ -201,6 +223,8 @@ export default function CoachPage() {
                   </div>
                 </div>
               )}
+
+              {leadWithAnalysis && <div style={{ marginTop: 22 }}>{guides}</div>}
 
               <p style={{ fontSize: 12, color: "var(--inchiostro-35)", margin: "18px 0 0", lineHeight: 1.45 }}>
                 Ogni riferimento qui sopra è una fascia di popolazione, non un obiettivo: i numeri

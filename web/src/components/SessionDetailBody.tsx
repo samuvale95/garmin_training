@@ -335,7 +335,7 @@ export function SessionDetailBody({
                     Passo target
                   </span>
                   <span className="font-mono" style={{ display: "block", fontSize: 15, fontWeight: 600, color: "var(--inchiostro)", marginTop: 2 }}>
-                    {fallbackPace ? `${formatPaceValue(fallbackPace)}/km` : "Libero"}
+                    {fallbackPace ? formatPaceValue(fallbackPace) : "Libero"}
                   </span>
                 </div>
 
@@ -676,7 +676,7 @@ export function SessionDetailBody({
               </div>
               <p className="font-mono" style={{ fontSize: 13, fontWeight: 600, color: "var(--inchiostro)", margin: "3px 0 0" }}>
                 {matchData.distance_km != null ? `${matchData.distance_km.toFixed(1)} km` : "—"}
-                {matchData.avg_pace_sec_per_km != null && ` · ${formatPaceValue(matchData.avg_pace_sec_per_km)}/km`}
+                {matchData.avg_pace_sec_per_km != null && ` · ${formatPaceValue(matchData.avg_pace_sec_per_km)}`}
               </p>
               <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "3px 0 0" }}>
                 Tocca per confrontare pianificato e svolto

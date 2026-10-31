@@ -306,8 +306,10 @@ export function WeekPageContent() {
 
   const summaryText = liveMode
     ? `${weekSessions.length} sedute (calendario Garmin)`
-    : showProgress
-      ? `${doneKm.toFixed(0)} / ${weekKm.toFixed(0)} km · ${weekSessions.length} sedute`
+    : showProgress && weekKm > 0
+      ? `${doneKm.toFixed(0)} km fatti · ${weekKm.toFixed(0)} in piano · ${weekSessions.length} sedute`
+      : showProgress && doneKm > 0
+      ? `${doneKm.toFixed(0)} km fatti · nessuna seduta in piano`
       : `${weekKm.toFixed(0)} km · ${weekSessions.length} sedute`;
 
   // The session the week is waiting on: today's, unless it is already done, else the

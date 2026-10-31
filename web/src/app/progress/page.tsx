@@ -49,7 +49,7 @@ export default function ProgressPage() {
                 <Tokens tokens={data.tokens} max={data.max_tokens} />
                 <span style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)" }}>salva-serie</span>
               </div>
-              <p className="font-serif-italic" style={{ fontSize: 14, lineHeight: 1.35, margin: "12px 0 0" }}>
+              <p className="font-serif-italic" style={{ fontSize: 14, lineHeight: 1.35, margin: "12px 0 0", color: "var(--crema)", opacity: 0.85 }}>
                 {data.mascot.sentence}
               </p>
             </div>

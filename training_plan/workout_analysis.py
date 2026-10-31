@@ -462,8 +462,10 @@ def analyze_workout_streams(
         i += 30  # evaluate every 30 seconds
 
     if reliability is not None:
-        for step in reliability.steps[:2]:
-            breakpoints.append(_sensor_breakpoint(step, time_stream, dist_stream))
+        # The step that decides the verdict only: an earlier smaller one (a dip in the
+        # baseline) shown next to it read as a second, unexplained event.
+        if reliability.key_step is not None:
+            breakpoints.append(_sensor_breakpoint(reliability.key_step, time_stream, dist_stream))
         if reliability.steps:
             findings.insert(0, _sensor_finding(reliability, hr_source))
 
@@ -1020,7 +1022,8 @@ def analyze_workout_streams(
     if avg_hr:
         summary_deterministic += f" FC media {avg_hr} bpm."
     if breakpoints:
-        summary_deterministic += f" {len(breakpoints)} punto di rottura individuato."
+        n_breaks = len(breakpoints)
+        summary_deterministic += " 1 punto di rottura individuato." if n_breaks == 1 else f" {n_breaks} punti di rottura individuati."
 
     return WorkoutAnalysisResult(
         activity_id=activity_id,

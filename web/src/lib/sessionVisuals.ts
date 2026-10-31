@@ -85,10 +85,13 @@ export function classifySession(session: DisplaySession | null): SessionVisual {
 
   const steps = effectiveSteps(session);
   const efforts = flattenSteps(steps).filter((s) => s.type === "interval").length;
-  if (steps.some(isRepeatBlock) || efforts > 1) return { kind: "ripetute", ...VISUALS.ripetute };
+  if (steps.some(isRepeatBlock)) return { kind: "ripetute", ...VISUALS.ripetute };
+  // Checked before "several efforts": a long run with a faster finish (18 km easy, then
+  // 3 km at marathon pace) has two efforts and is still a long run, not a rep session.
   if (sessionDistanceKm(session) >= LONG_RUN_KM) {
     return { kind: "lungo", ...VISUALS.lungo, illustration: "corsa" };
   }
+  if (efforts > 1) return { kind: "ripetute", ...VISUALS.ripetute };
   return { kind: "fondo_lento", ...VISUALS.fondo_lento };
 }
 
