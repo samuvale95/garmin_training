@@ -516,7 +516,7 @@ def activities_between(
     that duplicates a Garmin one is left out (see `resolve_duplicates`)."""
     columns = ("source", "activity_id", "day", "sport", "title", "distance_km", "duration_min",
                "avg_hr", "max_hr", "avg_cadence", "avg_power", "elevation_gain", "start_time",
-               "calories", "calories_source")
+               "calories", "calories_source", "hr_source")
     canonical = "AND duplicate_of IS NULL " if canonical_only else ""
     with db.connect() as conn, conn.cursor() as cur:
         cur.execute(

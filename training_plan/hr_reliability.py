@@ -18,6 +18,7 @@ resampled (a sample every 15-20 s on a marathon) and Garmin's are not, and a win
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from itertools import pairwise
@@ -136,7 +137,12 @@ def _mean(bins: list[_Bin], attr: str) -> float | None:
 
 
 def _between(bins: list[_Bin], start: float, end: float) -> list[_Bin]:
-    return [b for b in bins if start <= b.t < end]
+    """The bins in [start, end); `bins` is sorted by time, so two bisections."""
+    return bins[bisect_left(bins, start, key=_bin_t) : bisect_left(bins, end, key=_bin_t)]
+
+
+def _bin_t(b: _Bin) -> float:
+    return b.t
 
 
 def _dropout_share(streams: dict[str, Sequence[float | None]]) -> float:
@@ -212,11 +218,20 @@ def assess(streams: dict[str, Sequence[float | None]] | None) -> HrReliability |
             top = _between(bins, best_t, best_t + WINDOW_S)
             hr_top = _mean(top, "hr") or hr_a
             cad_top = _mean(top, "cadence")
-            onset = _between(bins, t - RAMP_S, t + BIN_S)
-            dist = next((b.distance for b in onset if b.distance is not None), None)
+            # The step starts at the first bin that has left the baseline by a quarter of
+            # the rise, not at the edge of the search window.
+            rising = [
+                b for b in _between(bins, t - RAMP_S, best_t + WINDOW_S)
+                if b.hr is not None and b.hr >= hr_b + 0.25 * (hr_top - hr_b)
+            ]
+            onset_bin = rising[0] if rising else _between(bins, t - RAMP_S, t + BIN_S)[0]
+            onset_dist = next(
+                (b.distance for b in _between(bins, onset_bin.t, onset_bin.t + 60) if b.distance is not None), None
+            )
+            dist = onset_dist
             steps.append(
                 SensorStep(
-                    time_s=int(t - RAMP_S),
+                    time_s=int(onset_bin.t - bins[0].t),
                     distance_km=round(dist / 1000, 2) if dist is not None else None,
                     hr_before=round(hr_b),
                     hr_after=round(hr_top),

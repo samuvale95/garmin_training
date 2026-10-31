@@ -289,6 +289,10 @@ Regole assolute:
 - Se c'è stato un Cadence Lock (aggancio del sensore ottico alla cadenza dei passi), rassicura
   l'atleta spiegando che si tratta di un artefatto del sensore ottico e non di un problema cardiaco.
 - Se c'è stato un cedimento di falcata o una partenza troppo veloce, spiega il meccanismo fisico.
+- Se c'è "analisi_gara", parti da come è stata gestita la corsa (le metà, il calo finale) e
+  adatta il dettaglio a "livello_atleta": 1 parole semplici e niente sigle, 3 linguaggio tecnico.
+- Se "affidabilita_battito" non è "affidabile", non trarre conclusioni dai battiti del tratto
+  indicato e dillo.
 - Tono asciutto, tecnico, adulto, privo di allarmismi e di esclamativi o emoji.
 - Rispondi solo con le frasi, senza virgolette e senza preamboli."""
 
@@ -300,7 +304,7 @@ def _write_sentence(system_prompt: str, facts: dict) -> str | None:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": json.dumps(facts, ensure_ascii=False)},
         ],
-        max_tokens=200,
+        max_tokens=260,
         json_object=False,
     )
     if content is None:

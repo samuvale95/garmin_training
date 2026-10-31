@@ -148,6 +148,18 @@ async def coach_workout_analysis_narrative(
                 {"titolo": f.title, "cosa": f.what_happened, "perche": f.why_it_happened, "azione": f.how_to_improve}
                 for f in result.findings
             ],
+            "affidabilita_battito": result.hr_reliability,
+            "analisi_gara": (
+                {
+                    "livello_atleta": result.race_analysis["level"],
+                    "punti_chiave": result.race_analysis["insights"],
+                    "meta": result.race_analysis["halves"],
+                    "calo_finale": result.race_analysis["fade"],
+                    "tenuta_aerobica": result.race_analysis["decoupling"],
+                }
+                if result.race_analysis
+                else None
+            ),
         }
         text = llm.write_workout_diagnosis(facts)
         if text:
