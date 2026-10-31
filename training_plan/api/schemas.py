@@ -2821,6 +2821,8 @@ class WorkoutAnalysisResponse(BaseModel):
     segments: list[WorkoutSegmentOut] = Field(default_factory=list)
     mechanics_summary: dict[str, Any] = Field(default_factory=dict)
     vigilia_context: dict[str, Any] = Field(default_factory=dict)
+    hr_reliability: dict[str, Any] | None = None
+    race_analysis: dict[str, Any] | None = None
 
     @classmethod
     def from_model(cls, res: "workout_analysis.WorkoutAnalysisResult") -> "WorkoutAnalysisResponse":
@@ -2842,6 +2844,8 @@ class WorkoutAnalysisResponse(BaseModel):
             segments=[WorkoutSegmentOut.from_model(s) for s in res.segments],
             mechanics_summary=res.mechanics_summary,
             vigilia_context=res.vigilia_context,
+            hr_reliability=res.hr_reliability,
+            race_analysis=res.race_analysis,
         )
 
 

@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from datetime import date as date_type, timedelta
 from typing import Any, Literal, Sequence
 
-from . import db, history, intensity, nutrition
+from . import db, history, hr_reliability, intensity, nutrition, race_analysis
 from .hr_cleaning import clean_heart_rate_stream
 
 
@@ -34,6 +34,7 @@ class StreamBreakpoint:
         "hill_surge",
         "metabolic_wall",
         "pacing_trap",
+        "hr_sensor_step",
     ]
     headline: str
     detail: str
@@ -89,6 +90,10 @@ class WorkoutAnalysisResult:
     segments: list[WorkoutSegment] = field(default_factory=list)
     mechanics_summary: dict[str, Any] = field(default_factory=dict)
     vigilia_context: dict[str, Any] = field(default_factory=dict)
+    # `hr_reliability.assess`, flattened for the screen; None without a heart rate.
+    hr_reliability: dict[str, Any] | None = None
+    # `race_analysis.analyze` for runs long enough to have one.
+    race_analysis: dict[str, Any] | None = None
 
 
 def format_pace(sec_per_km: int | float | None) -> str:
@@ -162,6 +167,8 @@ def analyze_workout_streams(
     baseline_rhr: float | None = None,
     carbs_prev_day_g: float | None = None,
     carbs_target_g: float | None = None,
+    level: int = 1,
+    hr_source: str | None = None,
 ) -> WorkoutAnalysisResult:
     """Core deterministic analyzer for a single workout's streams."""
     time_stream = [float(t) for t in streams.get("time", []) if t is not None]
@@ -214,6 +221,21 @@ def analyze_workout_streams(
     )
     hr_stream = cleaned_hr_res.cleaned_heart_rates
 
+    # 2b. Whether the heart rate is the heart at all. A sensor that locked onto the step
+    # rhythm is excluded from everything downstream -- halves, splits, decoupling -- from
+    # the moment it locked, instead of being read as a 20 bpm effort.
+    reliability = hr_reliability.assess(streams)
+    unreliable_from = (
+        reliability.unreliable_from_s
+        if reliability is not None and reliability.verdict == "inaffidabile"
+        else None
+    )
+    if unreliable_from is not None:
+        hr_stream = [
+            None if t >= time_stream[0] + unreliable_from else h
+            for t, h in zip(time_stream, hr_stream)
+        ]
+
     # 3. Derive stride length (meters per stride = speed (m/s) * 60 / cadence (spm))
     stride_lengths: list[float | None] = []
     for s, c in zip(speeds, cadences):
@@ -257,6 +279,10 @@ def analyze_workout_streams(
     while i < n - min_elevated_window:
         t_now = time_stream[i]
         d_now = dist_stream[i] / 1000.0
+        # Past the point the sensor stopped reading the heart, no heart-rate step means
+        # anything; the reliability finding below stands for all of it.
+        if unreliable_from is not None and t_now - time_stream[0] >= unreliable_from - step_window:
+            break
 
         before_hr_chunk = [
             h for h in raw_hr[i - step_window : i] if h is not None and h > 30
@@ -342,91 +368,6 @@ def analyze_workout_streams(
                     grade_in_window = (delta_a / delta_d) * 100.0
 
                 min_mark = int(round(t_now / 60.0))
-
-                # CHECK A: Cadence Lock
-                # If HR jumps close to cadence (within 4 bpm) while speed is stable (+-10%)
-                is_cadence_lock = False
-                if cad_after and abs(hr_after - cad_after) <= 4.0:
-                    if (
-                        cad_before
-                        and abs(hr_before - cad_before) > 10.0
-                        and abs(spd_after - spd_before) / max(spd_before, 1.0)
-                        < 0.12
-                    ):
-                        is_cadence_lock = True
-
-                if is_cadence_lock:
-                    bp = StreamBreakpoint(
-                        time_sec=int(t_now),
-                        distance_km=round(d_now, 2),
-                        kind="cadence_lock",
-                        headline=f"Aggancio Cadenza (Cadence Lock) al minuto {min_mark}",
-                        detail=(
-                            f"Al min {min_mark} i battiti sono balzati da {round(hr_before)} a {round(hr_after)} bpm "
-                            f"(+{round(delta_hr)} bpm), agganciando esattamente la tua cadenza di corsa ({round(cad_after)} spm) "
-                            f"a passo costante ({format_pace(1000.0/spd_after if spd_after>0 else 0)})."
-                        ),
-                        before_metrics={
-                            "hr": round(hr_before),
-                            "cadence": (
-                                round(cad_before) if cad_before else "—"
-                            ),
-                            "pace": format_pace(
-                                1000.0 / spd_before if spd_before > 0 else 0
-                            ),
-                        },
-                        after_metrics={
-                            "hr": round(hr_after),
-                            "cadence": round(cad_after) if cad_after else "—",
-                            "pace": format_pace(
-                                1000.0 / spd_after if spd_after > 0 else 0
-                            ),
-                        },
-                    )
-                    breakpoints.append(bp)
-                    findings.append(
-                        CausalFinding(
-                            key="cadence_lock",
-                            category="sensore",
-                            confidence="alta",
-                            evidence_badge="stream secondo-per-secondo",
-                            title=f"Perché il battito è schizzato al minuto {min_mark} (+{round(delta_hr)} bpm)",
-                            what_happened=(
-                                f"Al minuto {min_mark} ({d_now:.1f} km), la frequenza cardiaca è passata da {round(hr_before)} a {round(hr_after)} bpm "
-                                f"in pochi secondi, pur mantenendo lo stesso passo in pianura."
-                            ),
-                            why_it_happened=(
-                                f"I dati dimostrano un classico fenomeno di 'Cadence Lock': il sensore ottico al polso "
-                                f"ha perso l'onda sfigmica (spesso per sudore o assestamento dell'orologio dopo ~45-50 minuti) "
-                                f"e ha iniziato a contare i passi ({round(cad_after)} spm) scambiandoli per battiti cardiaci ({round(hr_after)} bpm)."
-                            ),
-                            how_to_improve=(
-                                "Nessuna crisi cardiaca né allarme: stringi il cinturino un dito sopra l'osso del polso prima di partire, "
-                                "oppure nelle gare e nei test chiave utilizza una fascia cardio toracica (a rilevamento elettrico)."
-                            ),
-                            supporting_metrics=[
-                                {
-                                    "label": "Frequenza cardiaca prima -> dopo",
-                                    "value": f"{round(hr_before)} bpm → {round(hr_after)} bpm",
-                                },
-                                {
-                                    "label": "Cadenza passi",
-                                    "value": (
-                                        f"{round(cad_after)} spm (coincidente al"
-                                        " 99%)"
-                                        if cad_after
-                                        else "—"
-                                    ),
-                                },
-                                {
-                                    "label": "Variazione passo",
-                                    "value": "Nessuna (velocità stabile)",
-                                },
-                            ],
-                        )
-                    )
-                    i += min_elevated_window
-                    continue
 
                 # CHECK B: Hill Surge (Debito da salita)
                 if (
@@ -519,6 +460,12 @@ def analyze_workout_streams(
                     continue
 
         i += 30  # evaluate every 30 seconds
+
+    if reliability is not None:
+        for step in reliability.steps[:2]:
+            breakpoints.append(_sensor_breakpoint(step, time_stream, dist_stream))
+        if reliability.steps:
+            findings.insert(0, _sensor_finding(reliability, hr_source))
 
     # -------------------------------------------------------------
     # 7. Mechanics & Pacing Breakdown (First Half vs Second Half vs Final Third)
@@ -1041,8 +988,19 @@ def analyze_workout_streams(
         if current_end_m >= tot_dist_m:
             break
 
+    race = race_analysis.analyze(
+        streams, hr=hr_stream, reliability=reliability, level=level
+    ) if sport_is_running(sport) else None
+
     # Determine status and headline
-    if breakpoints:
+    sensor_only = bool(breakpoints) and all(b.kind == "cadence_lock" or b.kind == "hr_sensor_step" for b in breakpoints)
+    if sensor_only and race is not None:
+        # The run itself may have been a good one; the headline says both things.
+        verdict_status = "anomalia_rilevata"
+        lead = race["insights"][0]["title"] if race["insights"] else "Corsa completata"
+        where = breakpoints[0].distance_km
+        headline = f"{lead} — ma il battito dal km {where:.0f} non è affidabile"
+    elif breakpoints:
         verdict_status = "anomalia_rilevata"
         headline = (
             f"Rilevata anomalia al minuto {int(round(breakpoints[0].time_sec/60.0))}: "
@@ -1080,6 +1038,119 @@ def analyze_workout_streams(
         segments=segments,
         mechanics_summary=mechanics_summary,
         vigilia_context=vigilia_context,
+        hr_reliability=_reliability_dict(reliability, hr_source),
+        race_analysis=race,
+    )
+
+
+def sport_is_running(sport: str | None) -> bool:
+    key = (sport or "").lower()
+    return "run" in key or key in intensity.RUNNING_SPORTS
+
+
+def _reliability_dict(reliability: hr_reliability.HrReliability | None, hr_source: str | None) -> dict[str, Any] | None:
+    if reliability is None:
+        return None
+    return {
+        "verdict": reliability.verdict,
+        "unreliable_from_s": reliability.unreliable_from_s,
+        "unreliable_from_km": reliability.steps[0].distance_km if reliability.steps else None,
+        "locked_share": reliability.locked_share,
+        "dropout_share": reliability.dropout_share,
+        "reasons": reliability.reasons,
+        "hr_source": hr_source,
+        "steps": [
+            {
+                "time_s": s.time_s,
+                "distance_km": s.distance_km,
+                "hr_before": s.hr_before,
+                "hr_after": s.hr_after,
+                "cadence_after": s.cadence_after,
+                "pace_change_pct": s.pace_change_pct,
+                "locked_to_cadence": s.locked_to_cadence,
+            }
+            for s in reliability.steps
+        ],
+    }
+
+
+def _sensor_breakpoint(
+    step: hr_reliability.SensorStep, time_stream: list[float], dist_stream: list[float]
+) -> StreamBreakpoint:
+    minute = int(round(step.time_s / 60.0))
+    where = f"km {step.distance_km:.1f}" if step.distance_km is not None else f"minuto {minute}"
+    if step.locked_to_cadence:
+        return StreamBreakpoint(
+            time_sec=step.time_s,
+            distance_km=step.distance_km or 0.0,
+            kind="cadence_lock",
+            headline=f"Aggancio alla cadenza al {where}",
+            detail=(
+                f"Dal {where} il battito è passato da {step.hr_before} a {step.hr_after} bpm in pochi minuti, "
+                f"a passo invariato ({step.pace_change_pct:+.1f}%), finendo sulla tua cadenza ({step.cadence_after} passi/min)."
+            ),
+            before_metrics={"hr": step.hr_before},
+            after_metrics={"hr": step.hr_after, "cadence": step.cadence_after or "—"},
+        )
+    return StreamBreakpoint(
+        time_sec=step.time_s,
+        distance_km=step.distance_km or 0.0,
+        kind="hr_sensor_step",
+        headline=f"Salto del battito senza causa al {where}",
+        detail=(
+            f"Dal {where} il battito è passato da {step.hr_before} a {step.hr_after} bpm in pochi minuti "
+            f"senza che cambiassero passo ({step.pace_change_pct:+.1f}%) o pendenza."
+        ),
+        before_metrics={"hr": step.hr_before},
+        after_metrics={"hr": step.hr_after},
+    )
+
+
+def _sensor_finding(reliability: hr_reliability.HrReliability, hr_source: str | None) -> CausalFinding:
+    step = reliability.steps[0]
+    where = f"km {step.distance_km:.1f}" if step.distance_km is not None else f"minuto {round(step.time_s / 60)}"
+    strap = hr_source == "chest_strap"
+    if step.locked_to_cadence and not strap:
+        why = (
+            f"Al cuore non succede: a passo costante e in piano la frequenza sale di pochi battiti l'ora, non di "
+            f"{step.hr_after - step.hr_before} in cinque minuti. Il sensore ottico al polso ha perso il segnale del sangue "
+            f"e ha iniziato a contare i passi ({step.cadence_after} al minuto) come battiti: è il cosiddetto Cadence Lock. Succede più spesso col freddo, "
+            "col cinturino lento o con il sudore."
+        )
+        how = (
+            "Per le gare e i lunghi usa la fascia cardio. Con il solo orologio: cinturino stretto, due dita sopra "
+            "l'osso del polso, e qualche minuto di riscaldamento prima della partenza."
+        )
+    elif strap:
+        why = (
+            "Con la fascia l'aggancio ai passi è raro: più spesso è il contatto degli elettrodi (pelle asciutta all'inizio, "
+            "fascia che scivola) o la batteria scarica."
+        )
+        how = "Inumidisci gli elettrodi prima di partire, stringi la fascia sotto il petto e controlla la batteria."
+    else:
+        why = (
+            "A passo e pendenza invariati il cuore non fa salti del genere: è molto più probabile un errore del sensore "
+            "che uno sforzo vero."
+        )
+        how = "Confronta con una corsa fatta con la fascia cardio: se lì non succede, è il sensore dell'orologio."
+    return CausalFinding(
+        key="cadence_lock" if step.locked_to_cadence else "hr_sensor_step",
+        category="sensore",
+        confidence="alta" if step.locked_to_cadence else "media",
+        evidence_badge="stream secondo-per-secondo",
+        title=f"Il battito dal {where} non è affidabile",
+        what_happened=(
+            f"Dal {where} la frequenza è salita da {step.hr_before} a {step.hr_after} bpm in pochi minuti, "
+            f"con il passo praticamente uguale ({step.pace_change_pct:+.1f}%)."
+        ),
+        why_it_happened=why,
+        how_to_improve=how,
+        supporting_metrics=[
+            {"label": "Battito prima → dopo", "value": f"{step.hr_before} → {step.hr_after} bpm"},
+            {"label": "Cadenza", "value": f"{step.cadence_after} passi/min" if step.cadence_after else "—"},
+            {"label": "Variazione del passo", "value": f"{step.pace_change_pct:+.1f}%"},
+            {"label": "Sensore", "value": {"chest_strap": "fascia cardio", "wrist": "polso"}.get(hr_source or "", "non noto")},
+        ],
     )
 
 
@@ -1142,7 +1213,15 @@ def compute_workout_analysis(
     except Exception:
         pass
 
+    level = 1
+    try:
+        level = int(history.load_profile(user_id)["reached_level"])
+    except Exception:  # noqa: BLE001 - the analysis stands without the level; level 1 shows least
+        pass
+
     return analyze_workout_streams(
+        level=level,
+        hr_source=activity.get("hr_source"),
         activity_id=activity_id,
         date=act_date,
         title=activity.get("title") or "Corsa",
