@@ -1,6 +1,5 @@
 "use client";
 
-import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
 import { SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
@@ -168,8 +167,8 @@ export default function LoadPage() {
     <div style={{ padding: "22px 20px 12px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* The tabs layout already shows the brand; a second mark read as a doubled header. */}
           <PageHeader backHref="/body" />
-          <BrandMark height={22} />
         </div>
         <span style={{ fontSize: 11, color: "var(--inchiostro-35)", fontWeight: 500 }}>
           {weeks.length > 0 ? `carico · ${weeks.length} settimane` : "carico"}
