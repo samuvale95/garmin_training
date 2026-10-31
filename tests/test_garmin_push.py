@@ -175,3 +175,31 @@ def test_a_past_session_stays_on_the_calendar(world):
     finally:
         gp._session_exists = original
     assert report.deleted == 0 and sync.client.calendar() == [("2026-11-03", "Corsa facile")]
+
+
+def test_recurring_titles_are_not_moved_to_another_week(world, monkeypatch):
+    """The bug that slid whole plans a week forward: matching by title."""
+    plan, links, sync = world
+    plan["a"] = _session(3, title="Corsa facile")
+    plan["b"] = _session(10, title="Corsa facile")
+    run(sync)
+    moved = []
+    import training_plan.plan_store as ps
+    monkeypatch.setattr(ps, "update_session", lambda u, sid, ch, by_user: moved.append((sid, ch)))
+    assert garmin_push.pull_moves("u", sync.list_scheduled_workouts(None, None)) == 0
+    assert moved == []
+
+
+def test_a_workout_moved_on_garmin_moves_its_session(world, monkeypatch):
+    plan, links, sync = world
+    plan["a"] = _session(3)
+    run(sync)
+    sid = links["a"]["scheduled_id"]
+    wid, _ = sync.client.schedule[sid]
+    sync.client.schedule[sid] = (wid, "2026-11-04")
+    moved = []
+    import training_plan.plan_store as ps
+    monkeypatch.setattr(ps, "update_session", lambda u, s, ch, by_user: moved.append((s, ch)))
+    assert garmin_push.pull_moves("u", sync.list_scheduled_workouts(None, None)) == 1
+    assert moved == [("a", {"date": "2026-11-04"})]
+    assert links["a"]["garmin_date"] == date(2026, 11, 4) and links["a"]["pushed_hash"].startswith("2026-11-04|")

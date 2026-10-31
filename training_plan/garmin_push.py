@@ -313,6 +313,39 @@ def _session_exists(user_id: str, session_id: str) -> bool:
         ).fetchone() is not None
 
 
+def pull_moves(user_id: str, calendar: list[ScheduledWorkout]) -> int:
+    """A workout moved on Garmin Connect (or on the watch) moves its plan session too.
+
+    Matched by the Garmin workout id remembered in `garmin_link`, never by title: the
+    old matching (same title and sport within seven days) took this week's "Corsa
+    facile" for next week's and moved it there, so a plan with recurring titles slid a
+    week forward -- sessions vanished, others doubled up -- every time the calendar was
+    read. Returns how many sessions moved.
+    """
+    from . import plan_store
+
+    links = {row.get("workout_id"): (sid, row) for sid, row in _links(user_id).items() if row.get("workout_id")}
+    moved = 0
+    for workout in calendar:
+        hit = links.get(workout.workout_id)
+        if hit is None:
+            continue
+        sid, link = hit
+        if link.get("garmin_date") in (None, workout.date):
+            continue
+        try:
+            plan_store.update_session(user_id, sid, {"date": workout.date.isoformat()}, by_user=True)
+        except plan_store.SessionNotFound:
+            continue
+        digest = link.get("pushed_hash")
+        if digest and "|" in digest:
+            digest = workout.date.isoformat() + digest[digest.index("|"):]
+        _save_link(user_id, sid, garmin_date=workout.date, scheduled_id=workout.scheduled_workout_id,
+                   pushed_hash=digest)
+        moved += 1
+    return moved
+
+
 def mark_pending(user_id: str, session_ids: list[str]) -> None:
     """An edit just happened: show these as on their way before the push even starts."""
     for sid in session_ids:

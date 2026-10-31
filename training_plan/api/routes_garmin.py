@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from datetime import date
@@ -23,6 +24,8 @@ from .cache import (
     invalidate_calendar,
     range_ttl,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -101,27 +104,12 @@ async def workouts(
         )
     )
 
-    # Reconcile any moved workouts from Garmin into local plan_session
-    def _reconcile():
-        try:
-            from .. import plan_store
-            stored = plan_store.list_sessions(user_id)
-            if not stored or not result:
-                return
-            for w in result:
-                for s in stored:
-                    # Match by title and sport, within a ±7 days window
-                    if s["title"].strip().lower() == w.title.strip().lower() and s["sport"] == w.sport:
-                        if s["date"] != w.date.isoformat():
-                            # Garmin has a different date for this workout (e.g. moved on Garmin Connect calendar)
-                            s_date = date.fromisoformat(s["date"])
-                            if abs((s_date - w.date).days) <= 7:
-                                plan_store.update_session(user_id, s["id"], {"date": w.date.isoformat()}, by_user=True)
-                                break
-        except Exception:
-            pass
-
-    await run_in_threadpool(_reconcile)
+    # A workout moved on Garmin Connect moves its plan session too -- matched by the
+    # workout id the push remembered, never by title (see garmin_push.pull_moves).
+    try:
+        await run_in_threadpool(garmin_push.pull_moves, user_id, result)
+    except Exception:  # noqa: BLE001 - reading the calendar must not fail because of this
+        logger.warning("pulling Garmin moves into the plan failed", exc_info=True)
 
     return schemas.WorkoutsResponse(workouts=[schemas.ScheduledWorkoutOut.from_model(w) for w in result])
 

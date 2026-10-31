@@ -37,7 +37,11 @@ const PERSIST_BUSTER = "passo-v1";
 const VOLATILE_KEYS = ["plan-state", "sync-job", "admin-agents"];
 
 function isPersistable(query: Query): boolean {
-  return !VOLATILE_KEYS.includes(String(query.queryKey[0]));
+  // Only finished answers. A query still in flight is dehydrated with its promise, which
+  // JSON turns into `{}`; restoring it threw ("promise.then is not a function") and the
+  // persister then discarded the *whole* cache -- so closing the app while anything was
+  // loading, which is nearly always, made the next open start from nothing.
+  return query.state.status === "success" && !VOLATILE_KEYS.includes(String(query.queryKey[0]));
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
