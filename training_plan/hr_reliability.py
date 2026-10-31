@@ -76,6 +76,16 @@ class HrReliability:
     dropout_share: float = 0.0
     reasons: list[str] = field(default_factory=list)
 
+    @property
+    def key_step(self) -> SensorStep | None:
+        """The step that decides the verdict: the first cadence lock, else the first step.
+
+        Not simply the first step: on a real marathon an earlier, smaller step came from
+        the baseline dipping (a short dropout to 128 bpm) and would have put the start of
+        the unreliable stretch at km 3 instead of km 8, where the lock is.
+        """
+        return next((s for s in self.steps if s.locked_to_cadence), self.steps[0] if self.steps else None)
+
 
 @dataclass
 class _Bin:
@@ -277,9 +287,10 @@ def assess(streams: dict[str, Sequence[float | None]] | None) -> HrReliability |
             verdict = "dubbia"
         reasons.append(f"Segnale assente per il {round(dropout_share * 100)}% del tempo.")
 
+    key = next((s for s in steps if s.locked_to_cadence), steps[0] if steps else None)
     return HrReliability(
         verdict=verdict,
-        unreliable_from_s=steps[0].time_s if steps else None,
+        unreliable_from_s=key.time_s if key else None,
         steps=steps,
         locked_share=round(locked_share, 3),
         dropout_share=round(dropout_share, 3),

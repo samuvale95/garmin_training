@@ -44,6 +44,7 @@ DECOUPLING_POOR_PCT = 10.0
 # A km faster or slower than the average by this much breaks the rhythm.
 SURGE_PCT = 5.0
 STOP_SPEED_MS = 1.0
+ALTITUDE_DEADBAND_M = 1.0
 MIN_STOP_S = 10
 
 SECTIONS_BY_LEVEL: dict[int, list[str]] = {
@@ -137,16 +138,23 @@ class _Track:
         idx = self.indices(start_m, end_m)
         hrs = [self.hr[i] for i in idx if self.hr[i] is not None and self.hr[i] > 30]
         cads = [self.cad[i] for i in idx if self.cad[i] is not None and self.cad[i] > 120]
+        # Climb counted with a dead band: GPS/barometric altitude wobbles by a metre or
+        # two sample to sample, and summing every wobble doubled the climb of a flat
+        # marathon (190 m against the ~90 m Strava reports).
         gain = loss = 0.0
-        prev = None
+        ref = None
         for i in idx:
             a = self.alt[i]
             if a is None:
                 continue
-            if prev is not None:
-                gain += max(0.0, a - prev)
-                loss += max(0.0, prev - a)
-            prev = a
+            if ref is None:
+                ref = a
+            elif a - ref >= ALTITUDE_DEADBAND_M:
+                gain += a - ref
+                ref = a
+            elif ref - a >= ALTITUDE_DEADBAND_M:
+                loss += ref - a
+                ref = a
         pace = seconds / km if km > 0 else None
         cadence = mean(cads) if cads else None
         stride = (1000.0 / pace) * 60.0 / cadence if pace and cadence else None
@@ -482,7 +490,7 @@ def _insights(
                                else f"Split del {halves['split_pct']:.1f}%: partenza troppo veloce o rifornimento insufficiente.")})
 
     if reliability is not None and reliability.verdict == "inaffidabile":
-        step = reliability.steps[0] if reliability.steps else None
+        step = reliability.key_step
         where = f" dal km {step.distance_km:.0f}" if step and step.distance_km is not None else ""
         out.append({"tone": "warn", "title": f"Battito non affidabile{where}",
                     "text": ("Il sensore dell'orologio ha smesso di misurare il cuore: i battiti di questo tratto non vanno presi sul serio."

@@ -998,7 +998,8 @@ def analyze_workout_streams(
         # The run itself may have been a good one; the headline says both things.
         verdict_status = "anomalia_rilevata"
         lead = race["insights"][0]["title"] if race["insights"] else "Corsa completata"
-        where = breakpoints[0].distance_km
+        key = reliability.key_step if reliability is not None else None
+        where = key.distance_km if key is not None and key.distance_km is not None else breakpoints[0].distance_km
         headline = f"{lead} — ma il battito dal km {where:.0f} non è affidabile"
     elif breakpoints:
         verdict_status = "anomalia_rilevata"
@@ -1054,7 +1055,7 @@ def _reliability_dict(reliability: hr_reliability.HrReliability | None, hr_sourc
     return {
         "verdict": reliability.verdict,
         "unreliable_from_s": reliability.unreliable_from_s,
-        "unreliable_from_km": reliability.steps[0].distance_km if reliability.steps else None,
+        "unreliable_from_km": reliability.key_step.distance_km if reliability.key_step else None,
         "locked_share": reliability.locked_share,
         "dropout_share": reliability.dropout_share,
         "reasons": reliability.reasons,
@@ -1107,7 +1108,7 @@ def _sensor_breakpoint(
 
 
 def _sensor_finding(reliability: hr_reliability.HrReliability, hr_source: str | None) -> CausalFinding:
-    step = reliability.steps[0]
+    step = reliability.key_step
     where = f"km {step.distance_km:.1f}" if step.distance_km is not None else f"minuto {round(step.time_s / 60)}"
     strap = hr_source == "chest_strap"
     if step.locked_to_cadence and not strap:
