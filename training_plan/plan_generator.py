@@ -31,7 +31,7 @@ from datetime import timedelta
 from statistics import median
 from typing import TYPE_CHECKING, Any
 
-from . import llm, parser, plan_rules, plan_skeleton, prescription
+from . import exercises, llm, parser, plan_rules, plan_skeleton, prescription
 from .models import (
     PaceTarget,
     RaceGoal,
@@ -243,6 +243,9 @@ class Window:
     # What already happened this week, and today's planned session: context for the
     # rules, never written.
     before: list[TrainingSession] = field(default_factory=list)
+    # Sports the athlete asked for. Running keeps every running rule; bodyweight and
+    # strength sessions sit beside the runs (they may share a day with one).
+    sports: tuple[str, ...] = (plan_rules.RUNNING,)
 
     @property
     def level(self) -> int:
@@ -411,7 +414,36 @@ def parse_proposal(raw: str) -> tuple[list[TrainingSession], list[str]]:
     data = llm.parse_json_object(raw)
     if data is None or not isinstance(data.get("sessions"), list):
         return [], ['La risposta non è un oggetto JSON con una lista "sessions".']
+    _rescue_exercises(data["sessions"])
     return parser.parse_sessions(data["sessions"])
+
+
+def _rescue_exercises(raw_sessions: list) -> None:
+    """An exercise name the catalogue does not know becomes part of the step's note.
+
+    The file import refuses an unknown exercise, so a person fixes the typo. A model's
+    invented name ("Trazioni negative lente") must not sink a whole generated plan:
+    the step keeps its repetitions, and the watch shows the name as the step's text.
+    """
+    def fix(step: object) -> None:
+        if not isinstance(step, dict):
+            return
+        for inner in step.get("steps") or []:
+            fix(inner)
+        name = step.get("exercise")
+        if name is not None and exercises.resolve(str(name)) is None:
+            step.pop("exercise")
+            note = str(step.get("note") or "").strip()
+            step["note"] = f"{name} · {note}" if note else str(name)
+
+    for session in raw_sessions:
+        if isinstance(session, dict):
+            for step in session.get("steps") or []:
+                fix(step)
+            variant = session.get("short_variant")
+            if isinstance(variant, dict):
+                for step in variant.get("steps") or []:
+                    fix(step)
 
 
 # ---- the checks ---------------------------------------------------------------------------
@@ -452,26 +484,34 @@ def check(proposal: Sequence[TrainingSession], window: Window) -> list[str]:
         return ["La proposta non contiene sedute."]
 
     errors: list[str] = []
-    seen: set[date_type] = set()
+    seen: set[tuple[date_type, bool]] = set()
     for session in proposal:
         label = f"{_fmt_day(session.date)} ({session.title})"
         if not window.start <= session.date <= window.end:
             errors.append(f"{label}: è fuori dalla finestra {window.start.isoformat()} - {window.end.isoformat()}.")
             continue
-        if session.sport != plan_rules.RUNNING:
-            errors.append(f"{label}: sport '{session.sport}', sono ammesse solo corse ('running').")
+        running = session.sport == plan_rules.RUNNING
+        allowed = set(window.sports) & (GENERATED_SPORTS | {plan_rules.RUNNING})
+        if session.sport not in allowed:
+            names = ", ".join(f"'{sport}'" for sport in sorted(allowed))
+            errors.append(f"{label}: sport '{session.sport}', sono ammessi solo {names}.")
         if not session.steps:
             errors.append(f"{label}: non ha passi.")
-        if session.date in window.taken_days:
+        # Bodyweight and strength may share a day with a run (or a fixed session): they
+        # load the upper body. Two sessions of the same kind on one day may not.
+        if running and session.date in window.taken_days:
             errors.append(f"{label}: quel giorno c'è già una seduta fissa, lascialo libero.")
-        if session.date in seen:
-            errors.append(f"{label}: c'è già un'altra seduta proposta lo stesso giorno.")
-        seen.add(session.date)
-        errors += _check_paces(session, window.bands)
+        slot = (session.date, running)
+        if slot in seen:
+            errors.append(f"{label}: c'è già un'altra seduta {'di corsa' if running else 'di forza'} proposta lo stesso giorno.")
+        seen.add(slot)
+        if running:
+            errors += _check_paces(session, window.bands)
     if errors:
         return errors
 
-    for week in window.weeks:
+    # A program without running (only bodyweight, say) has no running volume to meet.
+    for week in window.weeks if plan_rules.RUNNING in window.sports else []:
         mine = [s for s in proposal if _monday(s.date) == week.monday]
         planned = sum(_running_minutes(s) for s in mine)
         when = f"Settimana del {_fmt_day(week.monday)}"
@@ -479,7 +519,7 @@ def check(proposal: Sequence[TrainingSession], window: Window) -> list[str]:
             errors.append(f"{when}: {round(planned)} minuti di corsa proposti, il massimo è {week.maximum}.")
         if planned < week.minimum:
             errors.append(f"{when}: {round(planned)} minuti di corsa proposti, il minimo è {week.minimum}.")
-        days = len({s.date for s in mine})
+        days = len({s.date for s in mine if s.sport == plan_rules.RUNNING})
         if days > week.running_days_left:
             errors.append(f"{when}: {days} giorni di corsa, al massimo {week.running_days_left}.")
         quality = sum(1 for s in mine if plan_rules.session_kind(s) == plan_rules.KIND_QUALITY)
@@ -508,6 +548,22 @@ def check(proposal: Sequence[TrainingSession], window: Window) -> list[str]:
 
 # ---- the brief ----------------------------------------------------------------------------
 
+# The exercises the model may name: Garmin catalogue names, shown by name on the
+# watch. Short on purpose -- the list is sent on every call, and anything else the
+# model writes is kept as the step's note (`_rescue_exercises`).
+# Sports the generator writes besides running; their sessions are checked for shape,
+# not for the running rules. Cycling and swimming wait for their Garmin formats.
+GENERATED_SPORTS = frozenset({"calisthenics", "strength_training"})
+
+PROMPT_EXERCISES = (
+    "PULL_UP", "CHIN_UP", "BAND_ASSISTED_PULL_UP", "MUSCLE_UP", "INVERTED_ROW",
+    "PUSH_UP", "DIAMOND_PUSH_UP", "PIKE_PUSH_UP", "HANDSTAND_PUSH_UP", "BODY_WEIGHT_DIP",
+    "RING_DIP", "BENCH_DIP", "AIR_SQUAT", "JUMP_SQUAT", "LUNGE", "GLUTE_BRIDGE", "CALF_RAISE",
+    "PLANK", "SIDE_PLANK", "L_SIT", "HANGING_LEG_RAISE", "HANGING_KNEE_RAISE", "HOLLOW_ROCK",
+    "MOUNTAIN_CLIMBER", "BURPEE", "JUMPING_JACKS",
+)
+EXERCISE_PROMPT_LIST = ", ".join(PROMPT_EXERCISES)
+
 PLAN_SYSTEM_PROMPT = """Sei l'allenatore di Passo, un'app intelligente di allenamento sportivo (corsa, ciclismo, calisthenics, nuoto, forza).
 
 Componi o adatta le sedute di allenamento per i giorni indicati, dentro i limiti che ti passo. I limiti
@@ -527,7 +583,14 @@ Come lavori:
 - Se lo sport è "calisthenics":
   - Allenamento a corpo libero al parco / sbarra (trazioni, dip, push-up, core, muscle-up).
   - Poiché focalizzato su parte superiore e tronco, NON affatica le gambe ed è compatibile anche prima o dopo le corse.
-  - Ogni step può avere una "note" esplicativa (es. "Trazioni 8-10 rip", "Dip alle parallele").
+- Esercizi nelle sedute "calisthenics" e "strength_training": ogni serie è un passo
+  {"type": "interval", "exercise": NOME, "reps": N}, seguita da una pausa
+  {"type": "rest", "duration_type": "time", "duration_value": minuti}. I giri si scrivono
+  con "repeat" attorno a esercizi e pause. Le tenute (plank, L-sit) usano "exercise" con
+  "duration_type": "time" invece di "reps". Riscaldamento e defaticamento restano a tempo,
+  con una "note". "note" sugli esercizi solo per un'indicazione tecnica breve (es.
+  "discesa lenta"), mai per ripetere nome o ripetizioni.
+  NOME è uno di questi, scritto esattamente così: """ + EXERCISE_PROMPT_LIST + """.
 - Se lo sport è "strength_training":
   - Inserisci sedute di potenziamento funzionale, mobilità e core (30-60 minuti).
   - REGOLA FONDAMENTALE: Non inserire MAI forza gambe pesante il giorno immediatamente PRIMA di una seduta di qualità o del lungo di corsa.
@@ -560,7 +623,19 @@ Rispondi SOLO con un oggetto JSON, senza testo intorno e senza blocchi di codice
    }
   }
 ]}
-"type" è uno fra warmup, interval, recovery, cooldown, rest; "duration_type" è "time" (minuti) o "distance" (chilometri)."""
+Una seduta di calisthenics, per esempio:
+  {"date": "YYYY-MM-DD", "sport": "calisthenics", "title": "Parco: Trazioni e Dip", "description": "...",
+   "steps": [
+     {"type": "warmup", "duration_type": "time", "duration_value": 8, "note": "Mobilità spalle e polsi"},
+     {"repeat": 3, "steps": [
+       {"type": "interval", "exercise": "PULL_UP", "reps": 6, "note": "discesa lenta"},
+       {"type": "rest", "duration_type": "time", "duration_value": 1.5},
+       {"type": "interval", "exercise": "BODY_WEIGHT_DIP", "reps": 8},
+       {"type": "rest", "duration_type": "time", "duration_value": 1.5}
+     ]},
+     {"type": "cooldown", "exercise": "PLANK", "duration_type": "time", "duration_value": 1}
+   ]}
+"type" è uno fra warmup, interval, recovery, cooldown, rest; "duration_type" è "time" (minuti), "distance" (chilometri) o "reps" (ripetizioni, anche nella forma breve "reps": N)."""
 
 
 def _rules_in_words(level: int) -> list[str]:
@@ -1028,6 +1103,7 @@ def generate(
                 bands=pace_bands(profile),
                 goal=goal,
             )
+            window.sports = tuple(sports or (plan_rules.RUNNING,))
             return window, seen
 
         window, seen = fresh_window()
