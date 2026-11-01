@@ -27,9 +27,9 @@ import {
   useWeekWorkouts,
 } from "@/lib/queries";
 import { SkeletonDayCards } from "@/components/skeletons";
-import { sessionDistanceKm, toDateKey, weekBounds, weekOffsetFromToday } from "@/lib/sessionVisuals";
+import { sessionDistanceKm, shiftDateKey, toDateKey, weekBounds, weekOffsetFromToday } from "@/lib/sessionVisuals";
 import type { TrainingSession } from "@/lib/types";
-import { formatShortDate } from "@/lib/format";
+import { capitalize, formatShortDate } from "@/lib/format";
 import { useScreenReady } from "@/lib/useScreenReady";
 
 function formatWeekRange(start: Date, end: Date): string {
@@ -448,7 +448,7 @@ export function WeekPageContent() {
                     }}
                     style={{ display: "flex", gap: 10, position: "relative" }}
                   >
-                    <div className="font-mono" style={{ width: 36, paddingTop: 12, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flex: "none" }}>
+                    <div className="font-mono" style={{ width: 36, paddingTop: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flex: "none" }}>
                       <span style={{ fontSize: 10, letterSpacing: ".04em", textTransform: "uppercase", color: isToday ? "var(--inchiostro-70)" : "var(--inchiostro-35)" }}>
                         {day.date.toLocaleDateString("it-IT", { weekday: "short" }).replace(".", "")}
                       </span>
@@ -637,6 +637,13 @@ function NavButton({ label, onClick, children }: { label: string; onClick: () =>
 }
 
 
+/** From today (or the session's day, if later) for fourteen days. */
+function moveChoices(current: string): string[] {
+  const today = toDateKey(new Date());
+  const days = Array.from({ length: 15 }, (_, i) => shiftDateKey(today, i));
+  return days.includes(current) ? days : [current, ...days];
+}
+
 function MoveSessionControl({ card, blocked, onMove }: { card: DayCardData; blocked: boolean; onMove: (date: string) => boolean }) {
   const [date, setDate] = useState(card.session.date);
   const [error, setError] = useState(false);
@@ -650,7 +657,11 @@ function MoveSessionControl({ card, blocked, onMove }: { card: DayCardData; bloc
       setError(false);
       if (detail.current) detail.current.open = false;
     }}>
-      <label className="ux-field">Nuovo giorno<input type="date" required value={date} onChange={(event) => setDate(event.target.value)} data-track="week.move-date" /></label>
+      {/* A list of the next two weeks in Italian, not the native date input: that one
+          follows the browser's language (it showed "10/31/2026") and needs three taps. */}
+      <label className="ux-field">Nuovo giorno<select required value={date} onChange={(event) => setDate(event.target.value)} data-track="week.move-date">
+        {moveChoices(card.session.date).map((key) => <option key={key} value={key}>{capitalize(new Date(`${key}T12:00:00`).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" }))}{key === card.session.date ? " (ora)" : ""}</option>)}
+      </select></label>
       <button type="submit" className="ux-button" data-track="week.move-confirm" {...dis(blocked || !date || date === card.session.date, blocked ? "in_caricamento" : "scegli_un_altro_giorno")}>Sposta seduta</button>
     </form>
     {error && <p role="alert" className="ux-error">Il piano di quel giorno è in aggiornamento. Riprova al termine.</p>}

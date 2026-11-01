@@ -1046,3 +1046,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .activity-week-title small { font:500 12px var(--font-mono); color:var(--inchiostro-50); }
 .activity-row[data-big] h2 { color:var(--corallo-testo, #b34a20); }
 .activity-row[data-big] h2::after { content:" · lunga"; font:500 12px var(--font-mono); color:var(--inchiostro-50); }
+
+/* Attività: the search is always there, period and sport fold into one summary line. */
+.ux-filters-compact { display:block; }
+.ux-filter-more { margin-top:8px; }
+.ux-filter-more > summary { cursor:pointer; font-size:13px; font-weight:600; color:var(--inchiostro-70); min-height:36px; display:flex; align-items:center; }
+.ux-filter-more .ux-filters { margin:6px 0 0; }

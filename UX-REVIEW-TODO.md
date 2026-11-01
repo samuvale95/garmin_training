@@ -36,6 +36,17 @@ zone mancanti spiegate con cosa serve; letture raggruppate in `POST /batch` (hom
 freddo da 23 a 11 richieste, ogni risposta arriva appena pronta).
 Aperto: errore di idratazione al secondo caricamento (c'era già prima, da indagare).
 
+## Fatto (priorità C)
+
+Attività: ricerca sempre visibile, periodo e sport in una riga che si apre. Tecnica:
+sfumatura a destra sul selettore delle attività. Oggi: un solo "Registra pasto" quando c'è
+la card del pasto. Seduta: tolto il chip "Nel piano" che stringeva "Sposta a…". Recupero:
+ogni barra HRV colorata rispetto alla tua norma. Progressi: traguardi raggiunti come riga
+di badge, card solo per quelli da raggiungere. Calendario: giorni allineati alle card,
+"Sposta" con un elenco dei prossimi 14 giorni in italiano invece del selettore data del
+browser. Il bottone tondo in basso a destra è il pannello di sviluppo di TanStack Query:
+in produzione non c'è.
+
 ## Trasversale
 
 - **A — Una sola risposta per "cosa faccio oggi".** La home ha molti blocchi (hero,

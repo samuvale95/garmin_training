@@ -324,7 +324,8 @@ export function TodayView() {
     <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
       <div style={{ padding: "22px 20px 12px" }}>
         <WorkspaceHeading title="Oggi" description={capitalize(formatFullDate(todayKey))}>
-          <TodayHeader onOpenQuickLog={openMeal} />
+          {/* The meal card below has its own "Registra": one button, not two. */}
+          {!(mealMoment && isUrgent(mealMoment)) && <TodayHeader onOpenQuickLog={openMeal} />}
         </WorkspaceHeading>
         {watchSync.blocking && <p className="ux-error" role="status">Alcuni dati dell’orologio non sono aggiornati. <Link href="/watch-sync" data-track="today.stale-sync">Come aggiornarli</Link></p>}
 

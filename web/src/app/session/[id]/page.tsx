@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton } from "@/components/motion/primitives";
-import { CheckIcon } from "@/components/Icons";
 import { SessionDetailBody } from "@/components/SessionDetailBody";
 import { DeleteConfirmStrip, DeleteIconButton, DetailScaffold } from "@/components/DetailScaffold";
 import { SkeletonDetailBody } from "@/components/skeletons";
@@ -239,23 +238,8 @@ export default function SessionDetailPage() {
           >
             {isMoving ? "Sposto…" : `Sposta a ${formatWeekday(nextDayKey())}`}
           </button>
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 5,
-              fontSize: 12,
-              fontWeight: 600,
-              color: "var(--verde-testo)",
-              background: "rgba(5, 150, 105, 0.1)",
-              border: "1px solid rgba(5, 150, 105, 0.2)",
-              borderRadius: "var(--radius-pill)",
-              padding: "10px 14px",
-              whiteSpace: "nowrap",
-            }}
-          >
-            <CheckIcon size={13} strokeWidth={2.6} /> Nel piano
-          </span>
+          {/* The "Nel piano" chip next to it took the space the button needed at phone
+              width and said nothing new on a screen reached from the plan. */}
         </div>
       }
       footer={

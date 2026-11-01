@@ -46,10 +46,12 @@ function ActivitiesView() {
       <Link className="ux-button" href="/summary?from=%2Factivities" data-track="activities.summary">Resoconto settimanale</Link>
       <Link className="ux-button" href="/progress?from=%2Factivities" data-track="activities.progress">Continuità</Link>
     </nav>
-    <div className="ux-filters">
+    <div className="ux-filters ux-filters-compact">
+      <label className="ux-field ux-search">Cerca un’attività<input type="search" placeholder="Nome o sport" value={search} onChange={(e) => filter("q", e.target.value)} data-track="activities.search" /></label>
+      <details className="ux-filter-more"><summary data-track="activities.filters">{period === "30" ? "Ultimi 30 giorni" : period === "90" ? "Ultimi 90 giorni" : "Ultimo anno"} · {sport === "all" ? "tutti gli sport" : (sports.find(([v]) => v === sport)?.[1] ?? sport)}</summary><div className="ux-filters">
       <label className="ux-field">Periodo<select value={period} onChange={(e) => filter("days", e.target.value)} data-track="activities.period"><option value="30">Ultimi 30 giorni</option><option value="90">Ultimi 90 giorni</option><option value="365">Ultimo anno</option></select></label>
       <label className="ux-field">Sport<select value={sport} onChange={(e) => filter("sport", e.target.value)} data-track="activities.sport"><option value="all">Tutti gli sport</option>{sports.map(([value, label]) => <option key={value} value={value}>{label}</option>)}{sport !== "all" && !sports.some(([value]) => value === sport) && <option value={sport}>{sport}</option>}</select></label>
-      <label className="ux-field ux-search">Cerca un’attività<input type="search" placeholder="Nome o sport" value={search} onChange={(e) => filter("q", e.target.value)} data-track="activities.search" /></label>
+      </div></details>
     </div>
     {query.isPending ? <Skeleton height={180} /> : query.isError ? <div className="ux-error" role="alert"><p>Non è stato possibile caricare le attività.</p><button className="ux-button" onClick={() => query.refetch()} {...dis(query.isFetching, "in_caricamento")} data-track="activities.retry">Riprova</button></div> : <>
       <p className="ux-muted" aria-live="polite">{visible.length} attività nel periodo selezionato</p>

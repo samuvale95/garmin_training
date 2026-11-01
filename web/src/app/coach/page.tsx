@@ -256,7 +256,7 @@ function ActivityPicker({
 }) {
   return (
     <SlideUp active={animate} delayMs={60} style={{ marginTop: 18 }}>
-      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, WebkitOverflowScrolling: "touch" }}>
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, WebkitOverflowScrolling: "touch", maskImage: "linear-gradient(to right, #000 85%, transparent)", WebkitMaskImage: "linear-gradient(to right, #000 85%, transparent)", paddingRight: 32 }}>
         {activities.slice(0, 12).map((activity) => {
           const active = activity.activity_id === selectedId;
           return (
