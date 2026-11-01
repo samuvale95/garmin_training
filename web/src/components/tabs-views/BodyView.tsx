@@ -453,6 +453,12 @@ function MetricTile({
       {signal && (
         <p style={{ fontSize: 12.5, fontWeight: 700, color: flagged ? style.text : STATUS_STYLE.ok.stroke, margin: "6px 0 0", lineHeight: 1.2 }}>{signal.verdict}</p>
       )}
+      {(signal?.value == null) && (
+        // A bare dash read as "zero" or as a broken screen: say whose number is missing.
+        <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "6px 0 0", lineHeight: 1.25 }}>
+          L&apos;orologio non l&apos;ha ancora misurato
+        </p>
+      )}
     </div>
   );
 }

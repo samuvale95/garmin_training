@@ -49,7 +49,7 @@ export default function ProgressPage() {
                 <Tokens tokens={data.tokens} max={data.max_tokens} />
                 <span style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)" }}>salva-serie</span>
               </div>
-              <p className="font-serif-italic" style={{ fontSize: 14, lineHeight: 1.35, margin: "12px 0 0" }}>
+              <p className="font-serif-italic" style={{ fontSize: 14, lineHeight: 1.35, margin: "12px 0 0", color: "var(--crema)", opacity: 0.85 }}>
                 {data.mascot.sentence}
               </p>
             </div>
@@ -88,8 +88,24 @@ export default function ProgressPage() {
           </SlideUp>
 
           <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: "20px 2px 8px" }}>Traguardi</p>
+          {/* Earned ones become a row of chips -- a trophy shelf -- and the cards are kept
+              for what is still ahead, with its progress. Same weight for both hid which
+              was which. */}
+          {data.badges.some((b) => b.earned) && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+              {data.badges.filter((b) => b.earned).map((badge) => (
+                <span
+                  key={badge.key}
+                  title={badge.description}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "var(--corallo)", color: "var(--corallo-testo)", borderRadius: "var(--radius-pill)", padding: "5px 11px", fontSize: 12.5, fontWeight: 600 }}
+                >
+                  ★ {badge.title}
+                </span>
+              ))}
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 9 }}>
-            {data.badges.map((badge, i) => (
+            {data.badges.filter((b) => !b.earned).map((badge, i) => (
               <BadgeCard key={badge.key} badge={badge} animate={animate} delayMs={220 + i * 40} />
             ))}
           </div>

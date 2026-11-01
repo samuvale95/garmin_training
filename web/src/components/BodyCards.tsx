@@ -340,7 +340,16 @@ export function HrvCard({
                   style={{
                     flex: 1,
                     height: `${value == null ? 3 : Math.max(5, scale(value))}px`,
-                    background: isLast ? lastColor : "var(--neutro-barra)",
+                    // Every night against the personal norm, not only the last one: grey bars
+                    // all alike said nothing about which nights were off.
+                    background: isLast
+                      ? lastColor
+                      : value != null && hasNorm && norm && value < norm.normal_min
+                        ? STATUS_STYLE.attenzione.stroke
+                        : value != null && hasNorm && norm && value > norm.normal_max
+                          ? "var(--azzurro-tratto)"
+                          : "var(--neutro-barra)",
+                    opacity: isLast ? 1 : 0.75,
                     borderRadius: 3,
                     transformOrigin: "bottom",
                   }}

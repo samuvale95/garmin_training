@@ -400,6 +400,9 @@ function Decoupling({ race }: { race: RaceAnalysis }) {
 
 function KmTable({ race, lockedFromKm }: { race: RaceAnalysis; lockedFromKm: number | null }) {
   const [open, setOpen] = useState(false);
+  // Pace and heart rate for everyone; cadence and climb are extra columns that crowd a
+  // phone, shown from level 3 or on request.
+  const [extra, setExtra] = useState(race.level >= 3);
   return (
     <div style={card}>
       <button
@@ -420,8 +423,8 @@ function KmTable({ race, lockedFromKm }: { race: RaceAnalysis; lockedFromKm: num
                 <th style={{ fontWeight: 600 }}>passo</th>
                 {race.level >= 3 && <th style={{ fontWeight: 600 }}>in piano</th>}
                 <th style={{ fontWeight: 600 }}>bpm</th>
-                <th style={{ fontWeight: 600 }}>cad.</th>
-                <th style={{ fontWeight: 600 }}>D+</th>
+                {extra && <th style={{ fontWeight: 600 }}>cad.</th>}
+                {extra && <th style={{ fontWeight: 600 }}>D+</th>}
               </tr>
             </thead>
             <tbody>
@@ -436,13 +439,18 @@ function KmTable({ race, lockedFromKm }: { race: RaceAnalysis; lockedFromKm: num
                     </td>
                     {race.level >= 3 && <td style={{ color: "var(--inchiostro-50)" }}>{k.gap_pace.replace("/km", "")}</td>}
                     <td style={{ color: locked ? "var(--inchiostro-35)" : "var(--inchiostro-70)" }}>{locked ? "—" : (k.hr ?? "—")}</td>
-                    <td style={{ color: "var(--inchiostro-70)" }}>{k.cadence ?? "—"}</td>
-                    <td style={{ color: "var(--inchiostro-50)" }}>{k.gain_m}</td>
+                    {extra && <td style={{ color: "var(--inchiostro-70)" }}>{k.cadence ?? "—"}</td>}
+                    {extra && <td style={{ color: "var(--inchiostro-50)" }}>{k.gain_m}</td>}
                   </tr>
                 );
               })}
             </tbody>
           </table>
+          {!extra && (
+            <button type="button" data-track="analisi_gara.km-extra" onClick={() => setExtra(true)} style={{ all: "unset", cursor: "pointer", marginTop: 8, fontSize: 12, fontWeight: 700, color: "var(--accent)" }}>
+              Mostra anche cadenza e dislivello
+            </button>
+          )}
         </div>
       )}
     </div>

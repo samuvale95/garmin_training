@@ -31,6 +31,10 @@ export function WorkoutAnalysisSection({
   if (!analysis) return null;
 
   const hasAnomalies = analysis.breakpoints.length > 0;
+  // With a race card above, a sensor-only event is already its heart-rate note; the
+  // timeline would be the third telling of the same thing.
+  const sensorOnly = analysis.breakpoints.every((b) => b.kind === "cadence_lock" || (b.kind as string) === "hr_sensor_step");
+  const showTimeline = hasAnomalies && !(analysis.race_analysis && sensorOnly);
   const hasFindings = analysis.findings.length > 0;
 
   return (
@@ -83,7 +87,7 @@ export function WorkoutAnalysisSection({
           {analysis.headline}
         </p>
 
-        <p className="font-serif-italic" style={{ fontSize: 15.5, lineHeight: 1.4, margin: "12px 0 0", opacity: 0.9 }}>
+        <p className="font-serif-italic" style={{ fontSize: 15.5, lineHeight: 1.4, margin: "12px 0 0", color: "var(--crema)", opacity: 0.88 }}>
           {narrativeText ?? analysis.summary_deterministic}
         </p>
 
@@ -129,7 +133,7 @@ export function WorkoutAnalysisSection({
       )}
 
       {/* Breakpoints / Chronological Events Timeline */}
-      {hasAnomalies && (
+      {showTimeline && (
         <div style={{ marginTop: 18 }}>
           <span
             style={{
@@ -151,8 +155,19 @@ export function WorkoutAnalysisSection({
         </div>
       )}
 
-      {/* Causal Findings & Coaching Actions */}
-      {hasFindings && (
+      {/* Causal Findings & Coaching Actions. Under a race analysis they come after a lot
+          already said, so they fold behind one line instead of another full section. */}
+      {hasFindings && analysis.race_analysis && (
+        <details className="ux-disclosure" style={{ marginTop: 20 }}>
+          <summary data-track="analisi.findings">Perché è successo e come migliorare ({analysis.findings.length})</summary>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {analysis.findings.map((finding, i) => (
+              <FindingDetailCard key={finding.key} finding={finding} animate={animate} delayMs={180 + i * 50} />
+            ))}
+          </div>
+        </details>
+      )}
+      {hasFindings && !analysis.race_analysis && (
         <div style={{ marginTop: 20 }}>
           <span
             style={{

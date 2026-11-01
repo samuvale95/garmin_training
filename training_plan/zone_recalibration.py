@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import date as date_type, timedelta
 from typing import Any, Sequence
 
-from . import history, paces
+from . import history, hr_reliability, paces
 from .hr_cleaning import clean_heart_rate_stream
 from .intensity import RUNNING_SPORTS, Zones
 
@@ -259,6 +259,18 @@ def recalibrate_zones(
 
         if not times or not hrs or not speeds or len(times) < 60:
             continue
+
+        # A run whose sensor locked onto the step rhythm reads as a long effort at ~170+
+        # bpm and would set the threshold from the cadence: on a real marathon this put
+        # LTHR at 170 from a wrist sensor that had stopped measuring the heart at km 8.
+        reliability = hr_reliability.assess(streams_dict)
+        if reliability is not None and reliability.verdict == "inaffidabile":
+            continue
+
+        # The stored row does not always carry the distance; the stream does.
+        dists = [d for d in (streams_dict.get("distance") or []) if d is not None]
+        if not activity_dict.get("distance_km") and dists:
+            activity_dict = {**activity_dict, "distance_km": round((dists[-1] - dists[0]) / 1000.0, 2)}
 
         clean_res = clean_heart_rate_stream(hrs, times=times)
         effort = _find_best_20min_effort(clean_res.cleaned_heart_rates, speeds, times)

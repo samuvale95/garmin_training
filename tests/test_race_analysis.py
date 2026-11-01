@@ -88,3 +88,35 @@ def test_workout_analysis_says_good_race_but_unreliable_heart_rate():
     # Splits after the lock carry no heart rate rather than a wrong one.
     assert res.race_analysis["splits_5k"][-1]["hr"] is None
     assert res.findings[0].key == "cadence_lock"
+
+
+def test_the_real_marathon_of_2026_10_25():
+    """Strava's stream of the run that prompted all this (4000 samples, ~4 s apart):
+    an even, slightly negative-split 4:21 on the flat, with the wrist sensor locking onto
+    the step rhythm around km 8 (143 -> 171 bpm at an unchanged pace)."""
+    import json
+    from pathlib import Path
+
+    import pytest
+
+    # Personal health data: kept out of the repository unless its owner says otherwise.
+    fixture = Path(__file__).parent / "fixtures" / "strava_marathon_2026_10_25.json"
+    if not fixture.exists():
+        pytest.skip("real marathon stream not present")
+    streams = json.loads(fixture.read_text())
+    res = workout_analysis.analyze_workout_streams(
+        activity_id=20725695309, date=date(2026, 10, 25), title="Maratona", sport="Run", streams=streams, level=3,
+    )
+    rel = res.hr_reliability
+    assert rel["verdict"] == "inaffidabile"
+    assert 7.0 <= rel["unreliable_from_km"] <= 8.5
+    locked = [s for s in rel["steps"] if s["locked_to_cadence"]]
+    assert locked and locked[0]["hr_after"] - locked[0]["hr_before"] >= 20
+    assert "km 8" in res.headline
+    race = res.race_analysis
+    assert race["time"] == "4:21:19"
+    assert race["halves"]["kind"] == "negativo"
+    assert race["fade"]["kind"] == "tenuta"
+    assert race["decoupling"]["available"] is False
+    assert 60 <= race["terrain"]["gain_m"] <= 110
+    assert all(b["hr"] is None for b in race["splits_5k"][2:])

@@ -49,6 +49,8 @@ interface DraggableWeekCardProps {
   animate: boolean;
   delayMs: number;
   matchKm: number | null;
+  /** An activity of the right sport was recorded that day, with or without km. */
+  done?: boolean;
   /** True once this card has been picked up, so the row it came from can be marked. */
   onDragStateChange: (dragging: boolean) => void;
   /** Page-space pointer position, per frame, while the card is being carried. */
@@ -86,7 +88,7 @@ type Phase = "idle" | "pressing" | "dragging";
  * snap-back has to be explicit. On a real move the card's `key` lives under a different
  * day row after the state update and this instance unmounts anyway. */
 // `animate`/`delayMs` are accepted for call-site compatibility; cards no longer enter one by one.
-export function DraggableWeekCard({ card, matchKm, onDragStateChange, onDragOver, onDrop, onPrefetch, emphasis = null }: DraggableWeekCardProps) {
+export function DraggableWeekCard({ card, matchKm, done = false, onDragStateChange, onDragOver, onDrop, onPrefetch, emphasis = null }: DraggableWeekCardProps) {
   const { reduced } = useMotionEnabled();
   const dragControls = useDragControls();
   const [phase, setPhase] = useState<Phase>("idle");
@@ -181,6 +183,9 @@ export function DraggableWeekCard({ card, matchKm, onDragStateChange, onDragOver
         <span className="session-card-meta">{detail && detail !== visual.label && !meta.includes(detail) ? `${meta} · ${detail}` : meta}</span>
         {matchKm != null && (
           <span className="session-card-done"><CheckIcon size={13} strokeWidth={2.6} aria-hidden="true" /> Svolto, {matchKm.toLocaleString("it-IT", { maximumFractionDigits: 1 })} km</span>
+        )}
+        {matchKm == null && done && (
+          <span className="session-card-done"><CheckIcon size={13} strokeWidth={2.6} aria-hidden="true" /> Svolta</span>
         )}
       </span>
     </div>

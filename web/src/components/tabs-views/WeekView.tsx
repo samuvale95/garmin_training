@@ -8,7 +8,7 @@ import { dis } from "@/lib/disabled";
 import { ChevronLeft, ChevronRight, PlusIcon } from "@/components/Icons";
 import { EmptyState, Notice } from "@/components/ui";
 import { DraggableWeekCard, RestCard, type DayCardData } from "@/components/WeekCards";
-import { OffPlanCard, offPlanActivities } from "@/components/OffPlanCard";
+import { OffPlanCard, matchPlannedActivities } from "@/components/OffPlanCard";
 import { useMotionEnabled } from "@/lib/motion";
 import { useMoveSession } from "@/lib/moveWarnings";
 import { PullToRefresh } from "@/components/PullToRefresh";
@@ -26,9 +26,9 @@ import {
   useWeekWorkouts,
 } from "@/lib/queries";
 import { SkeletonDayCards } from "@/components/skeletons";
-import { sessionDistanceKm, sessionDurationMinutes, toDateKey, weekBounds, weekOffsetFromToday } from "@/lib/sessionVisuals";
+import { sessionDistanceKm, sessionDurationMinutes, shiftDateKey, toDateKey, weekBounds, weekOffsetFromToday } from "@/lib/sessionVisuals";
 import type { TrainingSession } from "@/lib/types";
-import { formatMinutes, formatShortDate } from "@/lib/format";
+import { capitalize, formatMinutes, formatShortDate } from "@/lib/format";
 import { useScreenReady } from "@/lib/useScreenReady";
 
 function formatWeekRange(start: Date, end: Date): string {
@@ -302,18 +302,22 @@ export function WeekPageContent() {
             .filter((w) => w.date === key)
             .map((w) => ({ id: `garmin:${w.scheduled_workout_id}`, session: w, workout: w }))
         : [];
-    const offPlan = offPlanActivities(
+    // Activities of the right sport tick their session off, with or without Strava.
+    const { done, offPlan } = matchPlannedActivities(
       (storedActivities.data?.activities ?? []).filter((a) => a.day === key),
       cards.map((card) => card.session.sport)
     );
-    return { date, key, cards, offPlan };
+    return { date, key, cards, offPlan, done };
   });
 
   const weekSessions = days.flatMap((d) => d.cards.map((c) => c.session));
   const weekKm = weekSessions.reduce((sum, s) => sum + sessionDistanceKm(s), 0);
   const weekMinutes = weekSessions.reduce((sum, s) => sum + sessionDurationMinutes(s), 0);
-  const doneKm = (activitiesQuery.data?.activities ?? []).reduce((sum, a) => sum + (a.distance_km ?? 0), 0);
-  const progressFraction = weekKm > 0 ? Math.min(1, doneKm / weekKm) : 0;
+  // Km that ticked off a planned session, apart from the rest: "58 / 21 km" read as
+  // overdoing the plan when most of it was a race outside it.
+  const planDoneKm = days.reduce((sum, d) => sum + d.done.reduce((s2, a) => s2 + (a?.distance_km ?? 0), 0), 0);
+  const offPlanKm = days.reduce((sum, d) => sum + d.offPlan.reduce((s2, a) => s2 + (a.distance_km ?? 0), 0), 0);
+  const progressFraction = weekKm > 0 ? Math.min(1, planDoneKm / weekKm) : 0;
 
   // The session the week is waiting on: today's, unless it is already done, else the
   // next one this week. Only on the current week -- elsewhere nothing is "next".
@@ -337,10 +341,10 @@ export function WeekPageContent() {
           </span>
           {showProgress && weekKm > 0 && (
             <>
-              <span className="week-progress" role="img" aria-label={`Corsa: ${doneKm.toFixed(0)} km svolti su ${weekKm.toFixed(0)} previsti`}>
+              <span className="week-progress" role="img" aria-label={`${planDoneKm.toFixed(0)} km del piano svolti su ${weekKm.toFixed(0)} previsti`}>
                 <span style={{ width: `${progressFraction * 100}%` }} />
               </span>
-              <span className="figure">{doneKm.toFixed(0)} / {weekKm.toFixed(0)} km di corsa e bici</span>
+              <span className="figure">{planDoneKm.toFixed(0)} / {weekKm.toFixed(0)} km del piano{offPlanKm >= 1 ? ` · +${offPlanKm.toFixed(0)} fuori piano` : ""}</span>
             </>
           )}
           {offset <= 0 && (
@@ -427,19 +431,21 @@ export function WeekPageContent() {
                               card={card}
                               animate={false}
                               delayMs={0}
-                              matchKm={j === 0 && match?.matched ? match.distance_km ?? null : null}
+                              matchKm={j === 0 && match?.matched ? match.distance_km ?? null : day.done[j]?.distance_km ?? null}
+                              done={!!day.done[j] || (j === 0 && !!match?.matched)}
                               onDragStateChange={(dragging) => handleDragStateChange(card, dragging)}
                               onDragOver={handleDragOver}
                               onDrop={handleCardDrop}
                               onPrefetch={card.workout ? () => prefetchWorkoutSession(card.workout!) : undefined}
                               emphasis={j === 0 && day.key === nextDayKey ? (isToday ? "oggi" : "prossimo") : null}
                             />
-                            <MoveSessionControl card={card} blocked={isRewritten(card.session.date) || rescheduleWorkout.isPending} onMove={(date) => {
+                            {/* Done or past sessions have nothing to move to. */}
+                            {!day.done[j] && card.session.date >= todayKey && <MoveSessionControl card={card} blocked={isRewritten(card.session.date) || rescheduleWorkout.isPending} onMove={(date) => {
                               if (isRewritten(date) || isRewritten(card.session.date)) return false;
                               if (card.planId) moveSession(card.planId, card.session.date, date);
                               else if (card.workout) rescheduleWorkout.mutate({ workout: card.workout, newDate: date });
                               return true;
-                            }} />
+                            }} />}
                           </div>
                         ))
                       )}
@@ -525,6 +531,13 @@ function WeekNav({ start, end, offset, onPrev, onNext, onToday }: { start: Date;
   );
 }
 
+/** From today for fourteen days, plus the session's own day if it falls outside. */
+function moveChoices(current: string): string[] {
+  const today = toDateKey(new Date());
+  const days = Array.from({ length: 15 }, (_, i) => shiftDateKey(today, i));
+  return days.includes(current) ? days : [current, ...days];
+}
+
 function MoveSessionControl({ card, blocked, onMove }: { card: DayCardData; blocked: boolean; onMove: (date: string) => boolean }) {
   const [date, setDate] = useState(card.session.date);
   const [error, setError] = useState(false);
@@ -538,7 +551,11 @@ function MoveSessionControl({ card, blocked, onMove }: { card: DayCardData; bloc
       setError(false);
       if (detail.current) detail.current.open = false;
     }}>
-      <label className="field">Nuovo giorno<input type="date" required value={date} onChange={(event) => setDate(event.target.value)} data-track="week.move-date" /></label>
+      {/* The next two weeks in Italian, not the native date input: that one follows the
+          browser's language ("10/31/2026") and needs three taps. */}
+      <label className="field">Nuovo giorno<select required value={date} onChange={(event) => setDate(event.target.value)} data-track="week.move-date">
+        {moveChoices(card.session.date).map((key) => <option key={key} value={key}>{capitalize(new Date(`${key}T12:00:00`).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" }))}{key === card.session.date ? " (ora)" : ""}</option>)}
+      </select></label>
       <button type="submit" className="btn" data-track="week.move-confirm" {...dis(blocked || !date || date === card.session.date, blocked ? "in_caricamento" : "scegli_un_altro_giorno")}>Sposta seduta</button>
     </form>
     {error && <p role="alert" className="ux-error">Il piano di quel giorno è in aggiornamento. Riprova al termine.</p>}

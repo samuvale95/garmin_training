@@ -9,6 +9,8 @@ import { Illustration } from "@/components/Illustration";
 import { CheckInCard } from "@/components/CheckInCard";
 import { AdaptationCard } from "@/components/AdaptationCard";
 import { NowMealCard } from "@/components/NowMealCard";
+import { BigEffortCard, bigEffort } from "@/components/BigEffortCard";
+import { GarminPushBar } from "@/components/GarminPushBar";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { Skeleton } from "@/components/motion/primitives";
 import { CheckIcon, UtensilsIcon } from "@/components/Icons";
@@ -24,7 +26,6 @@ import {
   useDayVerdict,
   useFuelStatus,
   useFuelTargets,
-  usePlanDiff,
   useRaceGoal,
   useRefreshServerData,
   useStravaActivityMatches,
@@ -72,7 +73,6 @@ export function TodayView() {
   const endKey = toDateKey(end);
   const liveMode = !access.plan && access.garminConnected;
   const workoutsQuery = useWeekWorkouts(today, liveMode);
-  const diffQuery = usePlanDiff(access.plan?.sessions ?? null);
   const bodyQuery = useBodyToday();
 
   const stravaStatus = useStravaStatus();
@@ -188,7 +188,8 @@ export function TodayView() {
   const doneOn = (session: DisplaySession) =>
     !!stravaMatches.data?.matches[session.date]?.matched || (session.date === todayKey && todaySessions.length === 1 && trainedOn(todayKey));
 
-  const pendingChanges = (diffQuery.data?.to_create?.length ?? 0) + (diffQuery.data?.changed?.length ?? 0);
+  // A long run or a race yesterday or today: its analysis is what to look at.
+  const effort = bigEffort(recentActivities.data?.activities);
   const mealMoment = fuelTargets.data ? currentMoment(fuelTargets.data, nowMinutes) : null;
   const readiness = bodyQuery.data?.readiness_score;
   const sleepMinutes = bodyQuery.data?.sleep?.total_minutes;
@@ -231,6 +232,7 @@ export function TodayView() {
                 today={today}
                 animate={animate}
               />
+              {effort && <BigEffortCard activity={effort} dayLabel={effort.date === todayKey ? "oggi" : "ieri"} animate={false} />}
               {hasPlan && <AdaptationCard animate={animate} delayMs={0} />}
             </div>
 
@@ -273,19 +275,11 @@ export function TodayView() {
               <Notice tone="neutral" title="Stai vedendo il calendario Garmin" action={<Link className="btn" data-size="sm" href="/week/programs/new?source=import" data-track="today.import">Importa un programma</Link>}>
                 Importa o crea un programma per vedere fasi, ritmi e obiettivo di ogni seduta.
               </Notice>
-            ) : pendingChanges > 0 ? (
-              <ul className="list">
-                <li>
-                  <RowLink
-                    href="/diff"
-                    from="/today"
-                    track="today.diff"
-                    title={`${pendingChanges} ${pendingChanges === 1 ? "modifica da inviare" : "modifiche da inviare"} a Garmin`}
-                    meta="Salvate nell’app, non ancora sull’orologio. Controlla prima di inviare."
-                    end={<Badge tone="warn">Da inviare</Badge>}
-                  />
-                </li>
-              </ul>
+            ) : access.garminConnected ? (
+              // Plans reach the watch on their own after each change; only a problem
+              // earns a line here. Replaces the full plan-vs-calendar diff, which read the
+              // whole Garmin calendar on every visit.
+              <GarminPushBar animate={false} quietWhenOk />
             ) : null}
           </div>
 
@@ -434,7 +428,22 @@ function SessionHero({
         {main && <Stat value={<span style={{ fontSize: "var(--text-lg)" }}>{stepGroupLine(main)}</span>} label="Parte principale" />}
       </div>
 
-      {verdict?.headline && badge && badge.tone !== "ok" && <p className="hero-text">{verdict.headline}</p>}
+      {verdict?.headline && badge && badge.tone !== "ok" && (
+        <p className="hero-text">
+          {verdict.headline}
+          {/* Why, on the same card: the reasons used to live only on the Recupero page. */}
+          {verdict.signals.some((sig) => sig.severity !== "info") && (
+            <span className="muted" style={{ display: "block", fontSize: "var(--text-sm)", marginTop: 2 }}>
+              {verdict.signals
+                .filter((sig) => sig.severity !== "info")
+                .sort((a, b) => (a.severity === "forte" ? 0 : 1) - (b.severity === "forte" ? 0 : 1))
+                .slice(0, 2)
+                .map((sig) => sig.label)
+                .join(" · ")}
+            </span>
+          )}
+        </p>
+      )}
 
       <div className="hero-actions">
         <ContextLink className="btn" data-variant="primary" href={href} from="/today" data-track="today.open-session">

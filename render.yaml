@@ -33,3 +33,9 @@ services:
       # Shared secret for POST /agents/cron (same value as the GitHub Actions secret).
       - key: AGENTS_CRON_SECRET
         sync: false
+      # Read-only maintenance summaries (/diagnostics/*); unset turns them off.
+      - key: PASSO_DIAGNOSTICS_TOKEN
+        sync: false
+      # The users' time zone: every "today" the API computes is in it (default Europe/Rome).
+      - key: PASSO_TZ
+        value: Europe/Rome

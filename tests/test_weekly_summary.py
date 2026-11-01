@@ -35,7 +35,7 @@ def test_three_of_four_planned_days():
     assert (s.planned_sessions, s.planned_days, s.planned_days_trained) == (4, 4, 3)
     assert s.planned_minutes == 160 and s.done_minutes == 120
     assert "3 giorni su 4" in s.headline
-    assert any("1 saltati" in h for h in s.highlights)
+    assert any("1 senza allenamento" in h for h in s.highlights)
 
 
 def test_without_a_plan_the_plan_figure_is_absent_not_zero():
@@ -86,3 +86,11 @@ def test_highlights_are_capped():
 def test_the_default_week():
     assert ws.default_monday(date(2026, 9, 28)) == date(2026, 9, 21)  # Monday: last week
     assert ws.default_monday(date(2026, 10, 1)) == date(2026, 9, 28)  # Thursday: this week
+
+
+def test_runs_off_the_plan_days_lead_the_headline():
+    """A week of runs on other days is not "0 su 2": what was done comes first."""
+    plan_days = [MONDAY + timedelta(days=d) for d in (1, 3)]
+    s = build(planned=[planned(d) for d in plan_days], days=[trained(MONDAY + timedelta(days=d)) for d in (2, 4)])
+    assert s.headline.startswith("La settimana: 2 allenamenti") or s.headline.startswith("Questa settimana: 2 allenamenti")
+    assert "0 giorni su" not in s.headline

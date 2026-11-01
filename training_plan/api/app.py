@@ -8,19 +8,23 @@ for the actual logic they call.
 from __future__ import annotations
 
 import os
+import time
+import re
+import threading
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .. import admins, checkin, db, history, interactions, move_check, plan_adaptation, plan_store, programs
+from .. import admins, checkin, db, garmin_push, history, interactions, move_check, plan_adaptation, plan_store, programs
 from ..agents import store as agent_store
 from ..garmin_sync import GarminRateLimitError, GarminSyncError
 from ..parser import TrainingPlanValidationError
 from ..strava_sync import StravaAuthError
-from . import schemas, user_tokenstore
-from .auth import AuthError, current_user_id
+from . import garmin_session, schemas, user_tokenstore
+from .auth import AuthError, current_claims, current_user_id
+from . import cache as cache_module
 from .cache import cache
 from .routes_body import router as body_router
 from .routes_checkin import router as checkin_router
@@ -38,12 +42,21 @@ from .routes_energy import router as energy_router
 from .routes_events import router as events_router
 from .routes_agents import cron_router as agents_cron_router
 from .routes_agents import router as agents_router
+from .routes_batch import router as batch_router
+from .routes_diagnostics import router as diagnostics_router
 
 # The CLI (cli.py) calls this too, but `uvicorn training_plan.api:app` never goes
 # through cli.py -- without this, GARMIN_EMAIL/GARMIN_PASSWORD/STRAVA_* in a local
 # .env file are silently invisible to the server, only to shells that happen to
 # export them some other way.
 load_dotenv()
+
+# Every "today" in this codebase is `date.today()`, i.e. the process's local date, and the
+# host runs in UTC: between midnight and 1-2 am in Italy the server still thought it was
+# yesterday -- Oggi, check-ins, nutrition and the Garmin push window all on the wrong day.
+# The users are in one time zone, so the process adopts it. PASSO_TZ overrides.
+os.environ["TZ"] = os.getenv("PASSO_TZ", "Europe/Rome")
+time.tzset()
 
 app = FastAPI(title="Passo training API")
 
@@ -56,6 +69,45 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["x-tracking-disabled"],
 )
+
+
+# Writes that change the plan -- an edit, a move, a deletion, a short variant, a new or
+# reactivated program, an applied adaptation (including one applied automatically by
+# the check Oggi runs on open). After any of them succeeds the Garmin
+# calendar is brought in line in the background (`garmin_push`), so nobody has to
+# remember a sync screen. Everything else under /plan (diff, sync, validate, parse,
+# previews) is read-like and left alone.
+_PLAN_WRITES = re.compile(
+    r"^/plan(/sessions(/[^/]+(/toggle-short)?)?|/[^/]+/toggle-active|/[^/]+|/adaptation/[^/]+/[^/]+"
+    r"|/adaptation/check|/generate|/move-decisions|/drafts/[^/]+/activate)?$"
+)
+# Single-segment paths under /plan that read or preview rather than change the plan
+# (`DELETE /plan/{plan_id}` is the one single-segment write the pattern is there for).
+_PLAN_READS = {"diff", "sync", "validate", "parse", "move-check", "constraints", "drafts", "skeleton",
+               "export", "goal-fit", "goal-prediction"}
+
+
+def _is_plan_write(method: str, path: str) -> bool:
+    if method not in ("POST", "PUT", "PATCH", "DELETE") or not _PLAN_WRITES.match(path):
+        return False
+    parts = path.strip("/").split("/")
+    return not (len(parts) == 2 and parts[1] in _PLAN_READS)
+
+
+@app.middleware("http")
+async def _push_plan_to_garmin(request: Request, call_next):
+    response = await call_next(request)
+    if 200 <= response.status_code < 300 and _is_plan_write(request.method, request.url.path):
+        try:
+            user_id = current_claims(authorization=request.headers.get("authorization"))["sub"]
+        except Exception:  # noqa: BLE001 - no user, nothing to push for
+            return response
+        threading.Thread(
+            target=garmin_push.run_for,
+            args=(user_id, lambda work: garmin_session.run(user_id, work)),
+            daemon=True,
+        ).start()
+    return response
 
 
 @app.on_event("startup")
@@ -77,6 +129,8 @@ def _ensure_schema() -> None:
     interactions.ensure_schema()
     agent_store.ensure_schema()
     admins.ensure_schema()
+    garmin_push.ensure_schema()
+    cache_module.ensure_schema()
     # Raw interaction events live 60 days; trimming at startup is enough for a one-person app.
     try:
         interactions.purge_old()
@@ -161,6 +215,9 @@ app.include_router(events_router, tags=["events"], dependencies=_auth_gate)
 app.include_router(agents_router, tags=["agents"], dependencies=_auth_gate)
 # Not JWT-gated: the scheduler has no user session. Guarded by AGENTS_CRON_SECRET instead.
 app.include_router(agents_cron_router, tags=["agents"])
+# Not JWT-gated either: read-only summaries for maintenance, behind PASSO_DIAGNOSTICS_TOKEN.
+app.include_router(diagnostics_router, tags=["diagnostics"])
+app.include_router(batch_router, tags=["batch"], dependencies=_auth_gate)
 
 
 @app.get("/health")

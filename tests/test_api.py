@@ -45,6 +45,9 @@ class FakeGarminSync:
     def connection_status(self) -> dict:
         return FakeGarminSync.status_response
 
+    def disconnect(self) -> None:
+        self.logged_in = False
+
     def user_profile(self) -> dict:
         return FakeGarminSync.profile_response
 

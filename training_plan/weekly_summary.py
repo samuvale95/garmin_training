@@ -181,9 +181,14 @@ def _headline(s: WeekSummary) -> str:
     when = "Questa settimana" if not s.complete else "La settimana"
     if s.done_sessions == 0:
         return f"{when} nessun allenamento registrato." if s.complete else "Settimana ancora da iniziare."
+    # What was done first, the plan second: "0 giorni su 2 del piano" as the opening line
+    # read as a failure in a week full of runs that just landed on other days.
+    done = f"{when}: {s.done_sessions} {'allenamento' if s.done_sessions == 1 else 'allenamenti'}, {s.done_minutes} minuti di corsa"
     if s.planned_days_trained is not None and s.planned_days:
-        return f"{when}: {s.planned_days_trained} giorni su {s.planned_days} del piano, {s.done_minutes} minuti di corsa."
-    return f"{when}: {s.done_sessions} {'allenamento' if s.done_sessions == 1 else 'allenamenti'}, {s.done_minutes} minuti di corsa."
+        if s.planned_days_trained == 0:
+            return f"{done}, in giorni diversi da quelli del piano."
+        return f"{done} · {s.planned_days_trained} giorni su {s.planned_days} del piano."
+    return f"{done}."
 
 
 def _highlights(s: WeekSummary) -> list[str]:
@@ -203,7 +208,7 @@ def _highlights(s: WeekSummary) -> list[str]:
         if missed == 0 and s.complete:
             out.append(f"Tutti i {s.planned_days} giorni del piano fatti.")
         elif missed > 0 and s.complete:
-            out.append(f"{s.planned_days_trained} giorni su {s.planned_days} del piano: {missed} saltati.")
+            out.append(f"{s.planned_days_trained} giorni su {s.planned_days} del piano, {missed} senza allenamento.")
     hard = s.efforts.get("dura", 0) + s.efforts.get("troppo", 0)
     easy = s.efforts.get("facile", 0) + s.efforts.get("giusta", 0)
     if s.efforts.get("troppo"):

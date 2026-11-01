@@ -14,12 +14,16 @@ MAX_REPETITIONS = 99
 
 # Garmin Connect sportType payload fragments, keyed by our file-format sport value.
 SPORT_TYPE_PAYLOAD = {
+    # Read from Garmin's own workout editor (`/workout-service/workout/types`) on a real
+    # account, Nov 2026. The earlier values came from community code and were wrong for
+    # three sports: 3 is "other" (swimming is 4), 6 is "cardio_training" (strength is
+    # 5), 8 is "pilates" (other is 3). See docs/garmin-workouts.md.
     "running": {"sportTypeId": 1, "sportTypeKey": "running", "displayOrder": 1},
     "cycling": {"sportTypeId": 2, "sportTypeKey": "cycling", "displayOrder": 2},
-    "swimming": {"sportTypeId": 3, "sportTypeKey": "swimming", "displayOrder": 3},
-    "strength_training": {"sportTypeId": 6, "sportTypeKey": "fitness_equipment", "displayOrder": 6},
-    "calisthenics": {"sportTypeId": 6, "sportTypeKey": "fitness_equipment", "displayOrder": 6},
-    "other": {"sportTypeId": 8, "sportTypeKey": "other", "displayOrder": 8},
+    "swimming": {"sportTypeId": 4, "sportTypeKey": "swimming", "displayOrder": 4},
+    "strength_training": {"sportTypeId": 5, "sportTypeKey": "strength_training", "displayOrder": 3},
+    "calisthenics": {"sportTypeId": 5, "sportTypeKey": "strength_training", "displayOrder": 3},
+    "other": {"sportTypeId": 3, "sportTypeKey": "other", "displayOrder": 3},
 }
 
 # The other direction: Garmin's own sport keys, mapped back onto the five file-format
@@ -39,6 +43,8 @@ _GARMIN_SPORT_STEMS = (
     ("street_workout", "calisthenics"),
     ("strength", "strength_training"),
     ("fitness_equipment", "strength_training"),
+    ("cardio", "strength_training"),
+    ("hiit", "strength_training"),
 )
 
 

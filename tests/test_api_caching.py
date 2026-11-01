@@ -116,27 +116,10 @@ WEEK = {"start": "2026-08-03", "end": "2026-08-09"}
 
 
 # ---- shared session ---------------------------------------------------------------------------
-
-
-def test_shared_session_logs_in_once_across_requests(client):
-    """The whole point: N requests, one login.
-
-    `garminconnect`'s `login()` always costs two extra Garmin round-trips even with a
-    valid cached token, so a screen firing six queries used to pay twelve of them.
-    """
-    client.get("/garmin/workouts", params=WEEK)
-    client.get("/garmin/activities", params=WEEK)
-    client.get("/garmin/workouts", params={"start": "2026-08-10", "end": "2026-08-16"})
-
-    assert CountingGarminSync.logins == 1
-
-
-def test_reset_forces_a_new_login(client):
-    client.get("/garmin/workouts", params=WEEK)
-    garmin_session.reset()
-    client.get("/garmin/workouts", params={"start": "2026-08-10", "end": "2026-08-16"})
-
-    assert CountingGarminSync.logins == 2
+#
+# The tests for one process-wide Garmin session (one login for every request, `reset()`,
+# healing a stale shared session) went with that design: a session now belongs to its
+# user and lives for one call (see `garmin_session.py`), so there is nothing to share.
 
 
 def test_disconnect_drops_the_shared_session_and_cache(client):
@@ -146,21 +129,6 @@ def test_disconnect_drops_the_shared_session_and_cache(client):
 
     assert CountingGarminSync.logins == 2
     assert CountingGarminSync.calendar_reads == 2  # the cached week went with it
-
-
-def test_stale_session_is_healed_once(client):
-    """A cached Garmin session can expire server-side; the first call using it fails.
-
-    That must not surface as an error the user has to retry by hand -- the session is
-    dropped and the read is replayed against a fresh login, exactly once.
-    """
-    client.get("/garmin/workouts", params=WEEK)  # establishes the shared session
-    CountingGarminSync.fail_calendar_once = True
-
-    response = client.get("/garmin/workouts", params={"start": "2026-08-10", "end": "2026-08-16"})
-
-    assert response.status_code == 200
-    assert CountingGarminSync.logins == 2
 
 
 def test_rate_limit_is_never_retried_and_reports_retry_after(client):
@@ -274,7 +242,7 @@ def test_cached_empty_result_is_still_a_hit(monkeypatch, client):
     """A falsy cached value (an empty calendar) must not read as a miss."""
     monkeypatch.setattr(CountingGarminSync, "list_scheduled_workouts", lambda self, start, end: [])
     assert client.get("/garmin/workouts", params=WEEK).json()["workouts"] == []
-    assert cache.get_or_call("garmin:workouts", (date(2026, 8, 3), date(2026, 8, 9)), 60, lambda: ["boom"]) == []
+    assert cache.get_or_call("garmin:workouts", "test-user", (date(2026, 8, 3), date(2026, 8, 9)), 60, lambda: ["boom"]) == []
 
 
 # ---- /body/conflict reuses /body/today's snapshot ---------------------------------------------

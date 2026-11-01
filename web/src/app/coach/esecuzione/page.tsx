@@ -71,9 +71,9 @@ export default function ExecutionPage() {
       ) : !data?.zones ? (
         <Empty
           title="Mi mancano le tue zone"
-          body="Per dire se una seduta è stata facile mi serve la tua frequenza di soglia, che Garmin stima dalle sedute dure. Non la trovo sul tuo account. Preferisco non mostrarti niente piuttosto che zone ricavate da 220 meno l'età: l'errore di quella formula è più largo delle zone che dovrebbe definire."
-          href="/settings"
-          cta="Controlla la connessione a Garmin"
+          body="Mi serve la tua frequenza di soglia. Garmin non ce l'ha, e non riesco ancora a stimarla io: basta una corsa sostenuta di almeno 20 minuti, con il battito affidabile (meglio con la fascia). Appena ci sono, le zone compaiono da sole. Niente 220 meno l'età: sbaglia più delle zone che dovrebbe definire."
+          href="/activities"
+          cta="Vedi le tue corse"
         />
       ) : !data.block ? (
         <Empty
@@ -123,8 +123,9 @@ export default function ExecutionPage() {
             </p>
             <p className="font-mono" style={{ fontSize: 14, margin: "8px 0 0" }}>{data.zones.describe}</p>
             <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "8px 0 0", lineHeight: 1.4 }}>
-              Ricavate dalla soglia del lattato che Garmin stima dalle tue sedute
-              ({data.zones.threshold_hr} bpm), non da una formula sull&apos;età.
+              {data.zones.source === "stimato"
+                ? <>Garmin non ha una soglia sul tuo account: questa ({data.zones.threshold_hr} bpm) è stimata dalle tue corse più impegnative, escluse quelle con il battito inaffidabile. Una gara o un test la rendono più precisa.</>
+                : <>Ricavate dalla soglia del lattato che Garmin stima dalle tue sedute ({data.zones.threshold_hr} bpm), non da una formula sull&apos;età.</>}
             </p>
           </SlideUp>
 

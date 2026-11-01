@@ -1,13 +1,12 @@
 "use client";
 
-import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
 import { SlideUp, WordIn } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
 import { numberToItalianWords } from "@/lib/format";
 import { FitnessFatigueCard } from "@/components/FitnessFatigueCard";
 import { AerobicEfficiencyCard } from "@/components/AerobicEfficiencyCard";
-import { useAerobicEfficiency, useBodyLoad, useFitnessFatigue, usePlanQuery } from "@/lib/queries";
+import { useAerobicEfficiency, useAthleteLevel, useBodyLoad, useFitnessFatigue, usePlanQuery } from "@/lib/queries";
 import { isoWeekNumber, sessionDistanceKm, toDateKey } from "@/lib/sessionVisuals";
 import { countdownLabel, goalTitle } from "@/lib/raceGoal";
 import { useScreenReady } from "@/lib/useScreenReady";
@@ -70,7 +69,10 @@ function loadStory(weeks: ChartWeek[]): {
 
   const planned = (deload ? prior : covered).map((w) => w.plannedKm);
 
-  if (planned.length < 2) {
+  // Weeks with no planned km are holes, not a flat line: "stabile" needs at least three
+  // real weeks to say so, otherwise two zero weeks read as a steady plan.
+  const real = planned.filter((km) => km > 0);
+  if (real.length < 2) {
     return {
       headline: "Ancora poco da leggere",
       caption: "Servono un paio di settimane di piano prima che l'andamento del carico voglia dire qualcosa.",
@@ -90,12 +92,14 @@ function loadStory(weeks: ChartWeek[]): {
       ? { headline: "Stai salendo", phrase: `${numberToItalianWords(streak + 1)} settimane in crescita` }
       : lastDirection === -1
         ? { headline: "Stai calando", phrase: `${numberToItalianWords(streak + 1)} settimane in calo` }
-        : { headline: "Sei stabile", phrase: "il volume tiene la stessa quota" };
+        : real.length >= 3
+          ? { headline: "Sei stabile", phrase: "il volume tiene la stessa quota" }
+          : { headline: "Ancora poco da leggere", phrase: "due settimane simili non fanno ancora un andamento" };
 
   const scarico = deload ? ` e una di scarico in arrivo, −${deload.dropPct}%` : "";
   return {
     headline: trend.headline,
-    caption: `${trend.phrase}${scarico}. È la forma che il tuo file disegna.`,
+    caption: `${trend.phrase}${scarico}. È la forma del tuo piano.`,
     deload,
   };
 }
@@ -115,6 +119,7 @@ export default function LoadPage() {
   const animate = useMountOnce("body-load");
   const { data, isLoading } = useBodyLoad();
   const { data: ffData } = useFitnessFatigue(60);
+  const { data: athleteLevel } = useAthleteLevel();
   const { data: aeData } = useAerobicEfficiency(90);
   // The plan drives every "previsto" bar and the whole trend story, so the screen waits
   // for it to come back out of localStorage too: reading it before hydration would show
@@ -168,8 +173,8 @@ export default function LoadPage() {
     <div style={{ padding: "22px 20px 12px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* The tabs layout already shows the brand; a second mark read as a doubled header. */}
           <PageHeader backHref="/body" />
-          <BrandMark height={22} />
         </div>
         <span style={{ fontSize: 12, color: "var(--inchiostro-35)", fontWeight: 500 }}>
           {weeks.length > 0 ? `carico · ${weeks.length} settimane` : "carico"}
@@ -200,25 +205,26 @@ export default function LoadPage() {
             delayMs={150}
             style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 18, marginTop: 10 }}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 14, marginBottom: 10 }}>
-              <Legend color="var(--accent)" label="fatto · carico" />
-              <Legend color="rgba(34, 34, 34, 0.22)" label="previsto · km" />
-            </div>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: ROW_HEIGHT }}>
-              {weeks.map((week) => {
-                const completedPx = Math.round(((week.completed_load ?? 0) / maxLoad) * ROW_HEIGHT);
-                const plannedPx = Math.round((week.plannedKm / maxPlanned) * ROW_HEIGHT);
-                return (
-                  <div key={week.week_start} style={{ flex: 1, display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 3, height: ROW_HEIGHT }}>
-                    <div
-                      className={week.in_progress ? "anim-bar-settle" : undefined}
-                      style={{ width: "45%", height: completedPx, background: "var(--accent)", borderRadius: "4px 4px 0 0", transformOrigin: "bottom" }}
-                    />
-                    <div style={{ width: "45%", height: plannedPx, background: "rgba(34, 34, 34, 0.22)", borderRadius: "4px 4px 0 0" }} />
-                  </div>
-                );
-              })}
-            </div>
+            {/* Two rows, one scale each: the Garmin load score and the planned km are
+                different units, and side-by-side bars invited comparing their heights. */}
+            {([
+              { label: "Fatto · carico Garmin", color: "var(--accent)", value: (w: ChartWeek) => w.completed_load ?? 0, max: maxLoad },
+              { label: "Previsto · km del piano", color: "rgba(34, 34, 34, 0.28)", value: (w: ChartWeek) => w.plannedKm, max: maxPlanned },
+            ] as const).map((row) => (
+              <div key={row.label} style={{ marginBottom: 10 }}>
+                <p style={{ fontSize: 11.5, fontWeight: 600, color: "var(--inchiostro-70)", margin: "0 0 6px" }}>{row.label}</p>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: ROW_HEIGHT / 2 }}>
+                  {weeks.map((week) => (
+                    <div key={week.week_start} style={{ flex: 1, display: "flex", alignItems: "flex-end", height: ROW_HEIGHT / 2 }}>
+                      <div
+                        className={week.in_progress ? "anim-bar-settle" : undefined}
+                        style={{ width: "100%", height: Math.round((row.value(week) / (row.max || 1)) * (ROW_HEIGHT / 2)), background: row.color, borderRadius: "4px 4px 0 0", transformOrigin: "bottom" }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
             <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
               {weeks.map((week) => {
                 const weekNumber = isoWeekNumber(new Date(week.week_start));
@@ -233,9 +239,8 @@ export default function LoadPage() {
                 );
               })}
             </div>
-            <p style={{ fontSize: 12, color: "var(--inchiostro-35)", marginTop: 10 }}>
-              Due scale diverse: il carico è il punteggio di Garmin, il previsto sono i km del piano. Ogni
-              serie è alta rispetto alla propria settimana migliore.
+            <p style={{ fontSize: 11, color: "var(--inchiostro-35)", marginTop: 10 }}>
+              Ogni riga è alta rispetto alla propria settimana migliore.
             </p>
             {deload && (
               <p style={{ fontSize: 12, color: "var(--inchiostro-50)", marginTop: 6 }}>
@@ -283,7 +288,7 @@ export default function LoadPage() {
 
           {ffData && (
             <div style={{ marginTop: 14 }}>
-              <FitnessFatigueCard data={ffData} animate={animate} />
+              <FitnessFatigueCard data={ffData} animate={animate} technical={(athleteLevel?.level ?? 2) >= 3} />
             </div>
           )}
 
@@ -295,7 +300,7 @@ export default function LoadPage() {
 
           {plannedAhead > 0 && (
             <SlideUp active={animate} delayMs={380} className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-70)", marginTop: 14 }}>
-              Nelle prossime due settimane il file chiede {plannedAhead.toFixed(0)} km.
+              Nelle prossime due settimane il piano prevede {plannedAhead.toFixed(0)} km.
             </SlideUp>
           )}
         </>
@@ -304,11 +309,3 @@ export default function LoadPage() {
   );
 }
 
-function Legend({ color, label }: { color: string; label: string }) {
-  return (
-    <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--inchiostro-50)" }}>
-      <span style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
-      {label}
-    </span>
-  );
-}

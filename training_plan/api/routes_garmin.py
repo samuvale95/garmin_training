@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import json
+import logging
+import threading
+import time
 from datetime import date
 
 from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
-from .. import service
+from .. import garmin_push, service
 from ..garmin_sync import ScheduledWorkout
 from .auth import current_user_id
+from .routes_agents import require_admin
 from . import garmin_session, schemas
 from .cache import (
     TTL_GARMIN_ACTIVITIES,
@@ -21,6 +26,8 @@ from .cache import (
     invalidate_calendar,
     range_ttl,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -99,27 +106,12 @@ async def workouts(
         )
     )
 
-    # Reconcile any moved workouts from Garmin into local plan_session
-    def _reconcile():
-        try:
-            from .. import plan_store
-            stored = plan_store.list_sessions(user_id)
-            if not stored or not result:
-                return
-            for w in result:
-                for s in stored:
-                    # Match by title and sport, within a ±7 days window
-                    if s["title"].strip().lower() == w.title.strip().lower() and s["sport"] == w.sport:
-                        if s["date"] != w.date.isoformat():
-                            # Garmin has a different date for this workout (e.g. moved on Garmin Connect calendar)
-                            s_date = date.fromisoformat(s["date"])
-                            if abs((s_date - w.date).days) <= 7:
-                                plan_store.update_session(user_id, s["id"], {"date": w.date.isoformat()}, by_user=True)
-                                break
-        except Exception:
-            pass
-
-    await run_in_threadpool(_reconcile)
+    # A workout moved on Garmin Connect moves its plan session too -- matched by the
+    # workout id the push remembered, never by title (see garmin_push.pull_moves).
+    try:
+        await run_in_threadpool(garmin_push.pull_moves, user_id, result)
+    except Exception:  # noqa: BLE001 - reading the calendar must not fail because of this
+        logger.warning("pulling Garmin moves into the plan failed", exc_info=True)
 
     return schemas.WorkoutsResponse(workouts=[schemas.ScheduledWorkoutOut.from_model(w) for w in result])
 
@@ -240,3 +232,58 @@ async def reschedule_workout(
     result = await run_in_threadpool(lambda: garmin_session.run(user_id, _run))
     invalidate_calendar(user_id)
     return schemas.RescheduleResultOut.from_model(result)
+
+
+# ---- automatic push of the plan to the Garmin calendar (see garmin_push) ----------------------
+
+# How often opening the app may start a retry of what is pending or failed. The status
+# read itself is one query; the retry is what costs Garmin calls.
+PUSH_RETRY_EVERY_S = 5 * 60
+_last_kick: dict[str, float] = {}
+
+
+def _kick(user_id: str, *, force: bool = False) -> bool:
+    now = time.monotonic()
+    if not force and now - _last_kick.get(user_id, 0.0) < PUSH_RETRY_EVERY_S:
+        return False
+    _last_kick[user_id] = now
+    threading.Thread(
+        target=garmin_push.run_for,
+        args=(user_id, lambda work: garmin_session.run(user_id, work)),
+        daemon=True,
+    ).start()
+    return True
+
+
+@router.get("/garmin/push/status")
+async def push_status(user_id: str = Depends(current_user_id)) -> dict:
+    """Which plan sessions are on Garmin, on their way, or failed (with why)."""
+    result = await run_in_threadpool(garmin_push.status, user_id)
+    if not result["running"] and (result["counts"]["pending"] or result["counts"]["failed"]):
+        result["running"] = _kick(user_id)
+    return result
+
+
+@router.post("/garmin/push/run")
+async def push_run(user_id: str = Depends(current_user_id)) -> dict:
+    """The 'retry now' button: push whatever differs, without waiting for the next edit."""
+    started = _kick(user_id, force=True)
+    return {"started": started}
+
+
+@router.get("/garmin/probe/workout-types")
+async def probe_workout_types(user_id: str = Depends(require_admin)) -> dict:
+    """Admin only, read-only: Garmin's workout codes as the account sees them. Logged too,
+    so the result can be read from the server logs without screenshots."""
+    result = await run_in_threadpool(garmin_session.run, user_id, lambda sync: sync.probe_workout_types())
+    logger.warning("garmin probe workout-types: %s", json.dumps(result, default=str)[:20000])
+    return result
+
+
+@router.get("/garmin/probe/workout/{workout_id}")
+async def probe_workout(workout_id: int, user_id: str = Depends(require_admin)) -> dict:
+    """Admin only, read-only: one saved workout as Garmin stores it (e.g. one made by
+    hand in Garmin Connect, to copy its exact shape)."""
+    result = await run_in_threadpool(garmin_session.run, user_id, lambda sync: sync.workout_json(workout_id))
+    logger.warning("garmin probe workout %s: %s", workout_id, json.dumps(result, default=str)[:20000])
+    return result

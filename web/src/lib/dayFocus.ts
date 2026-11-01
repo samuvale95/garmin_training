@@ -47,9 +47,10 @@ export function dayFocus({
 
 /** A short label under a screen's title saying which moment it is ordered for. */
 export const FOCUS_LINE: Record<DayFocus, string> = {
-  prontezza: "Prima dell'allenamento",
-  recupero: "Dopo l'allenamento",
-  domani: "Sera · si guarda a domani",
+  // Full sentences: a bare "Prima dell'allenamento" did not say what was being ordered.
+  prontezza: "Prima di allenarti: i dati per decidere",
+  recupero: "Dopo l'allenamento: i dati del recupero",
+  domani: "È sera: i dati per domani",
 };
 
 /** `dayFocus` for today, from the clock, the watch and the plan. The activity query is

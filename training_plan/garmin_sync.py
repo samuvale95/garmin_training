@@ -677,6 +677,35 @@ class GarminSync:
 
     # ---- workout creation & scheduling -------------------------------------------------
 
+    def probe_workout_types(self) -> dict:
+        """Read-only: the sport and step codes Garmin's own workout editor uses, and the
+        sports of the workouts already saved on the account.
+
+        The codes in `SPORT_TYPE_PAYLOAD` came from community sources that disagree
+        (swimming 3 or 4? strength 5 or 6?). This reads them from the account itself,
+        creating and deleting nothing.
+        """
+        out: dict = {}
+        try:
+            out["types"] = self.client.connectapi("/workout-service/workout/types")
+        except Exception as exc:  # noqa: BLE001 - each half is reported on its own
+            out["types_error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+        try:
+            seen: dict[str, dict] = {}
+            for workout in self.client.get_workouts(0, 200) or []:
+                sport = workout.get("sportType") or {}
+                key = f"{sport.get('sportTypeId')}:{sport.get('sportTypeKey')}"
+                entry = seen.setdefault(key, {"sportType": sport, "count": 0, "example_id": workout.get("workoutId")})
+                entry["count"] += 1
+            out["saved_workout_sports"] = list(seen.values())
+        except Exception as exc:  # noqa: BLE001
+            out["saved_workouts_error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+        return out
+
+    def workout_json(self, workout_id: int) -> dict:
+        """Read-only: one saved workout exactly as Garmin stores it."""
+        return self.client.get_workout_by_id(workout_id)
+
     def build_workout_payload(self, session: TrainingSession) -> dict:
         # Falls back rather than raising on an unknown sport: plan files are validated
         # against SUPPORTED_SPORTS and Garmin-sourced sessions go through

@@ -276,6 +276,7 @@ function persistPlanToServer(queryClient: ReturnType<typeof useQueryClient>, pla
   request
     .then((saved) => {
       queryClient.invalidateQueries({ queryKey: PLANS_LIST_KEY });
+      nudgeGarminPush(queryClient);
       // The imported sessions come back with the ids the server gave them; without
       // adopting those, the next edit would have nothing to address.
       if (plan && "sessions" in saved && saved.sessions) {
@@ -299,7 +300,9 @@ function persistPlanToServer(queryClient: ReturnType<typeof useQueryClient>, pla
       if (!plan.goal && current.goal) return; // a goal was set locally since this request went out
       applyPlanLocally(queryClient, { ...current, goal: saved.goal });
     })
-    .catch(() => {});
+    // Said out loud rather than swallowed: a refused write looked saved until the next
+    // load quietly brought the old plan back.
+    .catch(() => reportSaveFailed());
 }
 
 function writePlan(queryClient: ReturnType<typeof useQueryClient>, next: PlanState | null): void {
@@ -420,7 +423,7 @@ export function useSetRaceGoal() {
       : null;
     apiPut<{ goal: RaceGoal | null }>("/goal", { goal: goalPayload })
       .then((saved) => queryClient.setQueryData(STANDALONE_GOAL_KEY, saved))
-      .catch(() => {});
+      .catch(() => reportSaveFailed());
   };
 }
 
@@ -477,8 +480,14 @@ export function useUpdateSession() {
     replaceSessionLocally(queryClient, id, () => after);
 
     apiPatch<TrainingSession>(`/plan/sessions/${id}`, contentOf(after))
-      .then((saved) => replaceSessionLocally(queryClient, id, () => saved))
-      .catch(() => replaceSessionLocally(queryClient, id, () => before));
+      .then((saved) => {
+        replaceSessionLocally(queryClient, id, () => saved);
+        nudgeGarminPush(queryClient);
+      })
+      .catch(() => {
+        replaceSessionLocally(queryClient, id, () => before);
+        reportSaveFailed();
+      });
   };
 }
 
@@ -496,8 +505,14 @@ export function useAddSession() {
     replaceSessionLocally(queryClient, id, () => created);
 
     apiPost<TrainingSession>("/plan/sessions", { ...contentOf(created), id })
-      .then((saved) => replaceSessionLocally(queryClient, id, () => saved))
-      .catch(() => replaceSessionLocally(queryClient, id, () => null));
+      .then((saved) => {
+        replaceSessionLocally(queryClient, id, () => saved);
+        nudgeGarminPush(queryClient);
+      })
+      .catch(() => {
+        replaceSessionLocally(queryClient, id, () => null);
+        reportSaveFailed();
+      });
     return id;
   };
 }
@@ -514,6 +529,7 @@ export function useSavePlanSession() {
       replaceSessionLocally(queryClient, saved.id!, () => saved);
       queryClient.invalidateQueries({ queryKey: ["plan-list"] });
       queryClient.invalidateQueries({ queryKey: ["plan-diff"] });
+      nudgeGarminPush(queryClient);
     },
   });
 }
@@ -526,9 +542,12 @@ export function useRemoveSession() {
     if (!before) return;
     replaceSessionLocally(queryClient, id, () => null);
 
-    apiDelete<{ ok: boolean }>(`/plan/sessions/${id}`).catch(() =>
-      replaceSessionLocally(queryClient, id, () => before)
-    );
+    apiDelete<{ ok: boolean }>(`/plan/sessions/${id}`)
+      .then(() => nudgeGarminPush(queryClient))
+      .catch(() => {
+        replaceSessionLocally(queryClient, id, () => before);
+        reportSaveFailed();
+      });
   };
 }
 
@@ -545,8 +564,14 @@ export function useToggleSessionShort() {
     replaceSessionLocally(queryClient, id, () => optimistic);
 
     apiPost<TrainingSession>(`/plan/sessions/${id}/toggle-short`, {})
-      .then((saved) => replaceSessionLocally(queryClient, id, () => saved))
-      .catch(() => replaceSessionLocally(queryClient, id, () => before));
+      .then((saved) => {
+        replaceSessionLocally(queryClient, id, () => saved);
+        nudgeGarminPush(queryClient);
+      })
+      .catch(() => {
+        replaceSessionLocally(queryClient, id, () => before);
+        reportSaveFailed();
+      });
   };
 }
 
@@ -1953,4 +1978,57 @@ export function useUnretireShoe() {
       queryClient.invalidateQueries({ queryKey: ["strava", "shoes"] });
     },
   });
+}
+
+// ---- the plan on Garmin (automatic push, see training_plan/garmin_push.py) ----------------------
+
+export interface GarminPushSession {
+  session_id: string;
+  date: string;
+  title: string;
+  status: "ok" | "pending" | "failed";
+  error: string | null;
+}
+
+export interface GarminPushStatus {
+  running: boolean;
+  counts: { ok: number; pending: number; failed: number };
+  sessions: GarminPushSession[];
+}
+
+export const GARMIN_PUSH_KEY = ["garmin-push"] as const;
+
+/** Which plan sessions are on the watch. One DB read on the server, no Garmin call; while a
+ * push is running it is re-read every few seconds so "in invio" turns into "su Garmin". */
+export function useGarminPushStatus(enabled = true) {
+  return useQuery({
+    queryKey: GARMIN_PUSH_KEY,
+    queryFn: ({ signal }) => apiGet<GarminPushStatus>("/garmin/push/status", undefined, signal),
+    enabled,
+    staleTime: 30_000,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      return data && (data.running || data.counts.pending > 0) ? 4_000 : false;
+    },
+  });
+}
+
+export function useRetryGarminPush() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ started: boolean }>("/garmin/push/run", {}),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: GARMIN_PUSH_KEY }),
+  });
+}
+
+/** After a plan write: the server is already pushing, so show it and start polling. */
+function nudgeGarminPush(queryClient: ReturnType<typeof useQueryClient>): void {
+  queryClient.invalidateQueries({ queryKey: GARMIN_PUSH_KEY });
+}
+
+/** A save that failed used to revert silently, which reads as "my change vanished".
+ * Screens listen for this and say so (see GarminPushBar). */
+export const SAVE_FAILED_EVENT = "passo:save-failed";
+function reportSaveFailed(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(SAVE_FAILED_EVENT));
 }

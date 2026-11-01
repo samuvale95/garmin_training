@@ -6,6 +6,7 @@ import { useMounted } from "@/lib/hydration";
 import { isTrackingEnabled, setTrackingEnabled } from "@/lib/tracker";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { GarminSportProbe } from "@/components/GarminSportProbe";
 import { Avatar } from "@/components/Avatar";
 import { RefreshButton } from "@/components/RefreshButton";
 import { WorkspaceHeading } from "@/components/Workspace";
@@ -13,7 +14,7 @@ import { Badge, RowLink, Section } from "@/components/ui";
 import { useAthleteLevel, useClearPlan, useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, usePlanQuery, useResetAllLocalData, useStravaStatus } from "@/lib/queries";
 import { useAthleteIdentity } from "@/lib/identity";
 import { useIsAdmin } from "@/lib/agents";
-import { signOut } from "@/lib/auth";
+import { signOut, useSession } from "@/lib/auth";
 import { usePassoStore } from "@/lib/store";
 import { downloadEnrichedPlanYaml, downloadPlanYaml } from "@/lib/planYaml";
 import { countdownLabel, goalTitle } from "@/lib/raceGoal";
@@ -33,6 +34,7 @@ export default function SettingsPage() {
   const { data: athleteLevel } = useAthleteLevel();
   const identity = useAthleteIdentity();
   const { data: isAdmin } = useIsAdmin();
+  const accountEmail = useSession().session?.user?.email ?? null;
   const prefs = usePassoStore((s) => s.prefs);
   const setPref = usePassoStore((s) => s.setPref);
   const profile = usePassoStore((s) => s.profile);
@@ -87,10 +89,15 @@ export default function SettingsPage() {
                   <input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} placeholder="Il tuo nome" autoComplete="name" />
                 </label>
               )}
-              <label className="field">
-                Email
-                <input type="email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} placeholder="nome@esempio.it" autoComplete="email" />
-              </label>
+              {/* The login account's address, read-only: a typed one could differ from it. */}
+              {accountEmail ? (
+                <p className="muted" style={{ margin: 0, fontSize: "var(--text-sm)", overflow: "hidden", textOverflow: "ellipsis" }}>{accountEmail}</p>
+              ) : (
+                <label className="field">
+                  Email
+                  <input type="email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} placeholder="nome@esempio.it" autoComplete="email" />
+                </label>
+              )}
             </div>
           </div>
         </Section>
@@ -157,6 +164,7 @@ export default function SettingsPage() {
             <li><RowLink href="/shoes?from=/settings" track="settings.shoes-from-settings" title="Scarpe" meta="Chilometri e usura, da Strava" /></li>
             {isAdmin?.is_admin && <li><RowLink href="/settings/agents" track="settings.settings-agents" title="Agenti" meta="Proposte, esecuzioni e budget" /></li>}
           </ul>
+          {isAdmin?.is_admin && <div className="card" style={{ marginTop: 10 }}><GarminSportProbe /></div>}
         </Section>
 
         <Section title="Preferenze" id="profile-prefs">

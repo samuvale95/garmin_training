@@ -462,8 +462,10 @@ def analyze_workout_streams(
         i += 30  # evaluate every 30 seconds
 
     if reliability is not None:
-        for step in reliability.steps[:2]:
-            breakpoints.append(_sensor_breakpoint(step, time_stream, dist_stream))
+        # The step that decides the verdict only: an earlier smaller one (a dip in the
+        # baseline) shown next to it read as a second, unexplained event.
+        if reliability.key_step is not None:
+            breakpoints.append(_sensor_breakpoint(reliability.key_step, time_stream, dist_stream))
         if reliability.steps:
             findings.insert(0, _sensor_finding(reliability, hr_source))
 
@@ -998,7 +1000,8 @@ def analyze_workout_streams(
         # The run itself may have been a good one; the headline says both things.
         verdict_status = "anomalia_rilevata"
         lead = race["insights"][0]["title"] if race["insights"] else "Corsa completata"
-        where = breakpoints[0].distance_km
+        key = reliability.key_step if reliability is not None else None
+        where = key.distance_km if key is not None and key.distance_km is not None else breakpoints[0].distance_km
         headline = f"{lead} — ma il battito dal km {where:.0f} non è affidabile"
     elif breakpoints:
         verdict_status = "anomalia_rilevata"
@@ -1019,7 +1022,8 @@ def analyze_workout_streams(
     if avg_hr:
         summary_deterministic += f" FC media {avg_hr} bpm."
     if breakpoints:
-        summary_deterministic += f" {len(breakpoints)} punto di rottura individuato."
+        n_breaks = len(breakpoints)
+        summary_deterministic += " 1 punto di rottura individuato." if n_breaks == 1 else f" {n_breaks} punti di rottura individuati."
 
     return WorkoutAnalysisResult(
         activity_id=activity_id,
@@ -1054,7 +1058,7 @@ def _reliability_dict(reliability: hr_reliability.HrReliability | None, hr_sourc
     return {
         "verdict": reliability.verdict,
         "unreliable_from_s": reliability.unreliable_from_s,
-        "unreliable_from_km": reliability.steps[0].distance_km if reliability.steps else None,
+        "unreliable_from_km": reliability.key_step.distance_km if reliability.key_step else None,
         "locked_share": reliability.locked_share,
         "dropout_share": reliability.dropout_share,
         "reasons": reliability.reasons,
@@ -1107,7 +1111,7 @@ def _sensor_breakpoint(
 
 
 def _sensor_finding(reliability: hr_reliability.HrReliability, hr_source: str | None) -> CausalFinding:
-    step = reliability.steps[0]
+    step = reliability.key_step
     where = f"km {step.distance_km:.1f}" if step.distance_km is not None else f"minuto {round(step.time_s / 60)}"
     strap = hr_source == "chest_strap"
     if step.locked_to_cadence and not strap:

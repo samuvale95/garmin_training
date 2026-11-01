@@ -232,6 +232,23 @@ def _zones(user_id: str) -> intensity.Zones | None:
     try:
         return cache.get_or_call("coach:zones", user_id, "threshold", TTL_COACH_ZONES, read)
     except _NoZones:
+        pass
+    except Exception:  # noqa: BLE001 - Garmin unreachable: the estimate below still answers
+        logger.info("Garmin threshold unavailable", exc_info=True)
+
+    # No threshold on the Garmin account: the one estimated from the athlete's own hard
+    # runs (zone_recalibration, sensor-locked runs excluded), marked as an estimate. Before
+    # this, "Come ti alleni" proposed a threshold while "Come ti alleni davvero" said there
+    # were no zones -- two screens contradicting each other about the same athlete.
+    def estimate() -> intensity.Zones:
+        result = zone_recalibration.recalibrate_zones(user_id=user_id, current_zones=None)
+        if not result.estimated_lthr:
+            raise _NoZones
+        return intensity.Zones.from_threshold(result.estimated_lthr, source="stimato")
+
+    try:
+        return cache.get_or_call("coach:zones", user_id, "estimate", TTL_COACH_ZONES, estimate)
+    except _NoZones:
         return None
 
 

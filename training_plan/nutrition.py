@@ -62,7 +62,7 @@ SessionLoad = Literal["riposo", "facile", "moderato", "duro", "molto_lungo"]
 #   riposo / facile   -- "low intensity or skill-based", 3-5 g/kg
 #   moderato          -- "moderate exercise programme, ~1 h/day", 5-7 g/kg
 #   duro              -- "endurance programme, 1-3 h/day", the lower half of 6-10 g/kg
-#   molto_lungo       -- 3 h+ in one session, the upper half of the same row
+#   molto_lungo       -- VERY_LONG_MINUTES (2 h 20) and more in one session, the upper half of the same row
 #
 # The 8-12 g/kg row (four to five hours a day, every day) is not reachable from this
 # table at all, and that is deliberate: no session a plan in this app can describe earns
