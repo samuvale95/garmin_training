@@ -1033,6 +1033,10 @@ def _build_step_payload(step: Step, order: int) -> dict:
         ),
         "targetType": NO_TARGET_PAYLOAD,
     }
+    # The step's note is what the watch shows on that step ("Trazioni · 6 ripetizioni"):
+    # Garmin keeps it in the step's own `description`, as its editor does.
+    if step.note:
+        payload["description"] = step.note[:512]
 
     if step.target_pace:
         slower_mps, faster_mps = step.target_pace.as_speeds_mps()
@@ -1079,6 +1083,7 @@ def _parse_workout_step(raw_step: dict) -> Step | None:
     return Step(
         type=step_type, duration_type=duration_type, duration_value=duration_value,
         target_pace=_parse_pace_target(raw_step),
+        note=(raw_step.get("description") or None),
     )
 
 

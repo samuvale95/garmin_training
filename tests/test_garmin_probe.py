@@ -52,3 +52,15 @@ def test_sport_codes_match_what_garmin_reports():
     assert ids["strength_training"] == (5, "strength_training")
     assert ids["calisthenics"] == (5, "strength_training")
     assert ids["other"] == (3, "other")
+
+
+def test_a_step_note_travels_to_garmin_and_back():
+    """The note is what the watch shows on the step ("Trazioni · 6 ripetizioni")."""
+    from training_plan.garmin_sync import _build_step_payload, _parse_workout_step
+    from training_plan.models import Step
+
+    step = Step(type="interval", duration_type="time", duration_value=1, note="Trazioni · 6 ripetizioni")
+    payload = _build_step_payload(step, 1)
+    assert payload["description"] == "Trazioni · 6 ripetizioni"
+    assert _parse_workout_step(payload).note == "Trazioni · 6 ripetizioni"
+    assert "description" not in _build_step_payload(Step(type="interval", duration_type="time", duration_value=1), 1)
