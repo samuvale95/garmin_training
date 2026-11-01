@@ -84,6 +84,7 @@ function History({ setParam, here }: { setParam: (key: string, value: string, de
   const needle = search.trim().toLocaleLowerCase("it");
   const visible = activities.filter((a) => (sport === "all" || a.family === sport) && `${a.title} ${a.label}`.toLocaleLowerCase("it").includes(needle));
   const totalMinutes = visible.reduce((sum, a) => sum + a.minutes, 0);
+  const mixedSources = new Set(visible.map((a) => a.source)).size > 1;
 
   // Group by month: the list is long, and months are how a past run is remembered.
   const groups = new Map<string, StoredActivity[]>();
@@ -150,7 +151,10 @@ function History({ setParam, here }: { setParam: (key: string, value: string, de
                         <span className="row-main">
                           <span className="row-title">{activity.title || activity.label}</span>
                           <span className="row-meta">
-                            {activity.label} · {SOURCE_LABEL[activity.source]}
+                            {activity.label}
+                            {/* The source says something only when not everything comes from one place. */}
+                            {mixedSources && ` · ${SOURCE_LABEL[activity.source]}`}
+                            {((activity.distance_km ?? 0) >= 15 || activity.minutes >= 90) && <> · <strong style={{ color: "var(--accent)" }}>uscita lunga</strong></>}
                           </span>
                         </span>
                         <span className="row-end figure" style={{ flexDirection: "column", alignItems: "flex-end", gap: 0, color: "var(--ink)" }}>

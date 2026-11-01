@@ -313,8 +313,11 @@ export function WeekPageContent() {
   const weekSessions = days.flatMap((d) => d.cards.map((c) => c.session));
   const weekKm = weekSessions.reduce((sum, s) => sum + sessionDistanceKm(s), 0);
   const weekMinutes = weekSessions.reduce((sum, s) => sum + sessionDurationMinutes(s), 0);
-  const doneKm = (activitiesQuery.data?.activities ?? []).reduce((sum, a) => sum + (a.distance_km ?? 0), 0);
-  const progressFraction = weekKm > 0 ? Math.min(1, doneKm / weekKm) : 0;
+  // Km that ticked off a planned session, apart from the rest: "58 / 21 km" read as
+  // overdoing the plan when most of it was a race outside it.
+  const planDoneKm = days.reduce((sum, d) => sum + d.done.reduce((s2, a) => s2 + (a?.distance_km ?? 0), 0), 0);
+  const offPlanKm = days.reduce((sum, d) => sum + d.offPlan.reduce((s2, a) => s2 + (a.distance_km ?? 0), 0), 0);
+  const progressFraction = weekKm > 0 ? Math.min(1, planDoneKm / weekKm) : 0;
 
   // The session the week is waiting on: today's, unless it is already done, else the
   // next one this week. Only on the current week -- elsewhere nothing is "next".
@@ -338,10 +341,10 @@ export function WeekPageContent() {
           </span>
           {showProgress && weekKm > 0 && (
             <>
-              <span className="week-progress" role="img" aria-label={`Corsa: ${doneKm.toFixed(0)} km svolti su ${weekKm.toFixed(0)} previsti`}>
+              <span className="week-progress" role="img" aria-label={`${planDoneKm.toFixed(0)} km del piano svolti su ${weekKm.toFixed(0)} previsti`}>
                 <span style={{ width: `${progressFraction * 100}%` }} />
               </span>
-              <span className="figure">{doneKm.toFixed(0)} / {weekKm.toFixed(0)} km di corsa e bici</span>
+              <span className="figure">{planDoneKm.toFixed(0)} / {weekKm.toFixed(0)} km del piano{offPlanKm >= 1 ? ` · +${offPlanKm.toFixed(0)} fuori piano` : ""}</span>
             </>
           )}
           {offset <= 0 && (

@@ -30,7 +30,7 @@ export default function ProgramsPage(){
       <p className="card-text">{plan.sessions_count} sedute · {plan.sports.map(s=>SPORTS[s]??s).join(", ")||"Sport non indicato"}</p>
       <p className="card-text">{linked.length?`Contribuisce a: ${linked.map(g=>g.name).join(", ")}`:plan.goal?`Obiettivo: ${goalTitle(plan.goal)}`:"Programma libero, senza obiettivo specifico"}</p>
       <div className="actions">
-       <Link className="btn" data-size="sm" href={`/week/programs/new?source=ai&target=${plan.id}`} data-track="programs.adapt">Adatta le prossime settimane</Link>
+       <Link className="btn" data-size="sm" data-variant="primary" href={`/week/programs/new?source=ai&target=${plan.id}`} data-track="programs.adapt">Adatta le prossime settimane</Link>
        <button className="btn" data-size="sm" data-track="programs.link-goals" aria-expanded={linking===plan.id} onClick={()=>setLinking(linking===plan.id?null:plan.id)}>Collega obiettivi</button>
        <button className="btn" data-size="sm" data-variant="quiet" data-track="programs.toggle" {...dis(toggle.isPending,"in_caricamento")} onClick={()=>{if(plan.is_active){if(!toggle.isPending)toggle.mutate({planId:plan.id,isActive:false});}else startReactivation(plan.id);}}>{plan.is_active?"Disattiva":"Riattiva"}</button>
       </div>

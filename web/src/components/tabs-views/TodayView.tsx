@@ -428,7 +428,22 @@ function SessionHero({
         {main && <Stat value={<span style={{ fontSize: "var(--text-lg)" }}>{stepGroupLine(main)}</span>} label="Parte principale" />}
       </div>
 
-      {verdict?.headline && badge && badge.tone !== "ok" && <p className="hero-text">{verdict.headline}</p>}
+      {verdict?.headline && badge && badge.tone !== "ok" && (
+        <p className="hero-text">
+          {verdict.headline}
+          {/* Why, on the same card: the reasons used to live only on the Recupero page. */}
+          {verdict.signals.some((sig) => sig.severity !== "info") && (
+            <span className="muted" style={{ display: "block", fontSize: "var(--text-sm)", marginTop: 2 }}>
+              {verdict.signals
+                .filter((sig) => sig.severity !== "info")
+                .sort((a, b) => (a.severity === "forte" ? 0 : 1) - (b.severity === "forte" ? 0 : 1))
+                .slice(0, 2)
+                .map((sig) => sig.label)
+                .join(" · ")}
+            </span>
+          )}
+        </p>
+      )}
 
       <div className="hero-actions">
         <ContextLink className="btn" data-variant="primary" href={href} from="/today" data-track="today.open-session">

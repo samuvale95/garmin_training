@@ -37,3 +37,18 @@ def test_the_probe_only_reads_and_groups_saved_workouts_by_sport():
     assert out["types"]["workoutSportTypes"][0]["sportTypeKey"] == "running"
     counts = {s["sportType"]["sportTypeKey"]: s["count"] for s in out["saved_workout_sports"]}
     assert counts == {"running": 2, "strength_training": 1}
+
+
+def test_sport_codes_match_what_garmin_reports():
+    """Read from /workout-service/workout/types on a real account (docs/garmin-workouts.md):
+    the earlier values sent swims as "other", strength as "cardio_training" and other as
+    "pilates"."""
+    from training_plan.models import SPORT_TYPE_PAYLOAD
+
+    ids = {sport: (p["sportTypeId"], p["sportTypeKey"]) for sport, p in SPORT_TYPE_PAYLOAD.items()}
+    assert ids["running"] == (1, "running")
+    assert ids["cycling"] == (2, "cycling")
+    assert ids["swimming"] == (4, "swimming")
+    assert ids["strength_training"] == (5, "strength_training")
+    assert ids["calisthenics"] == (5, "strength_training")
+    assert ids["other"] == (3, "other")
