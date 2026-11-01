@@ -247,22 +247,28 @@ export function TodayView() {
   const readiness = bodyQuery.data?.readiness_score;
   const sleepMinutes = bodyQuery.data?.sleep?.total_minutes;
 
+  const checkInDate = checkInDay === "oggi" ? todayKey : yesterdayKey;
+  const checkInCard = checkInDay ? (
+    <CheckInCard
+      key={checkInDate}
+      date={checkInDate}
+      dayLabel={checkInDay}
+      trained={trainedOn(checkInDate)}
+      existing={checkInOn(checkInDate)}
+      animate={animate}
+      delayMs={130}
+    />
+  ) : null;
+  // With a long run or race on that same day, its card already asks "how did it go":
+  // the check-in joins it instead of being a second card about the same run.
+  const checkInJoined = !!effort && !!checkInDay && effort.date === checkInDate;
+
   // Check-in and technique analysis follow the training overview.
   const postSession = (
     <>
-      {checkInDay && (
-        <CheckInCard
-          key={checkInDay === "oggi" ? todayKey : yesterdayKey}
-          date={checkInDay === "oggi" ? todayKey : yesterdayKey}
-          dayLabel={checkInDay}
-          trained={trainedOn(checkInDay === "oggi" ? todayKey : yesterdayKey)}
-          existing={checkInOn(checkInDay === "oggi" ? todayKey : yesterdayKey)}
-          animate={animate}
-          delayMs={130}
-        />
-      )}
+      {checkInDay && !checkInJoined && checkInCard}
 
-      {trainedOn(todayKey) && (
+      {trainedOn(todayKey) && !effort && (
         <SlideUp active={animate} delayMs={140} style={{ marginTop: 10 }}>
           <Link data-track="today.coach"
             href="/coach"
@@ -336,7 +342,15 @@ export function TodayView() {
           onSelectSessionIndex={setSelectedTodaySessionIdx}
         />
 
+      {access.garminConnected && !liveMode && <GarminPushBar animate={animate} delayMs={60} quietWhenOk />}
+
+      {/* 1b. The meal only when it is time for it: right after the workout, not buried. */}
+      {nowMealCard}
+
       {effort && <BigEffortCard activity={effort} dayLabel={effort.date === todayKey ? "oggi" : "ieri"} animate={animate} />}
+      {checkInJoined && (
+        <div className="today-joined">{checkInCard}</div>
+      )}
 
       {todaySessions.length > 1 && <section className="today-sessions" aria-label="Tutti gli allenamenti di oggi">
         <h2 className="ux-section-title">Le {todaySessions.length} sedute di oggi</h2>
@@ -366,10 +380,6 @@ export function TodayView() {
         active={animate}
       />
 
-      {/* 5b. COSA MANGIARE, quando non è urgente */}
-      {nowMealCard}
-
-      <div className="ux-actions"><Link className="ux-button" href="/week" data-track="today.open-plan">Apri il calendario</Link><Link className="ux-button" href="/activities" data-track="today.open-activities">Attività svolte</Link></div>
       <details className="ux-disclosure"><summary data-track="today.more">Riepilogo e prossimi allenamenti</summary>
       {/* Compact secondary information remains accessible without crowding Today. */}
       <WeekStrip
@@ -463,8 +473,6 @@ export function TodayView() {
             <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
           </SlideUp>
         </Link>
-      ) : access.garminConnected ? (
-        <GarminPushBar animate={animate} delayMs={200} />
       ) : null}
 
       {/* The list always gets its title -- it's what separates it from the card above.

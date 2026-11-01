@@ -69,7 +69,10 @@ function loadStory(weeks: ChartWeek[]): {
 
   const planned = (deload ? prior : covered).map((w) => w.plannedKm);
 
-  if (planned.length < 2) {
+  // Weeks with no planned km are holes, not a flat line: "stabile" needs at least three
+  // real weeks to say so, otherwise two zero weeks read as a steady plan.
+  const real = planned.filter((km) => km > 0);
+  if (real.length < 2) {
     return {
       headline: "Ancora poco da leggere",
       caption: "Servono un paio di settimane di piano prima che l'andamento del carico voglia dire qualcosa.",
@@ -89,12 +92,14 @@ function loadStory(weeks: ChartWeek[]): {
       ? { headline: "Stai salendo", phrase: `${numberToItalianWords(streak + 1)} settimane in crescita` }
       : lastDirection === -1
         ? { headline: "Stai calando", phrase: `${numberToItalianWords(streak + 1)} settimane in calo` }
-        : { headline: "Sei stabile", phrase: "il volume tiene la stessa quota" };
+        : real.length >= 3
+          ? { headline: "Sei stabile", phrase: "il volume tiene la stessa quota" }
+          : { headline: "Ancora poco da leggere", phrase: "due settimane simili non fanno ancora un andamento" };
 
   const scarico = deload ? ` e una di scarico in arrivo, −${deload.dropPct}%` : "";
   return {
     headline: trend.headline,
-    caption: `${trend.phrase}${scarico}. È la forma che il tuo file disegna.`,
+    caption: `${trend.phrase}${scarico}. È la forma del tuo piano.`,
     deload,
   };
 }

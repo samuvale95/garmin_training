@@ -913,8 +913,13 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .today-sessions { margin:18px 0; }
 .today-session-link { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:14px 0; border-bottom:1px solid var(--sabbia-bordo); text-decoration:none; color:var(--inchiostro); font-size:14px; }
 .today-session-link small { display:block; color:var(--inchiostro-70); font-size:12px; margin-top:5px; }
-.week-move { margin:4px 0 10px; padding-left:6px; }
-.week-move summary { font-size:12px; cursor:pointer; min-height:44px; padding:12px 0; color:var(--inchiostro-70); }
+/* "Sposta" is a small right-aligned link under the card, not a full row. */
+.week-move { margin:0 0 6px; padding:0; text-align:right; position:relative; pointer-events:none; }
+.week-move[open] { text-align:left; }
+.week-move summary { display:inline-flex; align-items:center; pointer-events:auto; font-size:12px; font-weight:600; cursor:pointer; min-height:32px; padding:0 10px; color:var(--inchiostro-70); list-style:none; }
+.week-move summary::-webkit-details-marker { display:none; }
+.week-move[open] summary { width:100%; justify-content:flex-end; }
+.week-move form, .week-move [role="alert"] { pointer-events:auto; }
 .week-move form { display:flex; flex-wrap:wrap; align-items:end; gap:8px; padding-bottom:10px; }
 .skip-link { position:fixed; top:-100px; left:16px; z-index:200; padding:12px; background:var(--inchiostro); color:white; }
 .skip-link:focus { top:8px; }
@@ -1024,3 +1029,13 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 @media (prefers-reduced-motion: reduce) {
   .appear-late { animation-duration: 1ms; }
 }
+
+/* Programs: one primary action, the rest behind "Altro". */
+.program-more { position:relative; }
+.program-more > summary { list-style:none; }
+.program-more > summary::-webkit-details-marker { display:none; }
+.program-more-menu { display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+.program-more-menu .ux-button { justify-content:flex-start; }
+
+/* Home: the check-in tucked under the long-run card it is about. */
+.today-joined { margin-top: -6px; }

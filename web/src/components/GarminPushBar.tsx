@@ -9,7 +9,16 @@ import { dis } from "@/lib/disabled";
 /** One line that answers "is my plan on the watch?": on its way, all there, or what did
  * not make it and why -- with a retry. Replaces the plan-vs-calendar diff on Oggi, which
  * read the whole Garmin calendar on every visit. */
-export function GarminPushBar({ animate, delayMs = 0 }: { animate: boolean; delayMs?: number }) {
+export function GarminPushBar({
+  animate,
+  delayMs = 0,
+  quietWhenOk = false,
+}: {
+  animate: boolean;
+  delayMs?: number;
+  /** Home: say nothing when everything arrived -- only a problem earns the space. */
+  quietWhenOk?: boolean;
+}) {
   const status = useGarminPushStatus();
   const retry = useRetryGarminPush();
   const [open, setOpen] = useState(false);
@@ -64,7 +73,7 @@ export function GarminPushBar({ animate, delayMs = 0 }: { animate: boolean; dela
             Invio a Garmin in corso{data.counts.pending ? ` · ${data.counts.pending} ${data.counts.pending === 1 ? "seduta" : "sedute"}` : ""}…
           </span>
         </div>
-      ) : data.counts.ok > 0 ? (
+      ) : data.counts.ok > 0 && !quietWhenOk ? (
         <Link href="/week" data-track="today.push-ok" style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", textDecoration: "none" }}>
           <StatusDot kind="success" size={7} />
           <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>Piano sull&apos;orologio: {data.counts.ok} sedute aggiornate</span>

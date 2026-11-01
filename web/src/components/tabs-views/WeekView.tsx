@@ -9,7 +9,7 @@ import { motion } from "framer-motion";
 import { BarGrow, SlideUp } from "@/components/motion/primitives";
 import { ChevronLeft, ChevronRight, PlusIcon, ArrowRight } from "@/components/Icons";
 import { DraggableWeekCard, RestCard, type DayCardData } from "@/components/WeekCards";
-import { OffPlanCard, offPlanActivities } from "@/components/OffPlanCard";
+import { OffPlanCard, matchPlannedActivities } from "@/components/OffPlanCard";
 import { useMotionEnabled, useMountOnce } from "@/lib/motion";
 import { useMoveSession } from "@/lib/moveWarnings";
 import { PullToRefresh } from "@/components/PullToRefresh";
@@ -292,11 +292,11 @@ export function WeekPageContent() {
             .filter((w) => w.date === key)
             .map((w) => ({ id: `garmin:${w.scheduled_workout_id}`, session: w, workout: w }))
         : [];
-    const offPlan = offPlanActivities(
+    const { done, offPlan } = matchPlannedActivities(
       (storedActivities.data?.activities ?? []).filter((a) => a.day === key),
       cards.map((card) => card.session.sport)
     );
-    return { date, key, cards, offPlan };
+    return { date, key, cards, offPlan, done };
   });
 
   const weekSessions = days.flatMap((d) => d.cards.map((c) => c.session));
@@ -489,19 +489,21 @@ export function WeekPageContent() {
                             card={card}
                             animate={animate}
                             delayMs={i * 70 + j * 40}
-                            matchKm={j === 0 && match?.matched ? match.distance_km ?? null : null}
+                            matchKm={j === 0 && match?.matched ? match.distance_km ?? null : day.done[j]?.distance_km ?? null}
+                            done={!!day.done[j] || (j === 0 && !!match?.matched)}
                             onDragStateChange={(dragging) => handleDragStateChange(card, dragging)}
                             onDragOver={handleDragOver}
                             onDrop={handleCardDrop}
                             onPrefetch={card.workout ? () => prefetchWorkoutSession(card.workout!) : undefined}
                             emphasis={j === 0 && day.key === nextDayKey ? (isToday ? "oggi" : "prossimo") : null}
                           />
-                          <MoveSessionControl card={card} blocked={isRewritten(card.session.date) || rescheduleWorkout.isPending} onMove={(date) => {
+                          {/* Done or past sessions have nothing to move to. */}
+                          {!day.done[j] && card.session.date >= todayKey && <MoveSessionControl card={card} blocked={isRewritten(card.session.date) || rescheduleWorkout.isPending} onMove={(date) => {
                             if (isRewritten(date) || isRewritten(card.session.date)) return false;
                             if (card.planId) moveSession(card.planId, card.session.date, date);
                             else if (card.workout) rescheduleWorkout.mutate({ workout: card.workout, newDate: date });
                             return true;
-                          }} />
+                          }} />}
                           </div>
                         ))
                       )}
@@ -636,7 +638,7 @@ function MoveSessionControl({ card, blocked, onMove }: { card: DayCardData; bloc
   const [error, setError] = useState(false);
   const detail = useRef<HTMLDetailsElement>(null);
   return <details className="week-move" ref={detail}>
-    <summary data-track="week.move-open">Sposta <span className="sr-only">{card.session.title}</span></summary>
+    <summary data-track="week.move-open" title="Oppure tieni premuta la seduta e trascinala">Sposta <span className="sr-only">{card.session.title}</span></summary>
     <form onSubmit={(event) => {
       event.preventDefault();
       if (blocked || !date || date === card.session.date) return;

@@ -82,3 +82,19 @@ export function offPlanActivities(activities: StoredActivity[], plannedSports: (
     return true;
   });
 }
+
+/** Which stored activity counts as each planned session of the day (same sport family,
+ * in order), plus what is left over -- the off-plan ones. Unlike Strava matches this
+ * needs no Strava: a run recorded only on Garmin still ticks its session off. */
+export function matchPlannedActivities(
+  activities: StoredActivity[],
+  plannedSports: (string | null | undefined)[]
+): { done: (StoredActivity | null)[]; offPlan: StoredActivity[] } {
+  const left = [...activities];
+  const done = plannedSports.map((sport) => {
+    const family = planFamily(sport);
+    const index = left.findIndex((a) => a.family === family);
+    return index >= 0 ? left.splice(index, 1)[0] : null;
+  });
+  return { done, offPlan: left };
+}

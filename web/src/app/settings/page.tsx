@@ -15,7 +15,7 @@ import { ChevronRight } from "@/components/Icons";
 import { useAthleteLevel, useClearPlan, useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, usePlanQuery, useResetAllLocalData, useStravaStatus } from "@/lib/queries";
 import { useAthleteIdentity } from "@/lib/identity";
 import { useIsAdmin } from "@/lib/agents";
-import { signOut } from "@/lib/auth";
+import { signOut, useSession } from "@/lib/auth";
 import { usePassoStore } from "@/lib/store";
 import { downloadEnrichedPlanYaml, downloadPlanYaml } from "@/lib/planYaml";
 import { countdownLabel, goalTitle } from "@/lib/raceGoal";
@@ -34,6 +34,9 @@ export default function SettingsPage() {
   const { data: plan } = usePlanQuery();
   const { data: athleteLevel } = useAthleteLevel();
   const identity = useAthleteIdentity();
+  // The login account's address, never a typed one: an empty editable field showed
+  // "la tua email" to everyone, as if the app did not know who was signed in.
+  const accountEmail = useSession().session?.user?.email ?? null;
   const { data: isAdmin } = useIsAdmin();
   const prefs = usePassoStore((s) => s.prefs);
   const setPref = usePassoStore((s) => s.setPref);
@@ -77,7 +80,7 @@ export default function SettingsPage() {
         <Card>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Avatar size={40} />
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
               {identity.source === "strava" || identity.source === "garmin" ? (
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                   <span style={{ fontSize: 15, fontWeight: 600 }}>{identity.name}</span>
@@ -86,19 +89,22 @@ export default function SettingsPage() {
                   </span>
                 </div>
               ) : (
-                <input
-                  value={profile.name}
-                  onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                  placeholder="Il tuo nome"
-                  style={{ border: "none", background: "none", fontSize: 15, fontWeight: 600, padding: 0, outline: "none" }}
-                />
+                <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>Come ti chiami?</span>
+                  <input
+                    data-track="settings.name"
+                    value={profile.name}
+                    onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                    placeholder="Aggiungi il tuo nome"
+                    style={{ border: "none", borderBottom: "1px dashed var(--border-airbnb)", background: "none", fontSize: 15, fontWeight: 600, padding: "2px 0", outline: "none" }}
+                  />
+                </label>
               )}
-              <input
-                value={profile.email}
-                onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                placeholder="la tua email"
-                style={{ border: "none", background: "none", fontSize: 12, color: "var(--inchiostro-50)", padding: 0, outline: "none" }}
-              />
+              {accountEmail && (
+                <span style={{ fontSize: 12, color: "var(--inchiostro-50)", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {accountEmail}
+                </span>
+              )}
             </div>
           </div>
         </Card>
@@ -255,9 +261,9 @@ export default function SettingsPage() {
 
       <SlideUp delayMs={190}>
         <div style={{ background: "var(--azzurro)", color: "var(--azzurro-testo)", border: "1px solid var(--border-airbnb)", borderRadius: 20, padding: 18, marginTop: 12, boxShadow: "var(--shadow-airbnb-subtle)" }}>
-          <p style={{ fontWeight: 600, margin: "0 0 8px" }}>Il file resta la verità</p>
+          <p style={{ fontWeight: 600, margin: "0 0 8px" }}>Copia del tuo piano</p>
           <p className="font-serif-italic" style={{ fontSize: 13, margin: "0 0 12px" }}>
-            Ogni modifica fatta dall&apos;app te la riscrivo dentro, e puoi riscaricarlo quando vuoi.
+            Puoi scaricare il piano con tutte le modifiche fatte nell&apos;app, per conservarlo o riportarlo altrove.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 18px" }}>
             <button data-track="settings.plan"
@@ -276,7 +282,7 @@ export default function SettingsPage() {
                 opacity: plan ? 1 : 0.5,
               }}
             >
-              Scarica {plan?.filename ?? "il YAML"}
+              Scarica il piano
             </button>
             <button data-track="settings.plan-enriched"
               type="button"
@@ -294,7 +300,7 @@ export default function SettingsPage() {
                 opacity: plan ? 1 : 0.5,
               }}
             >
-              Scarica con storico e carichi (.yaml)
+              Scarica con storico e carichi
             </button>
             {/* The only way back to /import once a plan already exists -- without this,
                 a new or updated file has nowhere to be brought in from. */}
@@ -304,7 +310,7 @@ export default function SettingsPage() {
               className="tap-target"
               style={{ background: "none", color: "var(--azzurro-testo)", border: "none", fontSize: 13, fontWeight: 700, padding: 0, cursor: "pointer" }}
             >
-              {plan ? "Importa un nuovo file" : "Importa un file"}
+              {plan ? "Importa un altro piano" : "Importa un piano"}
             </button>
           </div>
         </div>

@@ -44,6 +44,17 @@ export function TodayHeroUnified({
 }: TodayHeroUnifiedProps) {
   const isWorkout = !!heroSession;
   const badge = verdict ? STATE_BADGE[verdict.state] ?? null : null;
+  // Why the badge says what it says, on the same card: the reasons used to live only on
+  // the Recupero page, so "Cauto" read as a judgement with no grounds.
+  const SEVERITY = { forte: 0, moderato: 1, info: 2 } as const;
+  const reasons =
+    verdict && verdict.state !== "pronto" && verdict.state !== "sconosciuto"
+      ? [...verdict.signals]
+          .filter((sig) => sig.severity !== "info")
+          .sort((a, b) => SEVERITY[a.severity] - SEVERITY[b.severity])
+          .slice(0, 2)
+          .map((sig) => sig.label)
+      : [];
   const toggleShort = useToggleSessionShort();
   const currentTitle = heroSession ? effectiveTitle(heroSession) : "";
   const isStrength = heroSession?.sport === "calisthenics" || heroSession?.sport === "strength_training";
@@ -99,6 +110,12 @@ export function TodayHeroUnified({
             </Link>
           )}
         </div>
+
+        {reasons.length > 0 && (
+          <p style={{ margin: "-4px 0 10px", fontSize: 12, color: badge?.color ?? "var(--inchiostro-70)", textAlign: "right" }}>
+            {reasons.join(" · ")}
+          </p>
+        )}
 
         {/* Multi-session picker pills if user has 2+ sessions on today */}
         {hasMultipleSessions && onSelectSessionIndex && (

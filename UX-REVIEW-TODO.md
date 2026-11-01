@@ -10,6 +10,16 @@ Già corretto e quindi escluso da qui: analisi gara, avviso battito ripetuto, "/
 intestazione doppia in Carico, schede vuote di tecnica in cima all'analisi, zone
 contraddittorie, modifica obiettivo che non salvava.
 
+## Fatto (priorità A)
+
+Home riordinata (seduta → avviso Garmin solo se qualcosa non è arrivato → pasto se è ora →
+corsa lunga con il check-in dentro), motivo sotto "Cauto", sedute del calendario spuntate
+dalle attività Garmin (non solo Strava), "Sposta" più piccolo e assente su sedute fatte o
+passate, Programmi con un'azione principale e il resto in "Altro", stato invio Garmin al
+posto di "Modifiche da inviare", "Sei stabile" solo con almeno tre settimane vere, Profilo
+senza segnaposto finti e senza "file/YAML". Resta aperto: vocabolario dell'import (YAML
+è ancora nominato dove si carica un file, dove serve).
+
 ## Trasversale
 
 - **A — Una sola risposta per "cosa faccio oggi".** La home ha molti blocchi (hero,

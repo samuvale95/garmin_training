@@ -84,6 +84,8 @@ interface DraggableWeekCardProps {
   animate: boolean;
   delayMs: number;
   matchKm: number | null;
+  /** An activity of the right sport was recorded that day, with or without km. */
+  done?: boolean;
   /** True once this card has been picked up, so the row it came from can be marked. */
   onDragStateChange: (dragging: boolean) => void;
   /** Page-space pointer position, per frame, while the card is being carried. */
@@ -120,7 +122,7 @@ type Phase = "idle" | "pressing" | "dragging";
  * identity changes, so nothing remounts it to reset its dragged position -- the
  * snap-back has to be explicit. On a real move the card's `key` lives under a different
  * day row after the state update and this instance unmounts anyway. */
-export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragStateChange, onDragOver, onDrop, onPrefetch, emphasis = null }: DraggableWeekCardProps) {
+export function DraggableWeekCard({ card, animate, delayMs, matchKm, done = false, onDragStateChange, onDragOver, onDrop, onPrefetch, emphasis = null }: DraggableWeekCardProps) {
   const { reduced } = useMotionEnabled();
   const dragControls = useDragControls();
   const [phase, setPhase] = useState<Phase>("idle");
@@ -304,6 +306,10 @@ export function DraggableWeekCard({ card, animate, delayMs, matchKm, onDragState
       {matchKm != null ? (
         <p className="font-mono" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, margin: "3px 0 0", color: "var(--verde-tratto-scuro)", fontWeight: 600, paddingRight: 56 }}>
           <CheckIcon size={12} strokeWidth={2.8} /> svolto {matchKm.toFixed(1)} km
+        </p>
+      ) : done ? (
+        <p className="font-mono" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, margin: "3px 0 0", color: "var(--verde-tratto-scuro)", fontWeight: 600, paddingRight: 56 }}>
+          <CheckIcon size={12} strokeWidth={2.8} /> svolta
         </p>
       ) : km === 0 && (card.session.sport === "calisthenics" || card.session.sport === "strength_training") ? (
         <p className="font-mono" style={{ fontSize: 11, margin: "3px 0 0", color: "var(--inchiostro-50)" }}>
