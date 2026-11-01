@@ -106,8 +106,104 @@ export async function apiGet<T>(
       if (value !== undefined) url.searchParams.set(key, value);
     }
   }
+  if (BATCHING) return batchedGet<T>(url, signal);
   const response = await timedFetch(url, { cache: "no-store", signal: requestSignal(signal), headers: await authHeaders() });
   return handle<T>(response);
+}
+
+// ---- read batching ---------------------------------------------------------------------
+//
+// Reads started within the same few milliseconds (a screen mounting a dozen queries) go
+// out as one `POST /batch`; the server answers each as an NDJSON line as soon as it is
+// ready, so a slow one holds up only itself. Anything the batch could not answer --
+// network error, older server without /batch, a line that never came -- falls back to
+// its own plain request, so batching can only remove round trips, never lose a read.
+
+const BATCHING = typeof window !== "undefined";
+const BATCH_WINDOW_MS = 8;
+const BATCH_MAX = 40;
+
+interface PendingGet {
+  url: URL;
+  signal?: AbortSignal;
+  resolve: (response: Response) => void;
+  reject: (error: unknown) => void;
+}
+
+let queue: PendingGet[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function batchedGet<T>(url: URL, signal?: AbortSignal): Promise<T> {
+  return new Promise<Response>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    queue.push({ url, signal, resolve, reject });
+    if (queue.length >= BATCH_MAX) flush();
+    else if (!flushTimer) flushTimer = setTimeout(flush, BATCH_WINDOW_MS);
+  }).then((response) => handle<T>(response));
+}
+
+async function single(item: PendingGet): Promise<void> {
+  try {
+    item.resolve(await timedFetch(item.url, { cache: "no-store", signal: requestSignal(item.signal), headers: await authHeaders() }));
+  } catch (error) {
+    item.reject(error);
+  }
+}
+
+function flush(): void {
+  if (flushTimer) clearTimeout(flushTimer);
+  flushTimer = null;
+  const items = queue.filter((item) => !item.signal?.aborted);
+  for (const item of queue) if (item.signal?.aborted) item.reject(item.signal.reason);
+  queue = [];
+  if (items.length === 0) return;
+  if (items.length === 1) {
+    void single(items[0]);
+    return;
+  }
+  void sendBatch(items);
+}
+
+async function sendBatch(items: PendingGet[]): Promise<void> {
+  const settled = new Set<number>();
+  try {
+    const response = await timedFetch(new URL("/batch", API_BASE_URL), {
+      method: "POST",
+      headers: { ...(await authHeaders()), "Content-Type": "application/json" },
+      body: JSON.stringify({ paths: items.map((item) => item.url.pathname + item.url.search) }),
+      cache: "no-store",
+      signal: requestSignal(undefined),
+    });
+    if (!response.ok || !response.body) throw new Error(`batch ${response.status}`);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (value) buffer += decoder.decode(value, { stream: true });
+      let newline: number;
+      while ((newline = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, newline);
+        buffer = buffer.slice(newline + 1);
+        if (!line.trim()) continue;
+        const { i, status, body } = JSON.parse(line) as { i: number; status: number; body: unknown };
+        const item = items[i];
+        if (!item || settled.has(i)) continue;
+        settled.add(i);
+        if (item.signal?.aborted) item.reject(item.signal.reason);
+        else item.resolve(new Response(status === 204 ? null : JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }));
+      }
+      if (done) break;
+    }
+  } catch {
+    // Fall through: whatever was not answered is fetched on its own below.
+  }
+  items.forEach((item, i) => {
+    if (!settled.has(i)) void single(item);
+  });
 }
 
 export async function apiGetBlob(

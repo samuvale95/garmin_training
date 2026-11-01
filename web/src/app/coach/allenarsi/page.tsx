@@ -53,9 +53,9 @@ export default function CoachTrainingPage() {
         ) : (
           <Empty
             title="Mi mancano le tue zone"
-            body="Per dire se una seduta è stata facile mi serve la tua frequenza di soglia, che Garmin stima dalle sedute dure. Non la trovo sul tuo account. Preferisco non dirti niente piuttosto che ricavare le zone da 220 meno l'età: l'errore di quella formula è più largo delle zone che dovrebbe definire."
-            href="/settings"
-            cta="Controlla la connessione a Garmin"
+            body="Mi serve la tua frequenza di soglia. Garmin non ce l'ha, e non riesco ancora a stimarla io: basta una corsa sostenuta di almeno 20 minuti, con il battito affidabile (meglio con la fascia). Appena ci sono, le zone compaiono da sole. Niente 220 meno l'età: sbaglia più delle zone che dovrebbe definire."
+            href="/activities"
+            cta="Vedi le tue corse"
           />
         )
       ) : !data.block ? (

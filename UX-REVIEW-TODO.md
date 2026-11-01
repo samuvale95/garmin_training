@@ -31,8 +31,10 @@ Nutrizione: il pasto attuale non è più ripetuto nella timeline. Resoconto: pri
 hai fatto, poi il piano. Profilo: copia del piano e ripristino in "Avanzate". Calendario:
 km del piano separati da quelli fuori piano. Oggi: "La settimana" dice cosa contiene.
 Obiettivi: previsione gara dentro l'obiettivo di tipo gara.
-Aperto: tono delle card scure; endpoint aggregato `/today`; errore di idratazione al
-secondo caricamento (c'era già prima di queste modifiche, da indagare a parte).
+Poi anche: il nero non è più usato per la navigazione ("Come ti alleni" è una card chiara);
+zone mancanti spiegate con cosa serve; letture raggruppate in `POST /batch` (home a
+freddo da 23 a 11 richieste, ogni risposta arriva appena pronta).
+Aperto: errore di idratazione al secondo caricamento (c'era già prima, da indagare).
 
 ## Trasversale
 

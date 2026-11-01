@@ -42,6 +42,7 @@ from .routes_energy import router as energy_router
 from .routes_events import router as events_router
 from .routes_agents import cron_router as agents_cron_router
 from .routes_agents import router as agents_router
+from .routes_batch import router as batch_router
 from .routes_diagnostics import router as diagnostics_router
 
 # The CLI (cli.py) calls this too, but `uvicorn training_plan.api:app` never goes
@@ -216,6 +217,7 @@ app.include_router(agents_router, tags=["agents"], dependencies=_auth_gate)
 app.include_router(agents_cron_router, tags=["agents"])
 # Not JWT-gated either: read-only summaries for maintenance, behind PASSO_DIAGNOSTICS_TOKEN.
 app.include_router(diagnostics_router, tags=["diagnostics"])
+app.include_router(batch_router, tags=["batch"], dependencies=_auth_gate)
 
 
 @app.get("/health")

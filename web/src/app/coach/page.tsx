@@ -106,16 +106,17 @@ export default function CoachPage() {
               <Link data-track="coach.coach-allenarsi"
                 href="/coach/allenarsi"
                 className="press-soft"
-                style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card)", padding: "16px 18px", textDecoration: "none" }}
+                style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", color: "inherit", borderRadius: "var(--radius-card)", padding: "16px 18px", textDecoration: "none" }}
               >
                 <div style={{ flex: 1 }}>
                   <p style={{ font: "600 15.5px/1.2 var(--font-sans)", margin: 0 }}>Come ti alleni</p>
-                  <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-su-scuro)", margin: "6px 0 0", lineHeight: 1.35 }}>
+                  <p className="font-serif-italic" style={{ fontSize: 14, color: "var(--inchiostro-70)", margin: "6px 0 0", lineHeight: 1.35 }}>
                     Un anno di corse contro il riferimento della ricerca, e le sedute che
                     cambierebbero il quadro.
                   </p>
                 </div>
-                <ChevronRight size={18} style={{ color: "var(--crema)", flex: "none" }} />
+                {/* Navigation is never dark: black is kept for "something happened here". */}
+                <ChevronRight size={18} style={{ color: "var(--inchiostro-50)", flex: "none" }} />
               </Link>
             </SlideUp>
   
