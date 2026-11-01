@@ -205,6 +205,9 @@ def validate_sessions(sessions):
     return out
 
 
+AI_SPORTS = {"running", "calisthenics", "strength_training"}
+
+
 def _read_yaml(text):
     if len(text) > 2_000_000:
         raise PlanningError("File troppo grande (massimo 2 MB)")
@@ -515,8 +518,10 @@ def begin_generation(user_id,draft_id,expected_revision):
         if draft["source"]!="ai" or draft["status"] in ("active","generating"):
             raise PlanningError("Questa bozza non può essere generata",409)
         inputs=draft.get("inputs") or {}
-        if (inputs.get("sports") or ["running"]) != ["running"]:
-            raise PlanningError("La generazione AI attuale supporta soltanto programmi corsa. Per altri sport importa un file.")
+        # The generator writes running, bodyweight and strength sessions (with Garmin
+        # exercises and repetitions); cycling and swimming still come from a file.
+        if not set(inputs.get("sports") or ["running"]) <= AI_SPORTS:
+            raise PlanningError("La generazione AI supporta corsa, calisthenics e forza. Per bici e nuoto importa un file.")
         requested_start=inputs.get("start_date")
         # The existing generator's detailed window starts tomorrow; unsupported dates
         # must never be silently ignored or disguised in the preview.

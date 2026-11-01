@@ -360,3 +360,75 @@ def test_a_plan_that_keeps_changing_gives_up_without_writing(storage):
     with pytest.raises(gen.GenerationFailed):
         gen.generate("u1", SUNDAY, profile=profile(), threshold_available=True)
     assert storage["replaced"] is None
+
+
+# ---- bodyweight and strength beside the runs ----------------------------------------------
+
+from training_plan.models import RepeatBlock, Step, TrainingSession  # noqa: E402
+
+
+def _calisthenics(day):
+    return TrainingSession(
+        date=day,
+        sport="calisthenics",
+        title="Parco: Trazioni e Dip",
+        steps=[
+            Step("warmup", "time", 8, note="Mobilità"),
+            RepeatBlock(reps=3, steps=[
+                Step("interval", "reps", 6, exercise="PULL_UP"),
+                Step("rest", "time", 1.5),
+                Step("interval", "reps", 8, exercise="BODY_WEIGHT_DIP"),
+                Step("rest", "time", 1.5),
+            ]),
+        ],
+    )
+
+
+def test_a_requested_calisthenics_session_passes_beside_the_runs():
+    w = window()
+    w.sports = ("running", "calisthenics")
+    runs = gen.compose_fallback(w)
+    run_day = runs[0].date
+    sessions = [*runs, _calisthenics(run_day)]  # same day as a run: allowed
+    assert gen.check(sessions, w) == []
+
+
+def test_calisthenics_is_refused_when_only_running_was_asked():
+    w = window()
+    runs = gen.compose_fallback(w)
+    errors = gen.check([*runs, _calisthenics(runs[0].date)], w)
+    assert any("sport 'calisthenics'" in e for e in errors)
+
+
+def test_two_bodyweight_sessions_on_one_day_are_refused():
+    w = window()
+    w.sports = ("running", "calisthenics")
+    runs = gen.compose_fallback(w)
+    day = runs[0].date
+    assert any("di forza" in e for e in gen.check([*runs, _calisthenics(day), _calisthenics(day)], w))
+
+
+def test_a_bodyweight_only_program_has_no_running_minimum():
+    w = window()
+    w.sports = ("calisthenics",)
+    assert gen.check([_calisthenics(w.start)], w) == []
+
+
+def test_the_model_is_told_the_exercise_names_and_reps():
+    assert "PULL_UP" in gen.PLAN_SYSTEM_PROMPT and '"reps"' in gen.PLAN_SYSTEM_PROMPT
+
+
+def test_an_invented_exercise_name_becomes_the_note_instead_of_failing_the_plan():
+    raw = json.dumps({"sessions": [{
+        "date": "2026-10-01", "sport": "calisthenics", "title": "Parco",
+        "steps": [
+            {"type": "interval", "exercise": "PULL_UP", "reps": 6},
+            {"type": "interval", "exercise": "Trazioni negative lente", "reps": 4, "note": "5 secondi in discesa"},
+        ],
+    }]})
+    sessions, errors = gen.parse_proposal(raw)
+    assert errors == []
+    first, second = sessions[0].steps
+    assert first.exercise == "PULL_UP"
+    assert second.exercise is None and second.note == "Trazioni negative lente · 5 secondi in discesa"
+    assert (second.duration_type, second.duration_value) == ("reps", 4.0)
