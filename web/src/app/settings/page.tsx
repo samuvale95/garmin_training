@@ -10,6 +10,7 @@ import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
 import { RefreshButton } from "@/components/RefreshButton";
+import { GarminSportProbe } from "@/components/GarminSportProbe";
 import { SlideUp, StatusDot } from "@/components/motion/primitives";
 import { ChevronRight } from "@/components/Icons";
 import { useAthleteLevel, useClearPlan, useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, usePlanQuery, useResetAllLocalData, useStravaStatus } from "@/lib/queries";
@@ -230,6 +231,9 @@ export default function SettingsPage() {
               </span>
               <ChevronRight size={16} style={{ color: "var(--inchiostro-50)" }} />
             </Link>
+          </Card>
+          <Card>
+            <GarminSportProbe />
           </Card>
         </SlideUp>
       )}

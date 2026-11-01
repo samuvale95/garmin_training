@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
@@ -13,6 +14,7 @@ from fastapi.concurrency import run_in_threadpool
 from .. import garmin_push, service
 from ..garmin_sync import ScheduledWorkout
 from .auth import current_user_id
+from .routes_agents import require_admin
 from . import garmin_session, schemas
 from .cache import (
     TTL_GARMIN_ACTIVITIES,
@@ -267,3 +269,21 @@ async def push_run(user_id: str = Depends(current_user_id)) -> dict:
     """The 'retry now' button: push whatever differs, without waiting for the next edit."""
     started = _kick(user_id, force=True)
     return {"started": started}
+
+
+@router.get("/garmin/probe/workout-types")
+async def probe_workout_types(user_id: str = Depends(require_admin)) -> dict:
+    """Admin only, read-only: Garmin's workout codes as the account sees them. Logged too,
+    so the result can be read from the server logs without screenshots."""
+    result = await run_in_threadpool(garmin_session.run, user_id, lambda sync: sync.probe_workout_types())
+    logger.warning("garmin probe workout-types: %s", json.dumps(result, default=str)[:20000])
+    return result
+
+
+@router.get("/garmin/probe/workout/{workout_id}")
+async def probe_workout(workout_id: int, user_id: str = Depends(require_admin)) -> dict:
+    """Admin only, read-only: one saved workout as Garmin stores it (e.g. one made by
+    hand in Garmin Connect, to copy its exact shape)."""
+    result = await run_in_threadpool(garmin_session.run, user_id, lambda sync: sync.workout_json(workout_id))
+    logger.warning("garmin probe workout %s: %s", workout_id, json.dumps(result, default=str)[:20000])
+    return result
