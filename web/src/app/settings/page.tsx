@@ -259,6 +259,21 @@ export default function SettingsPage() {
         </Card>
       </SlideUp>
 
+      <SlideUp delayMs={210}>
+        <Card>
+          <p style={{ fontWeight: 600, margin: "0 0 4px" }}>Dati da Garmin e Strava</p>
+          <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-50)", margin: "0 0 10px" }}>
+            Li tengo in cache per qualche minuto, così l&apos;app resta immediata. Se sull&apos;orologio vedi qualcosa che
+            qui non c&apos;è ancora, chiedili di nuovo adesso.
+          </p>
+          <RefreshButton />
+        </Card>
+      </SlideUp>
+
+      {/* Rare actions -- a file copy of the plan and the full reset -- out of the way,
+          instead of a blue and a red card in the middle of the profile. */}
+      <details className="ux-disclosure" style={{ marginTop: 20 }}>
+        <summary data-track="settings.advanced">Avanzate</summary>
       <SlideUp delayMs={190}>
         <div style={{ background: "var(--azzurro)", color: "var(--azzurro-testo)", border: "1px solid var(--border-airbnb)", borderRadius: 20, padding: 18, marginTop: 12, boxShadow: "var(--shadow-airbnb-subtle)" }}>
           <p style={{ fontWeight: 600, margin: "0 0 8px" }}>Copia del tuo piano</p>
@@ -316,17 +331,6 @@ export default function SettingsPage() {
         </div>
       </SlideUp>
 
-      <SlideUp delayMs={210}>
-        <Card>
-          <p style={{ fontWeight: 600, margin: "0 0 4px" }}>Dati da Garmin e Strava</p>
-          <p className="font-serif-italic" style={{ fontSize: 13, color: "var(--inchiostro-50)", margin: "0 0 10px" }}>
-            Li tengo in cache per qualche minuto, così l&apos;app resta immediata. Se sull&apos;orologio vedi qualcosa che
-            qui non c&apos;è ancora, chiedili di nuovo adesso.
-          </p>
-          <RefreshButton />
-        </Card>
-      </SlideUp>
-
       <SlideUp delayMs={230}>
         <div style={{ background: "var(--rosa-avviso)", border: "1px solid rgba(179,74,32,0.15)", borderRadius: 20, padding: 16, marginTop: 20, boxShadow: "var(--shadow-airbnb-subtle)" }}>
           <p style={{ fontWeight: 600, margin: "0 0 4px", color: "var(--rosso-testo)" }}>Qualcosa non torna?</p>
@@ -365,6 +369,7 @@ export default function SettingsPage() {
           </div>
         </div>
       </SlideUp>
+      </details>
 
       <SlideUp delayMs={250}>
         <button data-track="settings.async"

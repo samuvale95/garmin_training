@@ -20,6 +20,20 @@ posto di "Modifiche da inviare", "Sei stabile" solo con almeno tre settimane ver
 senza segnaposto finti e senza "file/YAML". Resta aperto: vocabolario dell'import (YAML
 è ancora nominato dove si carica un file, dove serve).
 
+## Fatto (priorità B)
+
+Recupero: badge in alto spiegato, "—" con il motivo. Seduta: distanza "~" quando stimata,
+illustrazione più piccola. Attività: settimane con totale, uscite lunghe evidenziate,
+sorgente mostrata solo se mista. Tecnica: tabella km con passo e battito, cadenza e
+dislivello dal livello 3 o a richiesta; "Perché è successo" piegato sotto l'analisi gara.
+Carico: due grafici con una scala ciascuno, sigle CTL/ATL/TSB solo dal livello 3.
+Nutrizione: il pasto attuale non è più ripetuto nella timeline. Resoconto: prima quello che
+hai fatto, poi il piano. Profilo: copia del piano e ripristino in "Avanzate". Calendario:
+km del piano separati da quelli fuori piano. Oggi: "La settimana" dice cosa contiene.
+Obiettivi: previsione gara dentro l'obiettivo di tipo gara.
+Aperto: tono delle card scure; endpoint aggregato `/today`; errore di idratazione al
+secondo caricamento (c'era già prima di queste modifiche, da indagare a parte).
+
 ## Trasversale
 
 - **A — Una sola risposta per "cosa faccio oggi".** La home ha molti blocchi (hero,

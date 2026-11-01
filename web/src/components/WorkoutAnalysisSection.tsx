@@ -161,8 +161,19 @@ export function WorkoutAnalysisSection({
         </div>
       )}
 
-      {/* Causal Findings & Coaching Actions */}
-      {hasFindings && (
+      {/* Causal Findings & Coaching Actions. Under a race analysis they come after a lot
+          already said, so they fold behind one line instead of another full section. */}
+      {hasFindings && analysis.race_analysis && (
+        <details className="ux-disclosure" style={{ marginTop: 20 }}>
+          <summary data-track="analisi.findings">Perché è successo e come migliorare ({analysis.findings.length})</summary>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {analysis.findings.map((finding, i) => (
+              <FindingDetailCard key={finding.key} finding={finding} animate={animate} delayMs={180 + i * 50} />
+            ))}
+          </div>
+        </details>
+      )}
+      {hasFindings && !analysis.race_analysis && (
         <div style={{ marginTop: 20 }}>
           <span
             style={{

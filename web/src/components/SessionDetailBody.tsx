@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { SlideUp } from "@/components/motion/primitives";
+import { flattenSteps } from "@/lib/types";
 import { effectiveDescription, effectiveSteps, effectiveTitle, sessionDistanceKm, sessionDurationMinutes } from "@/lib/sessionVisuals";
 import { useToggleSessionShort, useWorkoutAnalysis } from "@/lib/queries";
 import { formatPaceValue, groupDistanceKm, groupSteps, planStepsSummary, sessionFallbackPaceSecPerKm, stepDurationLabel, stepGroupParts } from "@/lib/format";
@@ -69,6 +70,8 @@ export function SessionDetailBody({
   const isCycling = session.sport === "cycling";
 
   const distanceKm = sessionDistanceKm(session);
+  // Time-based steps are converted at an assumed pace: the total is then an estimate.
+  const distanceEstimated = flattenSteps(effectiveSteps(session) ?? []).some((s) => s.duration_type !== "distance" && s.type !== "rest");
   const durationMin = sessionDurationMinutes(session);
   const groups = groupSteps(steps);
   const fallbackPace = sessionFallbackPaceSecPerKm(steps);
@@ -212,7 +215,7 @@ export function SessionDetailBody({
                         lineHeight: 1,
                       }}
                     >
-                      {distanceKm > 0 ? distanceKm.toFixed(1) : "—"}
+                      {distanceKm > 0 ? `${distanceEstimated ? "~" : ""}${distanceKm.toFixed(1)}` : "—"}
                     </span>
                     <span style={{ fontSize: 18, fontWeight: 600, color: "var(--inchiostro-50)" }}>km</span>
                     {isCycling && durationMin > 0 && (
@@ -222,7 +225,7 @@ export function SessionDetailBody({
                     )}
                   </div>
                   <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "4px 0 0", fontWeight: 500 }}>
-                    {isCycling ? "Distanza stimata a ~25 km/h" : "Distanza programmata"}
+                    {isCycling ? "Distanza stimata a ~25 km/h" : distanceEstimated ? "Distanza circa: le parti a tempo sono stimate al tuo passo" : "Distanza programmata"}
                   </p>
                 </div>
               )}
@@ -231,8 +234,8 @@ export function SessionDetailBody({
             {/* 3D Illustration - static, clean Airbnb look */}
             <div
               style={{
-                width: 76,
-                height: 76,
+                width: 56,
+                height: 56,
                 position: "relative",
                 flexShrink: 0,
                 display: "flex",
@@ -243,8 +246,8 @@ export function SessionDetailBody({
               <Image
                 src={illustrationSrc}
                 alt="Illustrazione allenamento"
-                width={76}
-                height={76}
+                width={56}
+                height={56}
                 style={{ objectFit: "contain" }}
                 priority
               />

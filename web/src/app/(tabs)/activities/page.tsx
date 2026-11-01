@@ -23,6 +23,17 @@ function ActivitiesView() {
   const activities = [...(query.data?.activities ?? [])].sort((a, b) => b.day.localeCompare(a.day) || (b.start_time ?? "").localeCompare(a.start_time ?? ""));
   const sports = [...new Map(activities.map((a) => [a.family, a.label])).entries()];
   const visible = activities.filter((a) => (sport === "all" || a.family === sport) && `${a.title} ${a.label}`.toLocaleLowerCase("it").includes(search.toLocaleLowerCase("it")));
+  // Grouped by training week (Monday), newest first, each with its total: a flat list of
+  // forty rows did not show how the weeks compared.
+  const weeks = [...visible.reduce((map, a) => {
+    const d = new Date(`${a.day}T12:00:00`);
+    const monday = shiftDateKey(a.day, -((d.getDay() + 6) % 7));
+    map.set(monday, [...(map.get(monday) ?? []), a]);
+    return map;
+  }, new Map<string, typeof visible>()).entries()];
+  const weekKm = (items: typeof visible) => items.reduce((sum, a) => sum + (a.distance_km ?? 0), 0);
+  // The source only says something when not everything comes from the same place.
+  const mixedSources = new Set(visible.map((a) => a.source)).size > 1;
   function filter(key: string, value: string) {
     const next = new URLSearchParams(window.location.search);
     if (value && value !== "all") next.set(key, value); else next.delete(key);
@@ -42,12 +53,14 @@ function ActivitiesView() {
     </div>
     {query.isPending ? <Skeleton height={180} /> : query.isError ? <div className="ux-error" role="alert"><p>Non è stato possibile caricare le attività.</p><button className="ux-button" onClick={() => query.refetch()} {...dis(query.isFetching, "in_caricamento")} data-track="activities.retry">Riprova</button></div> : <>
       <p className="ux-muted" aria-live="polite">{visible.length} attività nel periodo selezionato</p>
-      {visible.length === 0 ? <div className="ux-empty"><h2>{activities.length ? "Nessun risultato" : "Il tuo storico inizia qui"}</h2><p>{activities.length ? "Prova un altro sport o cambia la ricerca." : "Le attività acquisite da Garmin e Strava compariranno qui. Puoi ampliare il periodo o controllare le connessioni."}</p><Link className="ux-button" href="/settings" data-track="activities.connections">Controlla connessioni</Link></div> : <ul className="activity-list">{visible.map((activity) => <li key={`${activity.source}-${activity.activity_id}`} className="activity-row">
+      {visible.length === 0 ? <div className="ux-empty"><h2>{activities.length ? "Nessun risultato" : "Il tuo storico inizia qui"}</h2><p>{activities.length ? "Prova un altro sport o cambia la ricerca." : "Le attività acquisite da Garmin e Strava compariranno qui. Puoi ampliare il periodo o controllare le connessioni."}</p><Link className="ux-button" href="/settings" data-track="activities.connections">Controlla connessioni</Link></div> : <>{weeks.map(([weekStart, items]) => <section key={weekStart} className="activity-week" aria-label={`Settimana dal ${formatShortDate(weekStart)}`}>
+      <h2 className="activity-week-title"><span>Settimana dal {formatShortDate(weekStart)}</span><small>{weekKm(items) > 0 ? `${weekKm(items).toLocaleString("it-IT", { maximumFractionDigits: 1 })} km · ` : ""}{items.length} attività</small></h2>
+      <ul className="activity-list">{items.map((activity) => <li key={`${activity.source}-${activity.activity_id}`} className="activity-row" data-big={(activity.distance_km ?? 0) >= 15 || activity.minutes >= 90 || undefined}>
         <div className="activity-row-header"><span>{activity.label}</span><time dateTime={activity.day}>{formatShortDate(activity.day)}</time></div>
         <h2>{activity.title || activity.label}</h2>
         <div className="activity-metrics"><span>{Math.round(activity.minutes)} min</span>{activity.distance_km != null && activity.distance_km > 0 && <span>{activity.distance_km.toLocaleString("it-IT", { maximumFractionDigits: 2 })} km</span>}</div>
-        <p className="activity-meta">{activity.source === "garmin" ? "Garmin" : activity.source === "strava" ? "Strava" : "Dati stimati"}</p>
-      </li>)}</ul>}
+        {mixedSources && <p className="activity-meta">{activity.source === "garmin" ? "Garmin" : activity.source === "strava" ? "Strava" : "Dati stimati"}</p>}
+      </li>)}</ul></section>)}</>}
     </>}
   </div>;
 }

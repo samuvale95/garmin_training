@@ -1039,3 +1039,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
 /* Home: the check-in tucked under the long-run card it is about. */
 .today-joined { margin-top: -6px; }
+
+/* Attività: weeks with their total, long runs and races stand out. */
+.activity-week { margin-top:18px; }
+.activity-week-title { display:flex; justify-content:space-between; align-items:baseline; gap:10px; font:600 13px/1.3 var(--font-sans); color:var(--inchiostro-70); margin:0 2px 8px; }
+.activity-week-title small { font:500 12px var(--font-mono); color:var(--inchiostro-50); }
+.activity-row[data-big] h2 { color:var(--corallo-testo, #b34a20); }
+.activity-row[data-big] h2::after { content:" · lunga"; font:500 12px var(--font-mono); color:var(--inchiostro-50); }

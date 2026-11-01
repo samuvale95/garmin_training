@@ -302,12 +302,16 @@ export function WeekPageContent() {
   const weekSessions = days.flatMap((d) => d.cards.map((c) => c.session));
   const weekKm = weekSessions.reduce((sum, s) => sum + sessionDistanceKm(s), 0);
   const doneKm = (activitiesQuery.data?.activities ?? []).reduce((sum, a) => sum + (a.distance_km ?? 0), 0);
-  const progressFraction = weekKm > 0 ? Math.min(1, doneKm / weekKm) : 0;
+  // Km that ticked off a planned session, apart from the rest: 58 km "fatti" against 21
+  // "in piano" read as overdoing the plan when most of it was a race outside it.
+  const planDoneKm = days.reduce((sum, d) => sum + d.done.reduce((s2, a) => s2 + (a?.distance_km ?? 0), 0), 0);
+  const offPlanKm = days.reduce((sum, d) => sum + d.offPlan.reduce((s2, a) => s2 + (a.distance_km ?? 0), 0), 0);
+  const progressFraction = weekKm > 0 ? Math.min(1, planDoneKm / weekKm) : 0;
 
   const summaryText = liveMode
     ? `${weekSessions.length} sedute (calendario Garmin)`
     : showProgress && weekKm > 0
-      ? `${doneKm.toFixed(0)} km fatti · ${weekKm.toFixed(0)} in piano · ${weekSessions.length} sedute`
+      ? `${planDoneKm.toFixed(0)} di ${weekKm.toFixed(0)} km del piano${offPlanKm >= 1 ? ` · +${offPlanKm.toFixed(0)} fuori piano` : ""} · ${weekSessions.length} ${weekSessions.length === 1 ? "seduta" : "sedute"}`
       : showProgress && doneKm > 0
       ? `${doneKm.toFixed(0)} km fatti · nessuna seduta in piano`
       : `${weekKm.toFixed(0)} km · ${weekSessions.length} sedute`;

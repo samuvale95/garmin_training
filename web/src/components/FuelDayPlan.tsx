@@ -387,10 +387,14 @@ function MealRowItem({ meal, focus, past }: { meal: MealSlot; focus: boolean; pa
             {meal.carb_g} g C
           </span>
         </div>
-        {meal.portions.length > 0 && (
+        {/* The focused meal is the card above in full: here it only marks its place in
+            the day, instead of repeating the same portions twice on one screen. */}
+        {focus ? (
+          <p style={{ fontSize: 12, color: "var(--corallo-testo)", margin: "4px 0 0" }}>È il pasto qui sopra</p>
+        ) : meal.portions.length > 0 && (
           <p style={{ fontSize: 13.5, lineHeight: 1.4, color: "var(--inchiostro-70)", margin: "4px 0 0" }}>{portionsInline(meal.portions)}</p>
         )}
-        {meal.note && !past && (
+        {meal.note && !past && !focus && (
           <p style={{ fontSize: 12.5, lineHeight: 1.35, color: meal.role ? "var(--corallo-testo)" : "var(--inchiostro-50)", margin: "5px 0 0" }}>
             {capitalize(meal.note)}
           </p>

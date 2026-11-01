@@ -8,9 +8,12 @@ import { FlagIcon } from "@/components/Icons";
 interface FitnessFatigueCardProps {
   data: FitnessFatigueData;
   animate?: boolean;
+  /** Level 3: show the CTL/ATL/TSB acronyms. Below that they are jargon. */
+  technical?: boolean;
 }
 
-export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardProps) {
+export function FitnessFatigueCard({ data, animate = true, technical = false }: FitnessFatigueCardProps) {
+  const tag = (acronym: string) => (technical ? ` (${acronym})` : "");
   const [activeTab, setActiveTab] = useState<"all" | "tsb" | "load">("all");
   const current = data.current;
   const assessment = data.race_assessment;
@@ -119,7 +122,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
         {/* 3 Metric Columns */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, margin: "14px 0" }}>
           <div style={{ background: "var(--azzurro)", padding: 12, borderRadius: "var(--radius-card)" }}>
-            <span style={{ fontSize: 11, color: "var(--azzurro-testo)", fontWeight: 700, textTransform: "uppercase" }}>Fitness (CTL)</span>
+            <span style={{ fontSize: 11, color: "var(--azzurro-testo)", fontWeight: 700, textTransform: "uppercase" }}>Fitness{tag("CTL")}</span>
             <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 2px", color: "var(--azzurro-testo)" }}>
               {current.ctl.toFixed(0)}
             </p>
@@ -127,7 +130,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
           </div>
 
           <div style={{ background: "var(--giallo)", padding: 12, borderRadius: "var(--radius-card)" }}>
-            <span style={{ fontSize: 11, color: "var(--giallo-testo)", fontWeight: 700, textTransform: "uppercase" }}>Fatica (ATL)</span>
+            <span style={{ fontSize: 11, color: "var(--giallo-testo)", fontWeight: 700, textTransform: "uppercase" }}>Fatica{tag("ATL")}</span>
             <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 2px", color: "var(--giallo-testo)" }}>
               {current.atl.toFixed(0)}
             </p>
@@ -135,11 +138,11 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
           </div>
 
           <div style={{ background: current.tsb >= 0 ? "var(--verde)" : "var(--rosa-avviso)", padding: 12, borderRadius: "var(--radius-card)" }}>
-            <span style={{ fontSize: 11, color: current.tsb >= 0 ? "var(--verde-testo)" : "var(--rosso-testo)", fontWeight: 700, textTransform: "uppercase" }}>Forma (TSB)</span>
+            <span style={{ fontSize: 11, color: current.tsb >= 0 ? "var(--verde-testo)" : "var(--rosso-testo)", fontWeight: 700, textTransform: "uppercase" }}>Forma{tag("TSB")}</span>
             <p className="font-mono" style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 2px", color: current.tsb >= 0 ? "var(--verde-testo)" : "var(--rosso-testo)" }}>
               {current.tsb > 0 ? `+${current.tsb.toFixed(0)}` : current.tsb.toFixed(0)}
             </p>
-            <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>CTL − ATL</span>
+            <span style={{ fontSize: 10, color: "var(--inchiostro-50)" }}>{technical ? "CTL − ATL" : "fitness − fatica"}</span>
           </div>
         </div>
 
@@ -193,7 +196,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
                   cursor: "pointer",
                 }}
               >
-                Forma (TSB)
+                Forma{tag("TSB")}
               </button>
             </div>
 
@@ -209,7 +212,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
                 </>
               )}
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2.5, background: "var(--verde-tratto-scuro)" }} /> TSB
+                <span style={{ width: 8, height: 2.5, background: "var(--verde-tratto-scuro)" }} /> {technical ? "TSB" : "Forma"}
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 4, opacity: 0.7 }}>
                 <span style={{ width: 8, height: 0, borderTop: "2px dashed #888" }} /> Futuro
@@ -334,7 +337,7 @@ export function FitnessFatigueCard({ data, animate = true }: FitnessFatigueCardP
             </p>
             <div>
               <p style={{ fontWeight: 700, fontSize: 15, margin: 0 }}>{assessment.verdict}</p>
-              <span style={{ fontSize: 11, opacity: 0.85 }}>TSB stimato al via</span>
+              <span style={{ fontSize: 11, opacity: 0.85 }}>{technical ? "TSB stimato al via" : "Forma stimata al via"}</span>
             </div>
           </div>
 

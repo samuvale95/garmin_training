@@ -380,7 +380,13 @@ export function TodayView() {
         active={animate}
       />
 
-      <details className="ux-disclosure"><summary data-track="today.more">Riepilogo e prossimi allenamenti</summary>
+      <details className="ux-disclosure"><summary data-track="today.more">
+        {/* Says what is inside, so the fold is worth opening. */}
+        <span>La settimana</span>
+        {restOfWeek[0] && <small style={{ display: "block", fontWeight: 400, fontSize: 12.5, color: "var(--inchiostro-50)" }}>
+          Prossima: {effectiveTitle(restOfWeek[0])} {relativeDayLabel(restOfWeek[0].date, today)}{restOfWeek.length > 1 ? ` · altre ${restOfWeek.length - 1}` : ""}
+        </small>}
+      </summary>
       {/* Compact secondary information remains accessible without crowding Today. */}
       <WeekStrip
         currentDateKey={todayKey}
