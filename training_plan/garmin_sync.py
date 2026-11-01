@@ -41,6 +41,14 @@ from .models import (
     TrainingSession,
     flatten_steps,
     sport_from_garmin_key,
+    CADENCE_TARGET_PAYLOAD,
+    DEFAULT_POOL_LENGTH_M,
+    HEART_RATE_TARGET_PAYLOAD,
+    POOL_LENGTH_UNIT_PAYLOAD,
+    POWER_TARGET_PAYLOAD,
+    SWIM_EQUIPMENT,
+    SWIM_STROKES,
+    TargetRange,
 )
 
 logger = logging.getLogger(__name__)
@@ -736,7 +744,7 @@ class GarminSync:
             ]
             estimated_duration_secs = 0
 
-        return {
+        payload = {
             "workoutName": session.title,
             "description": session.description,
             "sportType": sport_payload,
@@ -749,6 +757,11 @@ class GarminSync:
                 }
             ],
         }
+        if session.sport == "swimming":
+            # The pool sits on the workout: the watch counts lengths of this size.
+            payload["poolLength"] = float(session.pool_length_m or DEFAULT_POOL_LENGTH_M)
+            payload["poolLengthUnit"] = POOL_LENGTH_UNIT_PAYLOAD
+        return payload
 
     def create_and_schedule(self, session: TrainingSession) -> SyncResult:
         try:
@@ -896,6 +909,7 @@ class GarminSync:
             title=title,
             description=remote.get("description"),
             steps=steps,
+            pool_length_m=float(remote["poolLength"]) if remote.get("poolLength") else None,
         )
 
     def list_activities(self, start: date_type, end: date_type) -> list[CompletedActivity]:
@@ -1050,6 +1064,33 @@ def _build_step_payload(step: Step, order: int) -> dict:
     if step.note:
         payload["description"] = step.note[:512]
 
+    # Garmin takes a primary and a secondary target per step. Pace leads (set below),
+    # then power, heart rate, cadence: the first one present is the primary, the next
+    # the secondary -- "220-240 W at 85-95 rpm".
+    bands = [
+        (band, target)
+        for band, target in (
+            (step.target_power, POWER_TARGET_PAYLOAD),
+            (step.target_hr, HEART_RATE_TARGET_PAYLOAD),
+            (step.target_cadence, CADENCE_TARGET_PAYLOAD),
+        )
+        if band is not None
+    ]
+    slots = ["secondary"] if step.target_pace else ["primary", "secondary"]
+    for (band, target), slot in zip(bands, slots):
+        if slot == "primary":
+            payload["targetType"] = target
+            payload["targetValueOne"] = float(band.low)
+            payload["targetValueTwo"] = float(band.high)
+        else:
+            payload["secondaryTargetType"] = target
+            payload["secondaryTargetValueOne"] = float(band.low)
+            payload["secondaryTargetValueTwo"] = float(band.high)
+    if step.stroke in SWIM_STROKES:
+        payload["strokeType"] = {"strokeTypeId": SWIM_STROKES[step.stroke], "strokeTypeKey": step.stroke, "displayOrder": SWIM_STROKES[step.stroke]}
+    if step.equipment in SWIM_EQUIPMENT:
+        payload["equipmentType"] = {"equipmentTypeId": SWIM_EQUIPMENT[step.equipment], "equipmentTypeKey": step.equipment, "displayOrder": SWIM_EQUIPMENT[step.equipment]}
+
     if step.target_pace:
         slower_mps, faster_mps = step.target_pace.as_speeds_mps()
         payload["targetType"] = PACE_TARGET_PAYLOAD
@@ -1079,6 +1120,19 @@ def _parse_pace_target(raw_step: dict) -> PaceTarget | None:
     return PaceTarget(slower_sec_per_km=round(1000 / slower_mps), faster_sec_per_km=round(1000 / faster_mps))
 
 
+def _parse_band(raw_step: dict, target: dict) -> TargetRange | None:
+    """A power, heart-rate or cadence band on a step read back from Garmin, whether it
+    was the step's primary or secondary target."""
+    for prefix in ("target", "secondaryTarget"):
+        kind = raw_step.get(f"{prefix}Type") or {}
+        if kind.get("workoutTargetTypeId") != target["workoutTargetTypeId"]:
+            continue
+        low, high = raw_step.get(f"{prefix}ValueOne"), raw_step.get(f"{prefix}ValueTwo")
+        if low and high:
+            return TargetRange(low=float(min(low, high)), high=float(max(low, high)))
+    return None
+
+
 def _parse_workout_step(raw_step: dict) -> Step | None:
     """None for a step this app has no way to represent (e.g. a "press lap button to
     end" step -- conditionTypeId 1 -- or a stepType/target kind outside `models`'s
@@ -1096,6 +1150,11 @@ def _parse_workout_step(raw_step: dict) -> Step | None:
         type=step_type, duration_type=duration_type, duration_value=duration_value,
         target_pace=_parse_pace_target(raw_step),
         note=(raw_step.get("description") or None),
+        target_power=_parse_band(raw_step, POWER_TARGET_PAYLOAD),
+        target_hr=_parse_band(raw_step, HEART_RATE_TARGET_PAYLOAD),
+        target_cadence=_parse_band(raw_step, CADENCE_TARGET_PAYLOAD),
+        stroke=((raw_step.get("strokeType") or {}).get("strokeTypeKey") if (raw_step.get("strokeType") or {}).get("strokeTypeKey") in SWIM_STROKES else None),
+        equipment=((raw_step.get("equipmentType") or {}).get("equipmentTypeKey") if (raw_step.get("equipmentType") or {}).get("equipmentTypeKey") in SWIM_EQUIPMENT else None),
         exercise=(found.key if (found := exercises.from_garmin(raw_step.get("category"), raw_step.get("exerciseName"))) else None),
     )
 

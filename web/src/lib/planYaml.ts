@@ -28,6 +28,13 @@ function stepLines(step: Step, indent: string): string[] {
   if (step.note) {
     lines.push(`${indent}  note: ${y(step.note)}`);
   }
+  if (step.exercise) lines.push(`${indent}  exercise: ${y(step.exercise)}`);
+  for (const key of ["target_power", "target_hr", "target_cadence"] as const) {
+    const r = step[key];
+    if (r) lines.push(`${indent}  ${key}: ${y(`${r.low}-${r.high}`)}`);
+  }
+  if (step.stroke) lines.push(`${indent}  stroke: ${step.stroke}`);
+  if (step.equipment) lines.push(`${indent}  equipment: ${step.equipment}`);
   return lines;
 }
 
@@ -62,6 +69,7 @@ export function serializePlanToYaml(sessions: TrainingSession[], goal?: RaceGoal
     if (session.description) lines.push(`    description: ${y(session.description)}`);
     if (session.priority && session.priority !== "flexible") lines.push(`    priority: ${session.priority}`);
     if (session.min_duration_minutes != null) lines.push(`    min_duration_minutes: ${session.min_duration_minutes}`);
+    if (session.pool_length_m != null) lines.push(`    pool_length: ${session.pool_length_m}`);
     if (session.steps.length > 0) {
       lines.push("    steps:");
       for (const item of session.steps) {

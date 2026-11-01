@@ -18,6 +18,18 @@ export interface Step {
   note?: string | null;
   /** Garmin catalogue exercise ("PULL_UP" or "CATEGORY/NAME"), for strength steps. */
   exercise?: string | null;
+  /** Bike and heart-rate targets: watts, bpm, rpm. */
+  target_power?: TargetRange | null;
+  target_hr?: TargetRange | null;
+  target_cadence?: TargetRange | null;
+  /** Swimming: Garmin stroke and equipment keys ("free", "pull_buoy"). */
+  stroke?: string | null;
+  equipment?: string | null;
+}
+
+export interface TargetRange {
+  low: number;
+  high: number;
 }
 
 /** A group of steps repeated `reps` times -- Garmin's own repeat group, kept as a
@@ -86,6 +98,8 @@ export interface TrainingSession {
   plan_id?: string;
   priority?: "key" | "flexible" | "normal" | "optional" | null;
   min_duration_minutes?: number | null;
+  /** Swimming: the pool in metres (25, 50); unset means 25 on Garmin. */
+  pool_length_m?: number | null;
   short_variant?: ShortVariant | null;
   is_short_active?: boolean;
 }

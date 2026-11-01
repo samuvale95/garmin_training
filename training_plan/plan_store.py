@@ -56,6 +56,7 @@ ALTER TABLE plan_session ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT
 ALTER TABLE plan_session ADD COLUMN IF NOT EXISTS min_duration_minutes REAL DEFAULT NULL;
 ALTER TABLE plan_session ADD COLUMN IF NOT EXISTS short_variant JSONB DEFAULT NULL;
 ALTER TABLE plan_session ADD COLUMN IF NOT EXISTS is_short_active BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE plan_session ADD COLUMN IF NOT EXISTS pool_length_m REAL DEFAULT NULL;
 CREATE INDEX IF NOT EXISTS plan_session_plan_idx ON plan_session (user_id, plan_id);
 
 ALTER TABLE user_plan ADD COLUMN IF NOT EXISTS sessions_migrated BOOLEAN NOT NULL DEFAULT FALSE;
@@ -82,7 +83,7 @@ WHERE user_plan.user_id = %(user_id)s
 
 _COLUMNS = (
     "id, date, position, sport, title, description, steps, origin, locked, plan_id, "
-    "priority, min_duration_minutes, short_variant, is_short_active"
+    "priority, min_duration_minutes, short_variant, is_short_active, pool_length_m"
 )
 
 
@@ -138,6 +139,7 @@ def _out(row: dict) -> dict:
         "min_duration_minutes": row.get("min_duration_minutes"),
         "short_variant": row.get("short_variant"),
         "is_short_active": bool(row.get("is_short_active", False)),
+        "pool_length_m": row.get("pool_length_m"),
     }
 
 
@@ -179,8 +181,8 @@ def create_session(user_id: str, session: dict, *, origin: Origin, plan_id: str 
     with db.connect() as conn, conn.cursor(row_factory=dict_row) as cur:
         position = _next_position(cur, user_id, session["date"])
         cur.execute(
-            f"""INSERT INTO plan_session (user_id, id, date, position, sport, title, description, steps, origin, locked, plan_id, priority, min_duration_minutes, short_variant, is_short_active)
-                VALUES (%s, coalesce(%s::uuid, gen_random_uuid()), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            f"""INSERT INTO plan_session (user_id, id, date, position, sport, title, description, steps, origin, locked, plan_id, priority, min_duration_minutes, short_variant, is_short_active, pool_length_m)
+                VALUES (%s, coalesce(%s::uuid, gen_random_uuid()), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING {_COLUMNS}""",
             [
                 user_id,
@@ -198,6 +200,7 @@ def create_session(user_id: str, session: dict, *, origin: Origin, plan_id: str 
                 session.get("min_duration_minutes"),
                 Jsonb(session.get("short_variant")) if session.get("short_variant") else None,
                 bool(session.get("is_short_active", False)),
+                session.get("pool_length_m"),
             ],
         )
         return _out(cur.fetchone())
@@ -214,6 +217,7 @@ _EDITABLE = (
     "min_duration_minutes",
     "short_variant",
     "is_short_active",
+    "pool_length_m",
 )
 
 
@@ -346,8 +350,8 @@ def replace_unlocked(
                 continue
             sess_plan_id = session.get("plan_id") or plan_id
             cur.execute(
-                f"""INSERT INTO plan_session (user_id, date, position, sport, title, description, steps, origin, locked, plan_id, priority, min_duration_minutes, short_variant, is_short_active)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s, %s, %s, %s, %s) RETURNING {_COLUMNS}""",
+                f"""INSERT INTO plan_session (user_id, date, position, sport, title, description, steps, origin, locked, plan_id, priority, min_duration_minutes, short_variant, is_short_active, pool_length_m)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s, %s, %s, %s, %s, %s) RETURNING {_COLUMNS}""",
                 [
                     user_id,
                     day,
@@ -362,6 +366,7 @@ def replace_unlocked(
                     session.get("min_duration_minutes"),
                     Jsonb(session.get("short_variant")) if session.get("short_variant") else None,
                     bool(session.get("is_short_active", False)),
+                session.get("pool_length_m"),
                 ],
             )
             result.written.append(_out(cur.fetchone()))
@@ -416,8 +421,8 @@ def import_sessions(
             sess_plan_id = session.get("plan_id") or plan_id
             is_locked = bool(session.get("locked", False))
             cur.execute(
-                f"""INSERT INTO plan_session (user_id, date, position, sport, title, description, steps, origin, locked, plan_id, priority, min_duration_minutes, short_variant, is_short_active)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'import', %s, %s, %s, %s, %s, %s) RETURNING {_COLUMNS}""",
+                f"""INSERT INTO plan_session (user_id, date, position, sport, title, description, steps, origin, locked, plan_id, priority, min_duration_minutes, short_variant, is_short_active, pool_length_m)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'import', %s, %s, %s, %s, %s, %s, %s) RETURNING {_COLUMNS}""",
                 [
                     user_id,
                     session["date"],
@@ -432,6 +437,7 @@ def import_sessions(
                     session.get("min_duration_minutes"),
                     Jsonb(session.get("short_variant")) if session.get("short_variant") else None,
                     bool(session.get("is_short_active", False)),
+                session.get("pool_length_m"),
                 ],
             )
             written.append(_out(cur.fetchone()))

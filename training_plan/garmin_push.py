@@ -100,6 +100,7 @@ def _session_model(row: dict) -> TrainingSession:
         "min_duration_minutes": row.get("min_duration_minutes"),
         "short_variant": row.get("short_variant"),
         "is_short_active": bool(row.get("is_short_active")),
+        "pool_length_m": row.get("pool_length_m"),
     }
     return schemas.TrainingSessionIn.model_validate(payload).to_model()
 
@@ -121,7 +122,7 @@ def wanted_sessions(user_id: str, today: date_type) -> dict[str, TrainingSession
     with db.connect() as conn, conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """SELECT ps.id, ps.date, ps.sport, ps.title, ps.description, ps.steps, ps.priority,
-                      ps.min_duration_minutes, ps.short_variant, ps.is_short_active
+                      ps.min_duration_minutes, ps.short_variant, ps.is_short_active, ps.pool_length_m
                FROM plan_session ps
                LEFT JOIN user_training_plan utp ON utp.user_id = ps.user_id AND utp.id = ps.plan_id
                WHERE ps.user_id = %s AND ps.date BETWEEN %s AND %s

@@ -71,3 +71,14 @@ sbagliati per nuoto, forza e "altro".
 - Fasi a tempo con obiettivo `power.zone` e i watt in `targetValueOne`/`targetValueTwo`
   (es. 162–178 W), oppure `heart.rate.zone` o `cadence` per chi non misura la potenza.
 - Le fasi centrali usano spesso il tipo `other` invece di `interval`.
+
+## Verificato con andata e ritorno (novembre 2026)
+
+Allenamenti caricati, riletti e cancellati subito sull'account reale:
+
+- **Nuoto**: `poolLength` 50 + `poolLengthUnit` metri, passi a distanza in metri,
+  `strokeType` (free, backstroke) ed `equipmentType` (pull_buoy) tornano identici.
+- **Bici**: obiettivo principale `power.zone` 220–240 W e **secondario** `cadence`
+  85–95 rpm sullo stesso passo (`secondaryTargetType`, `secondaryTargetValueOne/Two`);
+  `heart.rate.zone` 120–135 con i battiti come valori assoluti. Tutto torna identico.
+- **Forza**: `category` + `exerciseName` e fine a `reps`, confermati anche sull'orologio.
