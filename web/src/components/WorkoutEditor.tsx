@@ -265,6 +265,12 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       target_pace: s.target_pace,
       note: s.note?.trim() || null,
       exercise: s.exercise ?? null,
+      // Kept as they came: the editor has no fields for them, and saving must not drop them.
+      target_power: s.target_power ?? null,
+      target_hr: s.target_hr ?? null,
+      target_cadence: s.target_cadence ?? null,
+      stroke: s.stroke ?? null,
+      equipment: s.equipment ?? null,
     });
     return steps.flatMap((item): SessionStep[] => {
       if (!isEditableBlock(item)) return [strip(item)];
@@ -295,6 +301,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       steps: plainSteps(),
       priority: priority === "key" ? "key" : "flexible",
       min_duration_minutes: existing?.min_duration_minutes ?? null,
+      pool_length_m: existing?.pool_length_m ?? null,
       short_variant: existing?.short_variant ?? null,
       is_short_active: existing?.is_short_active ?? false,
       plan_id: existing?.plan_id,

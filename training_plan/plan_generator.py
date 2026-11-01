@@ -42,6 +42,7 @@ from .models import (
     avg_pace_sec_per_km,
     flatten_steps,
     session_duration_minutes,
+    TargetRange,
 )
 from .paces import PaceProfile, scale_pace
 from .plan_rules import RuleContext
@@ -396,6 +397,11 @@ def _step_from_dict(raw: dict) -> Step | RepeatBlock:
         # exercise on its way to Garmin.
         note=raw.get("note"),
         exercise=raw.get("exercise"),
+        target_power=TargetRange(**raw["target_power"]) if raw.get("target_power") else None,
+        target_hr=TargetRange(**raw["target_hr"]) if raw.get("target_hr") else None,
+        target_cadence=TargetRange(**raw["target_cadence"]) if raw.get("target_cadence") else None,
+        stroke=raw.get("stroke"),
+        equipment=raw.get("equipment"),
     )
 
 
@@ -406,6 +412,7 @@ def session_from_dict(raw: dict) -> TrainingSession:
         title=raw["title"],
         description=raw.get("description"),
         steps=[_step_from_dict(s) for s in raw.get("steps") or []],
+        pool_length_m=raw.get("pool_length_m"),
     )
 
 
@@ -522,7 +529,8 @@ def check(proposal: Sequence[TrainingSession], window: Window) -> list[str]:
         days = len({s.date for s in mine if s.sport == plan_rules.RUNNING})
         if days > week.running_days_left:
             errors.append(f"{when}: {days} giorni di corsa, al massimo {week.running_days_left}.")
-        quality = sum(1 for s in mine if plan_rules.session_kind(s) == plan_rules.KIND_QUALITY)
+        # The running quality cap counts runs: a swim with repeats is not a third interval run.
+        quality = sum(1 for s in mine if s.sport == plan_rules.RUNNING and plan_rules.session_kind(s) == plan_rules.KIND_QUALITY)
         if quality > week.quality_left:
             errors.append(f"{when}: {quality} sedute di qualità, al massimo {week.quality_left}.")
         for session in mine:
@@ -552,8 +560,8 @@ def check(proposal: Sequence[TrainingSession], window: Window) -> list[str]:
 # watch. Short on purpose -- the list is sent on every call, and anything else the
 # model writes is kept as the step's note (`_rescue_exercises`).
 # Sports the generator writes besides running; their sessions are checked for shape,
-# not for the running rules. Cycling and swimming wait for their Garmin formats.
-GENERATED_SPORTS = frozenset({"calisthenics", "strength_training"})
+# not for the running rules.
+GENERATED_SPORTS = frozenset({"calisthenics", "strength_training", "cycling", "swimming"})
 
 PROMPT_EXERCISES = (
     "PULL_UP", "CHIN_UP", "BAND_ASSISTED_PULL_UP", "MUSCLE_UP", "INVERTED_ROW",
@@ -596,6 +604,16 @@ Come lavori:
   - REGOLA FONDAMENTALE: Non inserire MAI forza gambe pesante il giorno immediatamente PRIMA di una seduta di qualità o del lungo di corsa.
 - Se lo sport è "cycling" o "swimming":
   - Inserisci sedute di scarico aerobico o fondo in Z2/recupero attivo (45-90 minuti), ottime per accumulare volume cardiovascolare senza impatto osteoarticolare.
+- Bici ("cycling"): passi a tempo. Usa "target_power" ("150-175", watt) solo se nel
+  contesto c'è una "ftp"; altrimenti "target_hr" ("120-135", bpm) solo se ci sono zone
+  cardiache; altrimenti nessun target e la zona descritta nella "note" (es. "Z2, pedalata
+  agile"). "target_cadence" ("85-95", rpm) solo per lavori di agilità o forza.
+- Nuoto ("swimming"): metri con "meters" (es. "meters": 100), sempre multipli di 25.
+  Ogni passo di nuoto ha "stroke" fra free, backstroke, breaststroke, fly,
+  individual_medley, drill, any_stroke; "equipment" (pull_buoy, fins, paddles, kickboard)
+  solo se serve. Pause fra le ripetute a tempo ("type": "rest", "duration_type": "time").
+  Il passo per 100 m va nella "note" (es. "1:55/100 m"). "pool_length" (25 o 50) sulla
+  seduta solo se l'atleta l'ha indicata.
 - Opzione "Salva-Tempo" (short_variant):
   - Per TUTTE le sedute non fondamentali (corsa facile, calisthenics, bici Z2), genera SEMPRE anche una "short_variant" (durata 25-35 minuti) che l'atleta può attivare nei giorni in cui ha poco tempo:
     - Per corsa/bici: riduci la durata mantenendo il ritmo facile.
@@ -634,6 +652,23 @@ Una seduta di calisthenics, per esempio:
        {"type": "rest", "duration_type": "time", "duration_value": 1.5}
      ]},
      {"type": "cooldown", "exercise": "PLANK", "duration_type": "time", "duration_value": 1}
+   ]}
+Una seduta di nuoto, per esempio:
+  {"date": "YYYY-MM-DD", "sport": "swimming", "title": "Piscina: 8×100", "description": "...",
+   "steps": [
+     {"type": "warmup", "meters": 300, "stroke": "free", "note": "facile"},
+     {"repeat": 8, "steps": [
+       {"type": "interval", "meters": 100, "stroke": "free", "note": "1:55/100 m"},
+       {"type": "rest", "duration_type": "time", "duration_value": 0.33}
+     ]},
+     {"type": "cooldown", "meters": 200, "stroke": "backstroke"}
+   ]}
+Una seduta di bici, per esempio:
+  {"date": "YYYY-MM-DD", "sport": "cycling", "title": "Bici Z2 60'", "description": "...",
+   "steps": [
+     {"type": "warmup", "duration_type": "time", "duration_value": 10, "note": "Z1"},
+     {"type": "interval", "duration_type": "time", "duration_value": 45, "note": "Z2, pedalata agile"},
+     {"type": "cooldown", "duration_type": "time", "duration_value": 5}
    ]}
 "type" è uno fra warmup, interval, recovery, cooldown, rest; "duration_type" è "time" (minuti), "distance" (chilometri) o "reps" (ripetizioni, anche nella forma breve "reps": N)."""
 

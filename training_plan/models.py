@@ -125,6 +125,34 @@ LAP_BUTTON_CONDITION_PAYLOAD = {
 }
 
 NO_TARGET_PAYLOAD = {"workoutTargetTypeId": 1, "workoutTargetTypeKey": "no.target", "displayOrder": 1}
+# Bike and heart-rate targets, ids from Garmin's workout editor (docs/garmin-workouts.md).
+# The bounds go on the step as targetValueOne/Two: watts, bpm or rpm.
+POWER_TARGET_PAYLOAD = {"workoutTargetTypeId": 2, "workoutTargetTypeKey": "power.zone", "displayOrder": 2}
+CADENCE_TARGET_PAYLOAD = {"workoutTargetTypeId": 3, "workoutTargetTypeKey": "cadence", "displayOrder": 3}
+HEART_RATE_TARGET_PAYLOAD = {"workoutTargetTypeId": 4, "workoutTargetTypeKey": "heart.rate.zone", "displayOrder": 4}
+
+# Swimming. Stroke and equipment keys are Garmin's; the plan file may also use the
+# Italian names in the aliases.
+SWIM_STROKES = {
+    "any_stroke": 1, "backstroke": 2, "breaststroke": 3, "drill": 4, "fly": 5,
+    "free": 6, "individual_medley": 7, "mixed": 8,
+}
+SWIM_STROKE_ALIASES = {
+    "qualsiasi": "any_stroke", "any": "any_stroke", "dorso": "backstroke", "back": "backstroke",
+    "rana": "breaststroke", "breast": "breaststroke", "tecnica": "drill", "farfalla": "fly",
+    "delfino": "fly", "butterfly": "fly", "libero": "free", "stile libero": "free",
+    "freestyle": "free", "crawl": "free", "misti": "individual_medley", "im": "individual_medley",
+    "misto": "mixed",
+}
+SWIM_EQUIPMENT = {"fins": 1, "kickboard": 2, "paddles": 3, "pull_buoy": 4, "snorkel": 5}
+SWIM_EQUIPMENT_ALIASES = {
+    "pinne": "fins", "tavoletta": "kickboard", "palette": "paddles", "pull buoy": "pull_buoy",
+    "pullbuoy": "pull_buoy", "boccaglio": "snorkel",
+}
+POOL_LENGTH_UNIT_PAYLOAD = {"unitId": 1, "unitKey": "meter", "factor": 100.0}
+DEFAULT_POOL_LENGTH_M = 25.0
+# Rough swim speed, only to estimate how long a session written in metres lasts.
+SWIM_MIN_PER_100M = 2.0
 
 # Garmin pace target. Garmin stores the two bounds as speeds in metres/second on the
 # step itself (targetValueOne/targetValueTwo), NOT nested inside targetType.
@@ -148,6 +176,14 @@ class PaceTarget:
 
 
 @dataclass
+class TargetRange:
+    """A target band on a step: watts, bpm or rpm, low first."""
+
+    low: float
+    high: float
+
+
+@dataclass
 class Step:
     type: str
     duration_type: str
@@ -156,6 +192,14 @@ class Step:
     note: str | None = None
     # A Garmin catalogue exercise ("PULL_UP", or "CATEGORY/NAME"), see `exercises.py`.
     exercise: str | None = None
+    # Bike (and any sport): watts, heart rate, cadence. One target reaches Garmin, in
+    # this order after the pace: power, heart rate, cadence.
+    target_power: TargetRange | None = None
+    target_hr: TargetRange | None = None
+    target_cadence: TargetRange | None = None
+    # Swimming: Garmin stroke and equipment keys (SWIM_STROKES, SWIM_EQUIPMENT).
+    stroke: str | None = None
+    equipment: str | None = None
 
 
 @dataclass
@@ -274,6 +318,9 @@ class TrainingSession:
     min_duration_minutes: float | None = None
     short_variant: ShortVariant | None = None
     is_short_active: bool = False
+    # Swimming: the pool the workout is written for (25, 50, ...). None means the
+    # default 25 m pool on Garmin; open water has no structured workout there.
+    pool_length_m: float | None = None
 
     @property
     def effective_steps(self) -> list[SessionStep]:
@@ -298,6 +345,19 @@ def session_duration_minutes(session: TrainingSession) -> float:
     """Total minutes the session asks for, repeat blocks expanded and distance steps
     converted at their own (or the session's slowest named) pace."""
     steps = flatten_steps(session.effective_steps)
+    if session.sport == "swimming":
+        # Metres at a steady swim, not at a running pace.
+        return sum(
+            step.duration_value * 10 * SWIM_MIN_PER_100M if step.duration_type == "distance"
+            else step_duration_minutes(step)
+            for step in steps
+        )
+    if session.sport == "cycling":
+        return sum(
+            step.duration_value * 60 / DEFAULT_CYCLING_SPEED_KMH if step.duration_type == "distance"
+            else step_duration_minutes(step)
+            for step in steps
+        )
     fallback = session_fallback_pace(steps)
     return sum(step_duration_minutes(step, fallback) for step in steps)
 
@@ -314,6 +374,13 @@ def session_distance_km(session: TrainingSession) -> float:
     steps = flatten_steps(session.effective_steps)
     if session.sport in ("strength_training", "calisthenics"):
         return 0.0
+    if session.sport == "swimming":
+        return sum(
+            step.duration_value if step.duration_type == "distance"
+            else 0.0 if step.type == "rest" or step.duration_type == "reps"
+            else step.duration_value / (10 * SWIM_MIN_PER_100M)
+            for step in steps
+        )
     if session.sport == "cycling":
         total = 0.0
         for step in steps:

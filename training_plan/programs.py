@@ -205,7 +205,7 @@ def validate_sessions(sessions):
     return out
 
 
-AI_SPORTS = {"running", "calisthenics", "strength_training"}
+AI_SPORTS = {"running", "calisthenics", "strength_training", "cycling", "swimming"}
 
 
 def _read_yaml(text):
@@ -462,12 +462,12 @@ def activate_draft(user_id,draft_id,expected_revision,validation_token,acknowled
             cur.execute("DELETE FROM plan_session WHERE user_id=%s AND id=%s",[user_id,session["id"]])
         for position,session in enumerate(draft["sessions"]):
             cur.execute("""INSERT INTO plan_session(user_id,plan_id,date,position,sport,title,description,steps,origin,locked,
-              priority,min_duration_minutes,short_variant,is_short_active)
-              VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,FALSE,%s,%s,%s,%s)""",
+              priority,min_duration_minutes,short_variant,is_short_active,pool_length_m)
+              VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,FALSE,%s,%s,%s,%s,%s)""",
               [user_id,plan_id,session["date"],position,session["sport"],session["title"],session.get("description"),
                Jsonb(session["steps"]),"ai" if draft["source"]=="ai" else "import",session.get("priority","flexible"),
                session.get("min_duration_minutes"),Jsonb(session["short_variant"]) if session.get("short_variant") else None,
-               session.get("is_short_active",False)])
+               session.get("is_short_active",False),session.get("pool_length_m")])
         if draft.get("goal_id"):
             cur.execute("""INSERT INTO program_goal(user_id,plan_id,goal_id,is_primary)
               SELECT %s,%s,%s,NOT EXISTS(SELECT 1 FROM program_goal WHERE user_id=%s AND plan_id=%s AND is_primary)
@@ -518,10 +518,8 @@ def begin_generation(user_id,draft_id,expected_revision):
         if draft["source"]!="ai" or draft["status"] in ("active","generating"):
             raise PlanningError("Questa bozza non può essere generata",409)
         inputs=draft.get("inputs") or {}
-        # The generator writes running, bodyweight and strength sessions (with Garmin
-        # exercises and repetitions); cycling and swimming still come from a file.
         if not set(inputs.get("sports") or ["running"]) <= AI_SPORTS:
-            raise PlanningError("La generazione AI supporta corsa, calisthenics e forza. Per bici e nuoto importa un file.")
+            raise PlanningError("Uno degli sport scelti non è ancora supportato dalla generazione AI.")
         requested_start=inputs.get("start_date")
         # The existing generator's detailed window starts tomorrow; unsupported dates
         # must never be silently ignored or disguised in the preview.

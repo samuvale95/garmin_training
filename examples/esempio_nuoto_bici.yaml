@@ -1,0 +1,72 @@
+# Esempio: una seduta di nuoto e una di bici.
+# Importalo da Piano → Programmi → Importa un file (o incollalo nel riquadro).
+#
+# Nuoto:
+#   pool_length     vasca in metri sulla seduta: 25 o 50 (senza, Garmin usa 25)
+#   meters          distanza del passo in metri (scorciatoia di distance in km)
+#   stroke          free | backstroke | breaststroke | fly | individual_medley | drill |
+#                   any_stroke — oppure libero, dorso, rana, farfalla, misti, tecnica
+#   equipment       pull_buoy | fins | paddles | kickboard | snorkel —
+#                   oppure pull buoy, pinne, palette, tavoletta, boccaglio
+# Bici (e qualsiasi sport):
+#   target_power    watt: "220-240", oppure 230 (±5%)
+#   target_hr       battiti: "120-135"
+#   target_cadence  pedalate al minuto: "85-95"
+#   Sull'orologio il primo obiettivo presente (watt, poi battito, poi cadenza) è il
+#   principale, il successivo il secondario.
+
+sessions:
+  # ---- NUOTO: 8 × 100 in vasca da 50 ---------------------------------------------
+  - date: 2026-11-06
+    sport: swimming
+    title: Piscina · 8×100
+    description: Riscaldamento, 8 × 100 a ritmo costante con 20" di pausa, pull buoy e defaticamento a dorso.
+    pool_length: 50
+    steps:
+      - type: warmup
+        meters: 300
+        stroke: libero
+        note: Facile, respirazione ogni 3 bracciate
+      - repeat: 8
+        steps:
+          - type: interval
+            meters: 100
+            stroke: libero
+            note: 1:55/100 m
+          - type: rest
+            duration_type: time
+            duration_value: 0.33
+      - type: interval
+        meters: 200
+        stroke: libero
+        equipment: pull buoy
+        note: Solo braccia, lungo e rilassato
+      - type: cooldown
+        meters: 100
+        stroke: dorso
+
+  # ---- BICI: 3 × 10' a soglia sui rulli ------------------------------------------
+  - date: 2026-11-07
+    sport: cycling
+    title: Rulli · 3×10' soglia
+    description: Riscaldamento a battito basso, tre blocchi da 10' a soglia con cadenza alta, recuperi agili.
+    steps:
+      - type: warmup
+        duration_type: time
+        duration_value: 15
+        target_hr: 120-135
+      - repeat: 3
+        steps:
+          - type: interval
+            duration_type: time
+            duration_value: 10
+            target_power: 220-240
+            target_cadence: 85-95
+          - type: recovery
+            duration_type: time
+            duration_value: 5
+            target_power: 130
+            note: Agile, gambe sciolte
+      - type: cooldown
+        duration_type: time
+        duration_value: 10

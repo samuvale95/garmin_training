@@ -16,6 +16,7 @@ export interface DisplaySession {
   description?: string | null;
   priority?: "key" | "flexible" | "normal" | "optional" | null;
   min_duration_minutes?: number | null;
+  pool_length_m?: number | null;
   steps?: SessionStep[];
   is_short_active?: boolean;
   short_variant?: ShortVariant | null;
@@ -108,6 +109,14 @@ export function classifySession(session: DisplaySession | null): SessionVisual {
 export function sessionDistanceKm(session: DisplaySession): number {
   if (session.sport === "strength_training" || session.sport === "calisthenics") return 0;
   const steps = effectiveSteps(session);
+  if (session.sport === "swimming") {
+    // Time-based swim steps at about 2 minutes per 100 m, never at a running pace.
+    return flattenSteps(steps).reduce((sum, s) => {
+      if (s.duration_type === "distance") return sum + s.duration_value;
+      if (s.type === "rest" || s.duration_type === "reps") return sum;
+      return sum + s.duration_value / 20;
+    }, 0);
+  }
   if (session.sport === "cycling") {
     return flattenSteps(steps).reduce((sum, s) => {
       if (s.duration_type === "distance") return sum + s.duration_value;
@@ -132,6 +141,7 @@ export function sessionDurationMinutes(session: DisplaySession): number {
     if (s.duration_type === "time") return sum + s.duration_value;
     // About 3 seconds a repetition, as the backend estimates (`SECONDS_PER_REP`).
     if (s.duration_type === "reps") return sum + (s.duration_value * 3) / 60;
+    if (session.sport === "swimming") return sum + s.duration_value * 20;
     if (session.sport === "cycling") {
       // 25 km/h -> 2.4 min per km
       return sum + s.duration_value * 2.4;

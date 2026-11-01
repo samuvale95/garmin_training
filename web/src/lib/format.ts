@@ -270,6 +270,29 @@ export function exerciseLabel(exercise: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+const STROKE_IT: Record<string, string> = {
+  any_stroke: "stile a scelta", backstroke: "dorso", breaststroke: "rana", drill: "tecnica",
+  fly: "farfalla", free: "stile libero", individual_medley: "misti", mixed: "misto",
+};
+const EQUIPMENT_IT: Record<string, string> = {
+  fins: "pinne", kickboard: "tavoletta", paddles: "palette", pull_buoy: "pull buoy", snorkel: "boccaglio",
+};
+const band = (r: { low: number; high: number }, unit: string) => `${Math.round(r.low)}–${Math.round(r.high)} ${unit}`;
+
+/** Watts, heart rate, cadence, stroke and equipment of a step, in reading order:
+ * "220–240 W · 85–95 rpm", "stile libero · pull buoy". */
+export function stepTargetsLabel(step: Step): string {
+  return [
+    step.target_power ? band(step.target_power, "W") : null,
+    step.target_hr ? band(step.target_hr, "bpm") : null,
+    step.target_cadence ? band(step.target_cadence, "rpm") : null,
+    step.stroke ? STROKE_IT[step.stroke] ?? step.stroke : null,
+    step.equipment ? EQUIPMENT_IT[step.equipment] ?? step.equipment : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 /** What a step is called on screen: its exercise, else its note. */
 function stepName(step: Step): string | null {
   return step.exercise ? exerciseLabel(step.exercise) : step.note ?? null;
@@ -282,7 +305,7 @@ export function stepGroupParts(group: StepGroup): { label: string; detail: strin
   const times = reps > 1 ? `${reps} × ` : "";
 
   if (kind === "interval") {
-    const pace = step.target_pace ? formatPaceRange(step.target_pace) : "";
+    const pace = [step.target_pace ? formatPaceRange(step.target_pace) : "", stepTargetsLabel(step)].filter(Boolean).join(" · ");
     // The recovery's own pace is spelled out too: it is the difference between a
     // jogged recovery and standing still, and the only place the plan says which.
     const rec = recovery
@@ -299,7 +322,8 @@ export function stepGroupParts(group: StepGroup): { label: string; detail: strin
     };
   }
 
-  const pace = step.target_pace ? formatPaceRange(step.target_pace) : "libero";
+  const targets = stepTargetsLabel(step);
+  const pace = step.target_pace ? formatPaceRange(step.target_pace) : targets || "libero";
   const name = stepName(step);
   const label = name ? `${times}${name}` : `${times}${stepTypeLabel(kind)}`;
   return { label, detail: `${stepDurationLabel(step)} · ${pace}` };

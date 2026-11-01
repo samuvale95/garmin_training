@@ -61,6 +61,18 @@ class PaceTargetIn(BaseModel):
         )
 
 
+class TargetRangeModel(BaseModel):
+    low: float
+    high: float
+
+    def to_model(self) -> models.TargetRange:
+        return models.TargetRange(low=self.low, high=self.high)
+
+    @classmethod
+    def from_model(cls, band: models.TargetRange | None) -> "TargetRangeModel | None":
+        return cls(low=band.low, high=band.high) if band else None
+
+
 class StepIn(BaseModel):
     type: str
     duration_type: str
@@ -68,6 +80,11 @@ class StepIn(BaseModel):
     target_pace: PaceTargetIn | None = None
     note: str | None = None
     exercise: str | None = None
+    target_power: TargetRangeModel | None = None
+    target_hr: TargetRangeModel | None = None
+    target_cadence: TargetRangeModel | None = None
+    stroke: str | None = None
+    equipment: str | None = None
 
     def to_model(self) -> models.Step:
         return models.Step(
@@ -77,6 +94,11 @@ class StepIn(BaseModel):
             target_pace=self.target_pace.to_model() if self.target_pace else None,
             note=self.note,
             exercise=self.exercise,
+            target_power=self.target_power.to_model() if self.target_power else None,
+            target_hr=self.target_hr.to_model() if self.target_hr else None,
+            target_cadence=self.target_cadence.to_model() if self.target_cadence else None,
+            stroke=self.stroke if self.stroke in models.SWIM_STROKES else None,
+            equipment=self.equipment if self.equipment in models.SWIM_EQUIPMENT else None,
         )
 
 
@@ -87,6 +109,11 @@ class StepOut(BaseModel):
     target_pace: PaceTargetOut | None = None
     note: str | None = None
     exercise: str | None = None
+    target_power: TargetRangeModel | None = None
+    target_hr: TargetRangeModel | None = None
+    target_cadence: TargetRangeModel | None = None
+    stroke: str | None = None
+    equipment: str | None = None
 
     @classmethod
     def from_model(cls, step: models.Step) -> "StepOut":
@@ -97,6 +124,11 @@ class StepOut(BaseModel):
             target_pace=PaceTargetOut.from_model(step.target_pace),
             note=step.note,
             exercise=step.exercise,
+            target_power=TargetRangeModel.from_model(step.target_power),
+            target_hr=TargetRangeModel.from_model(step.target_hr),
+            target_cadence=TargetRangeModel.from_model(step.target_cadence),
+            stroke=step.stroke,
+            equipment=step.equipment,
         )
 
 
@@ -172,6 +204,7 @@ class TrainingSessionIn(BaseModel):
     min_duration_minutes: float | None = None
     short_variant: ShortVariantIn | None = None
     is_short_active: bool = False
+    pool_length_m: float | None = None
 
     def to_model(self) -> models.TrainingSession:
         return models.TrainingSession(
@@ -184,6 +217,7 @@ class TrainingSessionIn(BaseModel):
             min_duration_minutes=self.min_duration_minutes,
             short_variant=self.short_variant.to_model() if self.short_variant else None,
             is_short_active=self.is_short_active,
+            pool_length_m=self.pool_length_m,
         )
 
 
@@ -203,6 +237,7 @@ class TrainingSessionOut(BaseModel):
     min_duration_minutes: float | None = None
     short_variant: ShortVariantOut | None = None
     is_short_active: bool = False
+    pool_length_m: float | None = None
 
     @classmethod
     def from_model(cls, session: models.TrainingSession) -> "TrainingSessionOut":
@@ -219,6 +254,7 @@ class TrainingSessionOut(BaseModel):
             min_duration_minutes=session.min_duration_minutes,
             short_variant=ShortVariantOut.from_model(session.short_variant),
             is_short_active=session.is_short_active,
+            pool_length_m=session.pool_length_m,
         )
 
 

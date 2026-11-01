@@ -12,6 +12,11 @@ from . import exercises
 from .models import (
     DEFAULT_PACE_TOLERANCE_SECONDS,
     MAX_STEP_REPS,
+    SWIM_EQUIPMENT,
+    SWIM_EQUIPMENT_ALIASES,
+    SWIM_STROKE_ALIASES,
+    SWIM_STROKES,
+    TargetRange,
     MAX_REPETITIONS,
     MIN_REPETITIONS,
     NAMED_DISTANCES_KM,
@@ -129,6 +134,11 @@ def _validate_step(label: str, raw_step: Any, errors: list[str]) -> Step | None:
     # Shorthand for strength steps: `reps: 6` means duration_type reps, value 6.
     if isinstance(raw_step, dict) and "reps" in raw_step and duration_type is None and duration_value is None:
         duration_type, duration_value = "reps", raw_step.get("reps")
+    # Shorthand for swimming: `meters: 100` is a 0.1 km distance step.
+    if isinstance(raw_step, dict) and "meters" in raw_step and duration_type is None and duration_value is None:
+        metres = raw_step.get("meters")
+        duration_type = "distance"
+        duration_value = metres / 1000 if isinstance(metres, (int, float)) and not isinstance(metres, bool) else metres
 
     if step_type not in SUPPORTED_STEP_TYPES:
         errors.append(f"{label}: invalid or missing 'type', expected one of {SUPPORTED_STEP_TYPES}")
@@ -171,6 +181,24 @@ def _validate_step(label: str, raw_step: Any, errors: list[str]) -> Step | None:
     if note is not None:
         note = str(note).strip() or None
 
+    targets = {}
+    for key, unit in (("target_power", "W"), ("target_hr", "bpm"), ("target_cadence", "rpm")):
+        if raw_step.get(key) is not None:
+            band = _parse_range(raw_step.get(key))
+            if band is None:
+                errors.append(f"{label}: invalid {key} {raw_step.get(key)!r}, expected a number or a range like '150-175' ({unit})")
+                return None
+            targets[key] = band
+
+    stroke = _choice(raw_step.get("stroke"), SWIM_STROKES, SWIM_STROKE_ALIASES)
+    if raw_step.get("stroke") is not None and stroke is None:
+        errors.append(f"{label}: unknown stroke {raw_step.get('stroke')!r}, expected one of {', '.join(SWIM_STROKES)} (or libero, dorso, rana, farfalla, misti)")
+        return None
+    equipment = _choice(raw_step.get("equipment"), SWIM_EQUIPMENT, SWIM_EQUIPMENT_ALIASES)
+    if raw_step.get("equipment") is not None and equipment is None:
+        errors.append(f"{label}: unknown equipment {raw_step.get('equipment')!r}, expected one of {', '.join(SWIM_EQUIPMENT)} (or pinne, palette, tavoletta, pull buoy)")
+        return None
+
     return Step(
         type=step_type,
         duration_type=duration_type,
@@ -178,7 +206,40 @@ def _validate_step(label: str, raw_step: Any, errors: list[str]) -> Step | None:
         target_pace=target_pace,
         note=note,
         exercise=exercise,
+        stroke=stroke,
+        equipment=equipment,
+        **targets,
     )
+
+
+def _parse_range(raw: Any) -> TargetRange | None:
+    """150 (widened by 5% each way, Garmin wants a band) or "150-175"."""
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, (int, float)):
+        if raw <= 0:
+            return None
+        return TargetRange(low=round(raw * 0.95), high=round(raw * 1.05))
+    parts = str(raw).replace("–", "-").split("-")
+    try:
+        values = [float(part) for part in parts]
+    except ValueError:
+        return None
+    if len(values) == 1:
+        return _parse_range(values[0])
+    if len(values) != 2 or min(values) <= 0 or values[0] == values[1]:
+        return None
+    return TargetRange(low=min(values), high=max(values))
+
+
+def _choice(raw: Any, keys: dict, aliases: dict) -> str | None:
+    if raw is None:
+        return None
+    text = str(raw).strip().lower()
+    if text in keys:
+        return text
+    text = aliases.get(text, text.replace(" ", "_"))
+    return text if text in keys else None
 
 
 def _validate_repeat_block(label: str, raw_block: dict[str, Any], errors: list[str]) -> RepeatBlock | None:
@@ -364,6 +425,17 @@ def parse_sessions(raw_sessions: list[Any]) -> tuple[list[TrainingSession], list
 
         is_short_active = bool(raw_entry.get("is_short_active", False))
 
+        pool_length = None
+        raw_pool = raw_entry.get("pool_length")
+        if raw_pool is not None:
+            text = str(raw_pool).strip().lower().removesuffix("m").strip()
+            try:
+                pool_length = float(text)
+            except ValueError:
+                pool_length = None
+            if pool_length is None or not 10 <= pool_length <= 100:
+                entry_errors.append(f"{_entry_label(index, raw_entry)}: invalid pool_length {raw_pool!r}, expected the pool in metres (25, 50, ...)")
+
         errors.extend(entry_errors)
         if entry_errors:
             continue
@@ -379,6 +451,7 @@ def parse_sessions(raw_sessions: list[Any]) -> tuple[list[TrainingSession], list
                 min_duration_minutes=min_duration,
                 short_variant=short_variant,
                 is_short_active=is_short_active,
+                pool_length_m=pool_length,
             )
         )
     return sessions, errors
@@ -434,6 +507,14 @@ def _step_out(step: Step) -> dict[str, Any]:
         out["note"] = step.note
     if step.exercise:
         out["exercise"] = step.exercise
+    for key in ("target_power", "target_hr", "target_cadence"):
+        band = getattr(step, key)
+        if band is not None:
+            out[key] = f"{_number(band.low)}-{_number(band.high)}"
+    if step.stroke:
+        out["stroke"] = step.stroke
+    if step.equipment:
+        out["equipment"] = step.equipment
     return out
 
 
@@ -492,6 +573,8 @@ def serialize_plan(sessions: list[TrainingSession], goal: RaceGoal | None = None
             }
         if session.is_short_active:
             entry["is_short_active"] = True
+        if session.pool_length_m is not None:
+            entry["pool_length"] = _number(session.pool_length_m)
 
         entries.append(entry)
     document["sessions"] = entries
