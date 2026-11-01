@@ -1,0 +1,89 @@
+# Esempio: una seduta di corsa e una di calisthenics.
+# Importalo da Piano → Programmi → Importa un file (o incollalo nel riquadro).
+#
+# Regole del formato:
+#   date            AAAA-MM-GG
+#   sport           running | cycling | swimming | strength_training | calisthenics | other
+#   priority        key (seduta chiave) | flexible (spostabile)
+#   steps.type      warmup | interval | recovery | rest | cooldown
+#   duration_type   time (minuti) | distance (km)
+#   target_pace     "5:00" (±5 s) oppure un intervallo "5:30-5:15", in min/km
+#   repeat          2–99 ripetizioni dei passi indicati sotto
+#   note            testo che compare sul passo, anche sull'orologio
+
+sessions:
+  # ---- CORSA: ripetute 6 × 1 km --------------------------------------------------
+  - date: 2026-11-04
+    sport: running
+    title: Ripetute 6×1 km
+    description: Riscaldamento facile, 6 ripetute a ritmo soglia con 2' di recupero, defaticamento.
+    priority: key
+    steps:
+      - type: warmup
+        duration_type: time
+        duration_value: 15
+        target_pace: "6:15-5:50"
+        note: Facile, ultimi 2' un po' più svelti
+      - repeat: 6
+        steps:
+          - type: interval
+            duration_type: distance
+            duration_value: 1
+            target_pace: "4:50-4:40"
+            note: Ritmo soglia, controllato
+          - type: recovery
+            duration_type: time
+            duration_value: 2
+            note: Corsa lentissima o camminata
+      - type: cooldown
+        duration_type: time
+        duration_value: 10
+        target_pace: "6:30-6:00"
+
+  # ---- CALISTHENICS: tirata e spinta al parchetto --------------------------------
+  # Il formato attuale misura i passi a tempo: ogni serie è un blocco di lavoro con
+  # l'esercizio e le ripetizioni scritti nella nota, seguito dalla pausa.
+  - date: 2026-11-05
+    sport: calisthenics
+    title: Parchetto · tirata e spinta
+    description: Sbarra e parallele. 3 giri, recuperi completi. Se non hai la sbarra, australian row su una barra bassa.
+    priority: flexible
+    steps:
+      - type: warmup
+        duration_type: time
+        duration_value: 8
+        note: Mobilità spalle e polsi, 10 scapular pull alla sbarra
+      - repeat: 3
+        steps:
+          - type: interval
+            duration_type: time
+            duration_value: 1
+            note: Trazioni presa prona · 6 ripetizioni
+          - type: rest
+            duration_type: time
+            duration_value: 1.5
+          - type: interval
+            duration_type: time
+            duration_value: 1
+            note: Dip alle parallele · 8 ripetizioni
+          - type: rest
+            duration_type: time
+            duration_value: 1.5
+          - type: interval
+            duration_type: time
+            duration_value: 1
+            note: Australian row · 10 ripetizioni
+          - type: rest
+            duration_type: time
+            duration_value: 1
+          - type: interval
+            duration_type: time
+            duration_value: 1
+            note: Piegamenti · 12 ripetizioni
+          - type: rest
+            duration_type: time
+            duration_value: 1.5
+      - type: cooldown
+        duration_type: time
+        duration_value: 5
+        note: Hollow hold 3 × 20", allungamento pettorali e dorsali
