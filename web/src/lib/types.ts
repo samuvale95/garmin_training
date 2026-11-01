@@ -3,7 +3,7 @@
 
 export type Sport = "running" | "cycling" | "swimming" | "strength_training" | "calisthenics" | "other";
 export type StepType = "warmup" | "interval" | "recovery" | "rest" | "cooldown";
-export type DurationType = "time" | "distance";
+export type DurationType = "time" | "distance" | "reps";
 
 export interface PaceTarget {
   slower_sec_per_km: number;
@@ -16,6 +16,8 @@ export interface Step {
   duration_value: number;
   target_pace?: PaceTarget | null;
   note?: string | null;
+  /** Garmin catalogue exercise ("PULL_UP" or "CATEGORY/NAME"), for strength steps. */
+  exercise?: string | null;
 }
 
 /** A group of steps repeated `reps` times -- Garmin's own repeat group, kept as a

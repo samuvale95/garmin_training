@@ -245,9 +245,34 @@ export function groupDistanceKm(group: StepGroup, fallbackPace?: number): number
   return group.reps * perRep;
 }
 
-/** How long a step lasts, in its own unit: "1000 m" or "15 min". */
+/** How long a step lasts, in its own unit: "1000 m", "15 min" or "6 ripetizioni". */
 export function stepDurationLabel(step: Step): string {
+  if (step.duration_type === "reps") return `${step.duration_value} ${step.duration_value === 1 ? "ripetizione" : "ripetizioni"}`;
   return step.duration_type === "distance" ? formatDistanceValue(step.duration_value) : `${step.duration_value} min`;
+}
+
+/** A catalogue exercise as a readable name: "PULL_UP" -> "Pull up". The Italian name
+ * for the common ones, the Garmin name tidied up for the rest. */
+const EXERCISE_IT: Record<string, string> = {
+  PULL_UP: "Trazioni", CHIN_UP: "Trazioni presa supina", CLOSE_GRIP_CHIN_UP: "Trazioni presa stretta",
+  BAND_ASSISTED_PULL_UP: "Trazioni con elastico", MUSCLE_UP: "Muscle up", PUSH_UP: "Piegamenti",
+  DIAMOND_PUSH_UP: "Piegamenti diamante", PIKE_PUSH_UP: "Piegamenti pike", HANDSTAND_PUSH_UP: "Piegamenti in verticale",
+  BODY_WEIGHT_DIP: "Dip alle parallele", RING_DIP: "Dip agli anelli", BENCH_DIP: "Dip alla panca",
+  INVERTED_ROW: "Australian row", AIR_SQUAT: "Squat", JUMP_SQUAT: "Squat saltato", LUNGE: "Affondi",
+  PLANK: "Plank", SIDE_PLANK: "Plank laterale", BURPEE: "Burpee", MOUNTAIN_CLIMBER: "Mountain climber",
+  L_SIT: "L-sit", HANGING_LEG_RAISE: "Sollevamento gambe alla sbarra", HANGING_KNEE_RAISE: "Sollevamento ginocchia alla sbarra",
+  GLUTE_BRIDGE: "Ponte glutei", CALF_RAISE: "Polpacci", JUMPING_JACKS: "Jumping jack", HOLLOW_ROCK: "Hollow rock",
+};
+export function exerciseLabel(exercise: string): string {
+  const name = exercise.includes("/") ? exercise.split("/")[1] : exercise;
+  if (EXERCISE_IT[name]) return EXERCISE_IT[name];
+  const words = name.toLowerCase().split("_").filter(Boolean).join(" ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** What a step is called on screen: its exercise, else its note. */
+function stepName(step: Step): string | null {
+  return step.exercise ? exerciseLabel(step.exercise) : step.note ?? null;
 }
 
 /** Label ("6 × 1000 m") and detail ("4:20-4:10 · rec 2 min a 6:30-6:00") for a step
@@ -264,15 +289,19 @@ export function stepGroupParts(group: StepGroup): { label: string; detail: strin
       ? `${stepTypeLabel(recovery.type).toLowerCase()} ${stepDurationLabel(recovery)}${recovery.target_pace ? ` a ${formatPaceRange(recovery.target_pace)}` : ""}${recovery.note ? ` (${recovery.note})` : ""}`
       : "";
     const rest = extra.map((s) => `${stepTypeLabel(s.type).toLowerCase()} ${stepDurationLabel(s)}${s.note ? ` (${s.note})` : ""}`);
-    const label = step.note ? `${times}${step.note}` : `${times}${stepDurationLabel(step)}`;
+    const name = stepName(step);
+    const label = name ? `${times}${name}` : `${times}${stepDurationLabel(step)}`;
+    // An exercise's repetitions belong in the detail ("6 ripetizioni · pausa 1,5 min").
+    const amount = step.exercise ? stepDurationLabel(step) : "";
     return {
       label,
-      detail: [pace, rec, ...rest].filter(Boolean).join(" · "),
+      detail: [amount, pace, rec, ...rest].filter(Boolean).join(" · "),
     };
   }
 
   const pace = step.target_pace ? formatPaceRange(step.target_pace) : "libero";
-  const label = step.note ? `${times}${step.note}` : `${times}${stepTypeLabel(kind)}`;
+  const name = stepName(step);
+  const label = name ? `${times}${name}` : `${times}${stepTypeLabel(kind)}`;
   return { label, detail: `${stepDurationLabel(step)} · ${pace}` };
 }
 
@@ -286,7 +315,11 @@ export function stepGroupLine(group: StepGroup): string {
 export function planStepsSummary(steps: SessionStep[]): string {
   const abbrev: Partial<Record<StepType, string>> = { warmup: "WU", cooldown: "CD", recovery: "rec", rest: "rip" };
   const compact = (step: Step) =>
-    step.duration_type === "distance" ? formatDistanceValue(step.duration_value).replace(" ", "") : `${step.duration_value}'`;
+    step.duration_type === "reps"
+      ? `${step.duration_value} ${step.exercise ? exerciseLabel(step.exercise).toLowerCase() : "rip"}`
+      : step.duration_type === "distance"
+        ? formatDistanceValue(step.duration_value).replace(" ", "")
+        : `${step.duration_value}'`;
 
   return groupSteps(steps)
     .map((group) => {
@@ -335,7 +368,7 @@ export function sessionFallbackPaceSecPerKm(steps: SessionStep[]): number {
  * `rest` is the one step that really is 0 km: it is time spent standing still. */
 export function stepDistanceKm(step: Step, fallbackPace = DEFAULT_EASY_PACE_SEC_PER_KM): number {
   if (step.duration_type === "distance") return step.duration_value;
-  if (step.type === "rest") return 0;
+  if (step.type === "rest" || step.duration_type === "reps") return 0;
   const secPerKm = step.target_pace ? avgPaceSecPerKm(step.target_pace) : fallbackPace;
   return (step.duration_value * 60) / secPerKm;
 }

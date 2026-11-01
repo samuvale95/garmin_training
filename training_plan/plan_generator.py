@@ -389,6 +389,10 @@ def _step_from_dict(raw: dict) -> Step | RepeatBlock:
         duration_type=raw["duration_type"],
         duration_value=float(raw["duration_value"]),
         target_pace=PaceTarget(**pace) if pace else None,
+        # Without these, a plan read back from the database lost every step's note and
+        # exercise on its way to Garmin.
+        note=raw.get("note"),
+        exercise=raw.get("exercise"),
     )
 
 

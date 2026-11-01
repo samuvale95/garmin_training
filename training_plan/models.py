@@ -5,7 +5,10 @@ from datetime import date as date_type
 
 SUPPORTED_SPORTS = ("running", "cycling", "swimming", "strength_training", "calisthenics", "other")
 SUPPORTED_STEP_TYPES = ("warmup", "interval", "recovery", "rest", "cooldown")
-SUPPORTED_DURATION_TYPES = ("time", "distance")
+SUPPORTED_DURATION_TYPES = ("time", "distance", "reps")
+# Rough time per repetition, only to estimate how long a strength session lasts.
+SECONDS_PER_REP = 3.0
+MAX_STEP_REPS = 500
 
 # Garmin caps a repeat group's iterations; anything outside this range is rejected by
 # the API rather than clamped, so it is validated on the way in instead.
@@ -107,6 +110,8 @@ ITERATIONS_CONDITION_PAYLOAD = {
 CONDITION_TYPE_PAYLOAD = {
     "time": {"conditionTypeId": 2, "conditionTypeKey": "time", "displayOrder": 2, "displayable": True},
     "distance": {"conditionTypeId": 3, "conditionTypeKey": "distance", "displayOrder": 3, "displayable": True},
+    # Read from Garmin's workout editor on a real account (docs/garmin-workouts.md).
+    "reps": {"conditionTypeId": 10, "conditionTypeKey": "reps", "displayOrder": 10, "displayable": True},
 }
 
 # End condition for the single step of a "simple" (no explicit steps) entry: the
@@ -146,9 +151,11 @@ class PaceTarget:
 class Step:
     type: str
     duration_type: str
-    duration_value: float  # minutes for "time", kilometers for "distance"
+    duration_value: float  # minutes for "time", kilometers for "distance", count for "reps"
     target_pace: PaceTarget | None = None
     note: str | None = None
+    # A Garmin catalogue exercise ("PULL_UP", or "CATEGORY/NAME"), see `exercises.py`.
+    exercise: str | None = None
 
 
 @dataclass
@@ -233,7 +240,7 @@ def step_distance_km(step: Step, fallback_pace: float = DEFAULT_EASY_PACE_SEC_PE
     """
     if step.duration_type == "distance":
         return step.duration_value
-    if step.type == "rest":
+    if step.type == "rest" or step.duration_type == "reps":
         return 0.0
     sec_per_km = avg_pace_sec_per_km(step.target_pace) if step.target_pace else fallback_pace
     return (step.duration_value * 60) / sec_per_km
@@ -250,6 +257,8 @@ def step_duration_minutes(step: Step, fallback_pace: float = DEFAULT_EASY_PACE_S
     """
     if step.duration_type == "time":
         return step.duration_value
+    if step.duration_type == "reps":
+        return step.duration_value * SECONDS_PER_REP / 60
     sec_per_km = avg_pace_sec_per_km(step.target_pace) if step.target_pace else fallback_pace
     return (step.duration_value * sec_per_km) / 60
 

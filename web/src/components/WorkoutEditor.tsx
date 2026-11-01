@@ -62,7 +62,7 @@ function toEditable(items: SessionStep[]): EditableItem[] {
 }
 
 function stepSummary(step: Step): string {
-  const duration = step.duration_type === "distance" ? `${step.duration_value} km` : `${step.duration_value} min`;
+  const duration = step.duration_type === "distance" ? `${step.duration_value} km` : step.duration_type === "reps" ? `${step.duration_value} rip` : `${step.duration_value} min`;
   const pace = step.target_pace ? ` · ${formatPaceRange(step.target_pace)}/km` : "";
   const note = step.note ? ` · ${step.note}` : "";
   return `${duration}${pace}${note}`;
@@ -264,6 +264,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       duration_value: s.duration_value,
       target_pace: s.target_pace,
       note: s.note?.trim() || null,
+      exercise: s.exercise ?? null,
     });
     return steps.flatMap((item): SessionStep[] => {
       if (!isEditableBlock(item)) return [strip(item)];
@@ -1082,6 +1083,7 @@ function StepEditorModal({
             <select value={durationType} onChange={(e) => setDurationType(e.target.value as Step["duration_type"])} style={{ ...selectStyle, flex: 1 }}>
               <option value="time">tempo (min)</option>
               {!isStrength && <option value="distance">distanza (km)</option>}
+              {(isStrength || durationType === "reps") && <option value="reps">ripetizioni</option>}
             </select>
             <input
               type="number"

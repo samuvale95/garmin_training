@@ -111,7 +111,7 @@ export function sessionDistanceKm(session: DisplaySession): number {
   if (session.sport === "cycling") {
     return flattenSteps(steps).reduce((sum, s) => {
       if (s.duration_type === "distance") return sum + s.duration_value;
-      if (s.type === "rest") return sum;
+      if (s.type === "rest" || s.duration_type === "reps") return sum;
       return sum + (s.duration_value * 25.0) / 60.0;
     }, 0);
   }
@@ -130,6 +130,8 @@ export function sessionDurationMinutes(session: DisplaySession): number {
   const fallbackPace = sessionFallbackPaceSecPerKm(steps);
   return flattenSteps(steps).reduce((sum, s) => {
     if (s.duration_type === "time") return sum + s.duration_value;
+    // About 3 seconds a repetition, as the backend estimates (`SECONDS_PER_REP`).
+    if (s.duration_type === "reps") return sum + (s.duration_value * 3) / 60;
     if (session.sport === "cycling") {
       // 25 km/h -> 2.4 min per km
       return sum + s.duration_value * 2.4;
