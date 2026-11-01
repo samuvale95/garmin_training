@@ -6,7 +6,11 @@
 #   sport           running | cycling | swimming | strength_training | calisthenics | other
 #   priority        key (seduta chiave) | flexible (spostabile)
 #   steps.type      warmup | interval | recovery | rest | cooldown
-#   duration_type   time (minuti) | distance (km)
+#   duration_type   time (minuti) | distance (km) | reps (ripetizioni)
+#   reps            scorciatoia: "reps: 6" equivale a duration_type reps, duration_value 6
+#   exercise        esercizio del catalogo Garmin (PULL_UP, PUSH_UP, BODY_WEIGHT_DIP…)
+#                   o un nome italiano comune (trazioni, piegamenti, dip, australian row,
+#                   squat, affondi, plank…). Sull'orologio compare il nome e conta le serie.
 #   target_pace     "5:00" (±5 s) oppure un intervallo "5:30-5:15", in min/km
 #   repeat          2–99 ripetizioni dei passi indicati sotto
 #   note            testo che compare sul passo, anche sull'orologio
@@ -41,12 +45,10 @@ sessions:
         target_pace: "6:30-6:00"
 
   # ---- CALISTHENICS: tirata e spinta al parchetto --------------------------------
-  # Il formato attuale misura i passi a tempo: ogni serie è un blocco di lavoro con
-  # l'esercizio e le ripetizioni scritti nella nota, seguito dalla pausa.
   - date: 2026-11-05
     sport: calisthenics
     title: Parchetto · tirata e spinta
-    description: Sbarra e parallele. 3 giri, recuperi completi. Se non hai la sbarra, australian row su una barra bassa.
+    description: Sbarra e parallele. 3 giri, recuperi completi. Senza sbarra, australian row su una barra bassa.
     priority: flexible
     steps:
       - type: warmup
@@ -56,34 +58,32 @@ sessions:
       - repeat: 3
         steps:
           - type: interval
-            duration_type: time
-            duration_value: 1
-            note: Trazioni presa prona · 6 ripetizioni
+            exercise: trazioni
+            reps: 6
+            note: Presa prona, discesa lenta
           - type: rest
             duration_type: time
             duration_value: 1.5
           - type: interval
-            duration_type: time
-            duration_value: 1
-            note: Dip alle parallele · 8 ripetizioni
+            exercise: dip alle parallele
+            reps: 8
           - type: rest
             duration_type: time
             duration_value: 1.5
           - type: interval
-            duration_type: time
-            duration_value: 1
-            note: Australian row · 10 ripetizioni
+            exercise: australian row
+            reps: 10
           - type: rest
             duration_type: time
             duration_value: 1
           - type: interval
-            duration_type: time
-            duration_value: 1
-            note: Piegamenti · 12 ripetizioni
+            exercise: piegamenti
+            reps: 12
           - type: rest
             duration_type: time
             duration_value: 1.5
       - type: cooldown
+        exercise: plank
         duration_type: time
-        duration_value: 5
-        note: Hollow hold 3 × 20", allungamento pettorali e dorsali
+        duration_value: 1
+        note: Poi allungamento pettorali e dorsali

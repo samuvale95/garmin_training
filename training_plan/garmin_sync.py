@@ -22,6 +22,7 @@ from garminconnect import (
     GarminConnectTooManyRequestsError,
 )
 
+from . import exercises
 from .models import (
     CONDITION_TYPE_PAYLOAD,
     ITERATIONS_CONDITION_PAYLOAD,
@@ -1029,10 +1030,21 @@ def _build_step_payload(step: Step, order: int) -> dict:
         "stepType": STEP_TYPE_PAYLOAD[step.type],
         "endCondition": CONDITION_TYPE_PAYLOAD[step.duration_type],
         "endConditionValue": (
-            step.duration_value * 60 if step.duration_type == "time" else step.duration_value * 1000
+            step.duration_value * 60
+            if step.duration_type == "time"
+            else step.duration_value
+            if step.duration_type == "reps"
+            else step.duration_value * 1000
         ),
         "targetType": NO_TARGET_PAYLOAD,
     }
+    # A catalogue exercise: the watch shows its name and counts the sets. Shape copied
+    # from a strength workout made in Garmin's own editor (docs/garmin-workouts.md).
+    found = exercises.resolve(step.exercise) if step.exercise else None
+    if found:
+        payload["category"] = found.category
+        payload["exerciseName"] = found.name
+        payload["weightValue"] = -1.0
     # The step's note is what the watch shows on that step ("Trazioni · 6 ripetizioni"):
     # Garmin keeps it in the step's own `description`, as its editor does.
     if step.note:
@@ -1079,11 +1091,12 @@ def _parse_workout_step(raw_step: dict) -> Step | None:
     value = raw_step.get("endConditionValue")
     if step_type is None or duration_type is None or value is None:
         return None
-    duration_value = value / 60 if duration_type == "time" else value / 1000
+    duration_value = value / 60 if duration_type == "time" else value if duration_type == "reps" else value / 1000
     return Step(
         type=step_type, duration_type=duration_type, duration_value=duration_value,
         target_pace=_parse_pace_target(raw_step),
         note=(raw_step.get("description") or None),
+        exercise=(found.key if (found := exercises.from_garmin(raw_step.get("category"), raw_step.get("exerciseName"))) else None),
     )
 
 

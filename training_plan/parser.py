@@ -8,8 +8,10 @@ from typing import Any
 
 import yaml
 
+from . import exercises
 from .models import (
     DEFAULT_PACE_TOLERANCE_SECONDS,
+    MAX_STEP_REPS,
     MAX_REPETITIONS,
     MIN_REPETITIONS,
     NAMED_DISTANCES_KM,
@@ -124,6 +126,9 @@ def _validate_step(label: str, raw_step: Any, errors: list[str]) -> Step | None:
     step_type = raw_step.get("type") if isinstance(raw_step, dict) else None
     duration_type = raw_step.get("duration_type") if isinstance(raw_step, dict) else None
     duration_value = raw_step.get("duration_value") if isinstance(raw_step, dict) else None
+    # Shorthand for strength steps: `reps: 6` means duration_type reps, value 6.
+    if isinstance(raw_step, dict) and "reps" in raw_step and duration_type is None and duration_value is None:
+        duration_type, duration_value = "reps", raw_step.get("reps")
 
     if step_type not in SUPPORTED_STEP_TYPES:
         errors.append(f"{label}: invalid or missing 'type', expected one of {SUPPORTED_STEP_TYPES}")
@@ -136,6 +141,22 @@ def _validate_step(label: str, raw_step: Any, errors: list[str]) -> Step | None:
     if not isinstance(duration_value, (int, float)) or isinstance(duration_value, bool) or duration_value <= 0:
         errors.append(f"{label}: 'duration_value' must be a positive number")
         return None
+    if duration_type == "reps" and (duration_value != int(duration_value) or duration_value > MAX_STEP_REPS):
+        errors.append(f"{label}: repetitions must be a whole number between 1 and {MAX_STEP_REPS}")
+        return None
+
+    exercise = None
+    raw_exercise = raw_step.get("exercise")
+    if raw_exercise is not None:
+        found = exercises.resolve(str(raw_exercise))
+        if found is None:
+            hint = exercises.suggestions(str(raw_exercise))
+            errors.append(
+                f"{label}: unknown exercise {raw_exercise!r}"
+                + (f", did you mean {', '.join(hint)}?" if hint else " (use a Garmin catalogue name such as PULL_UP)")
+            )
+            return None
+        exercise = found.key
 
     target_pace = None
     raw_target_pace = raw_step.get("target_pace")
@@ -156,6 +177,7 @@ def _validate_step(label: str, raw_step: Any, errors: list[str]) -> Step | None:
         duration_value=float(duration_value),
         target_pace=target_pace,
         note=note,
+        exercise=exercise,
     )
 
 
@@ -410,6 +432,8 @@ def _step_out(step: Step) -> dict[str, Any]:
         )
     if step.note:
         out["note"] = step.note
+    if step.exercise:
+        out["exercise"] = step.exercise
     return out
 
 

@@ -67,6 +67,7 @@ class StepIn(BaseModel):
     duration_value: float
     target_pace: PaceTargetIn | None = None
     note: str | None = None
+    exercise: str | None = None
 
     def to_model(self) -> models.Step:
         return models.Step(
@@ -75,6 +76,7 @@ class StepIn(BaseModel):
             duration_value=self.duration_value,
             target_pace=self.target_pace.to_model() if self.target_pace else None,
             note=self.note,
+            exercise=self.exercise,
         )
 
 
@@ -84,6 +86,7 @@ class StepOut(BaseModel):
     duration_value: float
     target_pace: PaceTargetOut | None = None
     note: str | None = None
+    exercise: str | None = None
 
     @classmethod
     def from_model(cls, step: models.Step) -> "StepOut":
@@ -93,6 +96,7 @@ class StepOut(BaseModel):
             duration_value=step.duration_value,
             target_pace=PaceTargetOut.from_model(step.target_pace),
             note=step.note,
+            exercise=step.exercise,
         )
 
 

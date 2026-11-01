@@ -31,3 +31,6 @@ garmin-training-import = "training_plan.cli:main"
 
 [tool.setuptools]
 packages = ["training_plan"]
+
+[tool.setuptools.package-data]
+training_plan = ["data/*.json"]

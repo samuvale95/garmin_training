@@ -19,6 +19,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from . import db, plan_generator, plan_store
+from .models import SECONDS_PER_REP
 from .models import SUPPORTED_SPORTS, SUPPORTED_STEP_TYPES, SUPPORTED_DURATION_TYPES
 from .parser import parse_sessions, _validate_goal
 
@@ -321,6 +322,8 @@ def _known_minutes(session):
             total += value * item["reps"]
         elif item["duration_type"] == "time":
             total += item["duration_value"]
+        elif item["duration_type"] == "reps":
+            total += item["duration_value"] * SECONDS_PER_REP / 60
         elif item["duration_type"] == "distance" and item.get("target_pace"):
             p = item["target_pace"]
             total += item["duration_value"] * p["slower_sec_per_km"]/60
