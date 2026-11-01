@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton, Skeleton } from "@/components/motion/primitives";
 import { useRequirePlan } from "@/lib/guards";
@@ -42,17 +41,14 @@ export default function DiffPage() {
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
       <div style={{ padding: "24px 22px 16px", background: "var(--crema)", position: "sticky", top: 0, zIndex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <PageHeader backHref="/import" />
-            <BrandMark height={22} forceStatic stillZone />
-          </div>
-          <span style={{ fontSize: 11, color: "var(--inchiostro-35)", fontWeight: 500 }}>fermo · stai decidendo</span>
+          <PageHeader backHref="/week" />
+          <span style={{ fontSize: 13, color: "var(--inchiostro-70)", fontWeight: 500 }}>Nulla è ancora stato inviato</span>
         </div>
-        <h1 style={{ font: "600 30px/1.04 var(--font-sans)", letterSpacing: "-.035em", margin: "16px 0 6px" }}>
-          {diff ? `${capitalize(numberToItalianWords(diff.to_create.length + diff.changed.length))} differenze` : "Differenze"}
+        <h1 className="page-title" style={{ fontSize: "var(--text-3xl)", margin: "12px 0 6px" }}>
+          {diff ? `${capitalize(numberToItalianWords(diff.to_create.length + diff.changed.length))} ${diff.to_create.length + diff.changed.length === 1 ? "modifica da inviare" : "modifiche da inviare"}` : "Modifiche da inviare"}
         </h1>
         <p className="font-serif-italic" style={{ fontSize: 15.5, color: "var(--inchiostro-70)", margin: "0 0 14px" }}>
-          Il file e il calendario non dicono la stessa cosa. Scegli tu cosa vince.
+          Il piano nell’app e il calendario Garmin non coincidono. Controlla cosa cambierà sull’orologio prima di confermare.
         </p>
         {diff && (
           <div style={{ display: "flex", gap: 8 }}>
@@ -92,7 +88,7 @@ export default function DiffPage() {
           state={!diff || diff.to_create.length === 0 ? "disabled" : startSync.isPending ? "loading" : "idle"}
           onClick={writeNewOnly}
         >
-          {diff ? `Scrivi le ${diff.to_create.length} nuove` : "Calcolo..."}
+          {diff ? (diff.to_create.length === 1 ? "Invia a Garmin la nuova seduta" : `Invia a Garmin le ${diff.to_create.length} nuove sedute`) : "Confronto in corso…"}
         </PrimaryButton>
         {diff && diff.changed.length > 0 && (
           <button data-track="diff.reviewchanged"
@@ -101,7 +97,7 @@ export default function DiffPage() {
             className="tap-target"
             style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", color: "var(--inchiostro-50)", fontSize: 13, fontWeight: 600, marginTop: 12, cursor: "pointer" }}
           >
-            Poi parliamo delle {numberToItalianWords(diff.changed.length)} cambiate
+            Controlla le {numberToItalianWords(diff.changed.length)} sedute modificate
           </button>
         )}
       </div>
@@ -132,13 +128,13 @@ function SessionCard({ kind, session }: { kind: "new" | "same"; session: Trainin
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
         <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{session.title}</p>
-        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>{formatShortDate(session.date)}</span>
+        <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{formatShortDate(session.date)}</span>
       </div>
       {summary && (
-        <p className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>{summary}</p>
+        <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>{summary}</p>
       )}
       {kind === "new" && (
-        <p style={{ fontSize: 11, color: "var(--verde-tratto-scuro)", margin: "6px 0 0" }}>nuova · la creo</p>
+        <p style={{ fontSize: 12, color: "var(--verde-tratto-scuro)", margin: "6px 0 0" }}>nuova · la creo</p>
       )}
     </div>
   );
@@ -150,7 +146,7 @@ function ChangedCard({ session, previousTitle }: { session: TrainingSession; pre
     <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-row)", borderLeft: "4px solid var(--giallo)", padding: 14 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
         <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{session.title}</p>
-        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>{formatShortDate(session.date)}</span>
+        <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{formatShortDate(session.date)}</span>
       </div>
       <p className="font-mono" style={{ fontSize: 13, color: "var(--rosso-avviso)", textDecoration: "line-through", margin: "0 0 2px" }}>
         era {previousTitle}
@@ -158,7 +154,7 @@ function ChangedCard({ session, previousTitle }: { session: TrainingSession; pre
       <p className="font-mono" style={{ fontSize: 13, color: "var(--verde-tratto-scuro)", margin: 0 }}>
         ora {session.title}{summary ? ` · ${summary}` : ""}
       </p>
-      <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>cambiata · cancello e ricreo</p>
+      <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "6px 0 0" }}>cambiata · cancello e ricreo</p>
     </div>
   );
 }

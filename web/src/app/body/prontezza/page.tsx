@@ -71,7 +71,7 @@ export default function ReadinessPage() {
               <p className="font-mono" style={{ fontSize: 25, fontWeight: 500, margin: 0 }}>{score}</p>
             </ProgressRing>
             <div style={{ minWidth: 0 }}>
-              <p className="font-mono" style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", opacity: 0.7, margin: 0 }}>
+              <p className="font-mono" style={{ fontSize: 12, opacity: 0.7, margin: 0 }}>
                 su 100
               </p>
               <p style={{ font: "600 22px/1.15 var(--font-sans)", letterSpacing: "-.02em", margin: "6px 0 0" }}>
@@ -125,7 +125,7 @@ export default function ReadinessPage() {
           {data?.readiness_factors && data.readiness_factors.length > 0 && (
             <Section title="Da cosa nasce il tuo">
               <ReadinessFactorList factors={data.readiness_factors} />
-              <p style={{ fontSize: 11.5, color: "var(--inchiostro-35)", margin: "10px 0 0", lineHeight: 1.45 }}>
+              <p style={{ fontSize: 12.5, color: "var(--inchiostro-35)", margin: "10px 0 0", lineHeight: 1.45 }}>
                 Sono i pesi che l&apos;orologio dichiara per ciascun ingrediente: più la barra è
                 piena, più quell&apos;ingrediente ti sta aiutando oggi.
               </p>
@@ -189,7 +189,7 @@ export default function ReadinessPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginTop: 22 }}>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
         {title}
       </span>
       <div style={{ marginTop: 10 }}>{children}</div>

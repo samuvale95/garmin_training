@@ -44,7 +44,7 @@ export function TodayVitalStrip({
             }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 11, fontWeight: 500, color: "var(--inchiostro-50)" }}>Prontezza</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)" }}>Prontezza</span>
               <span
                 style={{
                   width: 7,
@@ -65,7 +65,7 @@ export function TodayVitalStrip({
               <span className="font-mono" style={{ fontSize: 19, fontWeight: 600, color: "var(--inchiostro)" }}>
                 {readinessScore ?? "—"}
               </span>
-              <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>/100</span>
+              <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>/100</span>
             </div>
           </motion.div>
         </Link>
@@ -86,7 +86,7 @@ export function TodayVitalStrip({
             }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 11, fontWeight: 500, color: "var(--inchiostro-50)" }}>Sonno</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)" }}>Sonno</span>
               <MoonIcon size={12} strokeWidth={2} style={{ color: "var(--inchiostro-50)" }} />
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 2, marginTop: 2 }}>
@@ -119,14 +119,14 @@ export function TodayVitalStrip({
             }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 11, fontWeight: 500, color: "var(--inchiostro-50)" }}>Carbo</span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--corallo-accent)" }}>{carbPercent}%</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)" }}>Carbo</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--corallo-accent)" }}>{carbPercent}%</span>
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 2, marginTop: 2 }}>
               <span className="font-mono" style={{ fontSize: 18, fontWeight: 600, color: "var(--inchiostro)" }}>
                 {carbLoggedG ?? 0}
               </span>
-              <span className="font-mono" style={{ fontSize: 10.5, color: "var(--inchiostro-50)" }}>/{avgCarbTarget}g</span>
+              <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>/{avgCarbTarget}g</span>
             </div>
           </motion.div>
         </Link>

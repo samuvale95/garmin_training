@@ -121,7 +121,7 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
         >
           <BrandMark height={20} forceStatic={!refreshing} />
           {refreshing && (
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--inchiostro-50)" }}>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--inchiostro-50)" }}>
               Aggiornamento...
             </span>
           )}

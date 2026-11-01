@@ -5,3 +5,6 @@ __pycache__/
 .garmin_training_tokens
 *.egg-info/
 .DS_Store
+
+# Local prod credentials (Render API key, read-only DB URL)
+prod.env

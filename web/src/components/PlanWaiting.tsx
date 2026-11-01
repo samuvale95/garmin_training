@@ -81,7 +81,7 @@ export function PlanWaiting({ startedAt }: { startedAt: number }) {
       <p className="font-serif-italic" style={{ fontSize: 14, margin: 0, textAlign: "center" }}>
         {phaseAt(seconds)}…
       </p>
-      <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: 0 }}>
+      <p className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: 0 }}>
         {elapsedLabel(seconds)} · di solito meno di un minuto
       </p>
     </div>

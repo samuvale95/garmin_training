@@ -45,7 +45,7 @@ export default function LoginPage() {
         </div>
         <span
           style={{
-            fontSize: 11.5,
+            fontSize: 12.5,
             fontWeight: 600,
             background: "var(--sabbia-chip)",
             color: "var(--inchiostro-70)",
@@ -160,7 +160,7 @@ export default function LoginPage() {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>Adattamento reale</p>
-              <p style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>Se sei stanco o hai dolore, il piano scala</p>
+              <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>Se sei stanco o hai dolore, il piano scala</p>
             </div>
           </div>
 
@@ -180,7 +180,7 @@ export default function LoginPage() {
             <WatchIcon size={20} strokeWidth={1.8} style={{ color: "var(--azzurro-scuro)", flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>Garmin & Strava</p>
-              <p style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>Sincronizzazione automatica delle attività</p>
+              <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>Sincronizzazione automatica delle attività</p>
             </div>
           </div>
         </div>

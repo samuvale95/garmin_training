@@ -45,8 +45,6 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
                 fontSize: 12,
                 fontWeight: 700,
                 margin: 0,
-                textTransform: "uppercase",
-                letterSpacing: ".05em",
                 color: "#4338ca",
               }}
             >
@@ -55,7 +53,7 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
           </div>
           <span
             style={{
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
               padding: "3px 10px",
               borderRadius: "var(--radius-pill)",
@@ -100,12 +98,12 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#4338ca" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#4338ca" }}>
                     {ins.title}
                   </span>
                   <span
                     style={{
-                      fontSize: 10.5,
+                      fontSize: 12,
                       fontWeight: 700,
                       color: sig.color,
                       background: sig.bg,
@@ -124,7 +122,7 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
                 {/* Comparison chips */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, margin: "10px 0" }}>
                   <div style={{ background: "rgba(16, 185, 129, 0.08)", padding: "10px 12px", borderRadius: "var(--radius-card)", border: "1px solid rgba(16, 185, 129, 0.2)" }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: "#047857", textTransform: "uppercase" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#047857", }}>
                       {ins.good_band_label}
                     </span>
                     <p className="font-mono" style={{ fontSize: 14, fontWeight: 700, margin: "3px 0 0", color: "#064e3b" }}>
@@ -132,7 +130,7 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
                     </p>
                   </div>
                   <div style={{ background: "rgba(239, 68, 68, 0.06)", padding: "10px 12px", borderRadius: "var(--radius-card)", border: "1px solid rgba(239, 68, 68, 0.18)" }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: "#b91c1c", textTransform: "uppercase" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#b91c1c", }}>
                       {ins.bad_band_label}
                     </span>
                     <p className="font-mono" style={{ fontSize: 14, fontWeight: 700, margin: "3px 0 0", color: "#7f1d1d" }}>
@@ -190,7 +188,7 @@ export function PersonalCorrelationsCard({ data, animate = true, delayMs = 0 }: 
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    fontSize: 11.5,
+                    fontSize: 12.5,
                   }}
                 >
                   <div>

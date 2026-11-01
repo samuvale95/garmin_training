@@ -41,8 +41,6 @@ export function ZoneRecalibrationCard({ data, animate = true, delayMs = 0 }: Zon
               fontSize: 12,
               fontWeight: 700,
               margin: 0,
-              textTransform: "uppercase",
-              letterSpacing: ".05em",
               color: "var(--inchiostro-50)",
             }}
           >
@@ -50,7 +48,7 @@ export function ZoneRecalibrationCard({ data, animate = true, delayMs = 0 }: Zon
           </p>
           <span
             style={{
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
               padding: "3px 10px",
               borderRadius: "var(--radius-pill)",
@@ -67,7 +65,7 @@ export function ZoneRecalibrationCard({ data, animate = true, delayMs = 0 }: Zon
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, margin: "14px 0" }}>
             {/* LTHR Card */}
             <div style={{ background: "rgba(249, 115, 22, 0.08)", padding: 14, borderRadius: "var(--radius-card)" }}>
-              <span style={{ fontSize: 11, color: "#c2410c", fontWeight: 700, textTransform: "uppercase" }}>
+              <span style={{ fontSize: 12, color: "#c2410c", fontWeight: 700, }}>
                 Soglia FC (LTHR)
               </span>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "4px 0 2px" }}>
@@ -76,7 +74,7 @@ export function ZoneRecalibrationCard({ data, animate = true, delayMs = 0 }: Zon
                 </p>
                 <span style={{ fontSize: 13, color: "#7c2d12", fontWeight: 600 }}>bpm</span>
               </div>
-              <span style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
+              <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
                 {data.diff_lthr_bpm != null
                   ? `${data.diff_lthr_bpm >= 0 ? "+" : ""}${data.diff_lthr_bpm} bpm rispetto a Garmin`
                   : "stima su corse recenti"}
@@ -85,13 +83,13 @@ export function ZoneRecalibrationCard({ data, animate = true, delayMs = 0 }: Zon
 
             {/* Threshold Pace Card */}
             <div style={{ background: "rgba(59, 130, 246, 0.08)", padding: 14, borderRadius: "var(--radius-card)" }}>
-              <span style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700, textTransform: "uppercase" }}>
+              <span style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 700, }}>
                 Passo Soglia
               </span>
               <p className="font-mono" style={{ fontSize: 28, fontWeight: 800, margin: "4px 0 2px", color: "#1e3a8a" }}>
                 {data.estimated_threshold_pace_formatted}
               </p>
-              <span style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
+              <span style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
                 ritmo anaerobico sostenibile
               </span>
             </div>
@@ -115,7 +113,7 @@ export function ZoneRecalibrationCard({ data, animate = true, delayMs = 0 }: Zon
         {/* Supporting activities */}
         {data.supporting_workouts.length > 0 && (
           <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(34, 34, 34, 0.06)" }}>
-            <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--inchiostro-50)", margin: "0 0 6px" }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)", margin: "0 0 6px" }}>
               Sedute che hanno evidenziato la soglia:
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -163,7 +161,7 @@ export function ZoneRecalibrationCard({ data, animate = true, delayMs = 0 }: Zon
             border: "1px solid rgba(34, 34, 34, 0.06)",
           }}
         >
-          <p style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "var(--inchiostro-50)", margin: "0 0 10px" }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)", margin: "0 0 10px" }}>
             Le tue 5 zone ricalibrate
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -192,7 +190,7 @@ export function ZoneRecalibrationCard({ data, animate = true, delayMs = 0 }: Zon
                       </span>
                     </div>
                   </div>
-                  <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>
+                  <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>
                     {z.description}
                   </p>
                 </div>

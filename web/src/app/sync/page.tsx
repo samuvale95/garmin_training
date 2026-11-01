@@ -63,7 +63,7 @@ function SyncScreenInner() {
           <PageHeader color="var(--crema)" />
           <BrandMark height={26} color="var(--crema)" />
         </div>
-        <span style={{ fontSize: 11, color: "var(--inchiostro-su-scuro)", fontWeight: 500 }}>scrivo su Garmin</span>
+        <span style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", fontWeight: 500 }}>scrivo su Garmin</span>
       </div>
 
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 24 }}>
@@ -98,7 +98,7 @@ function SyncScreenInner() {
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <StatusDot kind={item.status === "ok" ? "success" : item.status === "failed" ? "error" : "in_progress"} />
               <span style={{ fontSize: 13, flex: 1 }}>{item.title}</span>
-              <span className="font-mono" style={{ fontSize: 11, color: item.status === "failed" ? "var(--corallo-chiaro)" : "var(--inchiostro-su-scuro)" }}>{statusLabel}</span>
+              <span className="font-mono" style={{ fontSize: 12, color: item.status === "failed" ? "var(--corallo-chiaro)" : "var(--inchiostro-su-scuro)" }}>{statusLabel}</span>
             </div>
           );
         })}
@@ -121,7 +121,7 @@ function Count({ value, label, color }: { value: number; label: string; color: s
   return (
     <div>
       <p style={{ font: "600 20px/1 var(--font-sans)", color, margin: "0 0 2px" }}>{value}</p>
-      <p style={{ fontSize: 11, color: "var(--inchiostro-su-scuro)", margin: 0 }}>{label}</p>
+      <p style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: 0 }}>{label}</p>
     </div>
   );
 }

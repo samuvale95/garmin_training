@@ -39,7 +39,7 @@ export default function ConfirmDeletionsPage() {
           <PageHeader backHref="/diff" color="var(--rosso-forte)" />
           <BrandMark height={22} color="var(--rosso-forte)" forceStatic stillZone />
         </div>
-        <span style={{ fontSize: 11, color: "var(--rosa-testo-50)", fontWeight: 500 }}>fermo · azione irreversibile</span>
+        <span style={{ fontSize: 12, color: "var(--rosa-testo-50)", fontWeight: 500 }}>fermo · azione irreversibile</span>
       </div>
 
       <h1 style={{ font: "600 28px/1.1 var(--font-sans)", color: "var(--rosso-testo)", letterSpacing: "-.03em", margin: "20px 0 8px" }}>
@@ -59,7 +59,7 @@ export default function ConfirmDeletionsPage() {
                   <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{change.session.title}</p>
                   <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>{formatShortDate(change.session.date)}</span>
                 </div>
-                <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>mai eseguita</p>
+                <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "2px 0 0" }}>mai eseguita</p>
               </div>
             ))}
           </div>

@@ -528,7 +528,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       />
 
       <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 14 }}>
-        <span style={{ display: "block", fontSize: 11, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--inchiostro-50)", marginBottom: 8 }}>
+        <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)", marginBottom: 8 }}>
           Titolo
         </span>
         <input
@@ -539,7 +539,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
         />
 
         <div style={{ marginTop: 14 }}>
-          <span style={{ display: "block", fontSize: 11, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--inchiostro-50)", marginBottom: 6 }}>
+          <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)", marginBottom: 6 }}>
             Priorità sessione
           </span>
           <div style={{ display: "flex", gap: 6 }}>
@@ -582,7 +582,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       </div>
 
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 20 }}>
-        <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>Struttura</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)" }}>Struttura</span>
         <span style={{ display: "flex", gap: 14 }}>
           <button data-track="workout-editor.addblock" type="button" onClick={addBlock} className="tap-target" style={{ background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             + blocco
@@ -666,7 +666,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       </Reorder.Group>
 
       <div style={{ marginTop: 20 }}>
-        <span style={{ display: "block", fontSize: 11, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--inchiostro-50)", marginBottom: 8 }}>
+        <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)", marginBottom: 8 }}>
           Note libere
         </span>
         <textarea
@@ -790,7 +790,7 @@ function DayField({
 
   return (
     <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 16, marginTop: 18 }}>
-      <span style={{ display: "block", fontSize: 11, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--inchiostro-50)", marginBottom: 8 }}>
+      <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)", marginBottom: 8 }}>
         Giorno
       </span>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -862,7 +862,7 @@ function StepRow({
       {draggable && <span aria-hidden="true" style={{ opacity: 0.5, fontSize: 14 }}>⠿</span>}
       <span style={{ flex: 1 }}>
         <span style={{ display: "block", fontSize: 13.5, fontWeight: 600 }}>{stepTypeLabel(step.type)}</span>
-        <span className="font-mono" style={{ display: "block", fontSize: 11.5, opacity: 0.8, marginTop: 2 }}>{stepSummary(step)}</span>
+        <span className="font-mono" style={{ display: "block", fontSize: 12.5, opacity: 0.8, marginTop: 2 }}>{stepSummary(step)}</span>
       </span>
       <button data-track="workout-editor.onedit"
         type="button"
@@ -1164,7 +1164,7 @@ const selectStyle: React.CSSProperties = {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label style={{ display: "block" }}>
-      <span style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--inchiostro-50)", marginBottom: 6 }}>{label}</span>
+      <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)", marginBottom: 6 }}>{label}</span>
       {children}
     </label>
   );

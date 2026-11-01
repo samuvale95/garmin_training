@@ -147,7 +147,7 @@ export default function BodySettingsPage() {
               <div style={{ display: "flex", alignItems: "flex-end", gap: 24 }}>
                 {metrics?.height_cm != null && (
                   <div>
-                    <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "0 0 2px" }}>altezza</p>
+                    <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "0 0 2px" }}>altezza</p>
                     <p className="font-mono" style={{ fontSize: 17, margin: 0 }}>
                       {metrics.height_cm} <span style={{ fontSize: 12 }}>cm</span>
                     </p>
@@ -155,7 +155,7 @@ export default function BodySettingsPage() {
                 )}
                 {age != null && (
                   <div>
-                    <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "0 0 2px" }}>età</p>
+                    <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "0 0 2px" }}>età</p>
                     <p className="font-mono" style={{ fontSize: 17, margin: 0 }}>{age}</p>
                   </div>
                 )}
@@ -205,7 +205,7 @@ export default function BodySettingsPage() {
         <SlideUp active={animate} delayMs={260} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 18, marginTop: 12, display: "flex", alignItems: "flex-end", gap: 24 }}>
           {metrics?.height_cm != null && (
             <div>
-              <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "0 0 2px" }}>altezza</p>
+              <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "0 0 2px" }}>altezza</p>
               <p className="font-mono" style={{ fontSize: 17, margin: 0 }}>
                 {metrics.height_cm} <span style={{ fontSize: 12 }}>cm</span>
               </p>
@@ -213,7 +213,7 @@ export default function BodySettingsPage() {
           )}
           {age != null && (
             <div>
-              <p style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "0 0 2px" }}>età</p>
+              <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "0 0 2px" }}>età</p>
               <p className="font-mono" style={{ fontSize: 17, margin: 0 }}>{age}</p>
             </div>
           )}

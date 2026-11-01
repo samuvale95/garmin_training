@@ -78,7 +78,7 @@ page.on('request',async req=>{
  else{unknown.add(path);status=404;data={category:'server_error',message:'Fixture non disponibile',details:[]};}
  return req.respond({status,contentType:'application/json',headers:{'access-control-allow-origin':origin},body:JSON.stringify(data)});
 });
-const go=async path=>{await page.goto(origin+path,{waitUntil:'networkidle0',timeout:60000});await page.waitForSelector('.workspace, .page-back',{timeout:15000});};
+const go=async path=>{await page.goto(origin+path,{waitUntil:'networkidle0',timeout:60000});await page.waitForSelector('.frame, .page-back',{timeout:15000});};
 const screenshot=async name=>{await new Promise(r=>setTimeout(r,500));await page.screenshot({path:`${output}/${name}.png`,fullPage:false});};
 const text=()=>page.evaluate(()=>document.body.innerText);
 const click=async selector=>{

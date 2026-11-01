@@ -55,7 +55,7 @@ export function WeekStrip({ currentDateKey, sessions, active = true }: WeekStrip
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, padding: "0 4px" }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--inchiostro-50)", letterSpacing: ".04em", textTransform: "uppercase" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro-50)", }}>
             Questa Settimana
           </span>
           <Link data-track="week-strip.week"
@@ -94,7 +94,7 @@ export function WeekStrip({ currentDateKey, sessions, active = true }: WeekStrip
                     position: "relative",
                   }}
                 >
-                  <span style={{ fontSize: 10, fontWeight: 600, opacity: item.isToday ? 0.75 : 0.45 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, opacity: item.isToday ? 0.75 : 0.45 }}>
                     {item.weekday}
                   </span>
                   <span className="font-mono" style={{ fontSize: 14, fontWeight: 700, margin: "2px 0 3px" }}>

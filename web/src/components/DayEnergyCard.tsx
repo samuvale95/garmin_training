@@ -48,7 +48,7 @@ export function DayEnergyCard({ energy, numbers, animate, delayMs = 0 }: { energ
         </div>
       )}
       {numbers && energy.spent_source === "garmin" && (
-        <p className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)", margin: "8px 0 0" }}>
+        <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "8px 0 0" }}>
           la nostra stima: {energy.estimate_kcal} kcal (riposo {energy.estimate_bmr_kcal}, attività {energy.activities_kcal}, passi {energy.estimate_steps_kcal})
         </p>
       )}
@@ -67,9 +67,9 @@ export function DayEnergyCard({ energy, numbers, animate, delayMs = 0 }: { energ
 function Figure({ label, value, muted = false }: { label: string; value: number; muted?: boolean }) {
   return (
     <div style={{ flex: 1, background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 12, opacity: muted ? 0.6 : 1 }}>
-      <p style={{ font: "500 11px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>{label}</p>
+      <p style={{ font: "500 12px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>{label}</p>
       <p className="font-mono" style={{ fontSize: 20, fontWeight: 500, margin: "6px 0 0" }}>
-        {value} <span style={{ fontSize: 11 }}>kcal</span>
+        {value} <span style={{ fontSize: 12 }}>kcal</span>
       </p>
     </div>
   );

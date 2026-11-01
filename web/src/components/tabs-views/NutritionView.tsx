@@ -3,11 +3,11 @@
 import { dis } from "@/lib/disabled";
 import { markFlowComplete, useFlowTracking } from "@/lib/useTracking";
 import { useRef, useState, type ChangeEvent } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { safeReturnHref } from "@/lib/navigation";
-import { PulseRing, Skeleton, SlideUp } from "@/components/motion/primitives";
-import { ChevronRight, ArrowRight, PencilIcon, CameraIcon, UtensilsIcon } from "@/components/Icons";
+import { Skeleton } from "@/components/motion/primitives";
+import { EmptyState, RowLink } from "@/components/ui";
+import { ChevronLeft, ChevronRight, PencilIcon, CameraIcon, UtensilsIcon } from "@/components/Icons";
 import { FuelCorrectionSheet, PortionPicker, macroAtPortion } from "@/components/FuelCorrectionSheet";
 import { DayEnergyCard } from "@/components/DayEnergyCard";
 import { MealList } from "@/components/FuelBlocks";
@@ -243,17 +243,110 @@ export function NutritionView() {
   const entries = day?.entries ?? [];
   const narrative = narrativeQuery.data?.text;
 
+  const isToday = today === calendarToday;
   return (
     <PullToRefresh onRefresh={() => refreshMutation.mutateAsync()}>
-      <div className="workspace-page">
-        <header className="workspace-heading"><div><h1>Nutrizione</h1><p>Indicazioni e registrazioni della tua giornata.</p></div></header>
-        <div className="nutrition-date"><button className="ux-button" aria-label="Giorno precedente" data-track="nutrition.previous-day" onClick={() => setDay(shiftDateKey(today, -1))}>‹</button><label className="ux-field">Giornata<input type="date" value={today} onChange={e => setDay(e.target.value)} data-track="nutrition.date" /></label><button className="ux-button" aria-label="Giorno successivo" data-track="nutrition.next-day" onClick={() => setDay(shiftDateKey(today, 1))}>›</button></div>
-        <p className="ux-muted">{formatFullDate(today)}{today === calendarToday ? " · Oggi" : ""}</p>
-        <nav className="section-nav" aria-label="Sezioni nutrizione"><a href={`/nutrition?date=${today}&view=plan`} aria-current={view === "plan" ? "page" : undefined} onClick={e => { e.preventDefault(); setView("plan"); }} data-track="nutrition.plan">Piano del giorno</a><a href={`/nutrition?date=${today}&view=diary`} aria-current={view === "diary" ? "page" : undefined} onClick={e => { e.preventDefault(); setView("diary"); }} data-track="nutrition.diary">Diario</a></nav>
-        <button className="ux-button ux-button-primary" data-track="nutrition.register-meal" onClick={() => setLogOpen(true)}>Registra pasto</button>
+      <div className="page">
+        <header className="page-head">
+          <div>
+            <h1 className="page-title">Nutrizione</h1>
+            <p className="page-sub">Cosa è indicato e cosa hai registrato, giorno per giorno.</p>
+          </div>
+          <div className="page-actions">
+            <button className="btn" data-variant="primary" data-track="nutrition.register-meal" onClick={() => setLogOpen(true)}>
+              <UtensilsIcon size={16} aria-hidden="true" />
+              Registra pasto
+            </button>
+          </div>
+        </header>
+
+        <div className="week-nav" role="group" aria-label="Giornata">
+          <button className="icon-btn" aria-label="Giorno precedente" data-track="nutrition.previous-day" onClick={() => setDay(shiftDateKey(today, -1))}>
+            <ChevronLeft size={18} aria-hidden="true" />
+          </button>
+          <button className="icon-btn" aria-label="Giorno successivo" data-track="nutrition.next-day" onClick={() => setDay(shiftDateKey(today, 1))}>
+            <ChevronRight size={18} aria-hidden="true" />
+          </button>
+          <p className="week-nav-range" style={{ margin: 0 }} aria-live="polite">
+            {formatFullDate(today)}
+            <small>{isToday ? "Oggi" : "Giornata selezionata"}</small>
+          </p>
+          <label className="field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <span className="sr-only">Scegli la giornata</span>
+            <input type="date" value={today} onChange={(e) => setDay(e.target.value)} data-track="nutrition.date" style={{ minHeight: 40, width: "auto" }} />
+          </label>
+          {!isToday && <button className="btn" data-size="sm" onClick={() => setDay(calendarToday)} data-track="nutrition.today">Oggi</button>}
+        </div>
+
+        <nav className="subnav" aria-label="Sezioni nutrizione">
+          <a href={`/nutrition?date=${today}&view=plan`} aria-current={view === "plan" ? "page" : undefined} onClick={(e) => { e.preventDefault(); setView("plan"); }} data-track="nutrition.plan">Piano del giorno</a>
+          <a href={`/nutrition?date=${today}&view=diary`} aria-current={view === "diary" ? "page" : undefined} onClick={(e) => { e.preventDefault(); setView("diary"); }} data-track="nutrition.diary">Diario</a>
+        </nav>
+
         {mealError && <p className="ux-error" role="alert">{mealError.message || "La registrazione non è riuscita. I dati inseriti restano disponibili: riprova."}</p>}
-        {logOpen && <section className="meal-entry-picker" aria-label="Registra pasto"><div className="program-topline"><h2 className="ux-section-title">Pasto del {formatFullDate(logDate)}</h2><button className="ux-button" data-track="nutrition.close-registration" onClick={() => { setLogOpen(false); if (from) router.push(from); }}>Annulla</button></div><p className="ux-muted">Scegli come inserirlo. Potrai verificare porzioni e valori prima di confermare.</p><div className="ux-actions"><button className="ux-button" data-track="nutrition.photo" {...dis(logPhoto.isPending, "in_caricamento")} onClick={openCamera}><CameraIcon size={18} />Foto</button><button className="ux-button" data-track="nutrition.text-manual" onClick={() => setFlow({ kind: "compose" })}><PencilIcon size={18} />Testo o valori manuali</button></div></section>}
-        {view === "plan" ? fuelQuery.isError ? <div role="alert" className="ux-error"><p>Le indicazioni non sono disponibili. Puoi continuare a registrare i pasti nel Diario.</p><button className="ux-button" data-track="nutrition.retry-plan" {...dis(fuelQuery.isFetching, "in_caricamento")} onClick={() => fuelQuery.refetch()}>Riprova</button></div> : !fuel ? <Skeleton height={180} /> : <section className="nutrition-plan"><p className="ux-muted">Queste sono indicazioni per la giornata, non pasti già consumati. Gli orari degli allenamenti sono previsti.</p><FuelDayPlan fuel={fuel} status={statusQuery.data} narrative={narrative} training={training} animate={animate} /></section> : <section aria-label="Pasti registrati"><h2 className="ux-section-title">Pasti registrati</h2>{dayQuery.isPending ? <Skeleton height={100} /> : dayQuery.isError ? <div className="ux-error" role="alert"><p>Il diario non è disponibile.</p><button className="ux-button" data-track="nutrition.retry-diary" {...dis(dayQuery.isFetching, "in_caricamento")} onClick={() => dayQuery.refetch()}>Riprova</button></div> : entries.length ? <MealList entries={entries} animate={animate} onSelect={setCorrecting} /> : <div className="ux-empty"><h3>Nessun pasto registrato</h3><p>Questo diario mostra solo ciò che hai inserito. L’assenza di registrazioni non indica che tu non abbia mangiato.</p></div>}{showEnergy && dayEnergy.data && <DayEnergyCard energy={dayEnergy.data} numbers={true} animate={animate} delayMs={0} />}<div className="ux-actions"><Link className="ux-button" data-track="nutrition.diary-history" href={`/body/fuel/diario?from=${encodeURIComponent(`/nutrition?date=${today}&view=diary`)}`}>Storico delle registrazioni</Link></div></section>}
+
+        {logOpen && (
+          <section className="card" aria-labelledby="meal-entry-title" style={{ marginBottom: 20 }}>
+            <div className="section-head">
+              <h2 className="section-title" id="meal-entry-title">Registra un pasto di {isToday ? "oggi" : formatFullDate(logDate)}</h2>
+              <button className="btn" data-variant="quiet" data-size="sm" data-track="nutrition.close-registration" onClick={() => { setLogOpen(false); if (from) router.push(from); }}>Annulla</button>
+            </div>
+            <p className="card-text" style={{ marginTop: 0 }}>Scegli come inserirlo. Prima di salvare potrai correggere porzioni e valori.</p>
+            <div className="actions">
+              <button className="btn" data-track="nutrition.photo" {...dis(logPhoto.isPending, "in_caricamento")} onClick={openCamera}><CameraIcon size={18} aria-hidden="true" />Foto</button>
+              <button className="btn" data-track="nutrition.text-manual" onClick={() => setFlow({ kind: "compose" })}><PencilIcon size={18} aria-hidden="true" />Descrizione o valori</button>
+            </div>
+          </section>
+        )}
+
+        {view === "plan" ? (
+          fuelQuery.isError ? (
+            <div role="alert" className="ux-error">
+              <p>Le indicazioni non sono disponibili. Puoi continuare a registrare i pasti nel Diario.</p>
+              <button className="btn" data-size="sm" data-track="nutrition.retry-plan" {...dis(fuelQuery.isFetching, "in_caricamento")} onClick={() => fuelQuery.refetch()}>Riprova</button>
+            </div>
+          ) : !fuel ? (
+            <Skeleton height={220} radius={16} />
+          ) : (
+            <section aria-label="Indicazioni della giornata" className="stack">
+              <p className="muted" style={{ margin: 0, fontSize: "var(--text-sm)", maxWidth: "62ch" }}>
+                Indicazioni per la giornata, non pasti consumati. Gli orari degli allenamenti sono quelli previsti.
+              </p>
+              <FuelDayPlan fuel={fuel} status={statusQuery.data} narrative={narrative} training={training} animate={animate} />
+            </section>
+          )
+        ) : (
+          <section aria-labelledby="diary-title" className="split">
+            <div className="stack">
+              <h2 className="section-title" id="diary-title">Pasti registrati</h2>
+              {dayQuery.isPending ? (
+                <Skeleton height={120} radius={16} />
+              ) : dayQuery.isError ? (
+                <div className="ux-error" role="alert">
+                  <p>Il diario non è disponibile.</p>
+                  <button className="btn" data-size="sm" data-track="nutrition.retry-diary" {...dis(dayQuery.isFetching, "in_caricamento")} onClick={() => dayQuery.refetch()}>Riprova</button>
+                </div>
+              ) : entries.length ? (
+                <MealList entries={entries} animate={animate} onSelect={setCorrecting} />
+              ) : (
+                <EmptyState
+                  title="Nessun pasto registrato"
+                  actions={<button className="btn" data-track="nutrition.empty-register" onClick={() => setLogOpen(true)}>Registra pasto</button>}
+                >
+                  Il diario mostra solo ciò che hai inserito: l’assenza di registrazioni non significa che tu non abbia mangiato.
+                </EmptyState>
+              )}
+            </div>
+            <aside className="stack">
+              {showEnergy && dayEnergy.data && <DayEnergyCard energy={dayEnergy.data} numbers={true} animate={animate} delayMs={0} />}
+              <ul className="list">
+                <li>
+                  <RowLink href={`/body/fuel/diario?from=${encodeURIComponent(`/nutrition?date=${today}&view=diary`)}`} track="nutrition.diary-history" title="Storico delle registrazioni" meta="Tutti i giorni registrati, con totali e correzioni" />
+                </li>
+              </ul>
+            </aside>
+          </section>
+        )}
         <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={onFileSelected} style={{ display: "none" }} />
         {correcting && <FuelCorrectionSheet entry={correcting} onClose={() => setCorrecting(null)} />}
       </div>

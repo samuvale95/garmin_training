@@ -63,7 +63,7 @@ function ShoesScreen() {
 
       {retired.length > 0 && (
         <>
-          <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--inchiostro-50)", marginTop: 26 }}>
+          <p style={{ fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)", marginTop: 26 }}>
             Archiviate
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>

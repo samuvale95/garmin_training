@@ -138,7 +138,7 @@ export default function DayStatePage() {
         <PageHeader backHref="/today" />
         <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Stato del giorno</h1>
         {goal && (
-          <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "6px 12px" }}>
+          <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "6px 12px" }}>
             {countdownLabel(goal)}
           </span>
         )}
@@ -167,10 +167,8 @@ export default function DayStatePage() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span
                 style={{
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: 700,
-                  letterSpacing: ".06em",
-                  textTransform: "uppercase",
                   background: header.badgeBg,
                   color: header.badgeColor,
                   borderRadius: "var(--radius-pill)",
@@ -211,7 +209,7 @@ export default function DayStatePage() {
 
           {verdict.alternative && (
             <SlideUp active={animate} delayMs={260} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 18, marginTop: 12 }}>
-              <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
+              <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
                 in alternativa
               </p>
               <p style={{ font: "600 17px/1.25 var(--font-sans)", margin: "8px 0 0" }}>{verdict.alternative.label}</p>
@@ -219,7 +217,7 @@ export default function DayStatePage() {
                 {verdict.alternative.detail}
               </p>
               {verdict.phase && (
-                <p className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-35)", margin: "8px 0 0" }}>
+                <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-35)", margin: "8px 0 0" }}>
                   {goal ? `${goalTitle(goal)} ${countdownLabel(goal)} · ${verdict.phase}` : verdict.phase}
                 </p>
               )}
@@ -292,7 +290,7 @@ export default function DayStatePage() {
 function SignalList({ signals, animate }: { signals: DaySignal[]; animate: boolean }) {
   return (
     <div style={{ marginTop: 18 }}>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)" }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
         Cosa ho letto
       </span>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
@@ -308,7 +306,7 @@ function SignalList({ signals, animate }: { signals: DaySignal[]; animate: boole
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                 <p style={{ fontWeight: 600, fontSize: 14.5, margin: 0 }}>{signal.label}</p>
-                <span style={{ background: style.background, color: style.color, borderRadius: "var(--radius-pill)", padding: "3px 10px", fontSize: 10.5, fontWeight: 700, flex: "none" }}>
+                <span style={{ background: style.background, color: style.color, borderRadius: "var(--radius-pill)", padding: "3px 10px", fontSize: 12, fontWeight: 700, flex: "none" }}>
                   {style.label}
                 </span>
               </div>
@@ -331,7 +329,7 @@ const DEMAND_LABEL: Record<string, string> = {
 function SessionBlock({ verdict, animate }: { verdict: DayVerdict; animate: boolean }) {
   return (
     <SlideUp active={animate} delayMs={220} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 18, marginTop: 12 }}>
-      <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
+      <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
         oggi in programma
       </p>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 7 }}>
@@ -339,7 +337,7 @@ function SessionBlock({ verdict, animate }: { verdict: DayVerdict; animate: bool
           {verdict.session_title ?? "Niente, è un giorno di riposo"}
         </p>
         {verdict.session_demand && (
-          <span className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", flex: "none" }}>
+          <span className="font-mono" style={{ fontSize: 12.5, color: "var(--inchiostro-50)", flex: "none" }}>
             {DEMAND_LABEL[verdict.session_demand] ?? verdict.session_demand}
           </span>
         )}

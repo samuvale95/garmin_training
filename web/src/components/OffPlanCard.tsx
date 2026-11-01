@@ -1,7 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { SlideUp } from "@/components/motion/primitives";
 import type { StoredActivity } from "@/lib/types";
 
 const SOURCE_LABELS: Record<StoredActivity["source"], string> = {
@@ -13,41 +11,23 @@ const SOURCE_LABELS: Record<StoredActivity["source"], string> = {
 /** A workout done outside the plan -- a ride, a swim, tennis -- in its day on Settimana.
  * Not draggable and not editable: it already happened. It is here so the calendar
  * describes the week that took place, not only the one that was planned. */
-export function OffPlanCard({ activity, animate, delayMs }: { activity: StoredActivity; animate: boolean; delayMs: number }) {
+export function OffPlanCard({ activity }: { activity: StoredActivity; animate?: boolean; delayMs?: number }) {
   const details = [
-    `${Math.round(activity.minutes)}'`,
-    activity.distance_km ? `${activity.distance_km.toFixed(1)} km` : null,
+    `${Math.round(activity.minutes)} min`,
+    activity.distance_km ? `${activity.distance_km.toLocaleString("it-IT", { maximumFractionDigits: 1 })} km` : null,
     `${activity.kcal} kcal ${SOURCE_LABELS[activity.source]}`,
   ].filter(Boolean);
   return (
-    <SlideUp
-      active={animate}
-      delayMs={delayMs}
-      row
-    >
-      <motion.div
-        whileHover={{ y: -2, scale: 1.01 }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
-        style={{
-          border: "1.5px dashed var(--sabbia-bordo)",
-          borderRadius: "var(--radius-card)",
-          padding: "11px 14px",
-          background: "transparent",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {activity.title || activity.label}
-          </p>
-          <span className="font-mono" style={{ fontSize: 10, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--inchiostro-50)", flex: "none" }}>
-            fuori piano · {activity.label}
-          </span>
-        </div>
-        <p className="font-mono" style={{ fontSize: 11.5, color: "var(--inchiostro-50)", margin: "4px 0 0" }}>
-          {details.join(" · ")}
-        </p>
-      </motion.div>
-    </SlideUp>
+    <div className="session-card" data-offplan style={{ "--sport": "var(--line-strong)" } as React.CSSProperties}>
+      <span className="session-card-body">
+        <span className="session-card-top">
+          <span className="badge" data-tone="ok">Svolto fuori piano</span>
+          <span className="sport-tag" style={{ color: "var(--ink-2)" }}>{activity.label}</span>
+        </span>
+        <span className="session-card-title">{activity.title || activity.label}</span>
+        <span className="session-card-meta">{details.join(" · ")}</span>
+      </span>
+    </div>
   );
 }
 

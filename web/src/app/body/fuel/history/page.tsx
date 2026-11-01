@@ -110,7 +110,7 @@ export default function FuelHistoryPage() {
                 <p
                   key={day.date}
                   className="font-mono"
-                  style={{ flex: 1, textAlign: "center", fontSize: 11, color: day.isToday ? "var(--inchiostro)" : "var(--inchiostro-50)", fontWeight: day.isToday ? 700 : 400, margin: 0 }}
+                  style={{ flex: 1, textAlign: "center", fontSize: 12, color: day.isToday ? "var(--inchiostro)" : "var(--inchiostro-50)", fontWeight: day.isToday ? 700 : 400, margin: 0 }}
                 >
                   {day.label}
                 </p>
@@ -156,7 +156,7 @@ export default function FuelHistoryPage() {
         </>
       )}
 
-      <p style={{ textAlign: "center", fontSize: 11, color: "var(--inchiostro-35)", fontWeight: 500, marginTop: 26 }}>
+      <p style={{ textAlign: "center", fontSize: 12, color: "var(--inchiostro-35)", fontWeight: 500, marginTop: 26 }}>
         Orientamento sportivo generale, non un consiglio clinico.
       </p>
     </div>
@@ -165,7 +165,7 @@ export default function FuelHistoryPage() {
 
 function Legend({ color, label }: { color: string; label: string }) {
   return (
-    <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--inchiostro-50)" }}>
+    <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--inchiostro-50)" }}>
       <span style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
       {label}
     </span>

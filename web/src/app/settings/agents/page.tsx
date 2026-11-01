@@ -63,10 +63,8 @@ const card: React.CSSProperties = {
   boxShadow: "var(--shadow-airbnb-subtle)",
 };
 const label: React.CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 700,
-  letterSpacing: ".06em",
-  textTransform: "uppercase",
   color: "var(--inchiostro-50)",
 };
 const pill = (active: boolean): React.CSSProperties => ({
@@ -200,7 +198,7 @@ function ProposalCard({ proposal }: { proposal: AgentProposal }) {
 
   return (
     <div style={card} data-track="agents.proposal" data-interactive="false">
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 11.5, fontWeight: 600 }}>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12.5, fontWeight: 600 }}>
         <Tag>{proposal.severity}</Tag>
         <Tag>{CATEGORY_LABEL[proposal.category]}</Tag>
         <Tag>confidenza {Math.round(proposal.confidence * 100)}%</Tag>
@@ -438,7 +436,7 @@ function Json({ value }: { value: unknown }) {
   return (
     <pre
       className="font-mono"
-      style={{ fontSize: 11.5, background: "var(--sabbia)", borderRadius: 12, padding: 10, margin: "8px 0 0", overflowX: "auto", maxHeight: 280, whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+      style={{ fontSize: 12.5, background: "var(--sabbia)", borderRadius: 12, padding: 10, margin: "8px 0 0", overflowX: "auto", maxHeight: 280, whiteSpace: "pre-wrap", wordBreak: "break-word" }}
     >
       {JSON.stringify(value, null, 2)}
     </pre>

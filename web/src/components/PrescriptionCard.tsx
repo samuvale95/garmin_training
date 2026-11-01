@@ -57,7 +57,7 @@ export function PrescriptionCard({
             color: "var(--azzurro-testo)",
             borderRadius: "var(--radius-pill)",
             padding: "3px 10px",
-            fontSize: 10,
+            fontSize: 12,
             fontWeight: 700,
             flex: "none",
           }}
@@ -76,7 +76,7 @@ export function PrescriptionCard({
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
           <p style={{ fontWeight: 600, fontSize: 15, margin: 0 }}>{prescription.session.title}</p>
           {prescription.heart_rate_cap && (
-            <span className="font-mono" style={{ fontSize: 11.5, color: "var(--rosso-testo)", fontWeight: 700, flex: "none" }}>
+            <span className="font-mono" style={{ fontSize: 12.5, color: "var(--rosso-testo)", fontWeight: 700, flex: "none" }}>
               max {prescription.heart_rate_cap} bpm
             </span>
           )}
@@ -153,7 +153,7 @@ export function SensitivityTable({ rows, animate, delayMs }: { rows: Sensitivity
         }}
       >
         <div>
-          <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
+          <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
             sensibilità stima soglia
           </p>
           <p style={{ font: "600 14px/1.2 var(--font-sans)", margin: "4px 0 0", color: "var(--inchiostro)" }}>
@@ -189,7 +189,7 @@ export function SensitivityTable({ rows, animate, delayMs }: { rows: Sensitivity
               ))}
             </tbody>
           </table>
-          <p style={{ fontSize: 11.5, color: "var(--inchiostro-35)", margin: "12px 0 0", lineHeight: 1.45 }}>
+          <p style={{ fontSize: 12.5, color: "var(--inchiostro-35)", margin: "12px 0 0", lineHeight: 1.45 }}>
             La riga in grassetto è la stima di Garmin. Tutto quello che c&apos;è sopra dipende da quel
             numero, quindi prima di riscrivere un blocco di allenamento su questi dati vale la pena
             confermarlo con un test sul campo.
@@ -220,7 +220,7 @@ export function PaceProfileCard({
 
   return (
     <SlideUp active={animate} delayMs={delayMs} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 18, marginTop: 12 }}>
-      <p className="font-mono" style={{ fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--inchiostro-50)", margin: 0 }}>
+      <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
         i tuoi passi, misurati
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
@@ -235,7 +235,7 @@ export function PaceProfileCard({
           </div>
         ))}
       </div>
-      <p style={{ fontSize: 11.5, color: "var(--inchiostro-35)", margin: "12px 0 0", lineHeight: 1.45 }}>
+      <p style={{ fontSize: 12.5, color: "var(--inchiostro-35)", margin: "12px 0 0", lineHeight: 1.45 }}>
         Non una tabella: la mediana del passo che tieni davvero a quella frequenza, su{" "}
         {(easy?.samples ?? 0) + (threshold?.samples ?? 0)} campioni del tuo storico.
       </p>

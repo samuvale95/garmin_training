@@ -43,16 +43,14 @@ export function WorkoutAnalysisSection({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
         <span
           style={{
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: 700,
-            letterSpacing: ".06em",
-            textTransform: "uppercase",
             color: "var(--inchiostro-50)",
           }}
         >
           Analisi Profonda & Correlazioni
         </span>
-        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
+        <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
           secondo per secondo
         </span>
       </div>
@@ -77,11 +75,9 @@ export function WorkoutAnalysisSection({
               color: hasAnomalies ? "var(--corallo-testo)" : "var(--verde-testo)",
               borderRadius: "var(--radius-pill)",
               padding: "3px 10px",
-              fontSize: 10.5,
+              fontSize: 12,
               fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-            }}
+              }}
           >
             {hasAnomalies ? "Punto di rottura rilevato" : "Diagnosi Esecuzione"}
           </span>
@@ -106,7 +102,7 @@ export function WorkoutAnalysisSection({
           }}
         >
           <div style={{ flex: 1 }}>
-            <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".05em", opacity: 0.65 }}>
+            <span style={{ fontSize: 12, opacity: 0.65 }}>
               Passo Medio
             </span>
             <span className="font-mono" style={{ display: "block", fontSize: 16, fontWeight: 600, marginTop: 2 }}>
@@ -114,7 +110,7 @@ export function WorkoutAnalysisSection({
             </span>
           </div>
           <div style={{ flex: 1 }}>
-            <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".05em", opacity: 0.65 }}>
+            <span style={{ fontSize: 12, opacity: 0.65 }}>
               Frequenza
             </span>
             <span className="font-mono" style={{ display: "block", fontSize: 16, fontWeight: 600, marginTop: 2 }}>
@@ -122,7 +118,7 @@ export function WorkoutAnalysisSection({
             </span>
           </div>
           <div style={{ flex: 1 }}>
-            <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".05em", opacity: 0.65 }}>
+            <span style={{ fontSize: 12, opacity: 0.65 }}>
               Eventi
             </span>
             <span className="font-mono" style={{ display: "block", fontSize: 16, fontWeight: 600, marginTop: 2 }}>
@@ -141,10 +137,8 @@ export function WorkoutAnalysisSection({
         <div style={{ marginTop: 18 }}>
           <span
             style={{
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
-              letterSpacing: ".06em",
-              textTransform: "uppercase",
               color: "var(--inchiostro-50)",
               display: "block",
               marginBottom: 8,
@@ -177,10 +171,8 @@ export function WorkoutAnalysisSection({
         <div style={{ marginTop: 20 }}>
           <span
             style={{
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
-              letterSpacing: ".06em",
-              textTransform: "uppercase",
               color: "var(--inchiostro-50)",
               display: "block",
               marginBottom: 8,
@@ -221,7 +213,7 @@ export function WorkoutAnalysisSection({
               <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--inchiostro)", display: "block" }}>
                 Progressione Meccanica (Passo, Cadenza, Falcata)
               </span>
-              <span style={{ fontSize: 11.5, color: "var(--inchiostro-50)" }}>
+              <span style={{ fontSize: 12.5, color: "var(--inchiostro-50)" }}>
                 {analysis.segments.length} blocchi analizzati
               </span>
             </div>
@@ -274,7 +266,7 @@ function BreakpointCard({
               color: "var(--corallo-testo)",
               borderRadius: "var(--radius-pill)",
               padding: "2px 8px",
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: 700,
             }}
           >
@@ -302,7 +294,7 @@ function BreakpointCard({
               padding: "8px 10px",
             }}
           >
-            <span style={{ fontSize: 9.5, textTransform: "uppercase", color: "var(--inchiostro-50)", display: "block" }}>
+            <span style={{ fontSize: 9.5, color: "var(--inchiostro-50)", display: "block" }}>
               Prima ({k})
             </span>
             <span className="font-mono" style={{ fontSize: 12.5, fontWeight: 600, color: "var(--inchiostro)" }}>
@@ -320,7 +312,7 @@ function BreakpointCard({
               padding: "8px 10px",
             }}
           >
-            <span style={{ fontSize: 9.5, textTransform: "uppercase", color: "var(--corallo-testo)", display: "block" }}>
+            <span style={{ fontSize: 9.5, color: "var(--corallo-testo)", display: "block" }}>
               Dopo ({k})
             </span>
             <span className="font-mono" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--corallo-testo)" }}>
@@ -366,7 +358,7 @@ function FindingDetailCard({
             color: cat.color,
             borderRadius: "var(--radius-pill)",
             padding: "3px 9px",
-            fontSize: 10,
+            fontSize: 12,
             fontWeight: 700,
             whiteSpace: "nowrap",
             flex: "none",
@@ -396,7 +388,7 @@ function FindingDetailCard({
                 background: "var(--sabbia-chip)",
                 borderRadius: "var(--radius-chip)",
                 padding: "6px 10px",
-                fontSize: 11.5,
+                fontSize: 12.5,
               }}
             >
               <span style={{ color: "var(--inchiostro-50)" }}>{sm.label}: </span>
@@ -421,10 +413,8 @@ function FindingDetailCard({
           <span
             style={{
               display: "block",
-              fontSize: 10.5,
+              fontSize: 12,
               fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: ".04em",
               color: "var(--inchiostro-50)",
               marginBottom: 3,
             }}
@@ -506,10 +496,10 @@ function WorkoutTimelineTrack({
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--inchiostro-50)" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
           Mappa temporale della seduta
         </span>
-        <span className="font-mono" style={{ fontSize: 11, color: "var(--inchiostro-50)" }}>
+        <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>
           0&apos; → {totalMin}&apos;
         </span>
       </div>
