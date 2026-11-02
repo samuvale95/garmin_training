@@ -14,7 +14,7 @@ export interface TrainingGoal {
   race_date?: string | null; distance_km?: number | null; target_time_seconds?: number | null; linked_program_ids: string[];
 }
 export interface GoalEvaluation {
-  id?: string; evaluated_at?: string; created_at?: string; status: string; execution?: Record<string, unknown>; progress?: Record<string, unknown>; quality?: Record<string, unknown>; evidence?: unknown; summary?: string;
+  id?: string; evaluated_at?: string; created_at?: string; goal_revision?: number; status: string; execution?: Record<string, unknown>; progress?: Record<string, unknown>; quality?: Record<string, unknown>; evidence?: unknown; summary?: string;
 }
 export interface ProgramConstraints { revision: number; available_days: number[] | null; max_daily_minutes: number | null; max_sessions_per_day: number | null }
 export interface DraftValidation {

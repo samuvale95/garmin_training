@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { keepPreviousData, useMutation, useMutationState, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm, apiPut } from "./apiClient";
+import { usePassoStore } from "./store";
+import { clearTrackingQueue } from "./tracker";
 import { shiftDateKey, toDateKey, weekBounds } from "./sessionVisuals";
 import type {
   ActivityForm,
@@ -204,7 +206,7 @@ function restorePersistedPlanOnce(queryClient: ReturnType<typeof useQueryClient>
  * guards.ts) hold off until then, so an existing plan doesn't cause a spurious bounce
  * to /import.
  */
-export function usePlanQuery() {
+export function usePlanQuery(enabled = true) {
   const queryClient = useQueryClient();
   const isHydrated = useSyncExternalStore(
     subscribePlanHydration,
@@ -218,15 +220,17 @@ export function usePlanQuery() {
   );
 
   useEffect(() => {
+    if (!enabled) return;
     // Seed local plan immediately into query cache so first render has real data synchronously
     const local = readPersistedPlan();
     if (local && !queryClient.getQueryData(PLAN_KEY)) {
       queryClient.setQueryData<PlanState | null>(PLAN_KEY, local);
     }
     restorePersistedPlanOnce(queryClient);
-  }, [queryClient]);
+  }, [queryClient, enabled]);
 
   const query = useQuery({
+    enabled,
     queryKey: PLAN_KEY,
     queryFn: (): PlanState | null => null,
     initialData: () => (typeof window !== "undefined" ? readPersistedPlan() : null),
@@ -320,28 +324,28 @@ export function useClearPlan() {
   return () => writePlan(queryClient, null);
 }
 
-/** Settings' "Ripristina tutto" escape hatch: wipes every piece of local app state
- * (the plan under both its current and legacy storage keys, plus every cached
- * server-derived query -- Garmin/Strava/body) so the app has nothing left to disagree
- * about with itself. Garmin/Strava *connections* are untouched (those tokens live
- * server-side, not here) -- afterwards the app simply falls back to showing the live
- * Garmin calendar directly, with nothing local left to be stale or inconsistent.
- */
+/** Clear account data held by this browser. Server data and connections remain available
+ * to the signed-in account and will be fetched again after a reload. Keep the auth
+ * session and the user's device-level tracking choice intact. */
+export function clearLocalAccountData(queryClient: ReturnType<typeof useQueryClient>): void {
+  queryClient.clear();
+  usePassoStore.setState(usePassoStore.getInitialState());
+  usePassoStore.persist.clearStorage();
+  clearTrackingQueue();
+  if (typeof window === "undefined") return;
+  for (const key of [PLAN_STORAGE_KEY, LEGACY_STORAGE_KEY, "passo-query-cache", ADAPTATION_CHECKED_KEY]) {
+    localStorage.removeItem(key);
+  }
+  for (const key of Object.keys(sessionStorage)) {
+    if (key === "passo.return-history" || key.startsWith("passo-program-wizard:") || key.startsWith("passo-editor:")) {
+      sessionStorage.removeItem(key);
+    }
+  }
+}
+
 export function useResetAllLocalData() {
   const queryClient = useQueryClient();
-  return () => {
-    queryClient.clear();
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(PLAN_STORAGE_KEY);
-      localStorage.removeItem(LEGACY_STORAGE_KEY);
-      // The cache is also mirrored to localStorage across reloads (see providers.tsx);
-      // clearing only the in-memory copy would let the old one come back on refresh.
-      localStorage.removeItem("passo-query-cache");
-    }
-    // The plan now also lives server-side (see `writePlan`) -- without this, the next
-    // reload's restore would pull the "deleted" plan right back down from there.
-    apiDelete("/plan").catch(() => {});
-  };
+  return () => clearLocalAccountData(queryClient);
 }
 
 /** "Ask again, now": the user-facing refresh.
@@ -1988,18 +1992,19 @@ export interface GarminPushSession {
   title: string;
   status: "ok" | "pending" | "failed";
   error: string | null;
+  removing?: boolean;
 }
 
 export interface GarminPushStatus {
   running: boolean;
+  run_error: string | null;
   counts: { ok: number; pending: number; failed: number };
   sessions: GarminPushSession[];
 }
 
 export const GARMIN_PUSH_KEY = ["garmin-push"] as const;
 
-/** Which plan sessions are on the watch. One DB read on the server, no Garmin call; while a
- * push is running it is re-read every few seconds so "in invio" turns into "su Garmin". */
+/** Which plan sessions reached Garmin Connect. The watch syncs separately. */
 export function useGarminPushStatus(enabled = true) {
   return useQuery({
     queryKey: GARMIN_PUSH_KEY,

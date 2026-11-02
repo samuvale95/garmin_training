@@ -11,7 +11,7 @@ import { Avatar } from "@/components/Avatar";
 import { RefreshButton } from "@/components/RefreshButton";
 import { WorkspaceHeading } from "@/components/Workspace";
 import { Badge, RowLink, Section } from "@/components/ui";
-import { useAthleteLevel, useClearPlan, useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, usePlanQuery, useResetAllLocalData, useStravaStatus } from "@/lib/queries";
+import { useAthleteLevel, useDisconnectGarmin, useDisconnectStrava, useGarminDevice, useGarminStatus, usePlanQuery, useResetAllLocalData, useStravaStatus } from "@/lib/queries";
 import { useAthleteIdentity } from "@/lib/identity";
 import { useIsAdmin } from "@/lib/agents";
 import { signOut, useSession } from "@/lib/auth";
@@ -39,9 +39,10 @@ export default function SettingsPage() {
   const setPref = usePassoStore((s) => s.setPref);
   const profile = usePassoStore((s) => s.profile);
   const setProfile = usePassoStore((s) => s.setProfile);
-  const clearPlan = useClearPlan();
   const resetAllLocalData = useResetAllLocalData();
   const [confirmReset, setConfirmReset] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   // Read after mount: localStorage is not there during the server render.
   const mounted = useMounted();
   const [trackingChoice, setTrackingChoice] = useState<boolean | null>(null);
@@ -61,6 +62,19 @@ export default function SettingsPage() {
     // (Zustand's store included) reinitializes from scratch, not just the storage
     // that backs it -- the whole point of this button is "no doubt left anywhere".
     window.location.href = "/";
+  }
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    setSignOutError(null);
+    try {
+      await signOut();
+      resetAllLocalData();
+      window.location.href = "/login";
+    } catch {
+      setSignOutError("Non siamo riusciti a uscire. Riprova.");
+      setSigningOut(false);
+    }
   }
 
   const garminLine = garminStatus?.connected
@@ -117,11 +131,11 @@ export default function SettingsPage() {
                 <span className="row-end">
                   <Badge tone={garminStatus?.connected ? "ok" : "warn"}>{garminStatus?.connected ? "Attivo" : "Da collegare"}</Badge>
                   {garminStatus?.connected ? (
-                    <button type="button" className="btn" data-size="sm" data-variant="quiet" data-track="settings.disconnect-mutate" onClick={() => disconnect.mutate(undefined, { onSuccess: () => router.push("/connect-garmin") })} {...dis(disconnect.isPending, "in_caricamento")}>
+                    <button type="button" className="btn" data-size="sm" data-variant="quiet" data-track="settings.disconnect-mutate" onClick={() => disconnect.mutate(undefined, { onSuccess: () => router.push("/connect-garmin?from=%2Fsettings") })} {...dis(disconnect.isPending, "in_caricamento")}>
                       Scollega
                     </button>
                   ) : (
-                    <Link className="btn" data-size="sm" href="/connect-garmin" data-track="settings.connect-garmin">Collega</Link>
+                    <Link className="btn" data-size="sm" href="/connect-garmin?from=%2Fsettings" data-track="settings.connect-garmin">Collega</Link>
                   )}
                 </span>
               </div>
@@ -197,11 +211,11 @@ export default function SettingsPage() {
           <div className="card">
             <p className="card-title">Ripristina i dati su questo dispositivo</p>
             <p className="card-text">
-              Cancella piano, preferenze e dati salvati sul dispositivo. Garmin e Strava non vengono toccati: dopo il ripristino l’app riparte dal calendario Garmin.
+              Cancella piano salvato, preferenze, profilo, cronologia e cache su questo dispositivo. Resti connesso; piano e altri dati presenti sul server ricompariranno dopo la ricarica. Le connessioni Garmin e Strava restano attive.
             </p>
             <div className="actions">
               <button type="button" className="btn" data-variant={confirmReset ? "accent" : "danger"} data-track="settings.handlereset" onClick={handleReset}>
-                {confirmReset ? "Conferma: cancella tutto" : "Ripristina tutto"}
+                {confirmReset ? "Conferma: cancella dati locali" : "Ripristina dati locali"}
               </button>
               {confirmReset && (
                 <button type="button" className="btn" data-variant="quiet" data-track="settings.setconfirmreset" onClick={() => setConfirmReset(false)}>Annulla</button>
@@ -214,15 +228,13 @@ export default function SettingsPage() {
             data-variant="danger"
             data-block
             style={{ marginTop: 16 }}
-            data-track="settings.async"
-            onClick={async () => {
-              clearPlan();
-              await signOut();
-              window.location.href = "/login";
-            }}
+            data-track="settings.sign-out"
+            onClick={handleSignOut}
+            {...dis(signingOut, "in_caricamento")}
           >
-            Esci da Passo
+            {signingOut ? "Uscita in corso…" : "Esci da Passo"}
           </button>
+          {signOutError && <p role="alert" className="card-text">{signOutError}</p>}
         </Section>
       </div>
     </div>

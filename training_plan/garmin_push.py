@@ -268,6 +268,9 @@ def reconcile(user_id: str, sync: GarminSync, *, today: date_type | None = None)
         if past and _session_exists(user_id, sid):
             continue
         try:
+            # Removal can fail after unscheduling. Never reuse the old success
+            # fingerprint if this session becomes active again before the retry.
+            _save_link(user_id, sid, pushed_hash=None, status="pending")
             _remove(sync, link)
             _drop_link(user_id, sid)
             report.deleted += 1
@@ -282,10 +285,13 @@ def reconcile(user_id: str, sync: GarminSync, *, today: date_type | None = None)
     for sid, session in sorted(wanted.items(), key=lambda kv: kv[1].date):
         link = links.get(sid) or {}
         digest = content_hash(sync, session)
-        if link.get("pushed_hash") == digest and link.get("status") == "ok":
+        if link.get("pushed_hash") == digest and link.get("workout_id"):
+            if link.get("status") != "ok":
+                _save_link(user_id, sid, status="ok", error=None, attempts=0)
             continue
         try:
             if link.get("workout_id"):
+                _save_link(user_id, sid, pushed_hash=None, status="pending")
                 _remove(sync, link)
             workout_id, scheduled_id = _push(sync, session)
         except GarminRateLimitError as exc:
@@ -361,13 +367,13 @@ def forget_links_on(user_id: str, days: list[date_type]) -> None:
 
 
 def mark_pending(user_id: str, session_ids: list[str]) -> None:
-    """An edit just happened: show these as on their way before the push even starts."""
+    """A plan write succeeded: invalidate visible OK until reconciliation completes."""
     for sid in session_ids:
         _save_link(user_id, sid, status="pending", error=None)
 
 
 def status(user_id: str, today: date_type | None = None) -> dict[str, Any]:
-    """Per-session push state for the window, for the screens. One query, no Garmin call."""
+    """Per-session push state, including Garmin entries waiting to be removed."""
     today = today or date_type.today()
     with db.connect() as conn, conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
@@ -380,6 +386,15 @@ def status(user_id: str, today: date_type | None = None) -> dict[str, Any]:
             [user_id, today - timedelta(days=1), today + timedelta(days=WINDOW_DAYS)],
         )
         rows = cur.fetchall()
+        cur.execute(
+            """SELECT gl.session_id, gl.garmin_date, ps.id AS plan_id, ps.title,
+                      gl.status, gl.error
+               FROM garmin_link gl
+               LEFT JOIN plan_session ps ON ps.user_id = gl.user_id AND ps.id = gl.session_id
+               WHERE gl.user_id = %s""",
+            [user_id],
+        )
+        linked = cur.fetchall()
     sessions = [
         {
             "session_id": str(r["id"]),
@@ -390,8 +405,26 @@ def status(user_id: str, today: date_type | None = None) -> dict[str, Any]:
         }
         for r in rows
     ]
+    visible_ids = {s["session_id"] for s in sessions}
+    for row in linked:
+        sid = str(row["session_id"])
+        if sid in visible_ids:
+            continue
+        # Existing historical sessions are intentionally retained by reconcile.
+        if row["plan_id"] is not None and row["garmin_date"] is not None and row["garmin_date"] < today - timedelta(days=1):
+            continue
+        sessions.append({
+            "session_id": sid,
+            "date": row["garmin_date"].isoformat() if row["garmin_date"] else "",
+            "title": row["title"] or "Seduta rimossa",
+            "status": "failed" if row["status"] == "failed" else "pending",
+            "error": row["error"],
+            "removing": True,
+        })
     counts = {k: sum(1 for s in sessions if s["status"] == k) for k in ("ok", "pending", "failed")}
-    return {"running": is_running(user_id), "counts": counts, "sessions": sessions}
+    with _lock:
+        run_error = _run_errors.get(user_id)
+    return {"running": is_running(user_id), "counts": counts, "sessions": sessions, "run_error": run_error}
 
 
 # ---- one reconcile at a time per user -------------------------------------------------------------
@@ -399,6 +432,13 @@ def status(user_id: str, today: date_type | None = None) -> dict[str, Any]:
 _lock = threading.Lock()
 _running: set[str] = set()
 _again: set[str] = set()
+_run_errors: dict[str, str] = {}
+
+
+def record_run_error(user_id: str, error: Exception) -> None:
+    """Expose failures before a Garmin session could start, including auth failures."""
+    with _lock:
+        _run_errors[user_id] = str(error)[:MAX_ERROR_LENGTH] or "Impossibile avviare l’invio a Garmin"
 
 
 def is_running(user_id: str) -> bool:
@@ -422,7 +462,10 @@ def run_for(user_id: str, open_sync) -> ReconcileReport | None:
         while True:
             try:
                 last = open_sync(lambda sync: reconcile(user_id, sync))
-            except Exception:
+                with _lock:
+                    _run_errors.pop(user_id, None)
+            except Exception as exc:
+                record_run_error(user_id, exc)
                 logger.warning("garmin push for %s did not run", user_id, exc_info=True)
             with _lock:
                 if user_id not in _again:

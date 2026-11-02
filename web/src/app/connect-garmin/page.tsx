@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
@@ -12,10 +12,14 @@ import { useConnectGarmin } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
 import { ApiError } from "@/lib/apiClient";
 import { useScreenReady } from "@/lib/useScreenReady";
+import { safeReturnHref } from "@/lib/navigation";
 
-export default function ConnectGarminPage() {
+function ConnectGarminContent() {
   useScreenReady(true);
   const router = useRouter();
+  const params = useSearchParams();
+  const from = params.get("from");
+  const returnHref = safeReturnHref(from, "/today");
   const animate = useMountOnce("connect-garmin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,7 +34,7 @@ export default function ConnectGarminPage() {
     setLastGarminEmail(email);
     try {
       await connect.mutateAsync({ email, password });
-      router.push("/import");
+      router.push(returnHref);
     } catch (err) {
       if (err instanceof ApiError && err.category === "rate_limited") {
         router.push("/rate-limit");
@@ -44,7 +48,7 @@ export default function ConnectGarminPage() {
     <div style={{ padding: "30px 22px 0", display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <PageHeader />
+          <PageHeader backHref={from ? returnHref : "/"} />
           <BrandMark height={24} />
         </div>
         {profile.email && (
@@ -57,15 +61,15 @@ export default function ConnectGarminPage() {
 
       <div style={{ marginTop: 24 }}>
         <WordIn active={animate} delayMs={0} style={{ font: "600 34px/1.04 var(--font-sans)", letterSpacing: "-.035em" }}>
-          Un passo
+          Collega Garmin
         </WordIn>
         <WordIn active={animate} delayMs={100} style={{ font: "600 34px/1.04 var(--font-sans)", letterSpacing: "-.035em" }}>
-          e non ci pensi più
+          Connect
         </WordIn>
       </div>
 
       <SlideUp active={animate} delayMs={200} className="font-serif-italic" style={{ fontSize: 17, color: "var(--inchiostro-70)", maxWidth: 290, marginTop: 12 }}>
-        La sessione Garmin resta attiva per settimane: questa schermata la vedi una volta.
+        Leggi calendario e attività Garmin. Se attivi un piano, le sedute vengono inviate a Garmin Connect fino a 28 giorni; l&apos;orologio si sincronizza separatamente.
       </SlideUp>
 
       <SlideUp
@@ -77,13 +81,12 @@ export default function ConnectGarminPage() {
         <Field label="Password" value={password} onChange={setPassword} type="password" />
         <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
           <LockIcon size={13} strokeWidth={2} style={{ color: "var(--inchiostro-50)" }} />
-          <span>Resta sul telefono. Salvo solo il token, mai la password.</span>
+          <span>Invio le credenziali al server per accedere a Garmin. Non salvo la password; conservo i token cifrati.</span>
         </p>
       </SlideUp>
 
-      <SlideUp active={animate} delayMs={400} style={{ display: "flex", gap: 10, marginTop: 16 }}>
-        <WarningCard title="Tre tentativi">poi Garmin blocca l&apos;IP per 15 minuti. Non insisto io al posto tuo.</WarningCard>
-        <WarningCard title="Codice a 6 cifre">se hai la verifica in due passaggi, te lo chiedo dopo.</WarningCard>
+      <SlideUp active={animate} delayMs={400} style={{ marginTop: 16 }}>
+        <WarningCard title="Verifica in due passaggi">Questo collegamento non supporta ancora la richiesta di un codice durante l&apos;accesso. Se Garmin lo richiede, il collegamento potrebbe non riuscire.</WarningCard>
       </SlideUp>
 
       {error && (
@@ -103,15 +106,19 @@ export default function ConnectGarminPage() {
         </PrimaryButton>
         <button data-track="connect-garmin.router-push"
           type="button"
-          onClick={() => router.push("/today")}
+          onClick={() => router.push(returnHref)}
           className="tap-target"
           style={{ background: "none", border: "none", color: "var(--inchiostro-50)", fontSize: 13, cursor: "pointer" }}
         >
-          Lo faccio dopo
+          Continua senza Garmin
         </button>
       </SlideUp>
     </div>
   );
+}
+
+export default function ConnectGarminPage() {
+  return <Suspense fallback={<div style={{ padding: "30px 22px" }}><BrandMark height={24} /></div>}><ConnectGarminContent /></Suspense>;
 }
 
 function Field({ label, value, onChange, type, placeholder }: { label: string; value: string; onChange: (v: string) => void; type: string; placeholder?: string }) {

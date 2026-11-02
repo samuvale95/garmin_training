@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { SlideUp } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
@@ -15,6 +15,8 @@ import { formatFullDate } from "@/lib/format";
 import { toDateKey } from "@/lib/sessionVisuals";
 import type { RaceGoal } from "@/lib/types";
 import { useScreenReady } from "@/lib/useScreenReady";
+import { SelectedRaceGoal } from "@/components/SelectedRaceGoal";
+import { Skeleton } from "@/components/motion/primitives";
 
 /** The distances offered as one tap. Anything else is typed in km -- these are only
  * the four that account for nearly every race a plan gets written for. */
@@ -44,7 +46,7 @@ function parseTargetTime(raw: string): number | null {
  * long before this screen -- so a race date typed here is the same kind of edit, and
  * travels back into the file on the next download.
  */
-export default function RaceGoalSettingsPage() {
+function LegacyRaceGoalSettingsPage() {
   const animate = useMountOnce("settings-goal");
   const router = useRouter();
   const { data: plan, isHydrated } = usePlanQuery();
@@ -208,6 +210,15 @@ export default function RaceGoalSettingsPage() {
       )}
     </div>
   );
+}
+
+function RaceGoalSettingsContent() {
+  const goalId = useSearchParams().get("goalId");
+  return goalId ? <SelectedRaceGoal goalId={goalId} /> : <LegacyRaceGoalSettingsPage />;
+}
+
+export default function RaceGoalSettingsPage() {
+  return <Suspense fallback={<Skeleton height={150} />}><RaceGoalSettingsContent /></Suspense>;
 }
 
 function GoalSummary({ goal, animate, onEdit }: { goal: RaceGoal; animate: boolean; onEdit: () => void }) {

@@ -10,6 +10,8 @@ import type { FoodEntry } from "@/lib/types";
 
 export type Preview = { kind: "photo"; url: string } | { kind: "text"; text: string };
 export type ComposeMode = "stima" | "manuale";
+export type ComposeData = { mode: ComposeMode; text: string; description: string; carb: string; protein: string; fat: string; kcal: string };
+export const emptyComposeData: ComposeData = { mode: "stima", text: "", description: "", carb: "", protein: "", fat: "", kcal: "" };
 
 function ModeTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
@@ -59,19 +61,20 @@ export function ComposeScreen({
   onSubmit,
   onSaveManual,
   saving,
+  data,
+  onChange,
+  error,
 }: {
   onCancel: () => void;
   onSubmit: (text: string) => void;
   onSaveManual: (fields: { description: string; carb: string; protein: string; fat: string; kcal: string }) => void;
   saving: boolean;
+  data: ComposeData;
+  onChange: (data: ComposeData) => void;
+  error?: string | null;
 }) {
-  const [mode, setMode] = useState<ComposeMode>("stima");
-  const [text, setText] = useState("");
-  const [description, setDescription] = useState("");
-  const [carb, setCarb] = useState("");
-  const [protein, setProtein] = useState("");
-  const [fat, setFat] = useState("");
-  const [kcal, setKcal] = useState("");
+  const { mode, text, description, carb, protein, fat, kcal } = data;
+  const change = (patch: Partial<ComposeData>) => onChange({ ...data, ...patch });
 
   const ready =
     mode === "stima"
@@ -100,10 +103,10 @@ export function ComposeScreen({
       </div>
 
       <div style={{ display: "flex", gap: 4, background: "var(--sabbia)", borderRadius: "var(--radius-pill)", padding: 4, marginTop: 16 }}>
-        <ModeTab active={mode === "stima"} onClick={() => setMode("stima")}>
+        <ModeTab active={mode === "stima"} onClick={() => change({ mode: "stima" })}>
           Lo stimo io
         </ModeTab>
-        <ModeTab active={mode === "manuale"} onClick={() => setMode("manuale")}>
+        <ModeTab active={mode === "manuale"} onClick={() => change({ mode: "manuale" })}>
           Scrivo i valori
         </ModeTab>
       </div>
@@ -117,7 +120,7 @@ export function ComposeScreen({
           <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 16, marginTop: 16 }}>
             <textarea
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => change({ text: e.target.value })}
               autoFocus
               rows={5}
               maxLength={400}
@@ -155,7 +158,7 @@ export function ComposeScreen({
             <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "0 0 4px" }}>descrizione</p>
             <input
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => change({ description: e.target.value })}
               autoFocus
               placeholder="Cos'era?"
               style={{ width: "100%", border: "none", background: "none", padding: 0, fontSize: 17, fontWeight: 600, outline: "none", color: "var(--inchiostro)" }}
@@ -163,9 +166,9 @@ export function ComposeScreen({
           </div>
 
           <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-            <ReviewMacroField label="carboidrati" value={carb} onChange={setCarb} />
-            <ReviewMacroField label="proteine" value={protein} onChange={setProtein} />
-            <ReviewMacroField label="grassi" value={fat} onChange={setFat} />
+            <ReviewMacroField label="carboidrati" value={carb} onChange={(v) => change({ carb: v })} />
+            <ReviewMacroField label="proteine" value={protein} onChange={(v) => change({ protein: v })} />
+            <ReviewMacroField label="grassi" value={fat} onChange={(v) => change({ fat: v })} />
           </div>
 
           <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -174,7 +177,7 @@ export function ComposeScreen({
               <input
                 inputMode="numeric"
                 value={kcal}
-                onChange={(e) => setKcal(e.target.value.replace(/\D/g, ""))}
+                onChange={(e) => change({ kcal: e.target.value.replace(/\D/g, "") })}
                 placeholder="—"
                 className="font-mono"
                 style={{ width: 70, textAlign: "right", border: "none", background: "none", fontSize: 20, fontWeight: 600, outline: "none", color: "var(--inchiostro)" }}
@@ -189,6 +192,7 @@ export function ComposeScreen({
         </>
       )}
 
+      {error && <p className="ux-error" role="alert">{error}</p>}
       <button data-track="meal-flow-screens.submit"
         type="button"
         onClick={submit}
@@ -398,6 +402,8 @@ export function ReviewScreen({ entry, preview, onDiscard, onSaved }: { entry: Fo
         </div>
       )}
 
+      {updateEntry.error && <p className="ux-error" role="alert">{updateEntry.error.message || "Salvataggio non riuscito. Riprova."}</p>}
+
       <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
         <button data-track="meal-flow-screens.ondiscard" type="button" onClick={onDiscard} className="tap-target" style={{ background: "var(--sabbia)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
           Scarta
@@ -410,7 +416,7 @@ export function ReviewScreen({ entry, preview, onDiscard, onSaved }: { entry: Fo
   );
 }
 
-export function FailedScreen({ entryId, preview, onRetake, onSaved }: { entryId: number; preview: Preview; onRetake: () => void; onSaved: () => void }) {
+export function FailedScreen({ entryId, preview, onRetake, onSaved, error, retaking }: { entryId: number; preview: Preview; onRetake: () => void; onSaved: () => void; error?: string | null; retaking?: boolean }) {
   const updateEntry = useUpdateEntry();
   const [carb, setCarb] = useState("");
   const [protein, setProtein] = useState("");
@@ -462,6 +468,7 @@ export function FailedScreen({ entryId, preview, onRetake, onSaved }: { entryId:
         <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", marginTop: 12 }}>Anche uno solo dei tre va bene. Meglio un dato tuo che una foto buttata.</p>
       </div>
 
+      {(error || updateEntry.error) && <p className="ux-error" role="alert">{error || updateEntry.error?.message || "Operazione non riuscita. Riprova."}</p>}
       <button data-track="meal-flow-screens.save-2"
         type="button"
         onClick={save}
@@ -471,7 +478,7 @@ export function FailedScreen({ entryId, preview, onRetake, onSaved }: { entryId:
       >
         Salva quello che ho scritto
       </button>
-      <button data-track="meal-flow-screens.onretake" type="button" onClick={onRetake} className="tap-target" style={{ marginTop: 12, alignSelf: "center", background: "none", border: "none", color: "var(--rosso-testo)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+      <button data-track="meal-flow-screens.onretake" type="button" onClick={onRetake} {...dis(!!retaking, "in_caricamento")} className="tap-target" style={{ marginTop: 12, alignSelf: "center", background: "none", border: "none", color: "var(--rosso-testo)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
         {preview.kind === "photo" ? "Rifai la foto" : "Riscrivilo"}
       </button>
     </div>

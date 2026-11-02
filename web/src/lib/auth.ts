@@ -70,8 +70,9 @@ export async function signInWithGoogle(): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
   if (typeof window !== "undefined") {
     localStorage.removeItem("passo_dev_token");
   }
-  await supabase.auth.signOut();
 }

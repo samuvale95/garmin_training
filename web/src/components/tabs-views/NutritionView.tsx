@@ -17,7 +17,7 @@ import { FuelReminderCard } from "@/components/FuelReminderCard";
 import { useMountOnce } from "@/lib/motion";
 import { formatFullDate } from "@/lib/format";
 import { useCalendarAccess } from "@/lib/guards";
-import { ComposeScreen, EstimatingScreen, ReviewScreen, FailedScreen } from "@/components/MealFlowScreens";
+import { ComposeScreen, EstimatingScreen, ReviewScreen, FailedScreen, emptyComposeData, type ComposeData } from "@/components/MealFlowScreens";
 import {
   useAddManualEntry,
   useDeleteEntry,
@@ -45,6 +45,7 @@ type Flow =
   | { kind: "idle" }
   | { kind: "compose" }
   | { kind: "estimating"; preview: Preview }
+  | { kind: "photo-error"; preview: Extract<Preview, { kind: "photo" }> }
   | { kind: "review"; entry: FoodEntry; preview: Preview }
   | { kind: "failed"; entry: FoodEntry; preview: Preview };
 
@@ -124,8 +125,12 @@ export function NutritionView() {
   const deleteEntry = useDeleteEntry();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoRef = useRef<{ file: File; thumbnail: Blob | null; date: string } | null>(null);
+  const requestIdRef = useRef(0);
   const cancelledRef = useRef(false);
   const [flow, setFlow] = useState<Flow>({ kind: "idle" });
+  const [composeData, setComposeData] = useState<ComposeData>(emptyComposeData);
+  const [flowError, setFlowError] = useState<string | null>(null);
   useFlowTracking("meal", flow.kind);
   const [correcting, setCorrecting] = useState<FoodEntry | null>(null);
 
@@ -142,30 +147,40 @@ export function NutritionView() {
     if (!file) return;
 
     const preview: Preview = { kind: "photo", url: URL.createObjectURL(file) };
+    photoRef.current = { file, thumbnail: null, date: logDate };
+    setFlowError(null);
     cancelledRef.current = false;
+    const requestId = ++requestIdRef.current;
     setFlow({ kind: "estimating", preview });
 
     createThumbnail(file).then((thumbnail) => {
-      logPhoto.mutate({ file, date: logDate, thumbnail }, estimateHandlers(preview));
+      if (requestId !== requestIdRef.current || cancelledRef.current) return;
+      photoRef.current = { file, thumbnail, date: logDate };
+      logPhoto.mutate({ file, date: logDate, thumbnail }, estimateHandlers(preview, requestId));
     });
   }
 
-  function estimateHandlers(preview: Preview) {
+  function estimateHandlers(preview: Preview, requestId: number) {
     return {
       onSuccess: (entry: FoodEntry) => {
-        if (cancelledRef.current) {
+        if (requestId !== requestIdRef.current || cancelledRef.current) {
+          // The request already created a row; remove it only after the user cancelled it.
           deleteEntry.mutate(entry.id);
           return;
         }
+        setFlowError(null);
         setFlow(entry.confidence != null ? { kind: "review", entry, preview } : { kind: "failed", entry, preview });
       },
-      onError: () => {
-        if (!cancelledRef.current) setFlow({ kind: "idle" });
+      onError: (error: Error) => {
+        if (requestId !== requestIdRef.current || cancelledRef.current) return;
+        setFlowError(error.message || "La stima non è riuscita. Riprova.");
+        setFlow(preview.kind === "text" ? { kind: "compose" } : { kind: "photo-error", preview });
       },
     };
   }
 
   function saveManualEntry(fields: { description: string; carb: string; protein: string; fat: string; kcal: string }) {
+    setFlowError(null);
     const asNumber = (raw: string) => (raw === "" ? null : Number(raw));
     addManualEntry.mutate(
       {
@@ -176,27 +191,34 @@ export function NutritionView() {
         fat_g: asNumber(fields.fat),
         kcal: asNumber(fields.kcal),
       },
-      { onSuccess: finishMeal }
+      { onSuccess: finishMeal, onError: (error) => setFlowError(error.message || "Salvataggio non riuscito. Riprova.") }
     );
   }
 
   function submitDescription(text: string) {
     const preview: Preview = { kind: "text", text };
+    setFlowError(null);
     cancelledRef.current = false;
+    const requestId = ++requestIdRef.current;
     setFlow({ kind: "estimating", preview });
-    describeMeal.mutate({ text, date: logDate }, estimateHandlers(preview));
+    describeMeal.mutate({ text, date: logDate }, estimateHandlers(preview, requestId));
   }
 
   function closeFlow() {
     if (flow.kind !== "idle" && flow.kind !== "compose" && flow.preview.kind === "photo") {
       URL.revokeObjectURL(flow.preview.url);
     }
+    photoRef.current = null;
+    setFlowError(null);
+    setComposeData(emptyComposeData);
     setFlow({ kind: "idle" });
   }
 
   function cancelEstimating() {
     cancelledRef.current = true;
-    closeFlow();
+    if (flow.kind === "estimating" && flow.preview.kind === "text") {
+      setFlow({ kind: "compose" });
+    } else closeFlow();
   }
 
   function discardReview(entry: FoodEntry) {
@@ -205,10 +227,25 @@ export function NutritionView() {
   }
 
   function retry(entry: FoodEntry, preview: Preview) {
-    deleteEntry.mutate(entry.id);
-    closeFlow();
-    if (preview.kind === "photo") openCamera();
-    else setFlow({ kind: "compose" });
+    setFlowError(null);
+    deleteEntry.mutate(entry.id, {
+      onSuccess: () => {
+        closeFlow();
+        if (preview.kind === "photo") requestAnimationFrame(openCamera);
+        else { setComposeData({ ...emptyComposeData, text: preview.text }); setFlow({ kind: "compose" }); }
+      },
+      onError: (error) => setFlowError(error.message || "Non sono riuscito a rimuovere il tentativo. Riprova."),
+    });
+  }
+
+  function retryPhoto(preview: Extract<Preview, { kind: "photo" }>) {
+    const photo = photoRef.current;
+    if (!photo) return;
+    setFlowError(null);
+    cancelledRef.current = false;
+    const requestId = ++requestIdRef.current;
+    setFlow({ kind: "estimating", preview });
+    logPhoto.mutate(photo, estimateHandlers(preview, requestId));
   }
 
   if (flow.kind === "compose") {
@@ -218,11 +255,17 @@ export function NutritionView() {
         onSubmit={submitDescription}
         onSaveManual={saveManualEntry}
         saving={addManualEntry.isPending}
+        data={composeData}
+        onChange={setComposeData}
+        error={flowError}
       />
     );
   }
   if (flow.kind === "estimating") {
     return <EstimatingScreen preview={flow.preview} onCancel={cancelEstimating} />;
+  }
+  if (flow.kind === "photo-error") {
+    return <div className="page"><p className="ux-error" role="alert">{flowError || "La stima non è riuscita. Riprova."}</p><div className="actions"><button className="btn" data-track="nutrition.retry-photo" onClick={() => retryPhoto(flow.preview)}>Riprova la foto</button><button className="btn" data-track="nutrition.cancel-photo" onClick={closeFlow}>Annulla</button></div></div>;
   }
   if (flow.kind === "review") {
     return <ReviewScreen entry={flow.entry} preview={flow.preview} onDiscard={() => discardReview(flow.entry)} onSaved={finishMeal} />;
@@ -234,6 +277,8 @@ export function NutritionView() {
         onRetake={() => retry(flow.entry, flow.preview)}
         onSaved={finishMeal}
         entryId={flow.entry.id}
+        error={flowError}
+        retaking={deleteEntry.isPending}
       />
     );
   }

@@ -25,12 +25,10 @@ export default function EntryPage() {
     if (plan || garminConnected) router.replace("/today");
   }, [plan, garminConnected, router]);
 
-  // The only two places this screen can lead. Prefetching them here means the tap lands
-  // on a ready screen: a `router.push` on its own fetches the route only once tapped
-  // (unlike a `<Link data-track="home.link">`, which prefetches when it comes into view).
   useEffect(() => {
     router.prefetch("/connect-garmin");
-    router.prefetch("/today");
+    router.prefetch("/week/programs/new?source=ai");
+    router.prefetch("/week/programs/new?source=import");
   }, [router]);
 
   // Wait for the first status check before deciding to show the welcome copy --
@@ -58,21 +56,21 @@ export default function EntryPage() {
 
       <div style={{ marginTop: 32 }}>
         <WordIn active={animate} delayMs={0} style={{ font: "600 40px/1 var(--font-sans)", letterSpacing: "-.04em" }}>
-          Il piano
+          Il tuo piano,
         </WordIn>
         <WordIn active={animate} delayMs={100} style={{ font: "600 40px/1.06 var(--font-sans)", letterSpacing: "-.04em" }}>
-          scritto una
+          da dove
         </WordIn>
         <WordIn active={animate} delayMs={200} style={{ font: "600 40px/1.06 var(--font-sans)", letterSpacing: "-.04em", color: "var(--accent)" }}>
-          volta sola
+          iniziamo?
         </WordIn>
       </div>
 
       <SlideUp active={animate} delayMs={300} className="font-serif-italic" style={{ fontSize: 18, color: "var(--inchiostro-70)", marginTop: 16, maxWidth: 280 }}>
-        Tu tieni il file. Io lo porto sull&apos;orologio e ti dico quando il corpo non è d&apos;accordo.
+        Scegli come partire. Garmin è facoltativo: puoi collegarlo ora o quando vuoi dalle impostazioni.
       </SlideUp>
 
-      <SlideUp active={animate} delayMs={400} style={{ position: "relative", height: 250, marginTop: 22, flex: 1 }}>
+      <SlideUp active={animate} delayMs={400} style={{ position: "relative", height: 150, marginTop: 22 }}>
         <div
           style={{
             position: "absolute",
@@ -86,18 +84,23 @@ export default function EntryPage() {
           }}
         >
           <p style={{ font: "600 16px/1.3 var(--font-sans)", color: "var(--corallo-testo)", margin: 0, maxWidth: 135, position: "relative", zIndex: 2 }}>
-            nessuna password Passo da ricordare
+            Un piano che segue i tuoi allenamenti.
           </p>
-          <Illustration name="corsa" width={148} height={160} right={8} bottom={0} active={animate} delayMs={900} priority />
+          <Illustration name="corsa" width={130} height={145} right={8} bottom={0} active={animate} delayMs={900} priority />
         </div>
       </SlideUp>
 
-      <SlideUp active={animate} delayMs={500} style={{ marginTop: 16, paddingBottom: 22, display: "flex", flexDirection: "column", gap: 13 }}>
-        <PrimaryButton data-track="home.router-push" sheen onClick={() => router.push("/connect-garmin")}>
-          Continua
+      <SlideUp active={animate} delayMs={500} style={{ marginTop: 16, paddingBottom: 22, display: "flex", flexDirection: "column", gap: 10 }}>
+        <PrimaryButton data-track="home.connect-garmin" sheen onClick={() => router.push("/connect-garmin")}>
+          Usa il calendario Garmin
         </PrimaryButton>
-        <p style={{ font: "500 12px/1.6 var(--font-sans)", color: "var(--inchiostro-35)", textAlign: "center", margin: 0 }}>
-          L&apos;account Garmin lo colleghi dopo, quando importi il primo piano.
+        <p style={{ font: "500 12px/1.5 var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>
+          Collega Garmin per leggere calendario e attività. Un piano attivo viene inviato a Garmin Connect fino a 28 giorni; l&apos;orologio si sincronizza separatamente.
+        </p>
+        <button type="button" className="ux-button" data-track="home.create-ai" onClick={() => router.push("/week/programs/new?source=ai")}>Crea un piano con AI</button>
+        <button type="button" className="ux-button" data-track="home.import-file" onClick={() => router.push("/week/programs/new?source=import")}>Importa un file YAML/YML</button>
+        <p style={{ font: "500 12px/1.5 var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>
+          Puoi creare o importare una bozza senza collegare Garmin.
         </p>
       </SlideUp>
     </div>

@@ -39,7 +39,7 @@ export default function ConnectStravaPage() {
       </WordIn>
 
       <SlideUp active={animate} delayMs={120} className="font-serif-italic" style={{ fontSize: 16, color: "var(--inchiostro-70)", maxWidth: 300, marginTop: 8 }}>
-        Garmin ti dice cosa fare. Strava ti dice cosa hai fatto davvero: passo, battito, dislivello, sensazione.
+        Strava è facoltativo: aggiunge attività e dati che puoi confrontare con il piano, anche se usi già Garmin.
       </SlideUp>
 
       <SlideUp
@@ -48,7 +48,7 @@ export default function ConnectStravaPage() {
         style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 18, marginTop: 22, display: "flex", flexDirection: "column", gap: 14 }}
       >
         <InfoRow title="Colma le lacune del piano">
-          Ogni sessione svolta viene affiancata a quella pianificata: passo reale, frequenza cardiaca, dislivello, sensazione percepita — così vedi dove il piano ha retto e dove no.
+          Le attività importate da Strava si affiancano alle sedute pianificate. Anche Garmin può fornire attività e dati degli allenamenti.
         </InfoRow>
         <div style={{ height: 1, background: "var(--sabbia-bordo)" }} />
         <InfoRow title="Sola lettura">

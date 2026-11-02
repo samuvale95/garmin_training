@@ -82,6 +82,14 @@ export function setTrackingEnabled(enabled: boolean): void {
   }
 }
 
+/** Drop queued events when account data is cleared, while keeping the tracking choice. */
+export function clearTrackingQueue(): void {
+  queue = [];
+  if (flushTimer) clearTimeout(flushTimer);
+  flushTimer = null;
+  try { storage()?.removeItem(QUEUE_KEY); } catch {}
+}
+
 function persist(): void {
   try {
     const s = storage();
