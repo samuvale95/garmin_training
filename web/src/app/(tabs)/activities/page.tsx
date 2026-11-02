@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, type CSSProperties } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useStoredActivities } from "@/lib/queries";
@@ -10,7 +10,8 @@ import { useScreenReady } from "@/lib/useScreenReady";
 import { dis } from "@/lib/disabled";
 import { Skeleton } from "@/components/motion/primitives";
 import { WorkspaceHeading } from "@/components/Workspace";
-import { DateLead, EmptyState, RowLink, Section } from "@/components/ui";
+import { DateLead, EmptyState, RowLink, Section, SportMark } from "@/components/ui";
+import { RunnerIcon, PulseIcon, ProgramIcon } from "@/components/Icons";
 import type { StoredActivity } from "@/lib/types";
 
 const VIEWS = [
@@ -20,14 +21,7 @@ const VIEWS = [
 ] as const;
 type View = (typeof VIEWS)[number][0];
 
-const FAMILY_COLOR: Record<string, string> = {
-  run: "var(--sport-run)",
-  ride: "var(--sport-bike)",
-  swim: "var(--sport-easy)",
-  strength: "var(--sport-strength)",
-  hike: "var(--sport-long)",
-  walk: "var(--sport-rest)",
-};
+const FAMILY_COLOR: Record<string, string> = { run: "var(--sport-run)", ride: "var(--sport-bike)", swim: "var(--sport-easy)", strength: "var(--sport-strength)", hike: "var(--sport-long)", walk: "var(--sport-rest)" };
 
 const SOURCE_LABEL: Record<StoredActivity["source"], string> = { garmin: "Garmin", strava: "Strava", stima: "Valori stimati" };
 
@@ -147,7 +141,7 @@ function History({ setParam, here }: { setParam: (key: string, value: string, de
                     <li key={`${activity.source}-${activity.activity_id}`}>
                       <div className="row activity-row">
                         <DateLead date={activity.day} />
-                        <span className="sport-mark" aria-hidden="true" style={{ "--sport": FAMILY_COLOR[activity.family] ?? "var(--sport-rest)" } as CSSProperties} />
+                        <SportMark accent={FAMILY_COLOR[activity.family]} session={{ date: activity.day, sport: activity.family, title: activity.title }} />
                         <span className="row-main">
                           <span className="row-title">{activity.title || activity.label}</span>
                           <span className="row-meta">
@@ -184,14 +178,14 @@ function Trend({ here }: { here: string }) {
   const from = here;
   return (
     <div className="stack-lg">
-      <Section title="Analisi della corsa">
+      <Section icon={<RunnerIcon size={18} />} title="Analisi della corsa">
         <ul className="list">
           <li><RowLink href="/coach" from={from} track="activities.analysis" title="Tecnica" meta="Cadenza, contatto al suolo e ritmi delle ultime corse" /></li>
           <li><RowLink href="/coach/esecuzione" from={from} track="activities.execution" title="Come hai eseguito il piano" meta="Previsto ed eseguito a confronto, seduta per seduta" /></li>
           <li><RowLink href="/coach/allenarsi" from={from} track="activities.habits" title="Come ti alleni" meta="Distribuzione delle intensità e abitudini" /></li>
         </ul>
       </Section>
-      <Section title="Carico">
+      <Section icon={<PulseIcon size={18} />} title="Carico">
         <ul className="list">
           <li><RowLink href="/body/load" track="activities.load" title="Carico e forma" meta="Ultime 4 settimane, con spiegazione delle sigle" /></li>
         </ul>
@@ -207,7 +201,7 @@ function Reports({ here }: { here: string }) {
   useScreenReady(true, "/activities");
   return (
     <div className="stack-lg">
-      <Section title="Resoconti">
+      <Section icon={<ProgramIcon size={18} />} title="Resoconti">
         <ul className="list">
           <li><RowLink href="/summary" from={here} track="activities.summary" title="Resoconto della settimana" meta="Cosa hai fatto rispetto al previsto, la settimana scorsa" /></li>
           <li><RowLink href="/progress" from={here} track="activities.progress" title="Continuità" meta="Settimane di fila, punti e traguardi" /></li>

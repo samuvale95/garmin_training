@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Fragment, useState, type ReactNode } from "react";
 import { HrvCard, readinessBand, SleepCard } from "@/components/BodyCards";
 import { ProgressRing, SlideUp } from "@/components/motion/primitives";
-import { AlertTriangleIcon, BatteryIcon, CheckIcon, HeartIcon, LightningIcon, MoonIcon, PulseIcon } from "@/components/Icons";
+import { AlertTriangleIcon, BatteryIcon, CheckIcon, HeartIcon, LightningIcon, MoonIcon, PulseIcon, UtensilsIcon } from "@/components/Icons";
 import { PersonalCorrelationsCard } from "@/components/PersonalCorrelationsCard";
 import { AerobicEfficiencyCard } from "@/components/AerobicEfficiencyCard";
 import { LoadingIndicator3D } from "@/components/LoadingIndicator3D";
@@ -81,7 +81,7 @@ export function BodyView() {
   // Nutrition has one home; here only a pointer to tomorrow's fuel, when it matters.
   const fuelMatters = !!fuel && (fuel.tomorrow.load === "duro" || fuel.tomorrow.load === "molto_lungo");
   const nutritionSection = fuel && !fuelDegraded ? (
-    <Section title="Alimentazione" id="body-fuel">
+    <Section icon={<UtensilsIcon size={18} />} title="Alimentazione" id="body-fuel">
       <ul className="list">
         <li>
           <RowLink
@@ -155,7 +155,7 @@ export function BodyView() {
               </ul>
             </Section>
             {aerobicEfficiency && (
-              <Section title="Efficienza aerobica" id="body-ae">
+              <Section icon={<PulseIcon size={18} />} title="Efficienza aerobica" id="body-ae">
                 <AerobicEfficiencyCard data={aerobicEfficiency} animate={animate} />
               </Section>
             )}

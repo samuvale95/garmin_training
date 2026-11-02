@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { ContextLink } from "@/components/ContextLink";
-import { ChevronRight } from "@/components/Icons";
+import { ChevronRight, RunnerIcon, StrengthIcon, BikeIcon, SwimIcon, PauseIcon, ShoeIcon, PulseIcon } from "@/components/Icons";
 import { classifySession, sessionDurationMinutes, toDateKey, type DisplaySession } from "@/lib/sessionVisuals";
 
 /** Small building blocks of the Passo system. Styling lives in globals.css; these only
@@ -11,12 +11,12 @@ import { classifySession, sessionDurationMinutes, toDateKey, type DisplaySession
 
 export type Tone = "ok" | "warn" | "danger" | "info" | "accent" | "neutral" | "ink";
 
-export function Section({ title, action, children, id, className }: { title?: ReactNode; action?: ReactNode; children: ReactNode; id?: string; className?: string }) {
+export function Section({ title, action, children, id, className, icon }: { icon?: ReactNode; title?: ReactNode; action?: ReactNode; children: ReactNode; id?: string; className?: string }) {
   return (
     <section className={["section", className].filter(Boolean).join(" ")} aria-labelledby={id && title ? `${id}-title` : undefined}>
       {(title || action) && (
         <div className="section-head">
-          {title && <h2 className="section-title" id={id ? `${id}-title` : undefined}>{title}</h2>}
+          {title && <h2 className="section-title" id={id ? `${id}-title` : undefined}>{icon && <span className="section-icon" aria-hidden="true">{icon}</span>}{title}</h2>}
           {action}
         </div>
       )}
@@ -60,11 +60,11 @@ export function EmptyState({ title, children, actions }: { title: ReactNode; chi
   );
 }
 
-export function Stat({ value, unit, label, note }: { value: ReactNode; unit?: string; label: ReactNode; note?: ReactNode }) {
+export function Stat({ value, unit, label, note, icon }: { icon?: ReactNode; value: ReactNode; unit?: string; label: ReactNode; note?: ReactNode }) {
   return (
     <div className="stat">
       <span className="stat-value">{value}{unit && <small>{unit}</small>}</span>
-      <span className="stat-label">{label}</span>
+      <span className="stat-label">{icon && <span className="stat-icon" aria-hidden="true">{icon}</span>}{label}</span>
       {note && <span className="stat-note">{note}</span>}
     </div>
   );
@@ -99,8 +99,10 @@ export function DateLead({ date }: { date: string }) {
   );
 }
 
-export function SportMark({ session }: { session: DisplaySession | null }) {
-  return <span className="sport-mark" aria-hidden="true" style={{ "--sport": classifySession(session).accent } as CSSProperties} />;
+export function SportMark({ session, accent }: { session: DisplaySession | null; accent?: string }) {
+  const sport = session?.sport;
+  const Icon = !session ? PauseIcon : sport === "cycling" || sport === "ride" ? BikeIcon : sport === "swimming" || sport === "swim" ? SwimIcon : sport === "strength_training" || sport === "calisthenics" || sport === "strength" ? StrengthIcon : sport === "running" || sport === "run" ? RunnerIcon : sport === "walking" || sport === "hiking" || sport === "walk" || sport === "hike" ? ShoeIcon : PulseIcon;
+  return <span className="sport-mark" aria-hidden="true" style={{ "--sport": accent ?? classifySession(session).accent } as CSSProperties}><Icon size={17} /></span>;
 }
 
 /** The week as the brand mark draws it: one bar per session, its height the planned

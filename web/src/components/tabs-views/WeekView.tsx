@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PlanNavigation, WorkspaceHeading } from "@/components/Workspace";
 import { dis } from "@/lib/disabled";
-import { ChevronLeft, ChevronRight, PlusIcon } from "@/components/Icons";
+import { ChevronLeft, ChevronRight, PlusIcon, MoveIcon, WatchIcon } from "@/components/Icons";
 import { EmptyState, Notice } from "@/components/ui";
 import { DraggableWeekCard, RestCard, type DayCardData } from "@/components/WeekCards";
 import { OffPlanCard, matchPlannedActivities } from "@/components/OffPlanCard";
@@ -279,7 +279,7 @@ export function WeekPageContent() {
             <>
               <Link className="btn" data-variant="primary" href="/week/programs/new" data-track="week.empty-programs">Nuovo programma</Link>
               <Link className="btn" href="/week/new?from=%2Fweek" data-track="week.empty-single">Allenamento singolo</Link>
-              <Link className="btn" href="/connect-garmin" data-track="week.empty-connect">Collega Garmin</Link>
+              <Link className="btn" href="/connect-garmin" data-track="week.empty-connect"><WatchIcon aria-hidden="true" />Collega Garmin</Link>
             </>
           }
         >
@@ -546,7 +546,7 @@ function MoveSessionControl({ card, blocked, onMove }: { card: DayCardData; bloc
   const [error, setError] = useState(false);
   const detail = useRef<HTMLDetailsElement>(null);
   return <details className="week-move" ref={detail}>
-    <summary data-track="week.move-open">Sposta<span className="sr-only"> {card.session.title}</span></summary>
+    <summary data-track="week.move-open"><MoveIcon aria-hidden="true" /> Sposta<span className="sr-only"> {card.session.title}</span></summary>
     <form onSubmit={(event) => {
       event.preventDefault();
       if (blocked || !date || date === card.session.date) return;

@@ -13,7 +13,7 @@ import { BigEffortCard, bigEffort } from "@/components/BigEffortCard";
 import { GarminPushBar } from "@/components/GarminPushBar";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { Skeleton } from "@/components/motion/primitives";
-import { CheckIcon, UtensilsIcon } from "@/components/Icons";
+import { CheckIcon, UtensilsIcon, HeartIcon, MoonIcon, CalendarIcon, ClockIcon, DistanceIcon, WatchIcon } from "@/components/Icons";
 import { Badge, DateLead, EmptyState, Notice, RowLink, Section, SectionLink, SportMark, Stat, WeekRhythm } from "@/components/ui";
 import { currentMoment, useClockMinutes } from "@/lib/fuelMoment";
 import { useMountOnce } from "@/lib/motion";
@@ -161,7 +161,7 @@ export function TodayView() {
           actions={
             <>
               <Link className="btn" data-variant="primary" href="/week/programs" data-track="today.empty-programs">Crea o importa un programma</Link>
-              <Link className="btn" href="/connect-garmin" data-track="today.empty-connect">Collega Garmin</Link>
+              <Link className="btn" href="/connect-garmin" data-track="today.empty-connect"><WatchIcon aria-hidden="true" />Collega Garmin</Link>
             </>
           }
         >
@@ -285,16 +285,16 @@ export function TodayView() {
           </div>
 
           <aside className="stack-lg" aria-label="Recupero, alimentazione e prossimi giorni">
-            <Section title="Come stai" id="today-body" action={<SectionLink href="/body" track="today.body">Recupero</SectionLink>}>
+            <Section icon={<HeartIcon size={18} />} title="Come stai" id="today-body" action={<SectionLink href="/body" track="today.body">Recupero</SectionLink>}>
               <div className="card">
                 <div className="stats">
-                  <Stat value={readiness != null ? Math.round(readiness) : "—"} unit={readiness != null ? "/100" : undefined} label="Prontezza" note={readiness == null ? "Non disponibile" : undefined} />
-                  <Stat value={sleepMinutes != null ? formatMinutes(sleepMinutes) : "—"} label="Sonno" note={sleepMinutes == null ? "Non disponibile" : undefined} />
+                  <Stat value={readiness != null ? Math.round(readiness) : "—"} unit={readiness != null ? "/100" : undefined} icon={<HeartIcon size={15} />} label="Prontezza" note={readiness == null ? "Non disponibile" : undefined} />
+                  <Stat value={sleepMinutes != null ? formatMinutes(sleepMinutes) : "—"} icon={<MoonIcon size={15} />} label="Sonno" note={sleepMinutes == null ? "Non disponibile" : undefined} />
                 </div>
               </div>
             </Section>
 
-            <Section title="Alimentazione" id="today-fuel" action={<SectionLink href={`/nutrition?date=${todayKey}`} track="today.nutrition">Nutrizione</SectionLink>}>
+            <Section icon={<UtensilsIcon size={18} />} title="Alimentazione" id="today-fuel" action={<SectionLink href={`/nutrition?date=${todayKey}`} track="today.nutrition">Nutrizione</SectionLink>}>
               <div className="stack">
                 {fuelTargets.data && mealMoment ? (
                   <NowMealCard fuel={fuelTargets.data} moment={mealMoment} onLog={openMeal} animate={animate} delayMs={0} />
@@ -316,7 +316,7 @@ export function TodayView() {
               </div>
             </Section>
 
-            <Section title="Questa settimana" id="today-week" action={<SectionLink href="/week" track="today.open-plan">Piano</SectionLink>}>
+            <Section icon={<CalendarIcon size={18} />} title="Questa settimana" id="today-week" action={<SectionLink href="/week" track="today.open-plan">Piano</SectionLink>}>
               <div className="card">
                 <WeekRhythm
                   days={weekDays}
@@ -427,8 +427,8 @@ function SessionHero({
       <h2 className="hero-title" id="today-hero-title" style={{ paddingRight: 0 }}>{effectiveTitle(session)}</h2>
 
       <div className="hero-figures">
-        {minutes > 0 && <Stat value={formatMinutes(minutes)} label="Durata prevista" />}
-        {km > 0 && <Stat value={km.toLocaleString("it-IT", { maximumFractionDigits: 1 })} unit="km" label="Distanza stimata" />}
+        {minutes > 0 && <Stat value={formatMinutes(minutes)} icon={<ClockIcon size={15} />} label="Durata prevista" />}
+        {km > 0 && <Stat value={km.toLocaleString("it-IT", { maximumFractionDigits: 1 })} unit="km" icon={<DistanceIcon size={15} />} label="Distanza stimata" />}
         {main && <Stat value={<span style={{ fontSize: "var(--text-lg)" }}>{stepGroupLine(main)}</span>} label="Parte principale" />}
       </div>
 

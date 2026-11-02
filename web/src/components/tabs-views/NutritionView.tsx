@@ -333,7 +333,7 @@ export function NutritionView() {
         {logOpen && (
           <section className="card" aria-labelledby="meal-entry-title" style={{ marginBottom: 20 }}>
             <div className="section-head">
-              <h2 className="section-title" id="meal-entry-title">Registra un pasto di {isToday ? "oggi" : formatFullDate(logDate)}</h2>
+              <h2 className="section-title" id="meal-entry-title"><span className="section-icon" aria-hidden="true"><UtensilsIcon size={18} /></span>Registra un pasto di {isToday ? "oggi" : formatFullDate(logDate)}</h2>
               <button className="btn" data-variant="quiet" data-size="sm" data-track="nutrition.close-registration" onClick={() => { setLogOpen(false); if (from) router.push(from); }}>Annulla</button>
             </div>
             <p className="card-text" style={{ marginTop: 0 }}>Scegli come inserirlo. Prima di salvare potrai correggere porzioni e valori.</p>
@@ -363,7 +363,7 @@ export function NutritionView() {
         ) : (
           <section aria-labelledby="diary-title" className="split">
             <div className="stack">
-              <h2 className="section-title" id="diary-title">Pasti registrati</h2>
+              <h2 className="section-title" id="diary-title"><span className="section-icon" aria-hidden="true"><UtensilsIcon size={18} /></span>Pasti registrati</h2>
               {dayQuery.isPending ? (
                 <Skeleton height={120} radius={16} />
               ) : dayQuery.isError ? (

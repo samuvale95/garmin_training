@@ -292,3 +292,20 @@ export function PulseIcon({ size = 14, strokeWidth = 2, ...props }: { size?: num
     </svg>
   );
 }
+
+
+type IconProps = { size?: number; strokeWidth?: number } & SVGProps<SVGSVGElement>;
+function OutlineIcon({ size = 16, strokeWidth = 2, children, ...props }: IconProps) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" {...props}>{children}</svg>;
+}
+export function CalendarIcon(props: IconProps) { return <OutlineIcon {...props}><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></OutlineIcon>; }
+export function ProgramIcon(props: IconProps) { return <OutlineIcon {...props}><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></OutlineIcon>; }
+export function ClockIcon(props: IconProps) { return <OutlineIcon {...props}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></OutlineIcon>; }
+export function DistanceIcon(props: IconProps) { return <OutlineIcon {...props}><path d="M3 18h18M4 14l5-5 4 3 6-7M16 5h3v3"/></OutlineIcon>; }
+export function UploadIcon(props: IconProps) { return <OutlineIcon {...props}><path d="M3 15v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4M7 8l5-5 5 5M12 3v12"/></OutlineIcon>; }
+export function SparklesIcon(props: IconProps) { return <OutlineIcon {...props}><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3zM19 15l.7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7L19 15z"/></OutlineIcon>; }
+export function StrengthIcon(props: IconProps) { return <OutlineIcon {...props}><path d="M6 8v8M3 10v4M18 8v8M21 10v4M6 12h12"/></OutlineIcon>; }
+export function BikeIcon(props: IconProps) { return <OutlineIcon {...props}><circle cx="5" cy="17" r="3"/><circle cx="19" cy="17" r="3"/><path d="M5 17l4-8 4 8H5m8 0 4-7 2 7M8 9h3m5-3h2l-1 4"/></OutlineIcon>; }
+export function SwimIcon(props: IconProps) { return <OutlineIcon {...props}><circle cx="16" cy="5" r="2"/><path d="M3 14l5-5 4 3 3-2 3 3M2 18c2-2 4 2 6 0s4 2 6 0 4 2 8 0"/></OutlineIcon>; }
+export function PauseIcon(props: IconProps) { return <OutlineIcon {...props}><path d="M9 5v14M15 5v14"/></OutlineIcon>; }
+export function MoveIcon(props: IconProps) { return <OutlineIcon {...props}><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></OutlineIcon>; }

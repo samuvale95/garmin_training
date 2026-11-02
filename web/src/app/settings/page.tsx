@@ -7,6 +7,7 @@ import { isTrackingEnabled, setTrackingEnabled } from "@/lib/tracker";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { GarminSportProbe } from "@/components/GarminSportProbe";
+import { WatchIcon, RunnerIcon, TargetIcon, ShoeIcon, DownloadIcon, UploadIcon } from "@/components/Icons";
 import { Avatar } from "@/components/Avatar";
 import { RefreshButton } from "@/components/RefreshButton";
 import { WorkspaceHeading } from "@/components/Workspace";
@@ -116,7 +117,7 @@ export default function SettingsPage() {
           </div>
         </Section>
 
-        <Section title="Connessioni" id="profile-connections">
+        <Section icon={<WatchIcon size={18} />} title="Connessioni" id="profile-connections">
           <ul className="list">
             <li>
               <div className="row">
@@ -170,12 +171,12 @@ export default function SettingsPage() {
           </ul>
         </Section>
 
-        <Section title="Atleta e attrezzatura" id="profile-athlete">
+        <Section icon={<RunnerIcon size={18} />} title="Atleta e attrezzatura" id="profile-athlete">
           <ul className="list">
             <li><RowLink href="/settings/body" track="settings.settings-body" title="Il tuo corpo" meta="Peso, altezza ed età, usati per le indicazioni" /></li>
             <li><RowLink href="/settings/level" track="settings.settings-level" title="Livello" meta={athleteLevel ? `Livello ${athleteLevel.level}${athleteLevel.level_name ? ` · ${athleteLevel.level_name}` : ""}` : "Da abitudine ad atleta"} /></li>
-            <li><RowLink href="/week/goals" track="settings.settings-goal" title="Obiettivi" meta={plan?.goal ? `${goalTitle(plan.goal)} · ${countdownLabel(plan.goal)}` : "Gara, prestazione, forza o costanza"} /></li>
-            <li><RowLink href="/shoes?from=/settings" track="settings.shoes-from-settings" title="Scarpe" meta="Chilometri e usura, da Strava" /></li>
+            <li><RowLink href="/week/goals" track="settings.settings-goal" lead={<span className="row-lead"><TargetIcon size={20} aria-hidden="true" /></span>} title="Obiettivi" meta={plan?.goal ? `${goalTitle(plan.goal)} · ${countdownLabel(plan.goal)}` : "Gara, prestazione, forza o costanza"} /></li>
+            <li><RowLink href="/shoes?from=/settings" track="settings.shoes-from-settings" lead={<span className="row-lead"><ShoeIcon size={20} aria-hidden="true" /></span>} title="Scarpe" meta="Chilometri e usura, da Strava" /></li>
             {isAdmin?.is_admin && <li><RowLink href="/settings/agents" track="settings.settings-agents" title="Agenti" meta="Proposte, esecuzioni e budget" /></li>}
           </ul>
           {isAdmin?.is_admin && <div className="card" style={{ marginTop: 10 }}><GarminSportProbe /></div>}
@@ -195,13 +196,13 @@ export default function SettingsPage() {
             <p className="card-text" style={{ marginTop: 0 }}>Ogni modifica fatta nell’app viene scritta anche nel file, che puoi scaricare quando vuoi.</p>
             <div className="actions">
               <button type="button" className="btn" data-size="sm" data-track="settings.plan" {...dis(!plan, "dati_non_caricati")} onClick={() => plan && downloadPlanYaml(plan.sessions, plan.filename ?? "piano.yaml", plan.goal)}>
-                Scarica {plan?.filename ?? "il file YAML"}
+                <DownloadIcon aria-hidden="true" /> Scarica {plan?.filename ?? "il file YAML"}
               </button>
               <button type="button" className="btn" data-size="sm" data-track="settings.plan-enriched" {...dis(!plan, "dati_non_caricati")} onClick={() => plan && downloadEnrichedPlanYaml()}>
-                Scarica con storico e carichi
+                <DownloadIcon aria-hidden="true" /> Scarica con storico e carichi
               </button>
               <Link className="btn" data-size="sm" href="/week/programs/new?source=import" data-track="settings.import-plan">
-                {plan ? "Importa un nuovo file" : "Importa un file"}
+                <UploadIcon aria-hidden="true" /> {plan ? "Importa un nuovo file" : "Importa un file"}
               </Link>
             </div>
           </div>

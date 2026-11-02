@@ -3,7 +3,7 @@ import { sessionFallbackPaceSecPerKm, stepDistanceKm } from "./format";
 import { flattenSteps, isRepeatBlock } from "./types";
 import type { ScheduledWorkout, SessionStep, ShortVariant, Sport, TrainingSession } from "./types";
 
-export type SessionKind = "riposo" | "ripetute" | "fondo_lento" | "forza" | "lungo" | "calisthenics" | "bici";
+export type SessionKind = "riposo" | "ripetute" | "fondo_lento" | "forza" | "lungo" | "calisthenics" | "bici" | "nuoto";
 
 /** Shared shape for anything rendered on Oggi/Settimana -- an imported plan's
  * `TrainingSession` (steps present, distance/interval-aware) or a raw Garmin
@@ -38,6 +38,7 @@ const VISUALS: Record<SessionKind, Omit<SessionVisual, "kind">> = {
   fondo_lento: { label: "Fondo lento", background: "var(--sport-easy-soft)", foreground: "var(--azzurro-testo)", accent: "var(--sport-easy)", illustration: "fondo_lento" },
   forza: { label: "Forza", background: "var(--sport-strength-soft)", foreground: "var(--giallo-testo)", accent: "var(--sport-strength)", illustration: "forza" },
   calisthenics: { label: "Calisthenics", background: "var(--sport-cali-soft)", foreground: "var(--lilla-testo)", accent: "var(--sport-cali)", illustration: "forza" },
+  nuoto: { label: "Nuoto", background: "var(--sport-easy-soft)", foreground: "var(--azzurro-testo)", accent: "var(--sport-easy)", illustration: null },
   bici: { label: "Bici", background: "var(--sport-bike-soft)", foreground: "#0f4440", accent: "var(--sport-bike)", illustration: "bici" },
   lungo: { label: "Lungo", background: "var(--sport-long-soft)", foreground: "var(--verde-testo)", accent: "var(--sport-long)", illustration: "corsa" },
 };
@@ -85,6 +86,7 @@ export function classifySession(session: DisplaySession | null): SessionVisual {
   if (session.sport === "calisthenics") return { kind: "calisthenics", ...VISUALS.calisthenics };
   if (session.sport === "strength_training") return { kind: "forza", ...VISUALS.forza };
   if (session.sport === "cycling") return { kind: "bici", ...VISUALS.bici };
+  if (session.sport === "swimming") return { kind: "nuoto", ...VISUALS.nuoto };
 
   const steps = effectiveSteps(session);
   const efforts = flattenSteps(steps).filter((s) => s.type === "interval").length;

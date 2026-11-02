@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
+import { CalendarIcon, ProgramIcon, TargetIcon } from "@/components/Icons";
 import { Avatar } from "@/components/Avatar";
 import { TabBar } from "@/components/TabBar";
 import { isPrimaryRoute } from "@/lib/navigation";
@@ -63,9 +64,9 @@ export function Workspace({ children }: { children: ReactNode }) {
 }
 
 const PLAN_SECTIONS = [
-  ["/week", "Calendario"],
-  ["/week/programs", "Programmi"],
-  ["/week/goals", "Obiettivi"],
+  ["/week", "Calendario", CalendarIcon],
+  ["/week/programs", "Programmi", ProgramIcon],
+  ["/week/goals", "Obiettivi", TargetIcon],
 ] as const;
 
 /** Calendario · Programmi · Obiettivi: the three stable parts of Piano. */
@@ -73,9 +74,9 @@ export function PlanNavigation() {
   const pathname = usePathname();
   return (
     <nav className="subnav" aria-label="Sezioni del piano">
-      {PLAN_SECTIONS.map(([href, label]) => (
+      {PLAN_SECTIONS.map(([href, label, Icon]) => (
         <Link key={href} href={href} aria-current={pathname === href || (href !== "/week" && pathname.startsWith(`${href}/`)) ? "page" : undefined} data-track={`plan-nav.${label.toLowerCase()}`}>
-          {label}
+          <Icon size={17} aria-hidden="true" />{label}
         </Link>
       ))}
     </nav>
