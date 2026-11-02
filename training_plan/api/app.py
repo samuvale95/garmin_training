@@ -42,6 +42,7 @@ from .routes_energy import router as energy_router
 from .routes_events import router as events_router
 from .routes_agents import cron_router as agents_cron_router
 from .routes_agents import router as agents_router
+from . import keepalive
 from .routes_batch import router as batch_router
 from .routes_diagnostics import router as diagnostics_router
 
@@ -117,6 +118,8 @@ def _ensure_schema() -> None:
     start rather than gating it behind a separate migration step for a two-table app."""
     db.ensure_schema()
     user_tokenstore.ensure_schema()
+    # Daytime self-ping so the free Render service does not sleep (see keepalive.py).
+    keepalive.start()
     # The stored history too: readers filter on columns its migration adds, so it has to
     # have run before the first request, not whenever a backfill next happens.
     history.ensure_schema()
