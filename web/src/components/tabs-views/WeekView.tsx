@@ -109,7 +109,7 @@ export function WeekPageContent() {
   const stravaEnabled = !!stravaStatus.data?.connected && planSessions.length > 0;
   const stravaMatches = useStravaActivityMatches(planSessions, stravaEnabled);
   const prefetchWorkoutSession = usePrefetchWorkoutSession();
-  const moveSession = useMoveSession();
+  const { move: moveSession, busy: moveBusy } = useMoveSession();
   const rescheduleWorkout = useRescheduleWorkout();
   // While the server rewrites the next weeks, their days hold still: a move made now
   // would race the generation, and the plan adopted when it finishes could hide it.
@@ -133,19 +133,19 @@ export function WeekPageContent() {
   const pointerPageY = useRef<number | null>(null);
   const swipeHandled = useRef(false);
 
-  const dayKeyAtPageY = useCallback((pageY: number): string | null => {
+  const dayKeyAtPoint = useCallback((pageX: number, pageY: number): string | null => {
     for (const [key, el] of dayRowRefs.current) {
       if (!el) continue;
       const rect = el.getBoundingClientRect();
-      if (pageY >= rect.top + window.scrollY && pageY <= rect.bottom + window.scrollY) return key;
+      if (pageX >= rect.left + window.scrollX && pageX <= rect.right + window.scrollX && pageY >= rect.top + window.scrollY && pageY <= rect.bottom + window.scrollY) return key;
     }
     return null;
   }, []);
 
   const handleDragOver = useCallback(
-    (pageY: number) => {
+    (pageX: number, pageY: number) => {
       pointerPageY.current = pageY;
-      const key = dayKeyAtPageY(pageY);
+      const key = dayKeyAtPoint(pageX, pageY);
       if (key === hoverKeyRef.current) return;
       hoverKeyRef.current = key;
       setHoverDayKey(key);
@@ -153,7 +153,7 @@ export function WeekPageContent() {
       // under the finger, where it can't be seen.
       if (key) haptic(6);
     },
-    [dayKeyAtPageY]
+    [dayKeyAtPoint]
   );
 
   const handleDragStateChange = useCallback((card: DayCardData, dragging: boolean) => {
@@ -166,9 +166,9 @@ export function WeekPageContent() {
     }
   }, []);
 
-  function handleCardDrop(card: DayCardData, pageY: number) {
-    const targetKey = dayKeyAtPageY(pageY);
-    if (!targetKey || targetKey === card.session.date) return;
+  function handleCardDrop(card: DayCardData, pageX: number, pageY: number) {
+    const targetKey = dayKeyAtPoint(pageX, pageY);
+    if (!targetKey || targetKey < todayKey || targetKey === card.session.date || rescheduleWorkout.isPending || moveBusy) return;
     if (isRewritten(targetKey) || isRewritten(card.session.date)) {
       haptic([30, 30, 30]);
       return;
@@ -368,7 +368,9 @@ export function WeekPageContent() {
         )}
         {weekSessions.length > 0 && (
           <p className="muted" style={{ margin: "0 0 12px", fontSize: "var(--text-sm)", color: carried ? "var(--accent-ink)" : undefined }} aria-live="polite">
-            {rewriting
+            {moveBusy || rescheduleWorkout.isPending
+              ? "Spostamento in corso…"
+              : rewriting
               ? `Sto riscrivendo i giorni fino a ${formatShortDate(rewriteUntil)}: potrai spostarli appena ho finito.`
               : carried
                 ? "Rilascia sul giorno in cui spostarla."
@@ -401,7 +403,7 @@ export function WeekPageContent() {
                 const isToday = day.key === todayKey;
                 const isPast = day.key < todayKey;
                 const match = stravaMatches.data?.matches[day.key];
-                const isDropTarget = !!carried && hoverDayKey === day.key && carried.session.date !== day.key;
+                const isDropTarget = !!carried && hoverDayKey === day.key && day.key >= todayKey && !isRewritten(day.key) && carried.session.date !== day.key;
                 return (
                   <section
                     key={day.key}
@@ -433,6 +435,7 @@ export function WeekPageContent() {
                               delayMs={0}
                               matchKm={j === 0 && match?.matched ? match.distance_km ?? null : day.done[j]?.distance_km ?? null}
                               done={!!day.done[j] || (j === 0 && !!match?.matched)}
+                              draggable={!isPast && !day.done[j] && !(j === 0 && match?.matched) && !isRewritten(day.key) && !rescheduleWorkout.isPending && !moveBusy}
                               onDragStateChange={(dragging) => handleDragStateChange(card, dragging)}
                               onDragOver={handleDragOver}
                               onDrop={handleCardDrop}
@@ -440,7 +443,7 @@ export function WeekPageContent() {
                               emphasis={j === 0 && day.key === nextDayKey ? (isToday ? "oggi" : "prossimo") : null}
                             />
                             {/* Done or past sessions have nothing to move to. */}
-                            {!day.done[j] && card.session.date >= todayKey && <MoveSessionControl card={card} blocked={isRewritten(card.session.date) || rescheduleWorkout.isPending} onMove={(date) => {
+                            {!day.done[j] && !(j === 0 && match?.matched) && card.session.date >= todayKey && <MoveSessionControl card={card} blocked={isRewritten(card.session.date) || rescheduleWorkout.isPending || moveBusy} onMove={(date) => {
                               if (isRewritten(date) || isRewritten(card.session.date)) return false;
                               if (card.planId) moveSession(card.planId, card.session.date, date);
                               else if (card.workout) rescheduleWorkout.mutate({ workout: card.workout, newDate: date });

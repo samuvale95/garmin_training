@@ -54,8 +54,9 @@ interface DraggableWeekCardProps {
   /** True once this card has been picked up, so the row it came from can be marked. */
   onDragStateChange: (dragging: boolean) => void;
   /** Page-space pointer position, per frame, while the card is being carried. */
-  onDragOver: (pageY: number) => void;
-  onDrop: (card: DayCardData, pageY: number) => void;
+  onDragOver: (pageX: number, pageY: number) => void;
+  onDrop: (card: DayCardData, pageX: number, pageY: number) => void;
+  draggable: boolean;
   onPrefetch?: () => void;
   /** "oggi" / "prossimo": the session the week is waiting on, drawn louder than the rest
    * so it is found without reading the list. */
@@ -88,7 +89,7 @@ type Phase = "idle" | "pressing" | "dragging";
  * snap-back has to be explicit. On a real move the card's `key` lives under a different
  * day row after the state update and this instance unmounts anyway. */
 // `animate`/`delayMs` are accepted for call-site compatibility; cards no longer enter one by one.
-export function DraggableWeekCard({ card, matchKm, done = false, onDragStateChange, onDragOver, onDrop, onPrefetch, emphasis = null }: DraggableWeekCardProps) {
+export function DraggableWeekCard({ card, matchKm, done = false, onDragStateChange, onDragOver, onDrop, onPrefetch, draggable, emphasis = null }: DraggableWeekCardProps) {
   const { reduced } = useMotionEnabled();
   const dragControls = useDragControls();
   const [phase, setPhase] = useState<Phase>("idle");
@@ -139,7 +140,7 @@ export function DraggableWeekCard({ card, matchKm, done = false, onDragStateChan
   useEffect(() => () => clearPress(), [clearPress]);
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (event.button !== 0) return;
+    if (!draggable || event.button !== 0) return;
     const nativeEvent = event.nativeEvent;
     pressOrigin.current = { x: event.clientX, y: event.clientY };
     setPhase("pressing");
@@ -201,16 +202,16 @@ export function DraggableWeekCard({ card, matchKm, done = false, onDragStateChan
   return (
     <motion.div
       className={`week-card${lifted ? " is-dragging" : ""}`}
-      drag="y"
+      drag={draggable}
       dragControls={dragControls}
       dragListener={false}
       dragMomentum={false}
       dragSnapToOrigin
       onDragEnd={(_event, info) => {
-        onDrop(card, info.point.y);
+        onDrop(card, info.point.x, info.point.y);
         endGesture();
       }}
-      onDrag={(_event, info) => onDragOver(info.point.y)}
+      onDrag={(_event, info) => onDragOver(info.point.x, info.point.y)}
       animate={
         reduced
           ? undefined
@@ -251,9 +252,9 @@ export function DraggableWeekCard({ card, matchKm, done = false, onDragStateChan
       ) : (
         body
       )}
-      <span aria-hidden="true" className="session-card-grip" title="Tieni premuto per trascinare">
+      {draggable && <span aria-hidden="true" className="session-card-grip" title="Tieni premuto per trascinare">
         {Array.from({ length: 6 }).map((_, i) => <i key={i} />)}
-      </span>
+      </span>}
     </motion.div>
   );
 }

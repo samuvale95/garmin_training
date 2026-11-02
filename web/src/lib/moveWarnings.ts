@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { apiPost } from "./apiClient";
 import { useUpdateSession } from "./queries";
 import type { MoveCheck, MoveWarning, TrainingSession } from "./types";
@@ -62,10 +62,20 @@ export function checkMoveAfterwards(sessionId: string, from: string, to: string)
 /** Move a plan session to another day, then check the move. */
 export function useMoveSession() {
   const updateSession = useUpdateSession();
-  return (sessionId: string, from: string, to: string) => {
-    updateSession(sessionId, (s: TrainingSession) => ({ ...s, date: to }));
-    checkMoveAfterwards(sessionId, from, to);
+  const inFlight = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const move = (sessionId: string, from: string, to: string) => {
+    if (inFlight.current || from === to) return;
+    inFlight.current = true;
+    setBusy(true);
+    void updateSession(sessionId, (s: TrainingSession) => ({ ...s, date: to })).then((saved) => {
+      if (saved) checkMoveAfterwards(sessionId, from, to);
+    }).finally(() => {
+      inFlight.current = false;
+      setBusy(false);
+    });
   };
+  return { move, busy };
 }
 
 export const EVIDENCE_LABELS: Record<MoveWarning["evidence"], string> = {

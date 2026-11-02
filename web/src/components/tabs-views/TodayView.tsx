@@ -226,6 +226,7 @@ export function TodayView() {
               <SessionHero
                 session={heroSession}
                 isToday={heroSession?.date === todayKey}
+                hasTodaySession={todaySessions.length > 0}
                 href={heroSession ? hrefFor(heroSession) : "/week"}
                 done={heroSession ? doneOn(heroSession) : false}
                 verdict={heroSession?.date === todayKey ? verdictQuery.data ?? null : null}
@@ -363,6 +364,7 @@ export function TodayView() {
 function SessionHero({
   session,
   isToday,
+  hasTodaySession,
   href,
   done,
   verdict,
@@ -371,6 +373,7 @@ function SessionHero({
 }: {
   session: DisplaySession | null;
   isToday: boolean;
+  hasTodaySession: boolean;
   href: string;
   done: boolean;
   verdict: DayVerdict | null;
@@ -398,19 +401,21 @@ function SessionHero({
   const steps = effectiveSteps(session);
   const groups = steps.length > 0 ? groupSteps(steps) : [];
   const main = groups.find((g) => g.kind === "interval") ?? null;
-  const badge = verdict && verdict.has_data ? VERDICT_BADGE[verdict.state] : undefined;
+  const badge = isToday && verdict && verdict.has_data ? VERDICT_BADGE[verdict.state] : undefined;
   const when = isToday ? "Oggi" : capitalize(relativeDayLabel(session.date, today));
   const restToday = !isToday;
 
   return (
+    <>
+    {restToday && <section className="today-rest"><strong>{hasTodaySession ? "Oggi · Allenamento in programma" : "Oggi · Riposo"}</strong><span>{hasTodaySession ? "Le sedute di oggi sono indicate qui sotto." : "Nessun allenamento in programma oggi."}</span></section>}
     <article className="hero" data-sport style={{ "--sport": visual.accent } as CSSProperties} aria-labelledby="today-hero-title">
+      {restToday && <p className="today-next-heading">Prossimo allenamento <span>{when} · {formatFullDate(session.date)}</span></p>}
       <div className="hero-kicker">
         <span className="sport-tag" style={{ "--sport": visual.accent } as CSSProperties}>
           <SportMark session={session} />
           {visual.label}
         </span>
-        <span aria-hidden="true">·</span>
-        <span>{restToday ? `${when}, ${formatFullDate(session.date)}` : when}</span>
+        {!restToday && <><span aria-hidden="true">·</span><span>{when}</span></>}
         {done ? <Badge tone="ok"><CheckIcon size={12} aria-hidden="true" />Svolto</Badge> : null}
         {session.is_short_active && <Badge tone="accent">Versione breve</Badge>}
         {badge && (
@@ -419,7 +424,6 @@ function SessionHero({
           </Link>
         )}
       </div>
-      {restToday && <p className="hero-text" style={{ marginTop: 6 }}>Oggi è un giorno di riposo. La prossima seduta:</p>}
       <h2 className="hero-title" id="today-hero-title" style={{ paddingRight: 0 }}>{effectiveTitle(session)}</h2>
 
       <div className="hero-figures">
@@ -447,7 +451,7 @@ function SessionHero({
 
       <div className="hero-actions">
         <ContextLink className="btn" data-variant="primary" href={href} from="/today" data-track="today.open-session">
-          {done ? "Apri il resoconto" : "Apri allenamento"}
+          {done ? "Apri il resoconto" : restToday ? (when.toLowerCase() === "domani" ? "Apri allenamento di domani" : `Apri allenamento del ${formatFullDate(session.date)}`) : "Apri allenamento"}
         </ContextLink>
       </div>
       {visual.illustration && (
@@ -456,5 +460,6 @@ function SessionHero({
         </div>
       )}
     </article>
+    </>
   );
 }

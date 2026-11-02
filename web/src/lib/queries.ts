@@ -479,18 +479,20 @@ export function useUpdateSession() {
   return (id: string, updater: (session: TrainingSession) => TrainingSession) => {
     const current = queryClient.getQueryData<PlanState | null>(PLAN_KEY);
     const before = current?.sessions.find((s) => s.id === id);
-    if (!before) return;
+    if (!before) return Promise.resolve(false);
     const after: TrainingSession = { ...updater(before), id, origin: before.origin, locked: true };
     replaceSessionLocally(queryClient, id, () => after);
 
-    apiPatch<TrainingSession>(`/plan/sessions/${id}`, contentOf(after))
+    return apiPatch<TrainingSession>(`/plan/sessions/${id}`, contentOf(after))
       .then((saved) => {
         replaceSessionLocally(queryClient, id, () => saved);
         nudgeGarminPush(queryClient);
+        return true;
       })
       .catch(() => {
         replaceSessionLocally(queryClient, id, () => before);
         reportSaveFailed();
+        return false;
       });
   };
 }

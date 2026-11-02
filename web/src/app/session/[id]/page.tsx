@@ -49,7 +49,7 @@ export default function SessionDetailPage() {
     ? workoutsQuery.workouts.find((w) => normalizeTitle(w.title) === normalizeTitle(session.title))
     : undefined;
 
-  const moveSession = useMoveSession();
+  const { move: moveSession } = useMoveSession();
   const applyDeletion = useApplyDeletion();
 
   const [confirmDelete, setConfirmDelete] = useState(false);
