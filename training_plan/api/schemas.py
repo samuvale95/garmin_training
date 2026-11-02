@@ -2406,7 +2406,7 @@ class EFTrendOut(BaseModel):
         )
 
 
-class FindingOut(BaseModel):
+class EfficiencyFindingOut(BaseModel):
     key: str
     headline: str
     measured: str
@@ -2419,7 +2419,7 @@ class FindingOut(BaseModel):
 class AerobicEfficiencyResponse(BaseModel):
     trend: EFTrendOut | None = None
     history: list[EFPointOut] = Field(default_factory=list)
-    findings: list[FindingOut] = Field(default_factory=list)
+    findings: list[EfficiencyFindingOut] = Field(default_factory=list)
 
     @classmethod
     def from_model(cls, res: "aerobic_efficiency.AerobicEfficiencyResult") -> "AerobicEfficiencyResponse":
@@ -2427,7 +2427,7 @@ class AerobicEfficiencyResponse(BaseModel):
             trend=EFTrendOut.from_model(res.trend) if res.trend else None,
             history=[EFPointOut.from_model(p) for p in res.history],
             findings=[
-                FindingOut(
+                EfficiencyFindingOut(
                     key=f.key,
                     headline=f.headline,
                     measured=f.measured,
