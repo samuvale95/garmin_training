@@ -1,0 +1,29 @@
+# Wakes the API just before 08:00 Italian time. During the day the API keeps itself
+# awake (training_plan/api/keepalive.py), but a sleeping service cannot wake itself.
+#
+# GitHub cron runs in UTC and has no time zones: 05:50 and 06:50 UTC cover 07:50 in
+# both summer (UTC+2) and winter (UTC+1) time. The earlier one in winter only wakes it
+# at 06:50; it falls asleep again by 07:05, and the 06:50 UTC run wakes it at 07:50.
+# Two short runs a day, about 60 minutes of Actions a month.
+name: keepalive
+
+on:
+  schedule:
+    - cron: "50 5,6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake the API
+        env:
+          API_URL: ${{ vars.PASSO_API_URL }}
+        run: |
+          url="${API_URL:-https://passo-api.onrender.com}/health"
+          for attempt in 1 2 3 4; do
+            if curl -fsS --max-time 90 "$url"; then exit 0; fi
+            sleep 15
+          done
+          echo "API did not answer"; exit 1
