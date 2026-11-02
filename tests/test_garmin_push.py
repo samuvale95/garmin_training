@@ -95,6 +95,100 @@ def test_an_edit_reaches_garmin_without_any_sync_screen(world):
     assert run(sync).pushed == 0
 
 
+def test_marking_a_saved_plan_pending_does_not_reupload_unchanged_workouts(world):
+    plan, links, sync = world
+    plan["a"] = _session(3)
+    run(sync)
+    original_id = links["a"]["workout_id"]
+    garmin_push.mark_pending("u", ["a"])
+    assert links["a"]["status"] == "pending"
+    assert run(sync).pushed == 0
+    assert links["a"]["status"] == "ok"
+    assert links["a"]["workout_id"] == original_id
+
+
+@pytest.mark.parametrize("removed", [True, False])
+@pytest.mark.parametrize("rate_limited", [True, False])
+def test_reactivated_session_restores_schedule_after_partial_removal(world, monkeypatch, removed, rate_limited):
+    plan, links, sync = world
+    original = _session(3)
+    plan["a"] = original
+    run(sync)
+    if removed:
+        del plan["a"]
+    else:
+        plan["a"] = _session(3, title="Corsa modificata")
+    delete = sync.client.delete_workout
+
+    def fail_delete(_workout_id):
+        if rate_limited:
+            raise GarminRateLimitError("429", retry_after_seconds=60)
+        raise RuntimeError("offline")
+
+    monkeypatch.setattr(sync.client, "delete_workout", fail_delete)
+    run(sync)
+    assert sync.client.calendar() == []  # unscheduled before deletion failed
+    plan["a"] = original
+    garmin_push.mark_pending("u", ["a"])
+    monkeypatch.setattr(sync.client, "delete_workout", delete)
+    assert run(sync).pushed == 1
+    assert sync.client.calendar() == [("2026-11-03", "Corsa facile")]
+    assert links["a"]["status"] == "ok"
+
+
+def test_status_includes_failed_removal_and_global_start_error(monkeypatch):
+    class Cursor:
+        def __init__(self):
+            self.rows = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def execute(self, query, params):
+            self.rows = [] if "FROM plan_session ps" in query else [{
+                "session_id": "removed", "garmin_date": TODAY, "plan_id": None,
+                "title": None, "status": "failed", "error": "rimozione: offline",
+            }]
+
+        def fetchall(self):
+            return self.rows
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def cursor(self, **kwargs):
+            return Cursor()
+
+    monkeypatch.setattr(garmin_push.db, "connect", Connection)
+    garmin_push.record_run_error("u", RuntimeError("Garmin non collegato"))
+    try:
+        state = garmin_push.status("u", TODAY)
+        assert state["run_error"] == "Garmin non collegato"
+        assert state["counts"]["failed"] == 1
+        assert state["sessions"][0]["removing"] is True
+        assert state["sessions"][0]["error"] == "rimozione: offline"
+    finally:
+        garmin_push._run_errors.pop("u", None)
+
+
+def test_run_for_exposes_session_start_failure_and_clears_after_retry(world):
+    plan, links, sync = world
+    def disconnected(_work):
+        raise RuntimeError("Garmin non collegato")
+
+    assert garmin_push.run_for("u", disconnected) is None
+    assert garmin_push._run_errors["u"] == "Garmin non collegato"
+    garmin_push.run_for("u", lambda work: work(sync))
+    assert "u" not in garmin_push._run_errors
+
+
 def test_a_moved_session_leaves_its_old_day(world):
     plan, links, sync = world
     plan["a"] = _session(3)

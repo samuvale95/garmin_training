@@ -247,11 +247,15 @@ def _kick(user_id: str, *, force: bool = False) -> bool:
     if not force and now - _last_kick.get(user_id, 0.0) < PUSH_RETRY_EVERY_S:
         return False
     _last_kick[user_id] = now
-    threading.Thread(
-        target=garmin_push.run_for,
-        args=(user_id, lambda work: garmin_session.run(user_id, work)),
-        daemon=True,
-    ).start()
+    try:
+        threading.Thread(
+            target=garmin_push.run_for,
+            args=(user_id, lambda work: garmin_session.run(user_id, work)),
+            daemon=True,
+        ).start()
+    except Exception as exc:  # noqa: BLE001 - visible in push status for retry
+        garmin_push.record_run_error(user_id, exc)
+        return False
     return True
 
 
@@ -259,7 +263,7 @@ def _kick(user_id: str, *, force: bool = False) -> bool:
 async def push_status(user_id: str = Depends(current_user_id)) -> dict:
     """Which plan sessions are on Garmin, on their way, or failed (with why)."""
     result = await run_in_threadpool(garmin_push.status, user_id)
-    if not result["running"] and (result["counts"]["pending"] or result["counts"]["failed"]):
+    if not result["running"] and (result["counts"]["pending"] or result["counts"]["failed"] or result["run_error"]):
         result["running"] = _kick(user_id)
     return result
 

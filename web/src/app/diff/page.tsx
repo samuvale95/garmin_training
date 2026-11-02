@@ -21,13 +21,13 @@ export default function DiffPage() {
   const markStarted = useSyncFlowStore((s) => s.markStarted);
 
   const diff = plan ? diffQuery.data : undefined;
-  useScreenReady(!!diff || diffQuery.isError);
+  useScreenReady(!!diff || diffQuery.isError || !!plan && plan.sessions.length === 0);
 
   async function writeNewOnly() {
     if (!diff) return;
     setSelection(diff.to_create, []);
-    markStarted();
     const { job_id } = await startSync.mutateAsync({ to_create: diff.to_create, changed: [] });
+    markStarted();
     router.push(`/sync?job=${job_id}`);
   }
 
@@ -42,13 +42,13 @@ export default function DiffPage() {
       <div style={{ padding: "24px 22px 16px", background: "var(--crema)", position: "sticky", top: 0, zIndex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <PageHeader backHref="/week" />
-          <span style={{ fontSize: 13, color: "var(--inchiostro-70)", fontWeight: 500 }}>Nulla è ancora stato inviato</span>
+          <span style={{ fontSize: 13, color: "var(--inchiostro-70)", fontWeight: 500 }}>Confronto con Garmin Connect</span>
         </div>
         <h1 className="page-title" style={{ fontSize: "var(--text-3xl)", margin: "12px 0 6px" }}>
-          {diff ? `${capitalize(numberToItalianWords(diff.to_create.length + diff.changed.length))} ${diff.to_create.length + diff.changed.length === 1 ? "modifica da inviare" : "modifiche da inviare"}` : "Modifiche da inviare"}
+          {diff && diff.to_create.length + diff.changed.length === 0 ? "Nessuna modifica da inviare" : diff ? `${capitalize(numberToItalianWords(diff.to_create.length + diff.changed.length))} ${diff.to_create.length + diff.changed.length === 1 ? "modifica da inviare" : "modifiche da inviare"}` : "Confronto Garmin Connect"}
         </h1>
         <p className="font-serif-italic" style={{ fontSize: 15.5, color: "var(--inchiostro-70)", margin: "0 0 14px" }}>
-          Il piano nell’app e il calendario Garmin non coincidono. Controlla cosa cambierà sull’orologio prima di confermare.
+          Il piano attivo viene inviato automaticamente a Garmin Connect. Qui puoi confrontare e avviare un invio manuale; l’orologio si sincronizza separatamente.
         </p>
         {diff && (
           <div style={{ display: "flex", gap: 8 }}>
@@ -60,7 +60,10 @@ export default function DiffPage() {
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "0 22px", display: "flex", flexDirection: "column", gap: 10 }}>
-        {!diff &&
+        {diffQuery.isError && <div role="alert" className="ux-error"><p>Impossibile caricare il confronto con Garmin Connect.</p><button className="ux-button" data-track="diff.retry" onClick={() => diffQuery.refetch()}>Riprova</button></div>}
+        {startSync.isError && <div role="alert" className="ux-error">Impossibile avviare l’invio a Garmin Connect. Riprova.</div>}
+        {diff && diff.to_create.length + diff.changed.length === 0 && <div role="status" className="ux-notice">Non ci sono modifiche da inviare. Torna al piano per controllare lo stato dell’invio automatico.</div>}
+        {!diff && !diffQuery.isError && !!plan?.sessions.length &&
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} height={64} radius={18} />)}
 
         {diff?.to_create.map((session, i) => (
@@ -84,12 +87,12 @@ export default function DiffPage() {
           background: "linear-gradient(to top, var(--crema) 62%, transparent)",
         }}
       >
-        <PrimaryButton data-track="diff.writenewonly"
+        {diff && diff.to_create.length + diff.changed.length === 0 ? <button type="button" className="ux-button ux-button-primary" data-track="diff.return" onClick={() => router.push("/week/programs#programs-garmin")}>Torna al piano</button> : <PrimaryButton data-track="diff.writenewonly"
           state={!diff || diff.to_create.length === 0 ? "disabled" : startSync.isPending ? "loading" : "idle"}
           onClick={writeNewOnly}
         >
           {diff ? (diff.to_create.length === 1 ? "Invia a Garmin la nuova seduta" : `Invia a Garmin le ${diff.to_create.length} nuove sedute`) : "Confronto in corso…"}
-        </PrimaryButton>
+        </PrimaryButton>}
         {diff && diff.changed.length > 0 && (
           <button data-track="diff.reviewchanged"
             type="button"

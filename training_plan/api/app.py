@@ -102,11 +102,16 @@ async def _push_plan_to_garmin(request: Request, call_next):
             user_id = current_claims(authorization=request.headers.get("authorization"))["sub"]
         except Exception:  # noqa: BLE001 - no user, nothing to push for
             return response
-        threading.Thread(
-            target=garmin_push.run_for,
-            args=(user_id, lambda work: garmin_session.run(user_id, work)),
-            daemon=True,
-        ).start()
+        try:
+            pending = [s["session_id"] for s in garmin_push.status(user_id)["sessions"]]
+            garmin_push.mark_pending(user_id, pending)
+            threading.Thread(
+                target=garmin_push.run_for,
+                args=(user_id, lambda work: garmin_session.run(user_id, work)),
+                daemon=True,
+            ).start()
+        except Exception as exc:  # noqa: BLE001 - the plan save has already succeeded
+            garmin_push.record_run_error(user_id, exc)
     return response
 
 

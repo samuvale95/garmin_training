@@ -13,6 +13,7 @@ import { ApiError } from "@/lib/apiClient";
 import { normalizeTitle, sessionDurationMinutes, parseDateKey, shiftDateKey, toDateKey } from "@/lib/sessionVisuals";
 import { capitalize, formatFullDate, formatPaceMinSec, formatShortDate, formatPaceRange, parsePaceMinSec, stepTypeHint, stepTypeLabel } from "@/lib/format";
 import { isRepeatBlock } from "@/lib/types";
+import { parseTargetRange, stripEditableSteps, validPoolLength } from "@/lib/workoutEditorSteps";
 import type { ScheduledWorkout, SessionStep, Sport, Step, StepType, TrainingSession } from "@/lib/types";
 
 const SPORT_CHIPS: { value: Sport; label: string }[] = [
@@ -23,6 +24,14 @@ const SPORT_CHIPS: { value: Sport; label: string }[] = [
   { value: "swimming", label: "Nuoto" },
   { value: "other", label: "Riposo" },
 ];
+
+// Common exercises resolve against the bundled Garmin catalogue in training_plan/exercises.py.
+const EXERCISE_OPTIONS = [
+  ["PULL_UP", "Trazioni"], ["CHIN_UP", "Trazioni presa supina"], ["PUSH_UP", "Piegamenti"],
+  ["BODY_WEIGHT_DIP", "Dip"], ["INVERTED_ROW", "Rematore inverso"], ["AIR_SQUAT", "Squat"],
+  ["LUNGE", "Affondi"], ["PLANK", "Plank"], ["SIDE_PLANK", "Plank laterale"],
+  ["BURPEE", "Burpee"], ["GLUTE_BRIDGE", "Ponte glutei"], ["MOUNTAIN_CLIMBER", "Mountain climber"],
+] as const;
 
 // Rest days have no dedicated sport in the file format (training_plan.models.SUPPORTED_SPORTS
 // has no "rest" value) -- the "Riposo" chip is stored as sport "other", same fallback the
@@ -56,7 +65,7 @@ function isEditableBlock(item: EditableItem): item is EditableBlock {
 function toEditable(items: SessionStep[]): EditableItem[] {
   return items.map((item) =>
     isRepeatBlock(item)
-      ? { _id: newStepId(), reps: item.reps, steps: item.steps.map((s) => ({ ...s, _id: newStepId() })) }
+      ? { ...item, _id: newStepId(), reps: item.reps, steps: item.steps.map((s) => ({ ...s, _id: newStepId() })) }
       : { ...item, _id: newStepId() }
   );
 }
@@ -100,7 +109,8 @@ function blankStep(type: StepType): EditableStep {
 type WorkoutEditorProps =
   | { mode: "create" }
   | { mode: "edit"; sessionId: string }
-  | { mode: "garmin"; workout: ScheduledWorkout; session: TrainingSession };
+  | { mode: "garmin"; workout: ScheduledWorkout; session: TrainingSession }
+  | { mode: "draft"; session: TrainingSession; draftKey: string; busy: boolean; onSave: (session: TrainingSession) => Promise<boolean>; onCancel: () => void };
 
 export function WorkoutEditor(props: WorkoutEditorProps) {
   const { mode } = props;
@@ -121,14 +131,14 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   // No `useRequirePlan()` here, deliberately: create mode must work with no plan at
   // all (the whole point of "+" from Settimana is to start one from scratch) --
   // `addSession` below lazily creates an empty plan the first time it's called.
-  const { data: plan } = usePlanQuery();
+  const { data: plan } = usePlanQuery(mode !== "draft");
   const savePlanSession = useSavePlanSession();
   const removeSession = useRemoveSession();
   const invalidateCalendar = useInvalidateCalendarData();
   const { isRewritten, until: rewriteUntil } = useIsRewritten();
 
   const existing =
-    mode === "edit" ? (sessionParam != null ? findPlanSession(plan, sessionParam) : null) : garminSession;
+    mode === "edit" ? (sessionParam != null ? findPlanSession(plan, sessionParam) : null) : props.mode === "draft" ? props.session : garminSession;
   // The id to write to; an old numeric URL resolves to the session's real id here.
   const sessionId = existing?.id ?? sessionParam;
   // Captured once, at mount: the (date, title) Garmin actually knows this session by,
@@ -147,13 +157,14 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
    * identity below keeps pointing at the *old* day while the form holds the new one. */
   const originalDate = mode === "garmin" ? garminWorkout!.date : originalKey?.date ?? null;
 
-  const editorStorageKey = `passo-editor:${mode}:${sessionParam ?? garminWorkout?.scheduled_workout_id ?? "new"}`;
-  const [restored] = useState(() => { try { return typeof window !== "undefined" ? JSON.parse(sessionStorage.getItem(editorStorageKey) ?? "null") as { date: string; sport: Sport; priority: "key"|"normal"|"optional"; title: string; description: string; steps: EditableItem[] } | null : null; } catch { return null; } });
+  const editorStorageKey = `passo-editor:${mode}:${sessionParam ?? garminWorkout?.scheduled_workout_id ?? (props.mode === "draft" ? props.draftKey : "new")}`;
+  const [restored] = useState(() => { try { return typeof window !== "undefined" ? JSON.parse(sessionStorage.getItem(editorStorageKey) ?? "null") as { date: string; sport: Sport; priority: "key"|"normal"|"optional"; title: string; description: string; steps: EditableItem[]; poolLength?: string } | null : null; } catch { return null; } });
   const [date, setDate] = useState(restored?.date ?? existing?.date ?? (parseDateKey(searchParams.get("date") ?? "") ? searchParams.get("date")! : toDateKey(new Date())));
   const [sport, setSport] = useState<Sport>(restored?.sport ?? (existing?.sport as Sport) ?? "running");
   const [priority, setPriority] = useState<"key" | "normal" | "optional">(() => restored?.priority ?? (existing?.priority === "key" ? "key" : existing?.priority === "optional" ? "optional" : "normal"));
   const [title, setTitle] = useState(restored?.title ?? existing?.title ?? "");
   const [description, setDescription] = useState(restored?.description ?? existing?.description ?? "");
+  const [poolLength, setPoolLength] = useState(restored?.poolLength ?? (existing?.pool_length_m == null ? "" : String(existing.pool_length_m)));
   const [steps, setSteps] = useState<EditableItem[]>(() => restored?.steps ?? toEditable(existing?.steps ?? []));
   const [editingStep, setEditingStep] = useState<EditableStep | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -226,10 +237,10 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
     }
   }, [jobId, jobSucceeded, successHref, router, invalidateCalendar]);
 
-  const formSnapshot = JSON.stringify({ date, sport, priority, title, description, steps });
-  const initialSnapshot = useRef(formSnapshot);
+  const formSnapshot = JSON.stringify({ date, sport, priority, title, description, steps, poolLength });
+  const [initialSnapshot] = useState(formSnapshot);
   const leavingAfterSave = useRef(false);
-  const dirty = formSnapshot !== initialSnapshot.current || !!restored;
+  const dirty = formSnapshot !== initialSnapshot || !!restored;
   useEffect(() => { if (!dirty || leavingAfterSave.current) return; try { sessionStorage.setItem(editorStorageKey, formSnapshot); } catch { /* Form remains usable if storage is unavailable. */ } }, [dirty, editorStorageKey, formSnapshot]);
   function clearEditorDraft() { try { sessionStorage.removeItem(editorStorageKey); } catch {} }
 
@@ -240,7 +251,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
     window.addEventListener("beforeunload", beforeUnload); document.addEventListener("click", onLink, true);
     return () => { window.removeEventListener("beforeunload", beforeUnload); document.removeEventListener("click", onLink, true); };
   }, [dirty]);
-  function leaveEditor() { if (!dirty || window.confirm("Uscire senza salvare le modifiche?")) { leavingAfterSave.current = true; clearEditorDraft(); router.push(originHref); } }
+  function leaveEditor() { if (!dirty || window.confirm("Uscire senza salvare le modifiche?")) { leavingAfterSave.current = true; clearEditorDraft(); if (props.mode === "draft") props.onCancel(); else router.push(originHref); } }
 
   if (mode === "edit" && (!plan || !existing)) {
     return (
@@ -251,61 +262,47 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   }
 
   const displayError = saveError ?? jobFailedMessage;
-  const isSaving = savePlanSession.isPending || startSync.isPending || (!!jobId && !jobFailedMessage && !jobSucceeded);
+  const isSaving = (props.mode === "draft" && props.busy) || savePlanSession.isPending || startSync.isPending || (!!jobId && !jobFailedMessage && !jobSucceeded);
   // A date field can be cleared, and an empty (or half-typed) day would reach the API as
   // an unparseable date and come back a 422 -- so it gates the save instead.
   const dayIsValid = parseDateKey(date) !== null;
+  const poolIsValid = sport !== "swimming" || validPoolLength(poolLength);
   const movedFrom = originalDate && dayIsValid && date !== originalDate ? originalDate : null;
 
   function plainSteps(): SessionStep[] {
-    const strip = (s: EditableStep): Step => ({
-      type: s.type,
-      duration_type: s.duration_type,
-      duration_value: s.duration_value,
-      target_pace: s.target_pace,
-      note: s.note?.trim() || null,
-      exercise: s.exercise ?? null,
-      // Kept as they came: the editor has no fields for them, and saving must not drop them.
-      target_power: s.target_power ?? null,
-      target_hr: s.target_hr ?? null,
-      target_cadence: s.target_cadence ?? null,
-      stroke: s.stroke ?? null,
-      equipment: s.equipment ?? null,
-    });
-    return steps.flatMap((item): SessionStep[] => {
-      if (!isEditableBlock(item)) return [strip(item)];
-      // An emptied block would be rejected by the backend, and a block is only a block
-      // from two repetitions up -- below that, hand its steps over on their own.
-      if (item.steps.length === 0) return [];
-      if (item.reps < MIN_REPS) return item.steps.map(strip);
-      return [{ reps: item.reps, steps: item.steps.map(strip) }];
-    });
+    return stripEditableSteps(steps);
   }
 
   /** A plan write that would race the generation running now (see `useIsRewritten`). */
   function blockedByGeneration(day: string): boolean {
-    if (mode === "garmin" || !(isRewritten(day) || (existing?.date != null && isRewritten(existing.date)))) return false;
+    if (mode === "garmin" || mode === "draft" || !(isRewritten(day) || (existing?.date != null && isRewritten(existing.date)))) return false;
     setSaveError(`Sto riscrivendo il piano fino a ${formatShortDate(rewriteUntil)}: salva appena ho finito.`);
     return true;
   }
 
   async function handleSave() {
-    if (!dayIsValid) return;
+    if (!dayIsValid || !poolIsValid) return;
     setSaveError(null);
     if (blockedByGeneration(date)) return;
     const session: TrainingSession = {
+      ...existing,
       date,
       sport,
       title: title.trim() || "Allenamento",
       description: description.trim() || null,
       steps: plainSteps(),
-      priority: priority === "key" ? "key" : "flexible",
+      priority: priority === (existing?.priority === "key" ? "key" : existing?.priority === "optional" ? "optional" : "normal") ? existing?.priority : priority === "normal" ? "flexible" : priority,
       min_duration_minutes: existing?.min_duration_minutes ?? null,
-      pool_length_m: existing?.pool_length_m ?? null,
+      pool_length_m: sport === "swimming" && poolLength !== (existing?.pool_length_m == null ? "" : String(existing.pool_length_m)) ? (poolLength.trim() ? Number(poolLength) : null) : existing?.pool_length_m,
       short_variant: existing?.short_variant ?? null,
       is_short_active: existing?.is_short_active ?? false,
       plan_id: existing?.plan_id,
     };
+
+    if (props.mode === "draft") {
+      if (await props.onSave(session)) { clearEditorDraft(); leavingAfterSave.current = true; }
+      return;
+    }
 
     if (mode !== "garmin") {
       try {
@@ -445,7 +442,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
-        {mode !== "create" ? (
+        {mode !== "create" && mode !== "draft" ? (
           <button data-track="workout-editor.elimina-allenamento"
             type="button"
             onClick={handleDelete}
@@ -589,6 +586,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
         )}
       </div>
 
+      {sport === "swimming" && <div style={{ marginTop: 14 }}><Field label="Lunghezza vasca (metri, facoltativa)"><input type="number" min="10" max="100" step="any" value={poolLength} onChange={(e) => setPoolLength(e.target.value)} style={selectStyle} data-track="workout-editor.pool-length" /></Field>{!poolIsValid && <p role="alert">Inserisci una lunghezza tra 10 e 100 metri.</p>}</div>}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 20 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)" }}>Struttura</span>
         <span style={{ display: "flex", gap: 14 }}>
@@ -693,21 +691,22 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
         </p>
       )}
 
-      <div className="editor-save-bar"><p className="ux-muted">{sessionDurationMinutes({ date, sport, title, description, steps: plainSteps() }) != null ? `${Math.round(sessionDurationMinutes({ date, sport, title, description, steps: plainSteps() })!)} min previsti` : "Durata non determinabile"} · {mode === "garmin" ? "Il salvataggio modifica il calendario Garmin." : "Salvato nell’app. L’invio a Garmin si conferma separatamente."}</p>
+      <div className="editor-save-bar"><p className="ux-muted">{sessionDurationMinutes({ date, sport, title, description, steps: plainSteps() }) != null ? `${Math.round(sessionDurationMinutes({ date, sport, title, description, steps: plainSteps() })!)} min previsti` : "Durata non determinabile"} · {mode === "draft" ? "Salva solo nella bozza; esegui una nuova verifica prima di attivarla." : mode === "garmin" ? "Il salvataggio modifica il calendario Garmin Connect. L’orologio si sincronizza separatamente." : "Salva in Passo; l’invio a Garmin Connect parte automaticamente. L’orologio si sincronizza separatamente."}</p>
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
         <PrimaryButton data-track="workout-editor.handlesave"
           state={
-            !dayIsValid ? "disabled" : calendarLookupFailed ? "idle" : isSaving || !calendarIdentityKnown ? "loading" : "idle"
+            !dayIsValid || !poolIsValid ? "disabled" : calendarLookupFailed ? "idle" : isSaving || !calendarIdentityKnown ? "loading" : "idle"
           }
           onClick={calendarLookupFailed ? () => void workoutsQuery.refetch() : handleSave}
         >
           {!dayIsValid
             ? "Scegli un giorno"
+            : !poolIsValid ? "Correggi la lunghezza vasca"
             : calendarLookupFailed
               ? "Calendario non raggiungibile · Riprova"
               : !calendarIdentityKnown
               ? "Leggo il calendario…"
-              : mode === "garmin" ? "Salva e invia a Garmin" : "Salva allenamento"}
+              : mode === "draft" ? "Salva nella bozza" : mode === "garmin" ? "Salva e invia a Garmin" : "Salva allenamento"}
         </PrimaryButton>
         <button data-track="workout-editor.router-push"
           type="button"
@@ -975,7 +974,17 @@ function StepEditorModal({
   const [durationType, setDurationType] = useState<Step["duration_type"]>(step.duration_type || (isStrength ? "time" : "distance"));
   const [durationValue, setDurationValue] = useState(step.duration_value);
   const [note, setNote] = useState(step.note ?? "");
-  const [hasPace, setHasPace] = useState(isStrength ? false : !!step.target_pace);
+  const keys = ["target_power", "target_hr", "target_cadence"] as const;
+  type RangeKey = typeof keys[number];
+  const initialRanges = Object.fromEntries(keys.map((key) => [key, { low: step[key] ? String(step[key]!.low) : "", high: step[key] ? String(step[key]!.high) : "" }])) as Record<RangeKey, { low: string; high: string }>;
+  const [ranges, setRanges] = useState(initialRanges);
+  const [exercise, setExercise] = useState(step.exercise ?? "");
+  const [stroke, setStroke] = useState(step.stroke ?? "");
+  const [equipment, setEquipment] = useState(step.equipment ?? "");
+  const visibleRanges: RangeKey[] = sport === "cycling" ? ["target_power", "target_hr", "target_cadence"] : sport === "running" ? ["target_hr", "target_cadence"] : sport === "other" ? [] : ["target_hr"];
+  const invalidRanges = visibleRanges.filter((key) => parseTargetRange(ranges[key].low, ranges[key].high) === undefined);
+
+  const [hasPace, setHasPace] = useState(!!step.target_pace);
   // Pace is typed -- and only ever typed -- as minutes per km ("4:40"), the same unit
   // the plan file and every other screen use. It lives in state as the raw text so a
   // half-typed "4:" isn't rounded into something else under the cursor; the seconds/km
@@ -998,7 +1007,7 @@ function StepEditorModal({
 
   const slowerSec = parsePaceMinSec(slowerText);
   const fasterSec = parsePaceMinSec(fasterText);
-  const paceError = !hasPace
+  const paceError = isStrength || !hasPace
     ? null
     : slowerSec == null || fasterSec == null
       ? "Passo in minuti al km, tipo 4:40."
@@ -1007,9 +1016,14 @@ function StepEditorModal({
         : null;
 
   function handleDone() {
-    if (paceError) return;
+    if (paceError || invalidRanges.length) return;
+    const editedRanges = Object.fromEntries(visibleRanges.filter((key) => ranges[key].low !== initialRanges[key].low || ranges[key].high !== initialRanges[key].high).map((key) => [key, parseTargetRange(ranges[key].low, ranges[key].high)]));
     onSave({
       ...step,
+      ...editedRanges,
+      ...(isStrength && exercise !== (step.exercise ?? "") ? { exercise: exercise.trim() || null } : {}),
+      ...(sport === "swimming" && stroke !== (step.stroke ?? "") ? { stroke: stroke || null } : {}),
+      ...(sport === "swimming" && equipment !== (step.equipment ?? "") ? { equipment: equipment || null } : {}),
       type,
       duration_type: durationType,
       duration_value: durationValue,
@@ -1017,7 +1031,7 @@ function StepEditorModal({
       // Stored slower-bound-first whichever field each was typed in, the same
       // normalisation `parse_target_pace` applies to the plan file.
       target_pace:
-        hasPace && slowerSec != null && fasterSec != null
+        isStrength ? step.target_pace : hasPace && slowerSec != null && fasterSec != null
           ? { slower_sec_per_km: Math.max(slowerSec, fasterSec), faster_sec_per_km: Math.min(slowerSec, fasterSec) }
           : null,
     });
@@ -1140,13 +1154,25 @@ function StepEditorModal({
           </>
         )}
 
+        {visibleRanges.map((key) => {
+          const label = key === "target_power" ? "Potenza (W)" : key === "target_hr" ? "Frequenza cardiaca (bpm)" : sport === "running" ? "Cadenza (passi/min)" : "Cadenza (rpm)";
+          return <div key={key}><span style={{ fontSize: 13, fontWeight: 600 }}>{label} · facoltativa</span><div style={{ display: "flex", gap: 8 }}>
+            {(["low", "high"] as const).map((bound) => <label key={bound} style={{ flex: 1, fontSize: 12 }}>{bound === "low" ? "Minimo" : "Massimo"}<input type="number" min="0" step="any" value={ranges[key][bound]} onChange={(e) => setRanges((prev) => ({ ...prev, [key]: { ...prev[key], [bound]: e.target.value } }))} style={selectStyle} aria-label={`${label}, ${bound === "low" ? "minimo" : "massimo"}`} /></label>)}
+          </div>{invalidRanges.includes(key) && <p role="alert" style={{ color: "var(--rosso-forte)", fontSize: 12 }}>Inserisci due valori positivi, con il minimo inferiore al massimo, oppure lascia entrambi vuoti.</p>}</div>;
+        })}
+        {isStrength && <Field label="Esercizio (facoltativo)"><select value={exercise} onChange={(e) => setExercise(e.target.value)} style={selectStyle} data-track="workout-editor.exercise"><option value="">Non specificato</option>{step.exercise && !EXERCISE_OPTIONS.some(([value]) => value === step.exercise) && <option value={step.exercise}>Esercizio importato</option>}{EXERCISE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>}
+        {sport === "swimming" && <>
+          <Field label="Stile (facoltativo)"><select value={stroke} onChange={(e) => setStroke(e.target.value)} style={selectStyle}><option value="">Non specificato</option>{[["any_stroke", "A scelta"], ["backstroke", "Dorso"], ["breaststroke", "Rana"], ["drill", "Tecnica"], ["fly", "Farfalla"], ["free", "Stile libero"], ["individual_medley", "Misti"], ["mixed", "Misto"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+          <Field label="Attrezzatura (facoltativa)"><select value={equipment} onChange={(e) => setEquipment(e.target.value)} style={selectStyle}><option value="">Non specificata</option>{[["fins", "Pinne"], ["kickboard", "Tavoletta"], ["paddles", "Palette"], ["pull_buoy", "Pull buoy"], ["snorkel", "Boccaglio"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+        </>}
+
         <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
           <button data-track="workout-editor.handledone"
             type="button"
             onClick={handleDone}
-            {...dis(!!paceError, "ritmo_non_valido")}
+            {...dis(!!paceError || invalidRanges.length > 0, "target_non_valido")}
             className="tap-target"
-            style={{ flex: 1, background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: paceError ? "not-allowed" : "pointer", opacity: paceError ? 0.45 : 1 }}
+            style={{ flex: 1, background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: paceError || invalidRanges.length ? "not-allowed" : "pointer", opacity: paceError || invalidRanges.length ? 0.45 : 1 }}
           >
             Fatto
           </button>
