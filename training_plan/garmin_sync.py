@@ -465,8 +465,11 @@ class GarminSync:
         api/garmin_session.py) -- so even when `user_profile`'s own fetch fails there is
         usually still a name to show, just no photo.
         """
-        name = getattr(self._client, "full_name", None) or getattr(self._client, "display_name", None)
-        return (name or "").strip() or None
+        for attr in ("full_name", "display_name"):
+            name = getattr(self._client, attr, None)
+            if isinstance(name, str) and name.strip():
+                return name.strip()
+        return None
 
     def user_profile(self) -> dict:
         """Best-effort account name + avatar URL, the fallback behind Strava's own.
