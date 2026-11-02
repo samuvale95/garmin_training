@@ -15,6 +15,7 @@ app paths, no nesting.
 from __future__ import annotations
 
 import asyncio
+import logging
 import json
 from typing import Any
 
@@ -22,6 +23,8 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 MAX_REQUESTS = 40
 
@@ -51,8 +54,13 @@ async def batch(body: BatchBody, request: Request) -> StreamingResponse:
                 payload: Any = response.json()
             except ValueError:
                 payload = response.text
+            if response.status_code >= 500:
+                logger.error("batch: GET %s -> %s", path, response.status_code)
             return {"i": index, "status": response.status_code, "body": payload}
         except Exception as error:  # noqa: BLE001 - one failing read must not sink the rest
+            # Inner requests never reach the access log: without this a broken screen
+            # behind /batch would leave no trace on the server.
+            logger.exception("batch: GET %s raised", path)
             return {"i": index, "status": 500, "body": {"detail": type(error).__name__}}
 
     async def stream():

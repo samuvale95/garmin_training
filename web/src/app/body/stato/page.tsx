@@ -180,7 +180,10 @@ export default function DayStatePage() {
             </div>
             <p style={{ font: "700 24px/1.2 var(--font-sans)", letterSpacing: "-.02em", margin: "12px 0 0" }}>{verdict.headline}</p>
             <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.4, margin: "10px 0 0", color: "var(--inchiostro-70)" }}>
-              {narrativeQuery.data?.text ?? "Guarda i segnali qui sotto: sono le misure di stanotte, confrontate con le tue."}
+              {/* Without a model the narrative falls back to the headline: never say it twice. */}
+              {narrativeQuery.data?.text && narrativeQuery.data.text.trim() !== verdict.headline.trim()
+                ? narrativeQuery.data.text
+                : "Guarda i segnali qui sotto: sono le misure di stanotte, confrontate con le tue."}
             </p>
           </SlideUp>
 

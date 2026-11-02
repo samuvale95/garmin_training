@@ -64,3 +64,13 @@ def test_a_step_note_travels_to_garmin_and_back():
     assert payload["description"] == "Trazioni · 6 ripetizioni"
     assert _parse_workout_step(payload).note == "Trazioni · 6 ripetizioni"
     assert "description" not in _build_step_payload(Step(type="interval", duration_type="time", duration_value=1), 1)
+
+
+def test_a_per_user_session_never_borrows_the_environment_credentials(monkeypatch, tmp_path):
+    """Server code passes a per-user tokenstore; GARMIN_EMAIL is the CLI's, never the server's."""
+    monkeypatch.setenv("GARMIN_EMAIL", "someone@example.com")
+    monkeypatch.setenv("GARMIN_PASSWORD", "secret")
+    sync = GarminSync(tokenstore=str(tmp_path))
+    assert sync._email is None and sync._password is None
+    cli = GarminSync()
+    assert cli._email == "someone@example.com"

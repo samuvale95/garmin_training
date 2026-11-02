@@ -287,8 +287,13 @@ class GarminSync:
         state_path: str | None = None,
         prompt_mfa: Callable[[], str] | None = None,
     ):
-        self._email = email or os.getenv("GARMIN_EMAIL")
-        self._password = password or os.getenv("GARMIN_PASSWORD")
+        # The environment's credentials are the CLI's, for a one-person local setup. The
+        # server always passes a per-user tokenstore: there they must never apply, or a
+        # user without a saved session would be logged into whoever's account the server
+        # happens to carry (it happened locally once GARMIN_EMAIL was set).
+        per_user = tokenstore is not None
+        self._email = email or (None if per_user else os.getenv("GARMIN_EMAIL"))
+        self._password = password or (None if per_user else os.getenv("GARMIN_PASSWORD"))
         self._tokenstore = tokenstore or os.getenv("GARMIN_TOKENSTORE", DEFAULT_TOKENSTORE_PATH)
         self._state_path = Path(state_path or os.getenv("GARMIN_LOGIN_STATE", DEFAULT_LOGIN_STATE_PATH))
         self._prompt_mfa = prompt_mfa
@@ -465,8 +470,11 @@ class GarminSync:
         api/garmin_session.py) -- so even when `user_profile`'s own fetch fails there is
         usually still a name to show, just no photo.
         """
-        name = getattr(self._client, "full_name", None) or getattr(self._client, "display_name", None)
-        return (name or "").strip() or None
+        for attr in ("full_name", "display_name"):
+            name = getattr(self._client, attr, None)
+            if isinstance(name, str) and name.strip():
+                return name.strip()
+        return None
 
     def user_profile(self) -> dict:
         """Best-effort account name + avatar URL, the fallback behind Strava's own.
