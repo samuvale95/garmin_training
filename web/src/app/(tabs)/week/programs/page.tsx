@@ -3,6 +3,8 @@ import { CheckIcon as ActionCheck, SyncIcon as ActionSync } from "@/components/I
 
 import { useState } from "react";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { useMotionEnabled } from "@/lib/motion";
 import { PlanNavigation, WorkspaceHeading } from "@/components/Workspace";
 import { Badge, EmptyState, RowLink, Section } from "@/components/ui";
 import { PlusIcon, ProgramIcon, PencilIcon, SparklesIcon, UploadIcon, WatchIcon, RunnerIcon, TargetIcon, TrashIcon } from "@/components/Icons";
@@ -15,6 +17,7 @@ import { GarminPushBar } from "@/components/GarminPushBar";
 import { goalTitle } from "@/lib/raceGoal";
 const SPORTS:Record<string,string>={running:"Corsa",cycling:"Bici",swimming:"Nuoto",strength_training:"Forza",calisthenics:"Calisthenics"};
 export default function ProgramsPage(){
+ const { reduced } = useMotionEnabled();
  const query=usePlanListQuery(),drafts=useProgramDrafts(),delDraft=useDeleteProgramDraft(),deletePlan=useDeletePlanById(),goals=useTrainingGoals(),constraints=useProgramConstraints();const toggle=useTogglePlanActive();const review=useProgramActivationReview();const[reviewing,setReviewing]=useState<string|null>(null),[activationReview,setActivationReview]=useState<DraftValidation|null>(null),[acknowledge,setAcknowledge]=useState(false),[linking,setLinking]=useState<string|null>(null),[confirmDeletePlan,setConfirmDeletePlan]=useState<string|null>(null);useScreenReady(!query.isPending&&!drafts.isPending);
  const plans=query.data?.plans??[];
  const activeCount=plans.filter(p=>p.is_active).length;
@@ -27,31 +30,157 @@ export default function ProgramsPage(){
    <div className="stack-lg">
     {query.isPending?<Skeleton height={150}/>:query.isError?<div role="alert" className="ux-error"><p>Non è stato possibile caricare i programmi.</p><button className="btn" data-size="sm" data-track="programs.retry" onClick={()=>query.refetch()} {...dis(query.isFetching,"in_caricamento")}><ActionSync className="action-symbol" aria-hidden="true" />Riprova</button></div>:plans.length===0?<EmptyState title="Da dove vuoi iniziare?" actions={<><Link href="/week/programs/new?source=ai" className="btn" data-variant="primary" data-track="programs.empty-ai">Crea con AI</Link><Link href="/week/programs/new?source=import" className="btn" data-track="programs.empty-import">Importa un file</Link></>}>Controlla ogni seduta prima di attivare il programma.</EmptyState>:<Section icon={<ProgramIcon size={18} />} title="I tuoi programmi" id="programs-list">
      <p className="muted" style={{margin:"0 0 12px",fontSize:"var(--text-sm)"}}>{activeCount} {activeCount===1?"attivo":"attivi"} sul calendario. Disattivare un programma conserva sedute svolte, attività e obiettivi.</p>
-     <div className="stack">{plans.map(plan=>{const linked=goals.data?.goals.filter(g=>g.linked_program_ids?.includes(plan.id))??[];return <article key={plan.id} className="card program-card">
-      <div className="program-topline"><h3 className="card-title" style={{fontSize:"var(--text-lg)"}}>{plan.name}</h3><Badge tone={plan.is_active?"ok":"neutral"}>{plan.is_active?"Attivo":"Non attivo"}</Badge></div>
-      <p className="card-text">{plan.sessions_count} sedute · {plan.sports.map(s=>SPORTS[s]??s).join(", ")||"Sport non indicato"}</p>
-      <p className="card-text">{linked.length?`Contribuisce a: ${linked.map(g=>g.name).join(", ")}`:plan.goal?`Obiettivo: ${goalTitle(plan.goal)}`:"Programma libero, senza obiettivo specifico"}</p>
-      <div className="actions">
-       <Link className="btn" data-size="sm" data-variant="primary" href={`/week/programs/new?source=ai&target=${plan.id}`} data-track="programs.adapt">Adatta le prossime settimane</Link>
-       <button className="btn" data-size="sm" data-track="programs.link-goals" aria-expanded={linking===plan.id} onClick={()=>setLinking(linking===plan.id?null:plan.id)}><TargetIcon aria-hidden="true" />Collega obiettivi</button>
-       <button className="btn" data-size="sm" data-variant="quiet" data-track="programs.toggle" {...dis(toggle.isPending,"in_caricamento")} onClick={()=>{if(plan.is_active){if(!toggle.isPending)toggle.mutate({planId:plan.id,isActive:false});}else startReactivation(plan.id);}}>{plan.is_active?"Disattiva":"Riattiva"}</button>
-       <button className="btn" data-size="sm" data-variant="quiet" style={{color:"var(--rosso-avviso)"}} data-track="programs.delete" {...dis(deletePlan.isPending,"in_caricamento")} onClick={()=>setConfirmDeletePlan(plan.id)}><TrashIcon size={14} aria-hidden="true" />Elimina</button>
-      </div>
-      {confirmDeletePlan===plan.id&&<div className="ux-notice" role="dialog" aria-modal="false" style={{marginTop:12}}>
-       <strong>Eliminare definitivamente “{plan.name}”?</strong>
-       <p style={{margin:"4px 0 8px",fontSize:"var(--text-sm)"}}>Il programma e le sue sedute nel calendario verranno rimossi. Le attività già svolte e registrate non verranno cancellate.</p>
-       <div className="actions">
-        <button className="btn" data-size="sm" style={{background:"var(--rosso-avviso)",color:"#fff"}} {...dis(deletePlan.isPending,"in_caricamento")} onClick={()=>{deletePlan.mutate(plan.id);setConfirmDeletePlan(null);}}>{deletePlan.isPending?"Elimino…":"Conferma eliminazione"}</button>
-        <button className="btn" data-size="sm" data-variant="quiet" onClick={()=>setConfirmDeletePlan(null)}>Annulla</button>
-       </div>
-      </div>}
-      {linking===plan.id&&<ProgramGoalLinks id={plan.id} goals={goals.data?.goals.map(g=>({id:g.id,name:g.name}))??[]}/>}
-     </article>;})}</div>
+     <div className="stack">
+      <AnimatePresence initial={false}>
+       {plans.map(plan=>{
+        const linked=goals.data?.goals.filter(g=>g.linked_program_ids?.includes(plan.id))??[];
+        return <motion.article
+         layout={!reduced}
+         key={plan.id}
+         initial={reduced ? false : { opacity: 0, y: 12 }}
+         animate={{ opacity: 1, y: 0 }}
+         exit={
+           reduced
+             ? { opacity: 0 }
+             : {
+                 opacity: 0,
+                 scale: 0.96,
+                 y: -8,
+                 height: 0,
+                 marginTop: 0,
+                 marginBottom: 0,
+                 paddingTop: 0,
+                 paddingBottom: 0,
+                 overflow: "hidden",
+                 transition: {
+                   opacity: { duration: 0.18, ease: "easeOut" },
+                   scale: { duration: 0.18, ease: "easeOut" },
+                   y: { duration: 0.18, ease: "easeOut" },
+                   height: { duration: 0.28, delay: 0.08, ease: [0.22, 1, 0.36, 1] },
+                   marginTop: { duration: 0.28, delay: 0.08, ease: [0.22, 1, 0.36, 1] },
+                   marginBottom: { duration: 0.28, delay: 0.08, ease: [0.22, 1, 0.36, 1] },
+                   paddingTop: { duration: 0.28, delay: 0.08, ease: [0.22, 1, 0.36, 1] },
+                   paddingBottom: { duration: 0.28, delay: 0.08, ease: [0.22, 1, 0.36, 1] },
+                 },
+               }
+         }
+         transition={{
+           layout: { type: "spring", stiffness: 350, damping: 30 },
+         }}
+         className="card program-card"
+        >
+         <div className="program-topline"><h3 className="card-title" style={{fontSize:"var(--text-lg)"}}>{plan.name}</h3><Badge tone={plan.is_active?"ok":"neutral"}>{plan.is_active?"Attivo":"Non attivo"}</Badge></div>
+         <p className="card-text">{plan.sessions_count} sedute · {plan.sports.map(s=>SPORTS[s]??s).join(", ")||"Sport non indicato"}</p>
+         <p className="card-text">{linked.length?`Contribuisce a: ${linked.map(g=>g.name).join(", ")}`:plan.goal?`Obiettivo: ${goalTitle(plan.goal)}`:"Programma libero, senza obiettivo specifico"}</p>
+         <div className="actions">
+          <Link className="btn" data-size="sm" data-variant="primary" href={`/week/programs/new?source=ai&target=${plan.id}`} data-track="programs.adapt">Adatta le prossime settimane</Link>
+          <button className="btn" data-size="sm" data-track="programs.link-goals" aria-expanded={linking===plan.id} onClick={()=>setLinking(linking===plan.id?null:plan.id)}><TargetIcon aria-hidden="true" />Collega obiettivi</button>
+          <button className="btn" data-size="sm" data-variant="quiet" data-track="programs.toggle" {...dis(toggle.isPending,"in_caricamento")} onClick={()=>{if(plan.is_active){if(!toggle.isPending)toggle.mutate({planId:plan.id,isActive:false});}else startReactivation(plan.id);}}>{plan.is_active?"Disattiva":"Riattiva"}</button>
+          <button className="btn" data-size="sm" data-variant="quiet" style={{color:"var(--rosso-avviso)"}} data-track="programs.delete" {...dis(deletePlan.isPending,"in_caricamento")} onClick={()=>setConfirmDeletePlan(plan.id)}><TrashIcon size={14} aria-hidden="true" />Elimina</button>
+         </div>
+         {confirmDeletePlan===plan.id&&<div className="ux-notice" role="dialog" aria-modal="false" style={{marginTop:12}}>
+          <strong>Eliminare definitivamente “{plan.name}”?</strong>
+          <p style={{margin:"4px 0 8px",fontSize:"var(--text-sm)"}}>Il programma e le sue sedute nel calendario verranno rimossi. Le attività già svolte e registrate non verranno cancellate.</p>
+          <div className="actions">
+           <button className="btn" data-size="sm" style={{background:"var(--rosso-avviso)",color:"#fff"}} {...dis(deletePlan.isPending,"in_caricamento")} onClick={()=>{deletePlan.mutate(plan.id);setConfirmDeletePlan(null);}}>{deletePlan.isPending?"Elimino…":"Conferma eliminazione"}</button>
+           <button className="btn" data-size="sm" data-variant="quiet" onClick={()=>setConfirmDeletePlan(null)}>Annulla</button>
+          </div>
+         </div>}
+         {linking===plan.id&&<ProgramGoalLinks id={plan.id} goals={goals.data?.goals.map(g=>({id:g.id,name:g.name}))??[]}/>}
+        </motion.article>;
+       })}
+      </AnimatePresence>
+     </div>
     </Section>}
     {deletePlan.isError&&<p role="alert" className="ux-error">{deletePlan.error instanceof Error?deletePlan.error.message:"Impossibile eliminare il programma."}</p>}
     {reviewing&&<section className="card" role="region" aria-labelledby="reactivation-title"><h3 id="reactivation-title" className="card-title">Riattiva {plans.find(p=>p.id===reviewing)?.name}</h3>{review.isPending?<Skeleton height={80}/>:review.isError?<p className="ux-error" role="alert">{review.error.message}</p>:activationReview&&<><p className="card-text"><Badge tone={activationReview.status==="compatible"?"ok":activationReview.status==="conflict"?"danger":"warn"}>{activationReview.status==="compatible"?"Compatibile con i vincoli verificati":activationReview.status==="conflict"?"Conflitto da risolvere":"Verifica parziale: dati insufficienti"}</Badge></p><ul className="card-text">{[...activationReview.conflicts,...activationReview.warnings,...activationReview.missing_data].map((item,i)=><li key={i}>{draftMessage(item)}</li>)}</ul>{activationReview.status==="insufficient_data"&&<label className="ux-check"><input type="checkbox" checked={acknowledge} onChange={e=>setAcknowledge(e.target.checked)} data-track="programs.acknowledge-reactivation"/>Ho letto i limiti della verifica.</label>}<div className="actions"><button className="btn" data-variant="primary" data-track="programs.confirm-reactivation" {...dis(toggle.isPending||activationReview.status==="conflict"||(activationReview.status==="insufficient_data"&&!acknowledge),"revisione_necessaria")} onClick={()=>toggle.mutate({planId:reviewing,isActive:true,validationToken:activationReview.token,acknowledgeInsufficientData:acknowledge},{onSuccess:()=>{setReviewing(null);setActivationReview(null);}})}><ActionCheck className="action-symbol" aria-hidden="true" />Conferma riattivazione</button></div></>}<div className="actions"><button className="btn" data-variant="quiet" data-track="programs.cancel-reactivation" {...dis(toggle.isPending,"in_caricamento")} onClick={()=>setReviewing(null)}>Annulla</button></div></section>}
     {toggle.isError&&<p role="alert" className="ux-error">{toggle.error instanceof Error?toggle.error.message:"La modifica non è riuscita. Verifica lo stato del programma prima di riprovare."}</p>}
-    <Section icon={<PencilIcon size={18} />} title="Bozze" id="programs-drafts">{drafts.isPending?<Skeleton height={100}/>:drafts.isError?<div className="ux-error" role="alert"><p>Non è stato possibile leggere le bozze.</p><button className="btn" data-size="sm" data-track="programs.retry-drafts" onClick={()=>drafts.refetch()}><ActionSync className="action-symbol" aria-hidden="true" />Riprova</button></div>:openDrafts.length?<ul className="list">{openDrafts.map(d=><li key={d.id} style={{display:"flex",alignItems:"center",gap:6}}><div style={{flex:1}}><RowLink href={`/week/programs/drafts/${d.id}`} track="programs.resume-draft" title={d.name} meta={`${d.source==="ai"?"Creata con AI":"Da file YAML"} · ${d.sessions?.length??0} sedute proposte · il calendario non è cambiato`} end={<Badge tone={d.status==="failed"?"danger":d.status==="generating"?"info":"neutral"}>{d.status==="generating"?"In generazione":d.status==="failed"?"Da correggere":"Bozza"}</Badge>}/></div><button className="btn" data-variant="quiet" data-size="sm" style={{color:"var(--rosso-avviso)",padding:"6px 8px"}} title="Elimina bozza" aria-label={`Elimina bozza ${d.name}`} onClick={e=>{e.preventDefault();if(window.confirm(`Eliminare la bozza “${d.name}”?`)){delDraft.mutate(d.id);}}}><TrashIcon size={15} aria-hidden="true"/></button></li>)}</ul>:<p className="muted" style={{margin:0,fontSize:"var(--text-sm)"}}>Nessuna bozza in corso.</p>}</Section>
+    <Section icon={<PencilIcon size={18} />} title="Bozze" id="programs-drafts">
+     {drafts.isPending ? (
+      <Skeleton height={100} />
+     ) : drafts.isError ? (
+      <div className="ux-error" role="alert">
+       <p>Non è stato possibile leggere le bozze.</p>
+       <button className="btn" data-size="sm" data-track="programs.retry-drafts" onClick={() => drafts.refetch()}>
+        <ActionSync className="action-symbol" aria-hidden="true" />Riprova
+       </button>
+      </div>
+     ) : openDrafts.length ? (
+      <ul className="list">
+       <AnimatePresence initial={false}>
+        {openDrafts.map((d) => (
+         <motion.li
+          layout={!reduced}
+          key={d.id}
+          initial={reduced ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={
+            reduced
+              ? { opacity: 0 }
+              : {
+                  opacity: 0,
+                  scale: 0.96,
+                  height: 0,
+                  paddingTop: 0,
+                  paddingBottom: 0,
+                  marginTop: 0,
+                  marginBottom: 0,
+                  overflow: "hidden",
+                  transition: {
+                    opacity: { duration: 0.16, ease: "easeOut" },
+                    scale: { duration: 0.16, ease: "easeOut" },
+                    height: { duration: 0.24, delay: 0.06, ease: [0.22, 1, 0.36, 1] },
+                    paddingTop: { duration: 0.24, delay: 0.06, ease: [0.22, 1, 0.36, 1] },
+                    paddingBottom: { duration: 0.24, delay: 0.06, ease: [0.22, 1, 0.36, 1] },
+                    marginTop: { duration: 0.24, delay: 0.06, ease: [0.22, 1, 0.36, 1] },
+                    marginBottom: { duration: 0.24, delay: 0.06, ease: [0.22, 1, 0.36, 1] },
+                  },
+                }
+          }
+          transition={{
+            layout: { type: "spring", stiffness: 350, damping: 30 },
+          }}
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+         >
+          <div style={{ flex: 1 }}>
+           <RowLink
+            href={`/week/programs/drafts/${d.id}`}
+            track="programs.resume-draft"
+            title={d.name}
+            meta={`${d.source === "ai" ? "Creata con AI" : "Da file YAML"} · ${d.sessions?.length ?? 0} sedute proposte · il calendario non è cambiato`}
+            end={
+             <Badge tone={d.status === "failed" ? "danger" : d.status === "generating" ? "info" : "neutral"}>
+              {d.status === "generating" ? "In generazione" : d.status === "failed" ? "Da correggere" : "Bozza"}
+             </Badge>
+            }
+           />
+          </div>
+          <button
+           className="btn"
+           data-variant="quiet"
+           data-size="sm"
+           style={{ color: "var(--rosso-avviso)", padding: "6px 8px" }}
+           title="Elimina bozza"
+           aria-label={`Elimina bozza ${d.name}`}
+           onClick={(e) => {
+            e.preventDefault();
+            if (window.confirm(`Eliminare la bozza “${d.name}”?`)) {
+             delDraft.mutate(d.id);
+            }
+           }}
+          >
+           <TrashIcon size={15} aria-hidden="true" />
+          </button>
+         </motion.li>
+        ))}
+       </AnimatePresence>
+      </ul>
+     ) : (
+      <p className="muted" style={{ margin: 0, fontSize: "var(--text-sm)" }}>
+       Nessuna bozza in corso.
+      </p>
+     )}
+    </Section>
    </div>
    <aside className="stack-lg" aria-label="Azioni e disponibilità">
     <Section icon={<PlusIcon size={18} />} title="Crea" id="programs-create"><ul className="list">

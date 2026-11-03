@@ -8,6 +8,8 @@ import { safeReturnHref } from "@/lib/navigation";
 import { PlusIcon, PencilIcon, TrashIcon } from "@/components/Icons";
 import { PlanNavigation, WorkspaceHeading } from "@/components/Workspace";
 import { Skeleton } from "@/components/motion/primitives";
+import { motion, AnimatePresence } from "framer-motion";
+import { useMotionEnabled } from "@/lib/motion";
 import { TrainingGoalForm } from "@/components/TrainingGoalForm";
 import { GOAL_TYPES, useTrainingGoals, useGoalEvaluations, useEvaluateGoal, useSaveTrainingGoal, useDeleteTrainingGoal, type TrainingGoal } from "@/lib/programDrafts";
 import { usePlanListQuery } from "@/lib/queries";
@@ -16,92 +18,194 @@ import { formatFullDate } from "@/lib/format";
 import { formatTargetTime } from "@/lib/raceGoal";
 import { dis } from "@/lib/disabled";
 const STATES:Record<string,string>={active:"Attivo",completed:"Concluso",archived:"Archiviato",insufficient_data:"Dati insufficienti",on_track:"In linea",needs_review:"Da rivedere",achieved:"Raggiunto"};
-function GoalsContent(){
- const params=useSearchParams(),router=useRouter();const returnTo=safeReturnHref(params.get("returnTo"),"");
- const query=useTrainingGoals(),programs=usePlanListQuery();const[creating,setCreating]=useState(params.get("new")==="1"),[editing,setEditing]=useState<string|null>(params.get("edit"));useScreenReady(!query.isPending);
- return <div className="workspace-page"><WorkspaceHeading title="Piano" description="Obiettivi e valutazioni, anche senza una gara."/><PlanNavigation/><div className="ux-actions"><button className="ux-button ux-button-primary" data-track="goals.new" onClick={()=>setCreating(true)}><PlusIcon aria-hidden="true" />Nuovo obiettivo</button></div>{creating&&<TrainingGoalForm onSaved={(saved)=>{setCreating(false);if(returnTo){const next=new URL(returnTo,"https://passo.local");if(next.pathname==="/week/programs/new")next.searchParams.set("goalId",saved.id);router.push(`${next.pathname}${next.search}`);}}} onCancel={()=>{setCreating(false);if(returnTo)router.push(returnTo);}}/>}
- {query.isPending?<Skeleton height={150}/>:query.isError?<div className="ux-error" role="alert"><p>Non è stato possibile caricare gli obiettivi.</p><button className="ux-button" data-track="goals.retry" onClick={()=>query.refetch()} {...dis(query.isFetching,"in_caricamento")}><ActionSync className="action-symbol" aria-hidden="true" />Riprova</button></div>:query.data?.goals.length?query.data.goals.map(goal=>editing===goal.id?<TrainingGoalForm key={goal.id} goal={goal} onSaved={()=>setEditing(null)} onCancel={()=>setEditing(null)}/>:<GoalCard key={goal.id} goal={goal} programs={programs.data?.plans.map(p=>({id:p.id,name:p.name}))??[]} onEdit={()=>setEditing(goal.id)}/>):<div className="ux-empty"><h2>In quale direzione vuoi andare?</h2><p>Puoi preparare una gara, migliorare una prestazione, allenare la forza o mantenere una frequenza sostenibile. Un programma libero può anche restare senza obiettivo.</p><button className="ux-button" data-track="goals.empty-new" onClick={()=>setCreating(true)}>Definisci un obiettivo</button></div>}</div>;
+
+function GoalsContent() {
+  const params = useSearchParams(), router = useRouter();
+  const returnTo = safeReturnHref(params.get("returnTo"), "");
+  const query = useTrainingGoals(), programs = usePlanListQuery();
+  const [creating, setCreating] = useState(params.get("new") === "1"), [editing, setEditing] = useState<string | null>(params.get("edit"));
+  useScreenReady(!query.isPending);
+
+  return (
+    <div className="workspace-page">
+      <WorkspaceHeading title="Piano" description="Obiettivi e valutazioni, anche senza una gara." />
+      <PlanNavigation />
+      <div className="ux-actions">
+        <button className="ux-button ux-button-primary" data-track="goals.new" onClick={() => setCreating(true)}>
+          <PlusIcon aria-hidden="true" />Nuovo obiettivo
+        </button>
+      </div>
+      {creating && (
+        <TrainingGoalForm
+          onSaved={(saved) => {
+            setCreating(false);
+            if (returnTo) {
+              const next = new URL(returnTo, "https://passo.local");
+              if (next.pathname === "/week/programs/new") next.searchParams.set("goalId", saved.id);
+              router.push(`${next.pathname}${next.search}`);
+            }
+          }}
+          onCancel={() => {
+            setCreating(false);
+            if (returnTo) router.push(returnTo);
+          }}
+        />
+      )}
+      {query.isPending ? (
+        <Skeleton height={150} />
+      ) : query.isError ? (
+        <div className="ux-error" role="alert">
+          <p>Non è stato possibile caricare gli obiettivi.</p>
+          <button className="ux-button" data-track="goals.retry" onClick={() => query.refetch()} {...dis(query.isFetching, "in_caricamento")}>
+            <ActionSync className="action-symbol" aria-hidden="true" />Riprova
+          </button>
+        </div>
+      ) : query.data?.goals.length ? (
+        <AnimatePresence initial={false}>
+          {query.data.goals.map((goal) =>
+            editing === goal.id ? (
+              <motion.div key={goal.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <TrainingGoalForm goal={goal} onSaved={() => setEditing(null)} onCancel={() => setEditing(null)} />
+              </motion.div>
+            ) : (
+              <GoalCard
+                key={goal.id}
+                goal={goal}
+                programs={programs.data?.plans.map((p) => ({ id: p.id, name: p.name })) ?? []}
+                onEdit={() => setEditing(goal.id)}
+              />
+            )
+          )}
+        </AnimatePresence>
+      ) : (
+        <div className="ux-empty">
+          <h2>In quale direzione vuoi andare?</h2>
+          <p>Puoi preparare una gara, migliorare una prestazione, allenare la forza o mantenere una frequenza sostenibile. Un programma libero può anche restare senza obiettivo.</p>
+          <button className="ux-button" data-track="goals.empty-new" onClick={() => setCreating(true)}>
+            Definisci un obiettivo
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
+
 function GoalCard({goal,programs,onEdit}:{goal:TrainingGoal;programs:Array<{id:string;name:string}>;onEdit:()=>void}){
   const query=useGoalEvaluations(goal.id),evaluate=useEvaluateGoal(),save=useSaveTrainingGoal(),del=useDeleteTrainingGoal();
+  const { reduced } = useMotionEnabled();
   const[showHistory,setShowHistory]=useState(false);
   const[confirmDelete,setConfirmDelete]=useState(false);
 
-  return <article className="program-card">
-    <div className="program-topline">
-      <h2>{goal.name}</h2>
-      <span className="program-status" data-active={goal.status==="active"}>{STATES[goal.status]??goal.status}</span>
-    </div>
-    <p className="program-details">
-      {GOAL_TYPES[goal.type]} · {goal.priority==="primary"?"Principale":"Secondario"}
-      {goal.distance_km != null ? ` · ${goal.distance_km} km` : ""}
-      {goal.elevation_gain_m != null ? ` · D+ ${goal.elevation_gain_m} m` : ""}
-    </p>
-    {goal.description&&<p className="ux-muted">{goal.description}</p>}
-
-    <dl className="goal-facts">
-      {goal.type === "race" && (
-        <div>
-          <dt>Dettagli gara</dt>
-          <dd>
-            {goal.race_date ? formatFullDate(goal.race_date) : "Data non indicata"}
-            {goal.distance_km != null ? ` · ${goal.distance_km} km` : ""}
-            {goal.elevation_gain_m != null ? ` · D+ ${goal.elevation_gain_m} m` : ""}
-            {goal.target_time_seconds ? ` · Obiettivo ${formatTargetTime(goal.target_time_seconds)}` : " · Senza tempo obiettivo"}
-          </dd>
-        </div>
-      )}
-
-      {(goal.type === "consistency" || goal.type === "maintenance") && (
-        <div>
-          <dt>Frequenza</dt>
-          <dd>
-            {goal.success_criterion?.target != null ? `${goal.success_criterion.target} sedute a settimana` : "Frequenza libera"}
-          </dd>
-        </div>
-      )}
-
-      {goal.type !== "race" && (goal.review_date || goal.deadline) && (
-        <div>
-          <dt>Data prevista</dt>
-          <dd>{formatFullDate((goal.review_date ?? goal.deadline)!)}</dd>
-        </div>
-      )}
-
-      <div>
-        <dt>Programmi collegati</dt>
-        <dd>{goal.linked_program_ids?.map(id=>programs.find(p=>p.id===id)?.name??"Programma conservato").join(", ")||"Nessuno collegato al momento."}</dd>
+  return (
+    <motion.article
+      layout={!reduced}
+      initial={reduced ? false : { opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={
+        reduced
+          ? { opacity: 0 }
+          : {
+              opacity: 0,
+              scale: 0.96,
+              y: -8,
+              height: 0,
+              marginTop: 0,
+              marginBottom: 0,
+              paddingTop: 0,
+              paddingBottom: 0,
+              overflow: "hidden",
+              transition: {
+                opacity: { duration: 0.18, ease: "easeOut" },
+                scale: { duration: 0.18, ease: "easeOut" },
+                y: { duration: 0.18, ease: "easeOut" },
+                height: { duration: 0.28, delay: 0.08, ease: [0.22, 1, 0.36, 1] },
+                marginTop: { duration: 0.28, delay: 0.08, ease: [0.22, 1, 0.36, 1] },
+                marginBottom: { duration: 0.28, delay: 0.08, ease: [0.22, 1, 0.36, 1] },
+                paddingTop: { duration: 0.28, delay: 0.08, ease: [0.22, 1, 0.36, 1] },
+                paddingBottom: { duration: 0.28, delay: 0.08, ease: [0.22, 1, 0.36, 1] },
+              },
+            }
+      }
+      transition={{
+        layout: { type: "spring", stiffness: 350, damping: 30 },
+      }}
+      className="program-card"
+    >
+      <div className="program-topline">
+        <h2>{goal.name}</h2>
+        <span className="program-status" data-active={goal.status==="active"}>{STATES[goal.status]??goal.status}</span>
       </div>
-    </dl>
+      <p className="program-details">
+        {GOAL_TYPES[goal.type]} · {goal.priority==="primary"?"Principale":"Secondario"}
+        {goal.distance_km != null ? ` · ${goal.distance_km} km` : ""}
+        {goal.elevation_gain_m != null ? ` · D+ ${goal.elevation_gain_m} m` : ""}
+      </p>
+      {goal.description&&<p className="ux-muted">{goal.description}</p>}
 
-    <div className="ux-actions">
-      <button className="ux-button" onClick={onEdit} data-track="goals.edit"><PencilIcon aria-hidden="true" />Modifica</button>
-      {goal.type==="race"&&<Link className="ux-button" href={`/settings/goal?goalId=${encodeURIComponent(goal.id)}`} data-track="goals.race-prediction">Previsione gara</Link>}
-      {!goal.linked_program_ids?.length&&goal.status==="active"&&<Link className="ux-button" href={`/week/programs/new?goalId=${encodeURIComponent(goal.id)}`} data-track="goals.create-program">Crea programma per questo obiettivo</Link>}
-      {goal.status==="active"&&<button className="ux-button" data-track="goals.archive" {...dis(save.isPending,"in_caricamento")} onClick={()=>save.mutate({id:goal.id,body:{expected_revision:goal.revision,status:"archived"}})}>Archivia</button>}
-      <button className="ux-button" style={{color:"var(--rosso-avviso)"}} data-track="goals.delete" {...dis(del.isPending,"in_caricamento")} onClick={()=>setConfirmDelete(true)}><TrashIcon aria-hidden="true" />Elimina obiettivo</button>
-    </div>
+      <dl className="goal-facts">
+        {goal.type === "race" && (
+          <div>
+            <dt>Dettagli gara</dt>
+            <dd>
+              {goal.race_date ? formatFullDate(goal.race_date) : "Data non indicata"}
+              {goal.distance_km != null ? ` · ${goal.distance_km} km` : ""}
+              {goal.elevation_gain_m != null ? ` · D+ ${goal.elevation_gain_m} m` : ""}
+              {goal.target_time_seconds ? ` · Obiettivo ${formatTargetTime(goal.target_time_seconds)}` : " · Senza tempo obiettivo"}
+            </dd>
+          </div>
+        )}
 
-    {confirmDelete && (
-      <div className="ux-notice" role="dialog" aria-modal="false" aria-labelledby="delete-goal-title">
-        <h4 id="delete-goal-title">Eliminare definitivamente “{goal.name}”?</h4>
-        <p>L’obiettivo verrà rimosso. I programmi e le sedute già nel calendario non verranno cancellati.</p>
-        <div className="ux-actions">
-          <button
-            className="ux-button"
-            style={{background:"var(--rosso-avviso)",color:"#fff"}}
-            {...dis(del.isPending,"in_caricamento")}
-            onClick={()=>{del.mutate(goal.id);setConfirmDelete(false);}}
-          >
-            {del.isPending ? "Elimino…" : "Conferma eliminazione"}
-          </button>
-          <button className="ux-button" onClick={()=>setConfirmDelete(false)}>Annulla</button>
+        {(goal.type === "consistency" || goal.type === "maintenance") && (
+          <div>
+            <dt>Frequenza</dt>
+            <dd>
+              {goal.success_criterion?.target != null ? `${goal.success_criterion.target} sedute a settimana` : "Frequenza libera"}
+            </dd>
+          </div>
+        )}
+
+        {goal.type !== "race" && (goal.review_date || goal.deadline) && (
+          <div>
+            <dt>Data prevista</dt>
+            <dd>{formatFullDate((goal.review_date ?? goal.deadline)!)}</dd>
+          </div>
+        )}
+
+        <div>
+          <dt>Programmi collegati</dt>
+          <dd>{goal.linked_program_ids?.map(id=>programs.find(p=>p.id===id)?.name??"Programma conservato").join(", ")||"Nessuno collegato al momento."}</dd>
         </div>
-      </div>
-    )}
+      </dl>
 
-    {(evaluate.isError||save.isError||del.isError)&&<p role="alert" className="ux-error">{(evaluate.error??save.error??del.error)?.message}</p>}
-  </article>;
+      <div className="ux-actions">
+        <button className="ux-button" onClick={onEdit} data-track="goals.edit"><PencilIcon aria-hidden="true" />Modifica</button>
+        {goal.type==="race"&&<Link className="ux-button" href={`/settings/goal?goalId=${encodeURIComponent(goal.id)}`} data-track="goals.race-prediction">Previsione gara</Link>}
+        {!goal.linked_program_ids?.length&&goal.status==="active"&&<Link className="ux-button" href={`/week/programs/new?goalId=${encodeURIComponent(goal.id)}`} data-track="goals.create-program">Crea programma per questo obiettivo</Link>}
+        {goal.status==="active"&&<button className="ux-button" data-track="goals.archive" {...dis(save.isPending,"in_caricamento")} onClick={()=>save.mutate({id:goal.id,body:{expected_revision:goal.revision,status:"archived"}})}>Archivia</button>}
+        <button className="ux-button" style={{color:"var(--rosso-avviso)"}} data-track="goals.delete" {...dis(del.isPending,"in_caricamento")} onClick={()=>setConfirmDelete(true)}><TrashIcon aria-hidden="true" />Elimina obiettivo</button>
+      </div>
+
+      {confirmDelete && (
+        <div className="ux-notice" role="dialog" aria-modal="false" aria-labelledby="delete-goal-title">
+          <h4 id="delete-goal-title">Eliminare definitivamente “{goal.name}”?</h4>
+          <p>L’obiettivo verrà rimosso. I programmi e le sedute già nel calendario non verranno cancellati.</p>
+          <div className="ux-actions">
+            <button
+              className="ux-button"
+              style={{background:"var(--rosso-avviso)",color:"#fff"}}
+              {...dis(del.isPending,"in_caricamento")}
+              onClick={()=>{del.mutate(goal.id);setConfirmDelete(false);}}
+            >
+              {del.isPending ? "Elimino…" : "Conferma eliminazione"}
+            </button>
+            <button className="ux-button" onClick={()=>setConfirmDelete(false)}>Annulla</button>
+          </div>
+        </div>
+      )}
+
+      {(evaluate.isError||save.isError||del.isError)&&<p role="alert" className="ux-error">{(evaluate.error??save.error??del.error)?.message}</p>}
+    </motion.article>
+  );
 }
 function evaluationText(value:unknown):string{
  if(value==null)return "Dati non ancora disponibili.";
