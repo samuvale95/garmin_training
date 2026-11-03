@@ -248,7 +248,42 @@ export function groupDistanceKm(group: StepGroup, fallbackPace?: number): number
 /** How long a step lasts, in its own unit: "1000 m", "15 min" or "6 ripetizioni". */
 export function stepDurationLabel(step: Step): string {
   if (step.duration_type === "reps") return `${step.duration_value} ${step.duration_value === 1 ? "ripetizione" : "ripetizioni"}`;
-  return step.duration_type === "distance" ? formatDistanceValue(step.duration_value) : `${step.duration_value} min`;
+  if (step.duration_type === "distance") return formatDistanceValue(step.duration_value);
+  return formatStepMinutes(step.duration_value);
+}
+
+/** Step minutes as people say them: "45 s", "1 min 30 s", "8 min". */
+function formatStepMinutes(minutes: number): string {
+  const total = Math.round(minutes * 60);
+  const m = Math.floor(total / 60);
+  const sec = total % 60;
+  if (m === 0) return `${sec} s`;
+  return sec ? `${m} min ${sec} s` : `${m} min`;
+}
+
+/** One line per exercise of a circuit (trazioni, dip, piegamenti…), each carrying the
+ * rest that follows it. Null for a plain interval + recovery repeat, which reads better
+ * as the one-line "6 × 1 km" row. */
+export function circuitRows(group: StepGroup): { label: string; detail: string }[] | null {
+  const steps = [group.step, ...(group.recovery ? [group.recovery] : []), ...group.extra];
+  const work = steps.filter((s) => !isRecoveryLike(s));
+  if (work.length < 2 && !steps.some((s) => s.exercise)) return null;
+  const rows: { label: string; detail: string }[] = [];
+  steps.forEach((s) => {
+    if (isRecoveryLike(s)) {
+      const rest = `${stepTypeLabel(s.type).toLowerCase()} ${stepDurationLabel(s)}`;
+      const last = rows[rows.length - 1];
+      if (last) last.detail = [last.detail, rest].filter(Boolean).join(" · ");
+      else rows.push({ label: stepTypeLabel(s.type), detail: stepDurationLabel(s) });
+      return;
+    }
+    const extras = [s.target_pace ? formatPaceRange(s.target_pace) : "", stepTargetsLabel(s), s.exercise && s.note ? s.note : ""];
+    rows.push({
+      label: stepName(s) ?? stepTypeLabel(s.type),
+      detail: [stepDurationLabel(s), ...extras].filter(Boolean).join(" · "),
+    });
+  });
+  return rows;
 }
 
 /** A catalogue exercise as a readable name: "PULL_UP" -> "Pull up". The Italian name
