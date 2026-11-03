@@ -8,7 +8,7 @@ import { Badge, Section, Stat } from "@/components/ui";
 import { ChevronRight } from "@/components/Icons";
 import { classifySession, effectiveDescription, effectiveSteps, effectiveTitle, sessionDistanceKm, sessionDurationMinutes } from "@/lib/sessionVisuals";
 import { useToggleSessionShort, useWorkoutAnalysis } from "@/lib/queries";
-import { capitalize, formatFullDate, formatMinutes, formatPaceRange, formatPaceValue, groupDistanceKm, groupSteps, planStepsSummary, sessionFallbackPaceSecPerKm, stepGroupParts } from "@/lib/format";
+import { capitalize, circuitRows, formatFullDate, formatMinutes, formatPaceRange, formatPaceValue, groupDistanceKm, groupSteps, planStepsSummary, sessionFallbackPaceSecPerKm, stepGroupParts } from "@/lib/format";
 import type { StravaActivityMatch, TrainingSession } from "@/lib/types";
 
 const SPORT_LABEL: Record<string, string> = {
@@ -125,8 +125,33 @@ export function SessionDetailBody({
         ) : (
           <ol className="list" style={{ listStyle: "none" }}>
             {groups.map((group, i) => {
-              const { label, detail } = stepGroupParts(group);
               const km = isStrength ? 0 : groupDistanceKm(group, fallbackPace);
+              const circuit = group.reps > 1 || group.extra.length > 0 ? circuitRows(group) : null;
+              if (circuit) {
+                return (
+                  <li key={group.startIndex ?? i}>
+                    <div className="row" style={{ alignItems: "stretch" }}>
+                      <span aria-hidden="true" style={{ width: 4, borderRadius: 2, background: PHASE_COLOR[group.kind] ?? "var(--line-strong)", flex: "none" }} />
+                      <span className="row-main">
+                        <span className="row-title">{group.reps > 1 ? `${group.reps} giri` : "Circuito"}</span>
+                        <ol style={{ listStyle: "none", margin: "8px 0 0", padding: 0, display: "grid", gap: 10 }}>
+                          {circuit.map((row, k) => (
+                            <li key={k} style={{ display: "flex", gap: 10 }}>
+                              <span className="figure muted" style={{ minWidth: 18 }}>{k + 1}</span>
+                              <span style={{ display: "grid" }}>
+                                <span style={{ fontWeight: 600 }}>{row.label}</span>
+                                {row.detail && <span className="row-meta figure" style={{ fontVariationSettings: "normal" }}>{row.detail}</span>}
+                              </span>
+                            </li>
+                          ))}
+                        </ol>
+                      </span>
+                      {km > 0 && <span className="row-end figure" style={{ color: "var(--ink)" }}>{km.toLocaleString("it-IT", { maximumFractionDigits: 1 })} km</span>}
+                    </div>
+                  </li>
+                );
+              }
+              const { label, detail } = stepGroupParts(group);
               return (
                 <li key={group.startIndex ?? i}>
                   <div className="row" style={{ alignItems: "stretch" }}>
