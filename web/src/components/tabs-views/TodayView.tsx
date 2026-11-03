@@ -408,7 +408,7 @@ function SessionHero({
   return (
     <>
     {restToday && <section className="today-rest"><strong>{hasTodaySession ? "Oggi · Allenamento in programma" : "Oggi · Riposo"}</strong><span>{hasTodaySession ? "Le sedute di oggi sono indicate qui sotto." : "Nessun allenamento in programma oggi."}</span></section>}
-    <article className="hero" data-sport style={{ "--sport": visual.accent } as CSSProperties} aria-labelledby="today-hero-title">
+    <article className="hero" style={{ "--sport": visual.accent } as CSSProperties} aria-labelledby="today-hero-title">
       {restToday && <p className="today-next-heading">Prossimo allenamento <span>{when} · {formatFullDate(session.date)}</span></p>}
       <div className="hero-kicker">
         <span className="sport-tag" style={{ "--sport": visual.accent } as CSSProperties}>

@@ -63,13 +63,18 @@ export function SessionDetailBody({
   const activityId = matchData?.activity_id ?? null;
   const analysisQuery = useWorkoutAnalysis(activityId, hasStravaMatch && !!activityId);
 
+  const sportLabel = SPORT_LABEL[session.sport] ?? capitalize(session.sport);
+  const tagLabel =
+    sportLabel.toLowerCase() === visual.label.toLowerCase()
+      ? visual.label
+      : `${sportLabel} · ${visual.label}`;
+
   return (
     <div className="stack-lg" style={{ marginTop: 8 }}>
-      <article className="hero" data-sport style={{ "--sport": visual.accent } as CSSProperties} aria-labelledby="session-title">
+      <article className="hero" style={{ "--sport": visual.accent } as CSSProperties} aria-labelledby="session-title">
         <div className="hero-kicker">
           <span className="sport-tag" style={{ "--sport": visual.accent } as CSSProperties}>
-            <span className="sport-mark" aria-hidden="true" />
-            {SPORT_LABEL[session.sport] ?? capitalize(session.sport)} · {visual.label}
+            {tagLabel}
           </span>
           <span aria-hidden="true">·</span>
           <time dateTime={session.date}>{capitalize(formatFullDate(session.date))}</time>
