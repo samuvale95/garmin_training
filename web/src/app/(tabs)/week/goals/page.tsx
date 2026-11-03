@@ -1,5 +1,5 @@
 "use client";
-import { PencilIcon as ActionEdit, SyncIcon as ActionSync } from "@/components/Icons";
+import { SyncIcon as ActionSync } from "@/components/Icons";
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
@@ -75,7 +75,7 @@ function GoalCard({goal,programs,onEdit}:{goal:TrainingGoal;programs:Array<{id:s
     </dl>
 
     <div className="ux-actions">
-      <button className="ux-button" onClick={onEdit} data-track="goals.edit"><PencilIcon aria-hidden="true" /><ActionEdit className="action-symbol" aria-hidden="true" />Modifica</button>
+      <button className="ux-button" onClick={onEdit} data-track="goals.edit"><PencilIcon aria-hidden="true" />Modifica</button>
       {goal.type==="race"&&<Link className="ux-button" href={`/settings/goal?goalId=${encodeURIComponent(goal.id)}`} data-track="goals.race-prediction">Previsione gara</Link>}
       {!goal.linked_program_ids?.length&&goal.status==="active"&&<Link className="ux-button" href={`/week/programs/new?goalId=${encodeURIComponent(goal.id)}`} data-track="goals.create-program">Crea programma per questo obiettivo</Link>}
       {goal.status==="active"&&<button className="ux-button" data-track="goals.archive" {...dis(save.isPending,"in_caricamento")} onClick={()=>save.mutate({id:goal.id,body:{expected_revision:goal.revision,status:"archived"}})}>Archivia</button>}

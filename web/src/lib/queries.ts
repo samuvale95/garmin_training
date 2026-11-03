@@ -1529,13 +1529,30 @@ export function useDeletePlanById() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (planId: string) => apiDelete<{ ok: boolean; deleted_plan_id?: string }>(`/plan/${planId}`),
+    onMutate: async (planId: string) => {
+      await queryClient.cancelQueries({ queryKey: PLANS_LIST_KEY });
+      const previous = queryClient.getQueryData<PlanListResponse>(PLANS_LIST_KEY);
+      if (previous) {
+        queryClient.setQueryData<PlanListResponse>(PLANS_LIST_KEY, {
+          ...previous,
+          plans: previous.plans.filter((p) => p.id !== planId),
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _planId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(PLANS_LIST_KEY, context.previous);
+      }
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: PLANS_LIST_KEY });
-      const { plan } = await apiGet<{ plan: PlanState | null }>("/plan");
-      applyPlanLocally(queryClient, plan);
+      queryClient.invalidateQueries({ queryKey: PLANS_LIST_KEY });
       queryClient.invalidateQueries({ queryKey: ["plan-diff"] });
       queryClient.invalidateQueries({ queryKey: ["plan-state"] });
       queryClient.invalidateQueries({ queryKey: ["training-goals"] });
+      apiGet<{ plan: PlanState | null }>("/plan")
+        .then(({ plan }) => applyPlanLocally(queryClient, plan))
+        .catch(() => {});
       nudgeGarminPush(queryClient);
     },
   });

@@ -41,7 +41,7 @@ export default function ProgramsPage(){
        <strong>Eliminare definitivamente “{plan.name}”?</strong>
        <p style={{margin:"4px 0 8px",fontSize:"var(--text-sm)"}}>Il programma e le sue sedute nel calendario verranno rimossi. Le attività già svolte e registrate non verranno cancellate.</p>
        <div className="actions">
-        <button className="btn" data-size="sm" style={{background:"var(--rosso-avviso)",color:"#fff"}} {...dis(deletePlan.isPending,"in_caricamento")} onClick={async()=>{await deletePlan.mutateAsync(plan.id);setConfirmDeletePlan(null);}}>{deletePlan.isPending?"Elimino…":"Conferma eliminazione"}</button>
+        <button className="btn" data-size="sm" style={{background:"var(--rosso-avviso)",color:"#fff"}} {...dis(deletePlan.isPending,"in_caricamento")} onClick={()=>{deletePlan.mutate(plan.id);setConfirmDeletePlan(null);}}>{deletePlan.isPending?"Elimino…":"Conferma eliminazione"}</button>
         <button className="btn" data-size="sm" data-variant="quiet" onClick={()=>setConfirmDeletePlan(null)}>Annulla</button>
        </div>
       </div>}

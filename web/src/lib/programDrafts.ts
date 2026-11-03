@@ -46,6 +46,22 @@ export function useDeleteProgramDraft() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => apiDelete<{ deleted: boolean; id: string }>(`/plan/drafts/${id}`),
+    onMutate: async (id: string) => {
+      await client.cancelQueries({ queryKey: ["plan-drafts"] });
+      const previous = client.getQueryData<{ drafts: ProgramDraft[] }>(["plan-drafts"]);
+      if (previous) {
+        client.setQueryData<{ drafts: ProgramDraft[] }>(["plan-drafts"], {
+          ...previous,
+          drafts: previous.drafts.filter((d) => d.id !== id),
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        client.setQueryData(["plan-drafts"], context.previous);
+      }
+    },
     onSuccess: (_, id) => {
       client.removeQueries({ queryKey: ["plan-draft", id] });
       for (const queryKey of listKeys) client.invalidateQueries({ queryKey });
@@ -62,6 +78,22 @@ export function useDeleteTrainingGoal() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => apiDelete<{ deleted: boolean; id: string }>(`/goals/${id}`),
+    onMutate: async (id: string) => {
+      await client.cancelQueries({ queryKey: ["training-goals"] });
+      const previous = client.getQueryData<{ goals: TrainingGoal[] }>(["training-goals"]);
+      if (previous) {
+        client.setQueryData<{ goals: TrainingGoal[] }>(["training-goals"], {
+          ...previous,
+          goals: previous.goals.filter((g) => g.id !== id),
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        client.setQueryData(["training-goals"], context.previous);
+      }
+    },
     onSuccess: (_, id) => {
       client.removeQueries({ queryKey: ["goal-evaluations", id] });
       client.invalidateQueries({ queryKey: ["training-goals"] });
