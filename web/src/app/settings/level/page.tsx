@@ -1,4 +1,6 @@
 "use client";
+import { CalendarIcon } from "@/components/Icons";
+import { TrendUpIcon as ScreenSymbol } from "@/components/Icons";
 
 import { dis } from "@/lib/disabled";
 import { PageHeader } from "@/components/PageHeader";
@@ -28,7 +30,7 @@ export default function LevelSettingsPage() {
         <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}>impostazioni</span>
       </div>
 
-      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 16px" }}>
+      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 16px" }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />
         Il tuo livello
       </WordIn>
 
@@ -49,7 +51,7 @@ export default function LevelSettingsPage() {
               livello {data.level} di 3
             </p>
             <p style={{ font: "600 34px/1 var(--font-sans)", letterSpacing: "-.03em", margin: "12px 0 0" }}>{data.level_name}</p>
-            <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.35, margin: "12px 0 0" }}>
+            <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.35, margin: "12px 0 0", color: "var(--crema)", opacity: 0.95 }}>
               {data.level_meaning}
             </p>
           </SlideUp>
@@ -133,7 +135,7 @@ function AdaptationModeSwitch({ level }: { level: AthleteLevel }) {
   ];
   return (
     <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 16 }}>
-      <p style={{ fontWeight: 600, fontSize: 14.5, margin: 0 }}>Quando il piano si adatta</p>
+      <p style={{ fontWeight: 600, fontSize: 14.5, margin: 0 }}><CalendarIcon className="action-symbol" aria-hidden="true" />Quando il piano si adatta</p>
       <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "4px 0 10px", lineHeight: 1.4 }}>
         Dopo un dolore, una seduta saltata o una notte storta. Le sedute che hai modificato tu non le tocco mai.
       </p>

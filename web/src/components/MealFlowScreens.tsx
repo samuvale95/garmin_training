@@ -1,4 +1,8 @@
 "use client";
+import { TrashIcon, SyncIcon } from "@/components/Icons";
+import { CheckIcon, CameraIcon } from "@/components/Icons";
+import { AlertTriangleIcon, PencilIcon } from "@/components/Icons";
+import { UtensilsIcon as ScreenSymbol } from "@/components/Icons";
 
 import { dis } from "@/lib/disabled";
 import { useState } from "react";
@@ -99,7 +103,7 @@ export function ComposeScreen({
         >
           <ChevronLeft size={20} strokeWidth={2.4} />
         </button>
-        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0 }}>Aggiungi un pasto</h1>
+        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0 }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />Aggiungi un pasto</h1>
       </div>
 
       <div style={{ display: "flex", gap: 4, background: "var(--sabbia)", borderRadius: "var(--radius-pill)", padding: 4, marginTop: 16 }}>
@@ -211,7 +215,7 @@ export function ComposeScreen({
           cursor: ready && !saving ? "pointer" : "default",
         }}
       >
-        {mode === "stima" ? "Calcola i valori" : saving ? "Salvo…" : "Salva il pasto"}
+        {mode === "stima" ? <ScreenSymbol className="action-symbol" aria-hidden="true" /> : <CheckIcon className="action-symbol" aria-hidden="true" />}{mode === "stima" ? "Calcola i valori" : saving ? "Salvo…" : "Salva il pasto"}
       </button>
     </div>
   );
@@ -248,7 +252,7 @@ export function EstimatingScreen({ preview, onCancel }: { preview: Preview; onCa
       <p style={{ font: "700 26px/1.15 var(--font-sans)", margin: "24px 0 0" }}>
         {preview.kind === "photo" ? (
           <>
-            Sto guardando
+            <CameraIcon className="action-symbol" aria-hidden="true" />Sto guardando
             <br />
             il piatto
           </>
@@ -406,10 +410,10 @@ export function ReviewScreen({ entry, preview, onDiscard, onSaved }: { entry: Fo
 
       <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
         <button data-track="meal-flow-screens.ondiscard" type="button" onClick={onDiscard} className="tap-target" style={{ background: "var(--sabbia)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
-          Scarta
+          <TrashIcon className="action-symbol" aria-hidden="true" />Scarta
         </button>
         <button data-track="meal-flow-screens.save" type="button" onClick={save} {...dis(updateEntry.isPending, "in_caricamento")} className="tap-target" style={{ flex: 1, background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
-          Salva
+          <CheckIcon className="action-symbol" aria-hidden="true" />Salva
         </button>
       </div>
     </div>
@@ -436,7 +440,7 @@ export function FailedScreen({ entryId, preview, onRetake, onSaved, error, retak
 
   return (
     <div style={{ minHeight: "100dvh", background: "var(--rosa-avviso)", padding: "22px 20px 28px", display: "flex", flexDirection: "column" }}>
-      <p style={{ fontSize: 12, fontWeight: 700, color: "var(--rosso-avviso)", margin: 0 }}>Stima non riuscita</p>
+      <p style={{ fontSize: 12, fontWeight: 700, color: "var(--rosso-avviso)", margin: 0 }}><AlertTriangleIcon className="action-symbol" aria-hidden="true" />Stima non riuscita</p>
       <p style={{ font: "700 30px/1.1 var(--font-sans)", color: "var(--rosso-testo)", margin: "10px 0 0" }}>
         {preview.kind === "photo" ? (
           <>
@@ -459,7 +463,7 @@ export function FailedScreen({ entryId, preview, onRetake, onSaved, error, retak
       </p>
 
       <div style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card-lg)", padding: 18, marginTop: 20 }}>
-        <p style={{ fontWeight: 700, fontSize: 15, margin: "0 0 12px" }}>Scrivili tu, se li sai</p>
+        <p style={{ fontWeight: 700, fontSize: 15, margin: "0 0 12px" }}><PencilIcon className="action-symbol" aria-hidden="true" />Scrivili tu, se li sai</p>
         <div style={{ display: "flex", gap: 10 }}>
           <ReviewMacroField label="carbo" value={carb} onChange={setCarb} />
           <ReviewMacroField label="proteine" value={protein} onChange={setProtein} />
@@ -476,10 +480,10 @@ export function FailedScreen({ entryId, preview, onRetake, onSaved, error, retak
         className="tap-target"
         style={{ marginTop: "auto", background: "var(--rosso-forte)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 22px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}
       >
-        Salva quello che ho scritto
+        <CheckIcon className="action-symbol" aria-hidden="true" />Salva quello che ho scritto
       </button>
       <button data-track="meal-flow-screens.onretake" type="button" onClick={onRetake} {...dis(!!retaking, "in_caricamento")} className="tap-target" style={{ marginTop: 12, alignSelf: "center", background: "none", border: "none", color: "var(--rosso-testo)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-        {preview.kind === "photo" ? "Rifai la foto" : "Riscrivilo"}
+        <SyncIcon className="action-symbol" aria-hidden="true" />{preview.kind === "photo" ? "Rifai la foto" : "Riscrivilo"}
       </button>
     </div>
   );

@@ -23,7 +23,7 @@ from .. import goal_fit, llm, programs
 from ..parser import parse_plan_document, serialize_plan
 from . import garmin_session, schemas
 from .auth import current_user_id
-from .cache import TTL_GOAL_FIT_NARRATIVE, TTL_PLAN_DIFF, cache
+from .cache import TTL_GOAL_FIT_NARRATIVE, TTL_PLAN_DIFF, cache, invalidate_calendar
 from .routes_coach import _zones, coach_state
 from .jobs import job_store
 
@@ -103,12 +103,14 @@ async def save_plan(payload: schemas.PlanIn, user_id: str = Depends(current_user
 @router.delete("/plan", response_model=schemas.DeletePlanResponse)
 async def delete_plan(user_id: str = Depends(current_user_id)) -> schemas.DeletePlanResponse:
     await run_in_threadpool(db.delete_plan, user_id)
+    invalidate_calendar(user_id)
     return schemas.DeletePlanResponse(ok=True)
 
 
 @router.delete("/plan/{plan_id}", response_model=schemas.DeletePlanResponse)
 async def delete_plan_by_id(plan_id: str, user_id: str = Depends(current_user_id)) -> schemas.DeletePlanResponse:
     await run_in_threadpool(db.delete_plan, user_id, plan_id=plan_id)
+    invalidate_calendar(user_id)
     return schemas.DeletePlanResponse(ok=True)
 
 

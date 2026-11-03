@@ -72,6 +72,28 @@ def test_non_race_goal_needs_no_distance_or_finish_time():
     assert "distance_km" not in goal
 
 
+def test_race_goal_supports_trail_elevation_gain():
+    goal = programs.validate_goal({
+        "type": "race",
+        "name": "Cortina Trail",
+        "race_date": "2027-06-25",
+        "distance_km": 48.0,
+        "elevation_gain_m": 2600.0,
+        "sports": ["running"],
+    })
+    assert goal["distance_km"] == 48.0
+    assert goal["elevation_gain_m"] == 2600.0
+
+    with pytest.raises(programs.PlanningError, match="dislivello"):
+        programs.validate_goal({
+            "type": "race",
+            "name": "Trail Errato",
+            "race_date": "2027-06-25",
+            "distance_km": 20.0,
+            "elevation_gain_m": -100,
+        })
+
+
 @pytest.fixture
 def local_store(monkeypatch):
     url=os.getenv("PASSO_TEST_DATABASE_URL")

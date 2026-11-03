@@ -1,4 +1,6 @@
 "use client";
+import { ProgramIcon, ClockIcon, LockIcon } from "@/components/Icons";
+import { SparklesIcon as ScreenSymbol } from "@/components/Icons";
 
 import { useState } from "react";
 import { dis } from "@/lib/disabled";
@@ -35,7 +37,7 @@ export default function AgentsAdminPage() {
         <PageHeader backHref="/settings" />
         <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}>impostazioni</span>
       </div>
-      <h1 style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 16px" }}>Agenti</h1>
+      <h1 style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 16px" }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />Agenti</h1>
       {isPending ? (
         <Skeleton height={160} radius={27} />
       ) : !me?.is_admin ? (
@@ -169,7 +171,7 @@ function Proposals() {
 
   return (
     <div style={{ marginTop: 26 }}>
-      <span style={label}>Proposte</span>
+      <span style={label}><ProgramIcon className="action-symbol" aria-hidden="true" />Proposte</span>
       <div style={{ display: "flex", gap: 6, overflowX: "auto", margin: "10px 0 2px" }}>
         {FILTERS.map((f) => (
           <button key={f} type="button" data-track={`agents.filter-${f}`} className="tap-target" onClick={() => setFilter(f)} style={pill(f === filter)}>
@@ -269,7 +271,7 @@ function Runs() {
   const { data, isPending } = useAgentRuns();
   return (
     <div style={{ marginTop: 26 }}>
-      <span style={label}>Esecuzioni</span>
+      <span style={label}><ClockIcon className="action-symbol" aria-hidden="true" />Esecuzioni</span>
       {isPending ? (
         <Skeleton height={100} radius={20} />
       ) : !data?.length ? (
@@ -341,7 +343,7 @@ function Admins() {
 
   return (
     <div style={{ marginTop: 26 }}>
-      <span style={label}>Amministratori</span>
+      <span style={label}><LockIcon className="action-symbol" aria-hidden="true" />Amministratori</span>
       <div style={card} data-track="agents.admins" data-interactive="false">
         <p style={{ fontSize: 13, color: "var(--inchiostro-50)", margin: "0 0 12px", lineHeight: 1.4 }}>
           Chi è qui vede questa pagina e decide sulle proposte. Basta l&apos;email del suo account: vale dal primo accesso.

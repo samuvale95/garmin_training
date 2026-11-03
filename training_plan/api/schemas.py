@@ -270,6 +270,7 @@ class RaceGoalOut(BaseModel):
     distance_km: float
     name: str | None = None
     target_time_seconds: int | None = None
+    elevation_gain_m: float | None = None
     # Derived, not stored: sent along so the phase label and the countdown are computed
     # in exactly one place (models.race_phase) rather than reimplemented per client.
     phase: str
@@ -282,6 +283,7 @@ class RaceGoalOut(BaseModel):
             distance_km=goal.distance_km,
             name=goal.name,
             target_time_seconds=goal.target_time_seconds,
+            elevation_gain_m=getattr(goal, "elevation_gain_m", None),
             phase=models.race_phase(goal),
             days_to_race=models.days_to_race(goal),
         )
@@ -292,6 +294,7 @@ class RaceGoalOut(BaseModel):
             distance_km=self.distance_km,
             name=self.name,
             target_time_seconds=self.target_time_seconds,
+            elevation_gain_m=self.elevation_gain_m,
         )
 
 
@@ -304,6 +307,7 @@ class RaceGoalIn(BaseModel):
     distance_km: float = Field(gt=0)
     name: str | None = None
     target_time_seconds: int | None = Field(default=None, gt=0)
+    elevation_gain_m: float | None = Field(default=None, ge=0)
 
     def to_model(self) -> models.RaceGoal:
         return models.RaceGoal(
@@ -311,6 +315,7 @@ class RaceGoalIn(BaseModel):
             distance_km=self.distance_km,
             name=self.name,
             target_time_seconds=self.target_time_seconds,
+            elevation_gain_m=self.elevation_gain_m,
         )
 
 

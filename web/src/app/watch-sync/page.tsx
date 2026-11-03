@@ -1,4 +1,5 @@
 "use client";
+import { WatchIcon as ScreenSymbol } from "@/components/Icons";
 
 import { dis } from "@/lib/disabled";
 import { useEffect } from "react";
@@ -98,7 +99,7 @@ export default function WatchSyncPage() {
         </div>
 
         {/* Two forced lines, not a wrapped paragraph: the break is part of the setting. */}
-        <h1 style={{ margin: 0 }}>
+        <h1 style={{ margin: 0 }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />
           <WordIn active={animate} style={{ font: "600 32px/1.05 var(--font-sans)", letterSpacing: "-.035em" }}>
             L&apos;orologio non
           </WordIn>

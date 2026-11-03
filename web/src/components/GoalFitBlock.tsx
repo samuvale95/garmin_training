@@ -42,7 +42,7 @@ export function GoalFitBlock({ fit, narrative, animate, delayMs = 0 }: { fit: Go
           {style.overline}
         </p>
         <p style={{ font: "600 19px/1.25 var(--font-sans)", letterSpacing: "-.01em", margin: "8px 0 0" }}>{fit.headline}</p>
-        <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.35, margin: "8px 0 0", opacity: 0.92 }}>
+        <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.35, margin: "8px 0 0", color: style.color ?? "var(--crema)", opacity: 0.95 }}>
           {narrative ?? "Ho riletto le sedute che hai già, da oggi alla gara."}
         </p>
 

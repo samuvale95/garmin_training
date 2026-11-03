@@ -1,5 +1,6 @@
 "use client";
 
+
 import { dis } from "@/lib/disabled";
 import { useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
 import { useMotionEnabled } from "@/lib/motion";
@@ -143,7 +144,7 @@ export function PortionPicker({ value, onChange, disabled }: { value: number; on
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
-          Quantità Porzione
+          <UtensilsIcon className="action-symbol" aria-hidden="true" />Quantità Porzione
         </span>
         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--inchiostro)" }}>
           {portionDescriptor(value)}

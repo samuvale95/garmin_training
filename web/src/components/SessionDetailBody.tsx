@@ -1,4 +1,5 @@
 "use client";
+import { ClockIcon, ProgramIcon, CheckIcon } from "@/components/Icons";
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
@@ -93,7 +94,7 @@ export function SessionDetailBody({
       </article>
 
       {session.short_variant && session.id && (
-        <Section title="Versione breve" id="session-short">
+        <Section icon={<ClockIcon aria-hidden="true" />} title="Versione breve" id="session-short">
           <div className="card">
             <div className="stats" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
               <Stat value={formatMinutes(fullMin)} label="Completa" note={isShortActive ? undefined : "In uso"} />
@@ -113,7 +114,7 @@ export function SessionDetailBody({
         </Section>
       )}
 
-      <Section title="Struttura" id="session-structure">
+      <Section icon={<ProgramIcon aria-hidden="true" />} title="Struttura" id="session-structure">
         {groups.length === 0 ? (
           <div className="card"><p className="card-text" style={{ margin: 0 }}>Seduta continua, senza fasi strutturate.</p></div>
         ) : (
@@ -142,7 +143,7 @@ export function SessionDetailBody({
       </Section>
 
       {hasStravaMatch && matchData && (
-        <Section title="Com’è andata" id="session-done">
+        <Section icon={<CheckIcon aria-hidden="true" />} title="Com’è andata" id="session-done">
           <ul className="list">
             <li>
               <Link className="row" href={stravaHref} data-track="session-detail-body.stravahref">

@@ -160,6 +160,14 @@ img { max-width: 100%; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .figure, .font-mono { font-family: var(--font-sans); font-variation-settings: "wdth" var(--wdth-figure); font-variant-numeric: tabular-nums; letter-spacing: 0; }
 .font-serif-italic { font-family: var(--font-sans); font-style: normal; font-weight: 400; color: var(--ink-2); }
+[style*="var(--inchiostro)"] .font-serif-italic,
+[style*="color: var(--crema)"] .font-serif-italic,
+[style*="color:var(--crema)"] .font-serif-italic,
+.card-dark .font-serif-italic,
+.dark .font-serif-italic {
+  color: var(--crema);
+  opacity: 0.95;
+}
 .display { font-variation-settings: "wdth" var(--wdth-display); letter-spacing: -0.015em; }
 .muted { color: var(--ink-2); }
 .tap-target { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
@@ -1265,3 +1273,10 @@ a.rhythm-day:hover, button.rhythm-day:hover { color: var(--ink); }
 .today-rest span { color: var(--ink-2); }
 .today-next-heading { margin: 0 0 16px; font-size: var(--text-lg); font-weight: 650; }
 .today-next-heading span { display: block; color: var(--ink-2); font-size: var(--text-md); font-weight: 500; text-transform: capitalize; }
+
+/* Decorative symbols sit beside readable labels throughout detail screens. */
+.icon-heading { display: flex; align-items: center; gap: .5em; }
+.icon-heading > svg, .heading-symbol { flex: none; vertical-align: -.08em; margin-right: .45em; }
+.heading-symbol { width: .75em; height: .75em; }
+.icon-heading > svg { margin-right: 0; }
+.action-symbol { display: inline-block; flex: none; vertical-align: -.15em; margin-right: .45em; }

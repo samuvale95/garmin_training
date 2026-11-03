@@ -1,4 +1,5 @@
 "use client";
+import { CheckIcon, AlertTriangleIcon, ClockIcon } from "@/components/Icons";
 
 import { dis } from "@/lib/disabled";
 import { Suspense, useEffect, useRef } from "react";
@@ -76,9 +77,9 @@ function SyncScreenInner() {
       </div>
 
       <div style={{ display: "flex", gap: 16, marginTop: 18 }}>
-        <Count value={done} label="fatte" color="var(--verde-tratto)" />
-        <Count value={failed} label="rifiutata" color="var(--corallo-chiaro)" />
-        <Count value={queued} label="in coda" color="var(--inchiostro-su-scuro)" />
+        <Count icon={<CheckIcon aria-hidden="true" />} value={done} label="fatte" color="var(--verde-tratto)" />
+        <Count icon={<AlertTriangleIcon aria-hidden="true" />} value={failed} label="rifiutata" color="var(--corallo-chiaro)" />
+        <Count icon={<ClockIcon aria-hidden="true" />} value={queued} label="in coda" color="var(--inchiostro-su-scuro)" />
       </div>
 
       <div style={{ flex: 1, position: "relative", minHeight: 150, marginTop: 20, background: "rgba(246,238,218,.05)", borderRadius: "var(--radius-card-lg)", padding: 18, boxSizing: "border-box", overflow: "hidden" }}>
@@ -117,11 +118,11 @@ function SyncScreenInner() {
   );
 }
 
-function Count({ value, label, color }: { value: number; label: string; color: string }) {
+function Count({ value, label, color, icon }: { value: number; label: string; color: string; icon: React.ReactNode }) {
   return (
     <div>
       <p style={{ font: "600 20px/1 var(--font-sans)", color, margin: "0 0 2px" }}>{value}</p>
-      <p style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: 0 }}>{label}</p>
+      <p style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: 0 }}>{icon} {label}</p>
     </div>
   );
 }

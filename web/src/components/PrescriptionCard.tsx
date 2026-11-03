@@ -1,4 +1,5 @@
 "use client";
+import { RunnerIcon, PulseIcon, ClockIcon } from "@/components/Icons";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -49,7 +50,7 @@ export function PrescriptionCard({
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
         <p style={{ font: "600 19px/1.2 var(--font-sans)", letterSpacing: "-.02em", margin: 0 }}>
-          {prescription.title}
+          <RunnerIcon className="action-symbol" aria-hidden="true" />{prescription.title}
         </p>
         <span
           style={{
@@ -154,7 +155,7 @@ export function SensitivityTable({ rows, animate, delayMs }: { rows: Sensitivity
       >
         <div>
           <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
-            sensibilità stima soglia
+            <PulseIcon className="action-symbol" aria-hidden="true" />sensibilità stima soglia
           </p>
           <p style={{ font: "600 14px/1.2 var(--font-sans)", margin: "4px 0 0", color: "var(--inchiostro)" }}>
             E se la soglia fosse diversa?
@@ -221,7 +222,7 @@ export function PaceProfileCard({
   return (
     <SlideUp active={animate} delayMs={delayMs} style={{ background: "var(--crema-card)", borderRadius: "var(--radius-card)", padding: 18, marginTop: 12 }}>
       <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
-        i tuoi passi, misurati
+        <ClockIcon className="action-symbol" aria-hidden="true" />i tuoi passi, misurati
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
         {rows.map(({ label, estimate }) => (

@@ -1,4 +1,5 @@
 "use client";
+import { WatchIcon, SparklesIcon, UploadIcon } from "@/components/Icons";
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -92,13 +93,13 @@ export default function EntryPage() {
 
       <SlideUp active={animate} delayMs={500} style={{ marginTop: 16, paddingBottom: 22, display: "flex", flexDirection: "column", gap: 10 }}>
         <PrimaryButton data-track="home.connect-garmin" sheen onClick={() => router.push("/connect-garmin")}>
-          Usa il calendario Garmin
+          <WatchIcon className="action-symbol" aria-hidden="true" />Usa il calendario Garmin
         </PrimaryButton>
         <p style={{ font: "500 12px/1.5 var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>
           Collega Garmin per leggere calendario e attività. Un piano attivo viene inviato a Garmin Connect fino a 28 giorni; l&apos;orologio si sincronizza separatamente.
         </p>
-        <button type="button" className="ux-button" data-track="home.create-ai" onClick={() => router.push("/week/programs/new?source=ai")}>Crea un piano con AI</button>
-        <button type="button" className="ux-button" data-track="home.import-file" onClick={() => router.push("/week/programs/new?source=import")}>Importa un file YAML/YML</button>
+        <button type="button" className="ux-button" data-track="home.create-ai" onClick={() => router.push("/week/programs/new?source=ai")}><SparklesIcon className="action-symbol" aria-hidden="true" />Crea un piano con AI</button>
+        <button type="button" className="ux-button" data-track="home.import-file" onClick={() => router.push("/week/programs/new?source=import")}><UploadIcon className="action-symbol" aria-hidden="true" />Importa un file YAML/YML</button>
         <p style={{ font: "500 12px/1.5 var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>
           Puoi creare o importare una bozza senza collegare Garmin.
         </p>

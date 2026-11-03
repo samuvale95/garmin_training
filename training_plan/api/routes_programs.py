@@ -70,6 +70,7 @@ class GoalIn(Request):
     race_date: str | None=None
     distance_km: float | None=None
     target_time_seconds: int | None=None
+    elevation_gain_m: float | None=None
 
 
 class GoalPatch(Revision):
@@ -87,6 +88,7 @@ class GoalPatch(Revision):
     race_date: str | None=None
     distance_km: float | None=None
     target_time_seconds: int | None=None
+    elevation_gain_m: float | None=None
 
 
 async def call(fn,*args):
@@ -118,6 +120,11 @@ async def draft(draft_id: str,user_id: str=Depends(current_user_id)):
 async def patch_draft(draft_id: str,payload: DraftPatch,user_id: str=Depends(current_user_id)):
     changes=payload.model_dump(exclude_unset=True,exclude={"expected_revision"})
     return await call(programs.patch_draft,user_id,draft_id,payload.expected_revision,changes)
+
+
+@router.delete("/plan/drafts/{draft_id}")
+async def delete_draft(draft_id: str, user_id: str = Depends(current_user_id)):
+    return await call(programs.delete_draft, user_id, draft_id)
 
 
 @router.post("/plan/drafts/{draft_id}/validate")
@@ -168,6 +175,11 @@ async def goal(goal_id: str,user_id: str=Depends(current_user_id)):
 @router.patch("/goals/{goal_id}")
 async def patch_goal(goal_id: str,payload: GoalPatch,user_id: str=Depends(current_user_id)):
     return await call(programs.patch_goal,user_id,goal_id,payload.expected_revision,payload.model_dump(exclude_unset=True,exclude={"expected_revision"}))
+
+
+@router.delete("/goals/{goal_id}")
+async def delete_goal(goal_id: str, user_id: str = Depends(current_user_id)):
+    return await call(programs.delete_goal, user_id, goal_id)
 
 
 @router.get("/goals/{goal_id}/evaluations")

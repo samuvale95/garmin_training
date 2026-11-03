@@ -1,4 +1,5 @@
 "use client";
+import { RunnerIcon as ScreenSymbol } from "@/components/Icons";
 
 import { dis } from "@/lib/disabled";
 import Link from "next/link";
@@ -33,7 +34,7 @@ export default function CoachTrainingPage() {
     <div style={{ padding: "22px 20px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/coach" />
-        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>
+        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />
           Come ti alleni
         </h1>
       </div>

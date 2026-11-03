@@ -1,4 +1,6 @@
 "use client";
+import { TrashIcon, CalendarIcon } from "@/components/Icons";
+import { AlertTriangleIcon as ScreenSymbol } from "@/components/Icons";
 
 import { useRouter } from "next/navigation";
 import { BrandMark } from "@/components/motion/BrandMark";
@@ -42,7 +44,7 @@ export default function ConfirmDeletionsPage() {
         <span style={{ fontSize: 12, color: "var(--rosa-testo-50)", fontWeight: 500 }}>fermo · azione irreversibile</span>
       </div>
 
-      <h1 style={{ font: "600 28px/1.1 var(--font-sans)", color: "var(--rosso-testo)", letterSpacing: "-.03em", margin: "20px 0 8px" }}>
+      <h1 style={{ font: "600 28px/1.1 var(--font-sans)", color: "var(--rosso-testo)", letterSpacing: "-.03em", margin: "20px 0 8px" }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />
         {changed.length > 0
           ? `${capitalize(numberToItalianWords(changed.length))} ${changed.length === 1 ? "sessione va" : "sessioni vanno"} cancellate`
           : "Nessuna sessione da cancellare"}
@@ -84,7 +86,7 @@ export default function ConfirmDeletionsPage() {
               textColor="var(--crema)"
               fillColor="var(--rosso-forte)"
             >
-              Cancella e ricrea
+              <TrashIcon className="action-symbol" aria-hidden="true" />Cancella e ricrea
             </PrimaryButton>
             <button data-track="confirm-deletions.router-push"
               type="button"
@@ -92,7 +94,7 @@ export default function ConfirmDeletionsPage() {
               className="tap-target"
               style={{ background: "var(--crema-card)", border: "none", borderRadius: "var(--radius-pill)", padding: "14px 22px", fontSize: 15, fontWeight: 600, cursor: "pointer" }}
             >
-              Lasciale come sono
+              <CalendarIcon className="action-symbol" aria-hidden="true" />Lasciale come sono
             </button>
           </div>
         </>

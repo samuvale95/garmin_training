@@ -1,4 +1,6 @@
 "use client";
+import { ProgramIcon, PlusIcon, LightningIcon } from "@/components/Icons";
+import { PencilIcon as ScreenSymbol } from "@/components/Icons";
 
 import { dis } from "@/lib/disabled";
 import { useEffect, useRef, useState } from "react";
@@ -491,7 +493,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       )}
 
       {restored && <p className="ux-notice" role="status">Modifiche non salvate recuperate da questo dispositivo. Controllale prima di salvare.</p>}
-      <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--inchiostro)", letterSpacing: "-0.03em", marginTop: 18, marginBottom: 0 }}>
+      <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--inchiostro)", letterSpacing: "-0.03em", marginTop: 18, marginBottom: 0 }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />
         {mode === "create" ? "Crea allenamento" : "Modifica allenamento"}
       </h1>
 
@@ -580,7 +582,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
         {existing?.short_variant && (
           <div style={{ marginTop: 12, padding: "8px 10px", background: "rgba(232, 93, 78, 0.08)", borderRadius: 10, display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 12, color: "var(--corallo-testo)", fontWeight: 600 }}>
-              ⚡ Variante salva-tempo presente ({existing.short_variant.steps?.length ?? 0} step)
+              <LightningIcon className="action-symbol" aria-hidden="true" />Variante salva-tempo presente ({existing.short_variant.steps?.length ?? 0} step)
             </span>
           </div>
         )}
@@ -588,13 +590,13 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
 
       {sport === "swimming" && <div style={{ marginTop: 14 }}><Field label="Lunghezza vasca (metri, facoltativa)"><input type="number" min="10" max="100" step="any" value={poolLength} onChange={(e) => setPoolLength(e.target.value)} style={selectStyle} data-track="workout-editor.pool-length" /></Field>{!poolIsValid && <p role="alert">Inserisci una lunghezza tra 10 e 100 metri.</p>}</div>}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 20 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)" }}>Struttura</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--inchiostro-70)" }}><ProgramIcon className="action-symbol" aria-hidden="true" />Struttura</span>
         <span style={{ display: "flex", gap: 14 }}>
           <button data-track="workout-editor.addblock" type="button" onClick={addBlock} className="tap-target" style={{ background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-            + blocco
+            <PlusIcon className="action-symbol" aria-hidden="true" />blocco
           </button>
           <button data-track="workout-editor.addstep" type="button" onClick={addStep} className="tap-target" style={{ background: "none", border: "none", color: "var(--rosso-avviso)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-            + step
+            <PlusIcon className="action-symbol" aria-hidden="true" />step
           </button>
         </span>
       </div>

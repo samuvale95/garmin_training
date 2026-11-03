@@ -1,4 +1,6 @@
 "use client";
+import { MoonIcon, PulseIcon, WatchIcon, BatteryIcon } from "@/components/Icons";
+import { BatteryIcon as ScreenSymbol } from "@/components/Icons";
 
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
@@ -33,7 +35,7 @@ export default function ReadinessPage() {
     <div style={{ padding: "22px 20px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/body" />
-        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>
+        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />
           Prontezza
         </h1>
       </div>
@@ -77,13 +79,13 @@ export default function ReadinessPage() {
               <p style={{ font: "600 22px/1.15 var(--font-sans)", letterSpacing: "-.02em", margin: "6px 0 0" }}>
                 Prontezza {band?.label}
               </p>
-              <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.35, margin: "8px 0 0", opacity: 0.92 }}>
+              <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.35, margin: "8px 0 0", color: "var(--crema)", opacity: 0.95 }}>
                 {band?.meaning}
               </p>
             </div>
           </SlideUp>
 
-          <Section title="Che cos'è">
+          <Section icon={<BatteryIcon aria-hidden="true" />} title="Che cos'è">
             <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.4, color: "var(--inchiostro-70)", margin: 0 }}>
               Un voto da 0 a 100 che l&apos;orologio calcola ogni mattina mettendo insieme quanto
               e come hai dormito, la variabilità del battito durante la notte, quanto recupero
@@ -92,7 +94,7 @@ export default function ReadinessPage() {
             </p>
           </Section>
 
-          <Section title="Le fasce">
+          <Section icon={<PulseIcon aria-hidden="true" />} title="Le fasce">
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               {READINESS_BANDS.map((entry, i) => {
                 const from = i === 0 ? 0 : READINESS_BANDS[i - 1].upper;
@@ -123,7 +125,7 @@ export default function ReadinessPage() {
           </Section>
 
           {data?.readiness_factors && data.readiness_factors.length > 0 && (
-            <Section title="Da cosa nasce il tuo">
+            <Section icon={<PulseIcon aria-hidden="true" />} title="Da cosa nasce il tuo">
               <ReadinessFactorList factors={data.readiness_factors} />
               <p style={{ fontSize: 12.5, color: "var(--inchiostro-35)", margin: "10px 0 0", lineHeight: 1.45 }}>
                 Sono i pesi che l&apos;orologio dichiara per ciascun ingrediente: più la barra è
@@ -133,7 +135,7 @@ export default function ReadinessPage() {
           )}
 
           {data?.readiness_message && (
-            <Section title="Come lo riassume l'orologio">
+            <Section icon={<WatchIcon aria-hidden="true" />} title="Come lo riassume l'orologio">
               <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.4, color: "var(--inchiostro-70)", margin: 0 }}>
                 {data.readiness_message}
               </p>
@@ -141,7 +143,7 @@ export default function ReadinessPage() {
           )}
 
           {data?.sleep && (
-            <Section title="La notte dietro al punteggio">
+            <Section icon={<MoonIcon aria-hidden="true" />} title="La notte dietro al punteggio">
               <p style={{ fontSize: 13.5, color: "var(--inchiostro-70)", margin: "0 0 12px", lineHeight: 1.4 }}>
                 {formatMinutes(data.sleep.total_minutes ?? 0)} in tutto
                 {data.sleep.score != null && `, qualità ${data.sleep.score} su 100`}.
@@ -186,11 +188,11 @@ export default function ReadinessPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <div style={{ marginTop: 22 }}>
       <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
-        {title}
+        {icon} {title}
       </span>
       <div style={{ marginTop: 10 }}>{children}</div>
     </div>

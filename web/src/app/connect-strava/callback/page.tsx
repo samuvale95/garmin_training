@@ -1,4 +1,5 @@
 "use client";
+import { SyncIcon } from "@/components/Icons";
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -22,7 +23,7 @@ export default function StravaCallbackPage() {
 function CallbackFallback() {
   return (
     <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", padding: 22 }}>
-      <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-70)" }}>Collegamento a Strava...</p>
+      <p className="font-serif-italic" style={{ fontSize: 15, color: "var(--inchiostro-70)" }}><SyncIcon className="action-symbol" aria-hidden="true" />Collegamento a Strava...</p>
     </div>
   );
 }

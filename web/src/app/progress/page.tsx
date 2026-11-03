@@ -1,4 +1,6 @@
 "use client";
+import { TargetIcon } from "@/components/Icons";
+import { TrendUpIcon as ScreenSymbol } from "@/components/Icons";
 
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton, SlideUp, WordIn } from "@/components/motion/primitives";
@@ -24,7 +26,7 @@ export default function ProgressPage() {
         <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}>progressi</span>
       </div>
 
-      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 16px" }}>
+      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 16px" }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />
         I tuoi progressi
       </WordIn>
 
@@ -130,7 +132,7 @@ function BadgeCard({ badge, animate, delayMs }: { badge: Badge; animate: boolean
         opacity: badge.earned ? 1 : 0.85,
       }}
     >
-      <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>{badge.title}</p>
+      <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}><TargetIcon className="action-symbol" aria-hidden="true" />{badge.title}</p>
       <p style={{ fontSize: 12, lineHeight: 1.35, margin: "4px 0 0", opacity: 0.8 }}>{badge.description}</p>
       <p className="font-mono" style={{ fontSize: 12, margin: "8px 0 0", opacity: 0.75 }}>
         {badge.earned ? (badge.earned_on ? formatFullDate(badge.earned_on) : "raggiunto") : `${badge.progress}/${badge.target}`}

@@ -1,4 +1,5 @@
 "use client";
+import { CalendarIcon } from "@/components/Icons";
 
 import { dis } from "@/lib/disabled";
 import { useEffect, useState } from "react";
@@ -33,7 +34,7 @@ export function AdaptationCard({ animate, delayMs = 0 }: { animate: boolean; del
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
         <div>
           <p style={{ font: "600 16px/1.2 var(--font-sans)", margin: 0 }}>
-            {pending ? "Ti propongo di adattare il piano" : "Ho adattato il piano"}
+            <CalendarIcon className="action-symbol" aria-hidden="true" />{pending ? "Ti propongo di adattare il piano" : "Ho adattato il piano"}
           </p>
           <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", display: "flex", flexDirection: "column", gap: 4 }}>
             {adaptation.events.map((event) => (

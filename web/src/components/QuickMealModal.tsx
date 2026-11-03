@@ -4,7 +4,7 @@ import { dis } from "@/lib/disabled";
 import { useState, useRef, useEffect, type ChangeEvent } from "react";
 import { useModalTracking } from "@/lib/useTracking";
 import { motion, AnimatePresence } from "framer-motion";
-import { CloseIcon, PlusIcon, LightningIcon, PencilIcon, CameraIcon, CheckIcon } from "@/components/Icons";
+import { CloseIcon, PlusIcon, LightningIcon, PencilIcon, CameraIcon, CheckIcon, UtensilsIcon } from "@/components/Icons";
 import { PortionPicker } from "@/components/FuelCorrectionSheet";
 import { useAddManualEntry, useDescribeMeal, useLogPhoto, useAthleteLevel } from "@/lib/queries";
 import { toDateKey } from "@/lib/sessionVisuals";
@@ -179,7 +179,7 @@ export function QuickMealModal({
               <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
                 1-tap quick log
               </p>
-              <h2 style={{ font: "600 20px/1.2 var(--font-sans)", margin: "4px 0 0" }}>Registra Pasto o Snack</h2>
+              <h2 style={{ font: "600 20px/1.2 var(--font-sans)", margin: "4px 0 0" }}><UtensilsIcon className="heading-symbol" aria-hidden="true" />Registra Pasto o Snack</h2>
             </div>
             <button data-track="quick-meal-modal.onclose"
               onClick={onClose}

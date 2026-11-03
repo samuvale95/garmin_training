@@ -655,10 +655,12 @@ def delete_plan(user_id: str, plan_id: str | None = None) -> None:
     with connect() as conn:
         with conn.cursor() as cur:
             if plan_id is None:
+                cur.execute("DELETE FROM program_goal WHERE user_id = %s", (user_id,))
                 cur.execute("DELETE FROM user_plan WHERE user_id = %s", (user_id,))
                 cur.execute("DELETE FROM user_training_plan WHERE user_id = %s", (user_id,))
                 cur.execute("DELETE FROM plan_session WHERE user_id = %s", (user_id,))
             else:
+                cur.execute("DELETE FROM program_goal WHERE user_id = %s AND plan_id = %s", (user_id, plan_id))
                 cur.execute("DELETE FROM user_training_plan WHERE user_id = %s AND id = %s", (user_id, plan_id))
                 cur.execute("DELETE FROM plan_session WHERE user_id = %s AND plan_id = %s", (user_id, plan_id))
                 if plan_id == "default":

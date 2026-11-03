@@ -1,4 +1,7 @@
 "use client";
+import { WatchIcon as ActionWatch } from "@/components/Icons";
+
+import { LockIcon, ProgramIcon, AlertTriangleIcon, PencilIcon } from "@/components/Icons";
 
 import { dis } from "@/lib/disabled";
 import { useState } from "react";
@@ -89,7 +92,7 @@ export default function SettingsPage() {
       <WorkspaceHeading title="Profilo" description="Account, connessioni, parametri e preferenze." />
 
       <div className="stack-lg">
-        <Section title="Account" id="profile-account">
+        <Section icon={<LockIcon aria-hidden="true" />} title="Account" id="profile-account">
           <div className="card" style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <Avatar size={48} />
             <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -136,7 +139,7 @@ export default function SettingsPage() {
                       Scollega
                     </button>
                   ) : (
-                    <Link className="btn" data-size="sm" href="/connect-garmin?from=%2Fsettings" data-track="settings.connect-garmin">Collega</Link>
+                    <Link className="btn" data-size="sm" href="/connect-garmin?from=%2Fsettings" data-track="settings.connect-garmin"><ActionWatch className="action-symbol" aria-hidden="true" />Collega</Link>
                   )}
                 </span>
               </div>
@@ -154,7 +157,7 @@ export default function SettingsPage() {
                       Scollega
                     </button>
                   ) : (
-                    <Link className="btn" data-size="sm" href="/connect-strava" data-track="settings.connect-strava">Collega</Link>
+                    <Link className="btn" data-size="sm" href="/connect-strava" data-track="settings.connect-strava"><RunnerIcon className="action-symbol" aria-hidden="true" />Collega</Link>
                   )}
                 </span>
               </div>
@@ -182,7 +185,7 @@ export default function SettingsPage() {
           {isAdmin?.is_admin && <div className="card" style={{ marginTop: 10 }}><GarminSportProbe /></div>}
         </Section>
 
-        <Section title="Preferenze" id="profile-prefs">
+        <Section icon={<PencilIcon aria-hidden="true" />} title="Preferenze" id="profile-prefs">
           <ul className="list">
             <li><Toggle label="Avvisami se il corpo non regge" hint="Un avviso accanto alla seduta quando i valori del mattino sono bassi." checked={prefs.avvisamiSeIlCorpoNonRegge} onChange={(v) => setPref("avvisamiSeIlCorpoNonRegge", v)} /></li>
             <li><Toggle label="Chiedi prima di cancellare" checked={prefs.chiediPrimaDiCancellare} onChange={(v) => setPref("chiediPrimaDiCancellare", v)} /></li>
@@ -191,7 +194,7 @@ export default function SettingsPage() {
           </ul>
         </Section>
 
-        <Section title="Il file del piano" id="profile-file">
+        <Section icon={<ProgramIcon aria-hidden="true" />} title="Il file del piano" id="profile-file">
           <div className="card">
             <p className="card-text" style={{ marginTop: 0 }}>Ogni modifica fatta nell’app viene scritta anche nel file, che puoi scaricare quando vuoi.</p>
             <div className="actions">
@@ -208,7 +211,7 @@ export default function SettingsPage() {
           </div>
         </Section>
 
-        <Section title="Ripristino e uscita" id="profile-danger">
+        <Section icon={<AlertTriangleIcon aria-hidden="true" />} title="Ripristino e uscita" id="profile-danger">
           <div className="card">
             <p className="card-title">Ripristina i dati su questo dispositivo</p>
             <p className="card-text">

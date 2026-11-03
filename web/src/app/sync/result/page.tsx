@@ -1,4 +1,5 @@
 "use client";
+import { CheckIcon, SyncIcon } from "@/components/Icons";
 
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -79,7 +80,7 @@ function ResultScreenInner() {
         }}
       >
         <div style={{ flex: 1, minWidth: 0, position: "relative", zIndex: 2 }}>
-          <p style={{ fontSize: 12, fontWeight: 600, margin: 0 }}>scritte sul calendario</p>
+          <p style={{ fontSize: 12, fontWeight: 600, margin: 0 }}><CheckIcon className="action-symbol" aria-hidden="true" />scritte sul calendario</p>
           <WordIn active={animate} delayMs={300} style={{ font: "600 52px/1 var(--font-sans)", letterSpacing: "-.045em", marginTop: 8 }}>
             {succeeded}
             <span style={{ fontSize: 24, opacity: 0.5 }}>/{total}</span>
@@ -119,7 +120,7 @@ function ResultScreenInner() {
       <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
         {failed.length > 0 && (
           <PrimaryButton data-track="sync.result.retryfailed" state={startSync.isPending ? "loading" : "idle"} onClick={retryFailed}>
-            Riprova solo queste {numberToItalianWords(failed.length)}
+            <SyncIcon className="action-symbol" aria-hidden="true" />Riprova solo queste {numberToItalianWords(failed.length)}
           </PrimaryButton>
         )}
         <button data-track="sync.result.router-push"

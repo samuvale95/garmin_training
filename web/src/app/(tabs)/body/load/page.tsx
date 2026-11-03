@@ -1,4 +1,5 @@
 "use client";
+import { PulseIcon } from "@/components/Icons";
 
 import { PageHeader } from "@/components/PageHeader";
 import { SlideUp, WordIn } from "@/components/motion/primitives";
@@ -186,7 +187,7 @@ export default function LoadPage() {
       ) : (
         <>
           <div style={{ marginTop: 14 }}>
-            <WordIn active={animate} style={{ font: "600 30px/1.04 var(--font-sans)", letterSpacing: "-.035em" }}>{headline}</WordIn>
+            <WordIn active={animate} style={{ font: "600 30px/1.04 var(--font-sans)", letterSpacing: "-.035em" }}><PulseIcon className="heading-symbol" aria-hidden="true" />{headline}</WordIn>
           </div>
           <p className="font-serif-italic" style={{ fontSize: 15.5, color: "var(--inchiostro-70)" }}>{caption}</p>
 
@@ -212,7 +213,7 @@ export default function LoadPage() {
               { label: "Previsto · km del piano", color: "rgba(34, 34, 34, 0.28)", value: (w: ChartWeek) => w.plannedKm, max: maxPlanned },
             ] as const).map((row) => (
               <div key={row.label} style={{ marginBottom: 10 }}>
-                <p style={{ fontSize: 11.5, fontWeight: 600, color: "var(--inchiostro-70)", margin: "0 0 6px" }}>{row.label}</p>
+                <p style={{ fontSize: 11.5, fontWeight: 600, color: "var(--inchiostro-70)", margin: "0 0 6px" }}><PulseIcon className="action-symbol" aria-hidden="true" />{row.label}</p>
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: ROW_HEIGHT / 2 }}>
                   {weeks.map((week) => (
                     <div key={week.week_start} style={{ flex: 1, display: "flex", alignItems: "flex-end", height: ROW_HEIGHT / 2 }}>

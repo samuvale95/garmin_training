@@ -1,4 +1,7 @@
 "use client";
+import { SyncIcon as ActionSync } from "@/components/Icons";
+
+import { WatchIcon as ScreenSymbol } from "@/components/Icons";
 
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
@@ -44,7 +47,7 @@ export default function DiffPage() {
           <PageHeader backHref="/week" />
           <span style={{ fontSize: 13, color: "var(--inchiostro-70)", fontWeight: 500 }}>Confronto con Garmin Connect</span>
         </div>
-        <h1 className="page-title" style={{ fontSize: "var(--text-3xl)", margin: "12px 0 6px" }}>
+        <h1 className="page-title" style={{ fontSize: "var(--text-3xl)", margin: "12px 0 6px" }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />
           {diff && diff.to_create.length + diff.changed.length === 0 ? "Nessuna modifica da inviare" : diff ? `${capitalize(numberToItalianWords(diff.to_create.length + diff.changed.length))} ${diff.to_create.length + diff.changed.length === 1 ? "modifica da inviare" : "modifiche da inviare"}` : "Confronto Garmin Connect"}
         </h1>
         <p className="font-serif-italic" style={{ fontSize: 15.5, color: "var(--inchiostro-70)", margin: "0 0 14px" }}>
@@ -60,7 +63,7 @@ export default function DiffPage() {
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "0 22px", display: "flex", flexDirection: "column", gap: 10 }}>
-        {diffQuery.isError && <div role="alert" className="ux-error"><p>Impossibile caricare il confronto con Garmin Connect.</p><button className="ux-button" data-track="diff.retry" onClick={() => diffQuery.refetch()}>Riprova</button></div>}
+        {diffQuery.isError && <div role="alert" className="ux-error"><p>Impossibile caricare il confronto con Garmin Connect.</p><button className="ux-button" data-track="diff.retry" onClick={() => diffQuery.refetch()}><ActionSync className="action-symbol" aria-hidden="true" />Riprova</button></div>}
         {startSync.isError && <div role="alert" className="ux-error">Impossibile avviare l’invio a Garmin Connect. Riprova.</div>}
         {diff && diff.to_create.length + diff.changed.length === 0 && <div role="status" className="ux-notice">Non ci sono modifiche da inviare. Torna al piano per controllare lo stato dell’invio automatico.</div>}
         {!diff && !diffQuery.isError && !!plan?.sessions.length &&

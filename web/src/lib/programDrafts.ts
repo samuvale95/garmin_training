@@ -1,17 +1,17 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPatch, apiPost, apiPut } from "@/lib/apiClient";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/apiClient";
 import type { TrainingSession } from "@/lib/types";
 
-export const GOAL_TYPES = { race: "Gara", performance: "Prestazione", fitness: "Forma fisica", strength: "Forza", consistency: "Costanza", maintenance: "Mantenimento" } as const;
+export const GOAL_TYPES = { race: "Gara (Strada o Trail)", performance: "Prestazione", fitness: "Forma fisica", strength: "Forza", consistency: "Costanza", maintenance: "Mantenimento" } as const;
 export type GoalType = keyof typeof GOAL_TYPES;
 export interface TrainingGoal {
   id: string; revision: number; type: GoalType; name: string; description?: string | null; sports: string[]; priority: "primary" | "secondary";
   status: "active" | "completed" | "archived"; deadline?: string | null; review_date?: string | null; review_interval_days: number;
   baseline?: { value?: number; recorded_at?: string; source?: string } | null;
   success_criterion?: { metric?: string; target?: number; unit?: string } | null;
-  race_date?: string | null; distance_km?: number | null; target_time_seconds?: number | null; linked_program_ids: string[];
+  race_date?: string | null; distance_km?: number | null; elevation_gain_m?: number | null; target_time_seconds?: number | null; linked_program_ids: string[];
 }
 export interface GoalEvaluation {
   id?: string; evaluated_at?: string; created_at?: string; goal_revision?: number; status: string; execution?: Record<string, unknown>; progress?: Record<string, unknown>; quality?: Record<string, unknown>; evidence?: unknown; summary?: string;
@@ -42,10 +42,32 @@ export function useDraftMutation(action: "create" | "edit" | "generate" | "valid
     for (const queryKey of listKeys) client.invalidateQueries({ queryKey });
   }});
 }
+export function useDeleteProgramDraft() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiDelete<{ deleted: boolean; id: string }>(`/plan/drafts/${id}`),
+    onSuccess: (_, id) => {
+      client.removeQueries({ queryKey: ["plan-draft", id] });
+      for (const queryKey of listKeys) client.invalidateQueries({ queryKey });
+    },
+  });
+}
+
 export function useTrainingGoals() { return useQuery({ queryKey: ["training-goals"], queryFn: ({ signal }) => apiGet<{ goals: TrainingGoal[] }>("/goals", undefined, signal) }); }
 export function useSaveTrainingGoal() {
   const client = useQueryClient();
   return useMutation({ mutationFn: (arg: { id?: string; body: unknown }) => arg.id ? apiPatch<TrainingGoal>(`/goals/${arg.id}`, arg.body) : apiPost<TrainingGoal>("/goals", arg.body), onSuccess: () => client.invalidateQueries({ queryKey: ["training-goals"] }) });
+}
+export function useDeleteTrainingGoal() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiDelete<{ deleted: boolean; id: string }>(`/goals/${id}`),
+    onSuccess: (_, id) => {
+      client.removeQueries({ queryKey: ["goal-evaluations", id] });
+      client.invalidateQueries({ queryKey: ["training-goals"] });
+      client.invalidateQueries({ queryKey: ["plan-state"] });
+    },
+  });
 }
 export function useGoalEvaluations(id: string) { return useQuery({ queryKey: ["goal-evaluations", id], queryFn: ({ signal }) => apiGet<{ evaluations: GoalEvaluation[] }>(`/goals/${id}/evaluations`, undefined, signal), enabled: !!id }); }
 export function useEvaluateGoal() { const client = useQueryClient(); return useMutation({ mutationFn: (id: string) => apiPost<GoalEvaluation>(`/goals/${id}/evaluations`, {}), onSuccess: (_, id) => client.invalidateQueries({ queryKey: ["goal-evaluations", id] }) }); }

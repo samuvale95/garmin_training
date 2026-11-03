@@ -1,4 +1,5 @@
 "use client";
+import { RunnerIcon as ScreenSymbol } from "@/components/Icons";
 
 import Link from "next/link";
 import { DetailScaffold } from "@/components/DetailScaffold";
@@ -49,7 +50,7 @@ export function StravaComparisonScreen({
               margin: "12px 0 16px",
               letterSpacing: "-0.02em",
             }}
-          >
+          ><ScreenSymbol className="heading-symbol" aria-hidden="true" />
             {title}
           </h1>
         )}

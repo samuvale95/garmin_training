@@ -1,4 +1,6 @@
 "use client";
+import { DistanceIcon } from "@/components/Icons";
+import { ShoeIcon as ScreenSymbol } from "@/components/Icons";
 
 import { dis } from "@/lib/disabled";
 import { Suspense } from "react";
@@ -37,7 +39,7 @@ function ShoesScreen() {
         <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)" }}>da Strava</span>
       </div>
 
-      <WordIn active={animate} style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", marginTop: 18 }}>
+      <WordIn active={animate} style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", marginTop: 18 }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />
         Usura scarpe
       </WordIn>
 
@@ -137,7 +139,7 @@ function ShoeCard({
           <BarGrow value={shoe.wear_percent / 100} color={highlight ? "var(--rosso-avviso)" : "var(--corallo)"} trackColor={highlight ? "var(--corallo-chiaro)" : "var(--sabbia-chip)"} active={active} delayMs={delay} />
         </div>
         <p style={{ fontSize: 12, color: highlight ? "var(--rosso-testo)" : "var(--inchiostro-50)", margin: "8px 0 0" }}>
-          {shoe.wear_percent.toFixed(0)}% dei 700 km
+          <DistanceIcon className="action-symbol" aria-hidden="true" />{shoe.wear_percent.toFixed(0)}% dei 700 km
           {shoe.weeks_remaining != null && ` · a questo ritmo si esauriscono in ${shoe.weeks_remaining} settiman${shoe.weeks_remaining === 1 ? "a" : "e"}`}
         </p>
         <button data-track="shoes.onretire"

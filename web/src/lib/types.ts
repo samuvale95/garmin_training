@@ -71,6 +71,7 @@ export function flattenSteps(steps: SessionStep[]): Step[] {
 export interface RaceGoal {
   race_date: string; // YYYY-MM-DD
   distance_km: number;
+  elevation_gain_m?: number | null;
   name: string | null;
   target_time_seconds: number | null;
   // Both derived from `race_date` server-side, so they are absent for the moment

@@ -124,12 +124,12 @@ export function FocusBlock({ form, animate, narrativeText }: { form: ActivityFor
       <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-su-scuro)", margin: 0 }}>
         il tuo allenatore
       </p>
-      <p style={{ font: "600 24px/1.15 var(--font-sans)", letterSpacing: "-.02em", margin: "10px 0 0" }}>{form.headline}</p>
-      <p className="font-serif-italic" style={{ fontSize: 16, lineHeight: 1.35, margin: "12px 0 0" }}>
+      <p style={{ font: "600 24px/1.15 var(--font-sans)", letterSpacing: "-.02em", margin: "10px 0 0", color: "var(--crema)" }}>{form.headline}</p>
+      <p className="font-serif-italic" style={{ fontSize: 16, lineHeight: 1.45, margin: "12px 0 0", color: "var(--crema)", opacity: 0.95 }}>
         {narrativeText ?? form.focus ?? "Le misure qui sotto sono tutte dentro le loro fasce di riferimento."}
       </p>
       {narrativeText && form.focus && (
-        <p style={{ background: "rgba(246,238,218,.12)", borderRadius: "var(--radius-chip)", padding: "12px 14px", fontSize: 13.5, margin: "14px 0 0", lineHeight: 1.4 }}>
+        <p style={{ background: "rgba(246,238,218,.12)", color: "var(--crema)", borderRadius: "var(--radius-chip)", padding: "12px 14px", fontSize: 13.5, margin: "14px 0 0", lineHeight: 1.4, opacity: 0.9 }}>
           {form.focus}
         </p>
       )}

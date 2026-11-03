@@ -1,4 +1,5 @@
 "use client";
+import { PulseIcon } from "@/components/Icons";
 
 import Link from "next/link";
 import { SlideUp, StatusDot } from "@/components/motion/primitives";
@@ -49,7 +50,7 @@ export function DayStateCard({ verdict, narrative, animate, delayMs = 0 }: { ver
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
             <StatusDot kind={style.dot} size={8} />
             <span className="font-mono" style={{ fontSize: 12, opacity: 0.75 }}>
-              stato del giorno
+              <PulseIcon className="action-symbol" aria-hidden="true" />stato del giorno
             </span>
           </span>
           {verdict.action && (

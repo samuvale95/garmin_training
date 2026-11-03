@@ -1,4 +1,6 @@
 "use client";
+import { DistanceIcon, ClockIcon, HeartIcon } from "@/components/Icons";
+import { RunnerIcon as ScreenSymbol } from "@/components/Icons";
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 
@@ -144,7 +146,7 @@ export default function CoachPage() {
     <div style={{ padding: "22px 20px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/body" />
-        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Tecnica</h1>
+        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />Tecnica</h1>
       </div>
 
       {activitiesQuery.isPending ? (
@@ -178,9 +180,9 @@ export default function CoachPage() {
               {!(leadWithAnalysis && !form.has_metrics) && <FocusBlock form={form} animate={animate} narrativeText={narrativeQuery.data?.text} />}
 
               {!leadWithAnalysis && <SlideUp active={animate} delayMs={160} style={{ display: "flex", gap: 9, marginTop: 12 }}>
-                <Stat label="distanza" value={form.distance_km != null ? `${form.distance_km} km` : "—"} />
-                <Stat label="ritmo medio" value={formatPaceOrDash(form.average_pace_sec_per_km)} />
-                <Stat label="cuore" value={form.average_heart_rate != null ? `${form.average_heart_rate} bpm` : "—"} />
+                <Stat icon={<DistanceIcon aria-hidden="true" />} label="distanza" value={form.distance_km != null ? `${form.distance_km} km` : "—"} />
+                <Stat icon={<ClockIcon aria-hidden="true" />} label="ritmo medio" value={formatPaceOrDash(form.average_pace_sec_per_km)} />
+                <Stat icon={<HeartIcon aria-hidden="true" />} label="cuore" value={form.average_heart_rate != null ? `${form.average_heart_rate} bpm` : "—"} />
               </SlideUp>}
 
               {!form.has_metrics && !leadWithAnalysis && (
@@ -296,11 +298,11 @@ function ActivityPicker({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
     <div style={{ flex: 1, background: "var(--crema-card)", borderRadius: "var(--radius-chip)", padding: 12 }}>
       <p className="font-mono" style={{ fontSize: 15, margin: 0 }}>{value}</p>
-      <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "3px 0 0" }}>{label}</p>
+      <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: "3px 0 0" }}>{icon} {label}</p>
     </div>
   );
 }

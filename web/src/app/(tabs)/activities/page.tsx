@@ -1,4 +1,6 @@
 "use client";
+import { SyncIcon as ActionSync } from "@/components/Icons";
+
 
 import { Suspense } from "react";
 import Link from "next/link";
@@ -117,7 +119,7 @@ function History({ setParam, here }: { setParam: (key: string, value: string, de
       ) : query.isError ? (
         <div className="ux-error" role="alert">
           <p>Non è stato possibile caricare le attività.</p>
-          <button className="btn" data-size="sm" onClick={() => query.refetch()} {...dis(query.isFetching, "in_caricamento")} data-track="activities.retry">Riprova</button>
+          <button className="btn" data-size="sm" onClick={() => query.refetch()} {...dis(query.isFetching, "in_caricamento")} data-track="activities.retry"><ActionSync className="action-symbol" aria-hidden="true" />Riprova</button>
         </div>
       ) : visible.length === 0 ? (
         <EmptyState

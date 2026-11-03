@@ -1,4 +1,5 @@
 "use client";
+import { SparklesIcon } from "@/components/Icons";
 
 import { useState } from "react";
 import { SlideUp } from "@/components/motion/primitives";
@@ -211,7 +212,7 @@ export function PlanGenerateCard({ animate, delayMs = 0, planId }: { animate: bo
               });
             }}
           >
-            Genera con AI
+            <SparklesIcon className="action-symbol" aria-hidden="true" />Genera con AI
           </button>
           <button data-track="plan-generate-card.setconfirming" type="button" className="press-soft" style={pill(false)} onClick={() => setConfirming(false)}>
             Annulla

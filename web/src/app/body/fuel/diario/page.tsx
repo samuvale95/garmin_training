@@ -1,4 +1,5 @@
 "use client";
+import { UtensilsIcon as ScreenSymbol } from "@/components/Icons";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -70,7 +71,7 @@ export default function FuelDiaryPage() {
     <div style={{ padding: "22px 20px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/body/fuel" />
-        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Diario pasti</h1>
+        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />Diario pasti</h1>
         <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "6px 12px" }}>
           {days.length} giorni
         </span>

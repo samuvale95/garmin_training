@@ -1528,12 +1528,15 @@ export function useTogglePlanActive() {
 export function useDeletePlanById() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (planId: string) => apiDelete<{ deleted_plan_id: string }>(`/plan/${planId}`),
+    mutationFn: (planId: string) => apiDelete<{ ok: boolean; deleted_plan_id?: string }>(`/plan/${planId}`),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: PLANS_LIST_KEY });
       const { plan } = await apiGet<{ plan: PlanState | null }>("/plan");
       applyPlanLocally(queryClient, plan);
       queryClient.invalidateQueries({ queryKey: ["plan-diff"] });
+      queryClient.invalidateQueries({ queryKey: ["plan-state"] });
+      queryClient.invalidateQueries({ queryKey: ["training-goals"] });
+      nudgeGarminPush(queryClient);
     },
   });
 }

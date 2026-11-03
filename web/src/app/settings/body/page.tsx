@@ -1,4 +1,6 @@
 "use client";
+import { CheckIcon } from "@/components/Icons";
+import { HeartIcon as ScreenSymbol } from "@/components/Icons";
 
 import { dis } from "@/lib/disabled";
 import { useState } from "react";
@@ -87,7 +89,7 @@ export default function BodySettingsPage() {
         <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}>impostazioni</span>
       </div>
 
-      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 16px" }}>
+      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 16px" }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />
         Il tuo corpo
       </WordIn>
 
@@ -127,7 +129,7 @@ export default function BodySettingsPage() {
                 className="tap-target"
                 style={{ background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "14px 22px", fontSize: 15, fontWeight: 600, cursor: "pointer" }}
               >
-                Salva
+                <CheckIcon className="action-symbol" aria-hidden="true" />Salva
               </button>
             </div>
           ) : (
@@ -187,7 +189,7 @@ export default function BodySettingsPage() {
               className="tap-target"
               style={{ background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "16px 24px", fontSize: 15, fontWeight: 600, cursor: draft ? "pointer" : "default", opacity: draft ? 1 : 0.5 }}
             >
-              Salva
+              <CheckIcon className="action-symbol" aria-hidden="true" />Salva
             </button>
           </div>
         </SlideUp>
@@ -223,7 +225,7 @@ export default function BodySettingsPage() {
 
       {effective && (
         <SlideUp active={animate} delayMs={220} style={{ background: "var(--azzurro)", color: "var(--azzurro-testo)", borderRadius: "var(--radius-card)", padding: 18, marginTop: 12 }}>
-          <p style={{ fontWeight: 700, margin: "0 0 8px" }}>A cosa serve il peso</p>
+          <p style={{ fontWeight: 700, margin: "0 0 8px" }}><ScreenSymbol className="action-symbol" aria-hidden="true" />A cosa serve il peso</p>
           <p className="font-serif-italic" style={{ fontSize: 14.5, margin: 0 }}>
             Solo a calcolare quanti carboidrati ti servono nei giorni duri. Non lo confronto con niente e non lo metto in un grafico.
           </p>

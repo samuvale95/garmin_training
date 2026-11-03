@@ -6,7 +6,7 @@ import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/motion/BrandMark";
 import { PageHeader } from "@/components/PageHeader";
 import { PrimaryButton, WordIn, SlideUp } from "@/components/motion/primitives";
-import { LockIcon } from "@/components/Icons";
+import { LockIcon, WatchIcon } from "@/components/Icons";
 import { useMountOnce } from "@/lib/motion";
 import { useConnectGarmin } from "@/lib/queries";
 import { usePassoStore } from "@/lib/store";
@@ -61,7 +61,7 @@ function ConnectGarminContent() {
 
       <div style={{ marginTop: 24 }}>
         <WordIn active={animate} delayMs={0} style={{ font: "600 34px/1.04 var(--font-sans)", letterSpacing: "-.035em" }}>
-          Collega Garmin
+          <WatchIcon className="heading-symbol" aria-hidden="true" />Collega Garmin
         </WordIn>
         <WordIn active={animate} delayMs={100} style={{ font: "600 34px/1.04 var(--font-sans)", letterSpacing: "-.035em" }}>
           Connect
@@ -80,7 +80,7 @@ function ConnectGarminContent() {
         <Field label="Email Garmin" value={email} onChange={setEmail} type="email" placeholder="luca@example.com" />
         <Field label="Password" value={password} onChange={setPassword} type="password" />
         <p style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
-          <LockIcon size={13} strokeWidth={2} style={{ color: "var(--inchiostro-50)" }} />
+          <LockIcon aria-hidden="true" size={13} strokeWidth={2} style={{ color: "var(--inchiostro-50)" }} />
           <span>Invio le credenziali al server per accedere a Garmin. Non salvo la password; conservo i token cifrati.</span>
         </p>
       </SlideUp>

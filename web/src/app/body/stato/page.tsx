@@ -1,4 +1,6 @@
 "use client";
+import { CalendarIcon, CheckIcon, WatchIcon } from "@/components/Icons";
+import { PulseIcon as ScreenSymbol } from "@/components/Icons";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -136,7 +138,7 @@ export default function DayStatePage() {
     <div style={{ padding: "22px 20px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <PageHeader backHref="/today" />
-        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}>Stato del giorno</h1>
+        <h1 style={{ font: "600 20px/1 var(--font-sans)", letterSpacing: "-.02em", margin: 0, flex: 1 }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />Stato del giorno</h1>
         {goal && (
           <span className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-70)", background: "var(--sabbia-chip)", borderRadius: "var(--radius-pill)", padding: "6px 12px" }}>
             {countdownLabel(goal)}
@@ -236,7 +238,7 @@ export default function DayStatePage() {
                   className="press-soft"
                   style={{ width: "100%", background: "var(--inchiostro)", color: "var(--crema)", border: "none", borderRadius: "var(--radius-pill)", padding: "15px 22px", marginTop: 16, fontSize: 15, fontWeight: 600, cursor: "pointer" }}
                 >
-                  Applica al piano
+                  <CheckIcon className="action-symbol" aria-hidden="true" />Applica al piano
                 </button>
               ) : (
                 <p style={{ fontSize: 12.5, color: "var(--inchiostro-50)", margin: "14px 0 0", lineHeight: 1.4 }}>
@@ -294,7 +296,7 @@ function SignalList({ signals, animate }: { signals: DaySignal[]; animate: boole
   return (
     <div style={{ marginTop: 18 }}>
       <span style={{ fontSize: 12, fontWeight: 700, color: "var(--inchiostro-50)" }}>
-        Cosa ho letto
+        <WatchIcon className="action-symbol" aria-hidden="true" />Cosa ho letto
       </span>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
         {signals.map((signal, i) => {
@@ -333,7 +335,7 @@ function SessionBlock({ verdict, animate }: { verdict: DayVerdict; animate: bool
   return (
     <SlideUp active={animate} delayMs={220} style={{ background: "var(--sabbia)", borderRadius: "var(--radius-card)", padding: 18, marginTop: 12 }}>
       <p className="font-mono" style={{ fontSize: 12, color: "var(--inchiostro-50)", margin: 0 }}>
-        oggi in programma
+        <CalendarIcon className="action-symbol" aria-hidden="true" />oggi in programma
       </p>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 7 }}>
         <p style={{ font: "600 16px/1.25 var(--font-sans)", margin: 0 }}>

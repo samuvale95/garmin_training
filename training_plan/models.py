@@ -431,6 +431,7 @@ class RaceGoal:
     distance_km: float
     name: str | None = None
     target_time_seconds: int | None = None
+    elevation_gain_m: float | None = None
 
 
 def days_to_race(goal: RaceGoal, today: date_type | None = None) -> int:

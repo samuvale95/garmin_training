@@ -1,4 +1,5 @@
 "use client";
+import { RunnerIcon as ScreenSymbol } from "@/components/Icons";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -34,7 +35,7 @@ export default function ConnectStravaPage() {
         <Avatar size={30} />
       </div>
 
-      <WordIn active={animate} style={{ font: "600 32px/1.05 var(--font-sans)", letterSpacing: "-.035em", marginTop: 20 }}>
+      <WordIn active={animate} style={{ font: "600 32px/1.05 var(--font-sans)", letterSpacing: "-.035em", marginTop: 20 }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />
         Collega Strava
       </WordIn>
 

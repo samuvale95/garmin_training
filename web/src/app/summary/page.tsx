@@ -1,4 +1,6 @@
 "use client";
+import { HeartIcon, UtensilsIcon, CalendarIcon } from "@/components/Icons";
+import { CalendarIcon as ScreenSymbol } from "@/components/Icons";
 
 import { dis } from "@/lib/disabled";
 import { Suspense, useState } from "react";
@@ -53,7 +55,7 @@ function SummaryContent() {
         <span style={{ fontSize: 13, color: "var(--inchiostro-50)" }}>resoconto</span>
       </div>
 
-      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 4px" }}>
+      <WordIn active={animate} as="h1" style={{ font: "600 30px/1.06 var(--font-sans)", letterSpacing: "-.03em", margin: "16px 0 4px" }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />
         La tua settimana
       </WordIn>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
@@ -124,7 +126,7 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
       )}
 
       <SlideUp active={animate} delayMs={220} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 16 }}>
-        <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>Sensazioni</p>
+        <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}><HeartIcon className="action-symbol" aria-hidden="true" />Sensazioni</p>
         {data.checkin_days === 0 ? (
           <p style={{ fontSize: 13.5, margin: "6px 0 0", color: "var(--inchiostro-70)" }}>
             Nessun check-in questa settimana: bastano due tocchi dopo l&apos;allenamento, su Oggi.
@@ -171,7 +173,7 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
 
       {data.food_days > 0 && (
         <SlideUp active={animate} delayMs={265} style={{ background: "var(--crema-card)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12 }}>
-          <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>Carburante</p>
+          <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}><UtensilsIcon className="action-symbol" aria-hidden="true" />Carburante</p>
           <p style={{ fontSize: 14, margin: "6px 0 0" }}>
             Cibo registrato {data.food_days} {data.food_days === 1 ? "giorno" : "giorni"} su 7.
           </p>
@@ -185,7 +187,7 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
 
       {data.next_week && (
         <SlideUp active={animate} delayMs={280} style={{ background: "var(--sabbia)", border: "1px solid var(--border-airbnb)", boxShadow: "var(--shadow-airbnb-subtle)", borderRadius: "var(--radius-card)", padding: 14, marginTop: 12 }}>
-          <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}>La prossima settimana</p>
+          <p style={{ font: "500 11.5px var(--font-sans)", color: "var(--inchiostro-50)", margin: 0 }}><CalendarIcon className="action-symbol" aria-hidden="true" />La prossima settimana</p>
           <p style={{ fontSize: 14, lineHeight: 1.45, margin: "6px 0 0" }}>
             {data.next_week.reason ??
               `${data.next_week.planned_sessions} sedute in piano, ${data.next_week.planned_minutes} minuti di corsa.`}

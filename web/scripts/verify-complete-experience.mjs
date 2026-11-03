@@ -92,6 +92,23 @@ const click=async selector=>{
 };
 const noOverflow=async()=>assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'horizontal overflow');
 try{
+ // Secondary captures use the same isolated interception; missing fixtures stay errors.
+ if (process.env.UX_SECONDARY_ONLY) {
+  for (const [route, label] of [['/login','login'],['/connect-garmin','connect-garmin'],['/connect-strava','connect-strava'],['/rate-limit','rate-limit'],['/session/ux-run','session'],['/session/ux-run/edit','session-edit'],['/session/ux-run/strava','comparison'],['/week/new','new-session'],['/week/programs/drafts/fixture-draft','draft'],['/diff','diff'],['/confirm-deletions','confirm-deletions'],['/sync','sync'],['/sync/result','sync-result'],['/watch-sync','watch-sync'],['/coach','coach'],['/coach/allenarsi','training'],['/coach/esecuzione','execution'],['/body/stato','day-state'],['/body/prontezza','readiness'],['/body/load','load'],['/body/conflict','conflict'],['/summary','summary'],['/progress','progress'],['/shoes','shoes'],['/settings','profile'],['/settings/body','profile-body'],['/settings/level','level'],['/settings/agents','agents'],['/settings/goal?goalId=race-a','race'],['/body/fuel/diario','diary'],['/body/fuel/history','fuel-history']]) {
+   if (process.env.UX_SECONDARY_FILTER && !process.env.UX_SECONDARY_FILTER.split(',').includes(label)) continue;
+   for (const width of [390,1440]) {
+    await page.setViewport({width,height:900});
+    await page.goto(origin+route,{waitUntil:'networkidle0',timeout:60000});
+    await new Promise(r=>setTimeout(r,1000));
+    await noOverflow(); await screenshot(`secondary-${label}-${width}`);
+    await page.keyboard.press('Tab');
+    const focused = await page.evaluate(() => { const el = document.activeElement; if (!el || el === document.body) return true; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.left >= -1 && r.right <= innerWidth + 1; });
+    assert(focused, `focus outside viewport: ${label} ${width}`);
+   }
+  }
+  console.log('Secondary captures complete. Unmocked endpoints:', [...unknown].join(', '));
+  await browser.close(); process.exit(0);
+ }
  if(!process.env.UX_JOURNEYS_ONLY)for(const [route,label]of[['/today','today'],['/body','recovery'],['/nutrition','nutrition-plan'],[`/nutrition?date=${shift(today,-1)}&view=diary`,'nutrition-diary'],['/week/programs','programs'],['/week/programs/new?source=ai','wizard'],['/week/programs/drafts/fixture-draft','draft-review'],['/week/goals','goals']]){await go(route);for(const width of [390,1440]){await page.setViewport({width,height:900});await noOverflow();await screenshot(`${label}-${width}`);}}
  await page.setViewport({width:390,height:844});await go('/body');assert.equal(new URL(page.url()).pathname,'/body');assert((await text()).includes('Oggi'));assert((await text()).includes('Tendenze'));
  await go('/week/goals?new=1');await page.type('[data-track="goal-form.name"]','Allenarmi con regolarità');await page.type('[data-track="goal-form.target"]','3');await click('[data-track="goal-form.save"]');await page.waitForFunction(()=>document.body.innerText.includes('Allenarmi con regolarità'));const savedGoal=JSON.parse(writes.findLast(w=>w.path==='/goals'&&w.method==='POST').body);assert.equal(savedGoal.success_criterion.metric,'sessions_per_week');assert.equal(savedGoal.success_criterion.target,3);
@@ -123,4 +140,4 @@ try{
  }
  assert(!writes.some(w=>w.path==='/plan/sync'),'no journey publishes to Garmin');
  assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',screenshots:output,checks:[...(process.env.UX_JOURNEYS_ONLY?[]:['daily routes mobile/desktop']),'nutrition shared date and diary','manual meal failure retry retains values','safe Garmin return','race selection by ID and time','restore or switch wizard source','read-only availability','draft edit avoids plan and Garmin writes','review-before-activation','explicit insufficient-data acknowledgement','activation separate from Garmin','AI/import create and durable resume','generation revision','goal association','conflict block','stale context and revalidation','acknowledgement bound to current review token'],unsupportedFixtures:[...unknown],fixtureWrites:writes.map(w=>`${w.method} ${w.path}`)},null,2));
-}catch(error){await page.screenshot({path:`${output}/failure.png`,fullPage:true}).catch(()=>{});console.error({url:page.url(),errors,text:(await text()).slice(0,3500),unknown:[...unknown]});throw error;}finally{await browser.close();}
+}catch(error){await page.screenshot({path:`${output}/failure.png`,fullPage:true}).catch(()=>{});console.error({url:page.url(),errors,text:(await text().catch(()=>"navigation in progress")).slice(0,3500),unknown:[...unknown]});throw error;}finally{await browser.close();}

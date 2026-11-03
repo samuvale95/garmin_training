@@ -295,6 +295,14 @@ def patch_draft(user_id, draft_id, expected_revision, changes):
         return _save_draft(cur,user_id,draft)
 
 
+def delete_draft(user_id, draft_id):
+    with db.connect() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+        _lock(cur)
+        draft = _draft(cur, user_id, draft_id, lock=True)
+        cur.execute("DELETE FROM program_draft WHERE user_id=%s AND id=%s", [user_id, draft_id])
+        return {"deleted": True, "id": draft_id}
+
+
 def _context(cur,user_id):
     cur.execute("SELECT revision FROM planning_context_revision WHERE user_id=%s",[user_id])
     row = cur.fetchone()
@@ -603,6 +611,10 @@ def validate_goal(payload):
             raise PlanningError("Per una gara indica data e distanza positiva")
         if data.get("target_time_seconds") is not None and (type(data["target_time_seconds"]) is not int or data["target_time_seconds"]<=0):
             raise PlanningError("Il tempo gara deve essere positivo")
+        if data.get("elevation_gain_m") is not None:
+            gain = data["elevation_gain_m"]
+            if not isinstance(gain, (int, float)) or not math.isfinite(gain) or gain < 0:
+                raise PlanningError("Il dislivello deve essere un valore positivo o nullo")
     criterion=data.get("success_criterion")
     if criterion is not None:
         if not isinstance(criterion,dict) or not isinstance(criterion.get("metric"),str):
@@ -618,7 +630,7 @@ def validate_goal(payload):
         except (ValueError,TypeError,KeyError) as exc: raise PlanningError("Data del valore iniziale non valida") from exc
     # Status and target revision are facts, never inferred from adherence.
     return {"description":None,"sports":[],"priority":"secondary","status":"active","baseline":None,
-            "success_criterion":None,"deadline":None,"review_date":None,"review_interval_days":28,**data}
+            "success_criterion":None,"deadline":None,"review_date":None,"review_interval_days":28,"elevation_gain_m":None,**data}
 
 
 def _goal(cur,user_id,goal_id):
@@ -650,6 +662,11 @@ def create_goal(user_id,payload):
         goal_id=str(uuid4())
         cur.execute("INSERT INTO training_goal(user_id,id,data) VALUES(%s,%s,%s)",[user_id,goal_id,Jsonb(data)])
         cur.execute("INSERT INTO training_goal_version(user_id,goal_id,revision,data) VALUES(%s,%s,1,%s)",[user_id,goal_id,Jsonb(data)])
+        race={k:data.get(k) for k in ("race_date","distance_km","name","target_time_seconds","elevation_gain_m")} if data["type"]=="race" and data["status"]=="active" else None
+        if race:
+            cur.execute("""UPDATE user_training_plan SET goal=%s,updated_at=now()
+              WHERE user_id=%s AND id IN (SELECT plan_id FROM program_goal WHERE user_id=%s AND goal_id=%s AND is_primary)""",
+              [Jsonb(race),user_id,user_id,goal_id])
         return _goal(cur,user_id,goal_id)
 
 
@@ -665,7 +682,7 @@ def patch_goal(user_id,goal_id,expected_revision,changes):
         cur.execute("UPDATE training_goal SET data=%s,revision=revision+1,updated_at=now() WHERE user_id=%s AND id=%s RETURNING revision",[Jsonb(data),user_id,goal_id])
         revision=cur.fetchone()["revision"]
         cur.execute("INSERT INTO training_goal_version(user_id,goal_id,revision,data) VALUES(%s,%s,%s,%s)",[user_id,goal_id,revision,Jsonb(data)])
-        race={k:data.get(k) for k in ("race_date","distance_km","name","target_time_seconds")} if data["type"]=="race" and data["status"]=="active" else None
+        race={k:data.get(k) for k in ("race_date","distance_km","name","target_time_seconds","elevation_gain_m")} if data["type"]=="race" and data["status"]=="active" else None
         cur.execute("""UPDATE user_training_plan SET goal=%s,updated_at=now()
           WHERE user_id=%s AND id IN (SELECT plan_id FROM program_goal WHERE user_id=%s AND goal_id=%s AND is_primary)""",
           [Jsonb(race) if race else None,user_id,user_id,goal_id])
@@ -678,6 +695,25 @@ def patch_goal(user_id,goal_id,expected_revision,changes):
             else:
                 cur.execute("DELETE FROM user_goal WHERE user_id=%s",[user_id])
         return _goal(cur,user_id,goal_id)
+
+
+def delete_goal(user_id, goal_id):
+    with db.connect() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+        _lock(cur)
+        goal = _goal(cur, user_id, goal_id)
+        cur.execute("""UPDATE user_training_plan SET goal=NULL,updated_at=now()
+          WHERE user_id=%s AND id IN (SELECT plan_id FROM program_goal WHERE user_id=%s AND goal_id=%s AND is_primary)""",
+          [user_id, user_id, goal_id])
+        cur.execute("""UPDATE user_plan SET goal=NULL,updated_at=now() WHERE user_id=%s AND EXISTS(
+          SELECT 1 FROM program_goal WHERE user_id=%s AND goal_id=%s AND plan_id='default' AND is_primary)""",
+          [user_id, user_id, goal_id])
+        cur.execute("DELETE FROM program_goal WHERE user_id=%s AND goal_id=%s", [user_id, goal_id])
+        cur.execute("DELETE FROM training_goal_evaluation WHERE user_id=%s AND goal_id=%s", [user_id, goal_id])
+        cur.execute("DELETE FROM training_goal_version WHERE user_id=%s AND goal_id=%s", [user_id, goal_id])
+        cur.execute("DELETE FROM training_goal WHERE user_id=%s AND id=%s", [user_id, goal_id])
+        if goal_id == "legacy-standalone":
+            cur.execute("DELETE FROM user_goal WHERE user_id=%s", [user_id])
+        return {"deleted": True, "id": goal_id}
 
 
 def list_evaluations(user_id,goal_id):

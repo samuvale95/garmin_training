@@ -1,4 +1,5 @@
 "use client";
+import { AlertTriangleIcon as ScreenSymbol } from "@/components/Icons";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -65,7 +66,7 @@ export default function RateLimitPage() {
         <span style={{ fontSize: 12, color: "var(--rosa-testo-50)" }}>fermo · non insisto</span>
       </div>
 
-      <h1 style={{ font: "600 26px/1.1 var(--font-sans)", color: "var(--rosso-testo)", letterSpacing: "-.03em", margin: "20px 0 16px" }}>
+      <h1 style={{ font: "600 26px/1.1 var(--font-sans)", color: "var(--rosso-testo)", letterSpacing: "-.03em", margin: "20px 0 16px" }}><ScreenSymbol className="heading-symbol" aria-hidden="true" />
         Aspetto io, così non peggiora
       </h1>
 
