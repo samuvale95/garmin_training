@@ -87,7 +87,7 @@ export function WorkoutAnalysisSection({
           {analysis.headline}
         </p>
 
-        <p className="font-serif-italic" style={{ fontSize: 15.5, lineHeight: 1.4, margin: "12px 0 0", color: "var(--crema)", opacity: 0.88 }}>
+        <p style={{ fontSize: 15.5, lineHeight: 1.4, margin: "12px 0 0", color: "var(--crema)", opacity: 0.92 }}>
           {narrativeText ?? analysis.summary_deterministic}
         </p>
 

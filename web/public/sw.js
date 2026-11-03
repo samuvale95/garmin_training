@@ -3,7 +3,7 @@
 // forever, so after a deploy a tab switch could be answered with another build's page
 // data -- which Next rejects by reloading the whole app (white flash, everything
 // fading back in). Activating v2 deletes that cache.
-const CACHE_NAME = "passo-pwa-v2";
+const CACHE_NAME = "passo-pwa-v3";
 const STATIC_ASSETS = [
   "/",
   "/manifest.webmanifest",

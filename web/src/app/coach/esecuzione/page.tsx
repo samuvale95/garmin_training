@@ -99,7 +99,7 @@ export default function ExecutionPage() {
             <p style={{ fontSize: 13.5, color: "var(--inchiostro-su-scuro)", margin: "4px 0 0" }}>
               del tempo sotto la soglia aerobica
             </p>
-            <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.35, margin: "14px 0 0" }}>
+            <p style={{ fontSize: 15, lineHeight: 1.35, margin: "14px 0 0", color: "var(--crema)", opacity: 0.95 }}>
               Il riferimento dell&apos;allenamento polarizzato è circa l&apos;80%. È la base aerobica a
               crescere lì, non nella fascia intermedia.
             </p>

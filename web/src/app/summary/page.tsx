@@ -95,7 +95,7 @@ function SummaryBody({ data, narrative, animate }: { data: WeekSummary; narrativ
       <SlideUp active={animate} delayMs={80} style={{ background: "var(--inchiostro)", color: "var(--crema)", borderRadius: "var(--radius-card-lg)", padding: 22 }}>
         <p style={{ font: "600 20px/1.25 var(--font-sans)", margin: 0 }}>{data.headline}</p>
         {narrative && (
-          <p className="font-serif-italic" style={{ fontSize: 15, lineHeight: 1.4, margin: "12px 0 0" }}>
+          <p style={{ fontSize: 15, lineHeight: 1.4, margin: "12px 0 0", color: "var(--crema)", opacity: 0.95 }}>
             {narrative}
           </p>
         )}

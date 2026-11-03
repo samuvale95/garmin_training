@@ -161,11 +161,14 @@ img { max-width: 100%; }
 .figure, .font-mono { font-family: var(--font-sans); font-variation-settings: "wdth" var(--wdth-figure); font-variant-numeric: tabular-nums; letter-spacing: 0; }
 .font-serif-italic { font-family: var(--font-sans); font-style: normal; font-weight: 400; color: var(--ink-2); }
 [style*="var(--inchiostro)"] .font-serif-italic,
+[style*="var(--ink)"] .font-serif-italic,
 [style*="color: var(--crema)"] .font-serif-italic,
 [style*="color:var(--crema)"] .font-serif-italic,
+[style*="color: var(--ink-inverse)"] .font-serif-italic,
+[style*="color:var(--ink-inverse)"] .font-serif-italic,
 .card-dark .font-serif-italic,
 .dark .font-serif-italic {
-  color: var(--crema);
+  color: var(--crema) !important;
   opacity: 0.95;
 }
 .display { font-variation-settings: "wdth" var(--wdth-display); letter-spacing: -0.015em; }

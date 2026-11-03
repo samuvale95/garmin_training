@@ -125,7 +125,7 @@ export function FocusBlock({ form, animate, narrativeText }: { form: ActivityFor
         il tuo allenatore
       </p>
       <p style={{ font: "600 24px/1.15 var(--font-sans)", letterSpacing: "-.02em", margin: "10px 0 0", color: "var(--crema)" }}>{form.headline}</p>
-      <p className="font-serif-italic" style={{ fontSize: 16, lineHeight: 1.45, margin: "12px 0 0", color: "var(--crema)", opacity: 0.95 }}>
+      <p style={{ fontSize: 16, lineHeight: 1.45, margin: "12px 0 0", color: "var(--crema)", opacity: 0.95 }}>
         {narrativeText ?? form.focus ?? "Le misure qui sotto sono tutte dentro le loro fasce di riferimento."}
       </p>
       {narrativeText && form.focus && (
