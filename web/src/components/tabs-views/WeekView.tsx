@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PlanNavigation, WorkspaceHeading } from "@/components/Workspace";
 import { dis } from "@/lib/disabled";
-import { ChevronLeft, ChevronRight, PlusIcon, MoveIcon, WatchIcon } from "@/components/Icons";
+import { ChevronLeft, ChevronRight, PlusIcon, WatchIcon } from "@/components/Icons";
 import { EmptyState, Notice } from "@/components/ui";
 import { DraggableWeekCard, RestCard, type DayCardData } from "@/components/WeekCards";
 import { OffPlanCard, matchPlannedActivities } from "@/components/OffPlanCard";
@@ -374,7 +374,7 @@ export function WeekPageContent() {
               ? `Sto riscrivendo i giorni fino a ${formatShortDate(rewriteUntil)}: potrai spostarli appena ho finito.`
               : carried
                 ? "Rilascia sul giorno in cui spostarla."
-                : "Apri una seduta per i dettagli. Per cambiarle giorno usa Sposta, oppure tienila premuta e trascinala."}
+                : "Apri una seduta per i dettagli, oppure trascinala per cambiarle giorno."}
           </p>
         )}
 
@@ -428,28 +428,20 @@ export function WeekPageContent() {
                         <RestCard animate={false} delayMs={0} withIllustration={false} />
                       ) : (
                         day.cards.map((card, j) => (
-                          <div key={card.id}>
-                            <DraggableWeekCard
-                              card={card}
-                              animate={false}
-                              delayMs={0}
-                              matchKm={j === 0 && match?.matched ? match.distance_km ?? null : day.done[j]?.distance_km ?? null}
-                              done={!!day.done[j] || (j === 0 && !!match?.matched)}
-                              draggable={!isPast && !day.done[j] && !(j === 0 && match?.matched) && !isRewritten(day.key) && !rescheduleWorkout.isPending && !moveBusy}
-                              onDragStateChange={(dragging) => handleDragStateChange(card, dragging)}
-                              onDragOver={handleDragOver}
-                              onDrop={handleCardDrop}
-                              onPrefetch={card.workout ? () => prefetchWorkoutSession(card.workout!) : undefined}
-                              emphasis={j === 0 && day.key === nextDayKey ? (isToday ? "oggi" : "prossimo") : null}
-                            />
-                            {/* Done or past sessions have nothing to move to. */}
-                            {!day.done[j] && !(j === 0 && match?.matched) && card.session.date >= todayKey && <MoveSessionControl card={card} blocked={isRewritten(card.session.date) || rescheduleWorkout.isPending || moveBusy} onMove={(date) => {
-                              if (isRewritten(date) || isRewritten(card.session.date)) return false;
-                              if (card.planId) moveSession(card.planId, card.session.date, date);
-                              else if (card.workout) rescheduleWorkout.mutate({ workout: card.workout, newDate: date });
-                              return true;
-                            }} />}
-                          </div>
+                          <DraggableWeekCard
+                            key={card.id}
+                            card={card}
+                            animate={false}
+                            delayMs={0}
+                            matchKm={j === 0 && match?.matched ? match.distance_km ?? null : day.done[j]?.distance_km ?? null}
+                            done={!!day.done[j] || (j === 0 && !!match?.matched)}
+                            draggable={!isPast && !day.done[j] && !(j === 0 && match?.matched) && !isRewritten(day.key) && !rescheduleWorkout.isPending && !moveBusy}
+                            onDragStateChange={(dragging) => handleDragStateChange(card, dragging)}
+                            onDragOver={handleDragOver}
+                            onDrop={handleCardDrop}
+                            onPrefetch={card.workout ? () => prefetchWorkoutSession(card.workout!) : undefined}
+                            emphasis={j === 0 && day.key === nextDayKey ? (isToday ? "oggi" : "prossimo") : null}
+                          />
                         ))
                       )}
                       {day.offPlan.map((activity) => (
@@ -532,35 +524,4 @@ function WeekNav({ start, end, offset, onPrev, onNext, onToday }: { start: Date;
       </button>
     </div>
   );
-}
-
-/** From today for fourteen days, plus the session's own day if it falls outside. */
-function moveChoices(current: string): string[] {
-  const today = toDateKey(new Date());
-  const days = Array.from({ length: 15 }, (_, i) => shiftDateKey(today, i));
-  return days.includes(current) ? days : [current, ...days];
-}
-
-function MoveSessionControl({ card, blocked, onMove }: { card: DayCardData; blocked: boolean; onMove: (date: string) => boolean }) {
-  const [date, setDate] = useState(card.session.date);
-  const [error, setError] = useState(false);
-  const detail = useRef<HTMLDetailsElement>(null);
-  return <details className="week-move" ref={detail}>
-    <summary data-track="week.move-open"><MoveIcon aria-hidden="true" /> Sposta<span className="sr-only"> {card.session.title}</span></summary>
-    <form onSubmit={(event) => {
-      event.preventDefault();
-      if (blocked || !date || date === card.session.date) return;
-      if (!onMove(date)) { setError(true); return; }
-      setError(false);
-      if (detail.current) detail.current.open = false;
-    }}>
-      {/* The next two weeks in Italian, not the native date input: that one follows the
-          browser's language ("10/31/2026") and needs three taps. */}
-      <label className="field">Nuovo giorno<select required value={date} onChange={(event) => setDate(event.target.value)} data-track="week.move-date">
-        {moveChoices(card.session.date).map((key) => <option key={key} value={key}>{capitalize(new Date(`${key}T12:00:00`).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" }))}{key === card.session.date ? " (ora)" : ""}</option>)}
-      </select></label>
-      <button type="submit" className="btn" data-track="week.move-confirm" {...dis(blocked || !date || date === card.session.date, blocked ? "in_caricamento" : "scegli_un_altro_giorno")}>Sposta seduta</button>
-    </form>
-    {error && <p role="alert" className="ux-error">Il piano di quel giorno è in aggiornamento. Riprova al termine.</p>}
-  </details>;
 }
