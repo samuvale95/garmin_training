@@ -96,22 +96,54 @@ export function SessionDetailBody({
             <Illustration name={visual.illustration} width={150} height={160} position="relative" active={false} priority />
           </div>
         )}
+        {session.id && (
+          <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+            <Link
+              href={`/session/${session.id}/edit`}
+              className="btn"
+              data-size="sm"
+              style={{
+                background: "var(--crema, #FFF)",
+                border: "1px solid var(--sabbia-bordo, #DDD)",
+                borderRadius: "var(--radius-pill)",
+                fontSize: 12,
+                fontWeight: 600,
+                textDecoration: "none",
+                color: "var(--inchiostro)",
+                padding: "4px 12px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              ✏️ Modifica seduta e priorità
+            </Link>
+          </div>
+        )}
       </article>
 
-      {session.short_variant && session.id && (
-        <Section icon={<ClockIcon aria-hidden="true" />} title="Versione breve" id="session-short">
+      {session.id && (
+        <Section icon={<ClockIcon aria-hidden="true" />} title="Versione salva-tempo" id="session-short">
           <div className="card">
-            <div className="stats" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
-              <Stat value={formatMinutes(fullMin)} label="Completa" note={isShortActive ? undefined : "In uso"} />
-              <Stat value={shortMin != null ? formatMinutes(shortMin) : "—"} label="Breve" note={isShortActive ? "In uso" : shortMin != null && fullMin > shortMin ? `${Math.round(fullMin - shortMin)} min in meno` : undefined} />
-            </div>
-            {session.short_variant.steps?.length > 0 && (
-              <p className="card-text">Fasi della versione breve: {planStepsSummary(session.short_variant.steps)}</p>
+            {session.short_variant ? (
+              <>
+                <div className="stats" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+                  <Stat value={formatMinutes(fullMin)} label="Completa" note={isShortActive ? undefined : "In uso"} />
+                  <Stat value={shortMin != null ? formatMinutes(shortMin) : "—"} label="Breve" note={isShortActive ? "In uso" : shortMin != null && fullMin > shortMin ? `${Math.round(fullMin - shortMin)} min in meno` : undefined} />
+                </div>
+                {session.short_variant.steps?.length > 0 && (
+                  <p className="card-text">Fasi della versione breve: {planStepsSummary(session.short_variant.steps)}</p>
+                )}
+                {session.short_variant.description && <p className="card-text">{session.short_variant.description}</p>}
+              </>
+            ) : (
+              <p className="card-text">
+                Hai poco tempo oggi? Puoi attivare una variante ridotta (25–30 min): lo stimolo principale viene preservato condensando il volume per non farti saltare l&apos;allenamento.
+              </p>
             )}
-            {session.short_variant.description && <p className="card-text">{session.short_variant.description}</p>}
             <div className="actions">
               <button type="button" className="btn" data-variant={isShortActive ? undefined : "primary"} data-track="session.toggle-short" onClick={() => toggleShort(session.id!)}>
-                {isShortActive ? "Ripristina la versione completa" : "Usa la versione breve"}
+                {isShortActive ? "Ripristina la versione completa" : "⚡ Usa la versione breve (poco tempo)"}
               </button>
             </div>
             <p className="card-text" style={{ fontSize: "var(--text-xs)" }}>Il cambio si applica al piano nell’app e si può annullare in ogni momento.</p>

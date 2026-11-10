@@ -8,7 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Reorder } from "framer-motion";
 import { PrimaryButton } from "@/components/motion/primitives";
 import { useMountOnce } from "@/lib/motion";
-import { checkMoveAfterwards } from "@/lib/moveWarnings";
+import { checkMoveAfterwards, evaluateSessionSchedule } from "@/lib/moveWarnings";
 import { findPlanSession, useSavePlanSession, useIsRewritten, useApplyDeletion, useInvalidateCalendarData, usePlanQuery, useRemoveSession, useStartSync, useSyncJobStatus, useWorkoutsForDate } from "@/lib/queries";
 import { safeReturnHref, withReturnTo } from "@/lib/navigation";
 import { ApiError } from "@/lib/apiClient";
@@ -16,7 +16,7 @@ import { normalizeTitle, sessionDurationMinutes, parseDateKey, shiftDateKey, toD
 import { capitalize, formatFullDate, formatPaceMinSec, formatShortDate, formatPaceRange, parsePaceMinSec, stepTypeHint, stepTypeLabel } from "@/lib/format";
 import { isRepeatBlock } from "@/lib/types";
 import { parseTargetRange, stripEditableSteps, validPoolLength } from "@/lib/workoutEditorSteps";
-import type { ScheduledWorkout, SessionStep, Sport, Step, StepType, TrainingSession } from "@/lib/types";
+import type { MoveWarning, ScheduledWorkout, SessionStep, Sport, Step, StepType, TrainingSession } from "@/lib/types";
 
 const SPORT_CHIPS: { value: Sport; label: string }[] = [
   { value: "running", label: "Corsa" },
@@ -171,6 +171,8 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
   const [editingStep, setEditingStep] = useState<EditableStep | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [scheduleWarning, setScheduleWarning] = useState<MoveWarning | null>(null);
+  const [isCheckingSchedule, setIsCheckingSchedule] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
 
   /** Where "×"/"Annulla" go back to: the screen this editor was opened from. */
@@ -282,7 +284,7 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
     return true;
   }
 
-  async function handleSave() {
+  async function handleSave(skipCheck = false) {
     if (!dayIsValid || !poolIsValid) return;
     setSaveError(null);
     if (blockedByGeneration(date)) return;
@@ -300,6 +302,27 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
       is_short_active: existing?.is_short_active ?? false,
       plan_id: existing?.plan_id,
     };
+
+    if (!skipCheck && mode !== "draft") {
+      setIsCheckingSchedule(true);
+      try {
+        const check = await evaluateSessionSchedule({
+          session_id: mode === "edit" ? sessionId : undefined,
+          date,
+          sport,
+          title: session.title,
+          steps: session.steps,
+          priority: session.priority,
+        });
+        setIsCheckingSchedule(false);
+        if (check.warnings && check.warnings.length > 0) {
+          setScheduleWarning(check.warnings[0]);
+          return;
+        }
+      } catch {
+        setIsCheckingSchedule(false);
+      }
+    }
 
     if (props.mode === "draft") {
       if (await props.onSave(session)) { clearEditorDraft(); leavingAfterSave.current = true; }
@@ -693,13 +716,56 @@ export function WorkoutEditor(props: WorkoutEditorProps) {
         </p>
       )}
 
+      {scheduleWarning && (
+        <div
+          style={{
+            background: "rgba(232, 93, 78, 0.12)",
+            border: "1.5px solid var(--corallo, #E85D4E)",
+            borderRadius: "var(--radius-card)",
+            padding: "14px 16px",
+            marginTop: 16,
+          }}
+          role="alert"
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--corallo-testo, #C0392B)", fontWeight: 700, fontSize: 14, marginBottom: 6 }}>
+            <span>⚠️ Attenzione programmazione e recupero</span>
+          </div>
+          <p style={{ margin: "0 0 12px", fontSize: 13, lineHeight: 1.45, color: "var(--inchiostro)" }}>
+            {scheduleWarning.message}
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="btn"
+              data-size="sm"
+              data-variant="primary"
+              onClick={() => {
+                setScheduleWarning(null);
+                handleSave(true);
+              }}
+            >
+              Conferma e Salva comunque
+            </button>
+            <button
+              type="button"
+              className="btn"
+              data-size="sm"
+              data-variant="secondary"
+              onClick={() => setScheduleWarning(null)}
+            >
+              Modifica data o sport
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="editor-save-bar"><p className="ux-muted">{sessionDurationMinutes({ date, sport, title, description, steps: plainSteps() }) != null ? `${Math.round(sessionDurationMinutes({ date, sport, title, description, steps: plainSteps() })!)} min previsti` : "Durata non determinabile"} · {mode === "draft" ? "Salva solo nella bozza; esegui una nuova verifica prima di attivarla." : mode === "garmin" ? "Il salvataggio modifica il calendario Garmin Connect. L’orologio si sincronizza separatamente." : "Salva in Passo; l’invio a Garmin Connect parte automaticamente. L’orologio si sincronizza separatamente."}</p>
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
         <PrimaryButton data-track="workout-editor.handlesave"
           state={
-            !dayIsValid || !poolIsValid ? "disabled" : calendarLookupFailed ? "idle" : isSaving || !calendarIdentityKnown ? "loading" : "idle"
+            !dayIsValid || !poolIsValid ? "disabled" : calendarLookupFailed ? "idle" : isSaving || isCheckingSchedule || !calendarIdentityKnown ? "loading" : "idle"
           }
-          onClick={calendarLookupFailed ? () => void workoutsQuery.refetch() : handleSave}
+          onClick={calendarLookupFailed ? () => void workoutsQuery.refetch() : () => handleSave(false)}
         >
           {!dayIsValid
             ? "Scegli un giorno"

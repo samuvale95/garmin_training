@@ -410,6 +410,15 @@ def save_activity(user_id: str, source: str, activity_id: int, day: date_type, v
         )
 
 
+def delete_manual_activity(user_id: str, activity_id: int) -> bool:
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM activity WHERE user_id = %s AND source = 'manual' AND activity_id = %s",
+            [user_id, activity_id],
+        )
+        return cur.rowcount > 0
+
+
 def save_stream(user_id: str, source: str, activity_id: int, packed: PackedStream) -> None:
     with db.connect() as conn:
         conn.execute(
@@ -596,7 +605,10 @@ _SPORT_FAMILIES = {
     "strength": ("WeightTraining", "strength_training"),
     "ski": ("AlpineSki", "BackcountrySki", "NordicSki", "resort_skiing", "resort_skiing_snowboarding_ws",
             "backcountry_skiing", "skate_skiing_ws", "cross_country_skiing_ws"),
-    "tennis": ("Tennis", "tennis", "tennis_v2"),
+    "tennis": ("Tennis", "tennis", "tennis_v2", "padel", "Padel", "Pickleball"),
+    "soccer": ("Soccer", "Football", "soccer", "calcetto", "calcio"),
+    "beach_volleyball": ("BeachVolleyball", "volleyball", "beach_volleyball", "beachvolley", "beach_volley"),
+    "calisthenics": ("calisthenics", "Calisthenics", "street_workout"),
     "climb": ("RockClimbing", "rock_climbing", "indoor_climbing", "bouldering"),
     "paddle": ("StandUpPaddling", "stand_up_paddleboarding", "stand_up_paddleboarding_v2"),
     "sail": ("Sail", "sailing", "sailing_v2"),

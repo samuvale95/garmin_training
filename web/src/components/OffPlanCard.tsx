@@ -1,28 +1,60 @@
 "use client";
 
+import { useDeleteManualActivity } from "@/lib/queries";
 import type { StoredActivity } from "@/lib/types";
 
 const SOURCE_LABELS: Record<StoredActivity["source"], string> = {
   garmin: "misurate",
   strava: "da Strava",
   stima: "stimate",
+  manual: "manuale (senza orologio)",
 };
 
 /** A workout done outside the plan -- a ride, a swim, tennis -- in its day on Settimana.
  * Not draggable and not editable: it already happened. It is here so the calendar
  * describes the week that took place, not only the one that was planned. */
 export function OffPlanCard({ activity }: { activity: StoredActivity; animate?: boolean; delayMs?: number }) {
+  const deleteMutation = useDeleteManualActivity();
   const details = [
     `${Math.round(activity.minutes)} min`,
     activity.distance_km ? `${activity.distance_km.toLocaleString("it-IT", { maximumFractionDigits: 1 })} km` : null,
-    `${activity.kcal} kcal ${SOURCE_LABELS[activity.source]}`,
+    `${activity.kcal} kcal ${SOURCE_LABELS[activity.source] ?? "stimate"}`,
   ].filter(Boolean);
   return (
     <div className="session-card" data-offplan style={{ "--sport": "var(--line-strong)" } as React.CSSProperties}>
       <span className="session-card-body">
-        <span className="session-card-top">
-          <span className="badge" data-tone="ok">Svolto fuori piano</span>
-          <span className="sport-tag" style={{ color: "var(--ink-2)" }}>{activity.label}</span>
+        <span className="session-card-top" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+            <span className="badge" data-tone={activity.source === "manual" ? "accent" : "ok"}>
+              {activity.source === "manual" ? "Attività extra (senza orologio)" : "Svolto fuori piano"}
+            </span>
+            <span className="sport-tag" style={{ color: "var(--ink-2)" }}>{activity.label}</span>
+          </span>
+          {activity.source === "manual" && (
+            <button
+              type="button"
+              className="press-soft"
+              title="Elimina attività manuale"
+              disabled={deleteMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (window.confirm("Vuoi eliminare questa attività inserita manualmente?")) {
+                  deleteMutation.mutate(activity.activity_id);
+                }
+              }}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 12,
+                color: "var(--inchiostro-50, #999)",
+                padding: "2px 6px",
+              }}
+            >
+              ✕
+            </button>
+          )}
         </span>
         <span className="session-card-title">{activity.title || activity.label}</span>
         <span className="session-card-meta">{details.join(" · ")}</span>

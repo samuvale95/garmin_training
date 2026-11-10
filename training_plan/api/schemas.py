@@ -2033,6 +2033,15 @@ class MoveCheckRequest(BaseModel):
     from_date: date_type | None = None
 
 
+class CheckSessionRequest(BaseModel):
+    session_id: str | None = None
+    date: date_type
+    sport: str
+    title: str = ""
+    steps: list[dict] = Field(default_factory=list)
+    priority: str | None = None
+
+
 class MoveWarningOut(BaseModel):
     key: str
     message: str
@@ -2068,11 +2077,25 @@ class StoredActivityOut(BaseModel):
     minutes: float
     distance_km: float | None
     kcal: int
-    source: Literal["garmin", "strava", "stima"]
+    source: Literal["garmin", "strava", "stima", "manual"]
 
 
 class ActivitiesListResponse(BaseModel):
     activities: list[StoredActivityOut]
+
+
+class ManualActivityIn(BaseModel):
+    day: date_type
+    sport: str
+    title: str
+    duration_min: float = Field(gt=0)
+    distance_km: float | None = None
+    rpe: int = Field(default=6, ge=1, le=10)
+    notes: str | None = None
+
+
+class ManualActivityResponse(BaseModel):
+    activity: StoredActivityOut
 
 
 class ActivityEnergyOut(BaseModel):

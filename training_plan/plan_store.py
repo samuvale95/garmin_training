@@ -378,20 +378,117 @@ def delete_plan_sessions(user_id: str, plan_id: str) -> None:
         cur.execute("DELETE FROM plan_session WHERE user_id = %s AND plan_id = %s", [user_id, plan_id])
 
 
+def generate_fallback_short_variant(row: dict) -> dict:
+    sport = (row.get("sport") or "running").lower()
+    title = row.get("title") or "Allenamento"
+    raw_steps = row.get("steps") or []
+
+    # Check for repeat blocks in raw steps
+    has_repeats = any(isinstance(s, dict) and s.get("reps") for s in raw_steps)
+    if sport == "running" and has_repeats:
+        short_steps = []
+        for s in raw_steps:
+            if isinstance(s, dict) and s.get("reps"):
+                reps = int(s["reps"])
+                short_reps = max(2, round(reps / 2))
+                short_steps.append({**s, "reps": short_reps})
+            elif isinstance(s, dict) and s.get("type") in ("warmup", "cooldown"):
+                val = s.get("duration_value")
+                if isinstance(val, (int, float)) and s.get("duration_type") == "time":
+                    short_steps.append({**s, "duration_value": max(5, round(val * 0.7))})
+                else:
+                    short_steps.append(s)
+            else:
+                short_steps.append(s)
+        return {
+            "title": f"{title} (ridotta)",
+            "description": "Versione salva-tempo: serie dimezzate per preservare la qualità aerobica in metà tempo.",
+            "steps": short_steps,
+        }
+
+    if sport == "running":
+        dur = 0
+        target_pace = None
+        for s in raw_steps:
+            if isinstance(s, dict):
+                if s.get("duration_type") == "time" and isinstance(s.get("duration_value"), (int, float)):
+                    dur += s["duration_value"]
+                elif s.get("duration_type") == "distance" and isinstance(s.get("duration_value"), (int, float)):
+                    dur += s["duration_value"] * 5.5
+                if s.get("target_pace") and not target_pace:
+                    target_pace = s["target_pace"]
+
+        short_min = 25 if dur <= 40 else 30
+        short_step = {"type": "interval", "duration_type": "time", "duration_value": short_min}
+        if target_pace:
+            short_step["target_pace"] = target_pace
+        return {
+            "title": f"{title} (ridotta {short_min}')",
+            "description": f"Versione salva-tempo: stimolo aerobico preservato in {short_min} minuti.",
+            "steps": [short_step],
+        }
+
+    if sport in ("calisthenics", "strength_training"):
+        short_steps = []
+        if raw_steps:
+            for s in raw_steps[:4]:
+                if isinstance(s, dict) and s.get("reps"):
+                    short_steps.append({**s, "reps": max(2, round(int(s["reps"]) / 2))})
+                else:
+                    short_steps.append(s)
+        if not short_steps:
+            short_steps = [{"type": "interval", "duration_type": "time", "duration_value": 25}]
+        return {
+            "title": f"{title} (express 25')",
+            "description": "Versione salva-tempo: serie condensate e recuperi ridotti in circa 25 minuti.",
+            "steps": short_steps,
+        }
+
+    if sport == "cycling":
+        return {
+            "title": f"{title} (ridotta 30')",
+            "description": "Versione salva-tempo: 30 minuti agili Z2 per attivare il metabolismo senza affaticare.",
+            "steps": [{"type": "interval", "duration_type": "time", "duration_value": 30}],
+        }
+
+    return {
+        "title": f"{title} (ridotta 25')",
+        "description": "Versione salva-tempo compatta da 25 minuti.",
+        "steps": [{"type": "interval", "duration_type": "time", "duration_value": 25}],
+    }
+
+
 def toggle_short_variant(user_id: str, session_id: str) -> dict:
-    """Toggle is_short_active on a specific session."""
+    """Toggle is_short_active on a specific session, generating a short variant if none exists."""
     with db.connect() as conn, conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
-            f"""UPDATE plan_session
-                SET is_short_active = NOT is_short_active, updated_at = now()
-                WHERE user_id = %s AND id = %s
-                RETURNING {_COLUMNS}""",
+            f"SELECT {_COLUMNS} FROM plan_session WHERE user_id = %s AND id = %s",
             [user_id, session_id],
         )
         row = cur.fetchone()
         if not row:
             raise SessionNotFound(session_id)
-        return _out(row)
+
+        short_variant = row.get("short_variant")
+        if not short_variant:
+            generated = generate_fallback_short_variant(row)
+            cur.execute(
+                f"""UPDATE plan_session
+                    SET short_variant = %s, is_short_active = TRUE, updated_at = now()
+                    WHERE user_id = %s AND id = %s
+                    RETURNING {_COLUMNS}""",
+                [Jsonb(generated), user_id, session_id],
+            )
+        else:
+            cur.execute(
+                f"""UPDATE plan_session
+                    SET is_short_active = NOT is_short_active, updated_at = now()
+                    WHERE user_id = %s AND id = %s
+                    RETURNING {_COLUMNS}""",
+                [user_id, session_id],
+            )
+        updated = cur.fetchone()
+        return _out(updated)
 
 
 def import_sessions(

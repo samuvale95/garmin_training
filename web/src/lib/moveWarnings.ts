@@ -3,7 +3,7 @@
 import { useRef, useState, useSyncExternalStore } from "react";
 import { apiPost } from "./apiClient";
 import { useUpdateSession } from "./queries";
-import type { MoveCheck, MoveWarning, TrainingSession } from "./types";
+import type { CheckSessionRequest, MoveCheck, MoveWarning, TrainingSession } from "./types";
 
 /** A move that came back with warnings, waiting for the user's answer. One at a time,
  * held outside React so the week screen and the editor can both raise it and the sheet
@@ -45,6 +45,11 @@ export function recordMoveDecision(move: PendingMove, choice: "confermo" | "adat
 
 export function clearPendingMove() {
   publish(null);
+}
+
+/** Check schedule impact before saving an edited or candidate workout. */
+export async function evaluateSessionSchedule(payload: CheckSessionRequest): Promise<MoveCheck> {
+  return apiPost<MoveCheck>("/plan/check-session", payload);
 }
 
 /** Ask the server what a move just made would make risky (see

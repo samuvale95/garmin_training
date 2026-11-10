@@ -43,11 +43,13 @@ KCAL_PER_KG_PER_HOUR = {
     "paddle": 5.0,
     "sail": 3.0,
     "soccer": 8.0,
+    "beach_volleyball": 8.0,
+    "calisthenics": 5.5,
 }
 DEFAULT_KCAL_PER_KG_PER_HOUR = 5.0
 
 # Families that draw on glycogen the way the carbohydrate ranges assume.
-ENDURANCE_FAMILIES = ("run", "ride", "swim", "hike", "ski", "paddle", "tennis", "soccer")
+ENDURANCE_FAMILIES = ("run", "ride", "swim", "hike", "ski", "paddle", "tennis", "soccer", "beach_volleyball")
 
 FAMILY_LABELS = {
     "run": "corsa",
@@ -61,7 +63,9 @@ FAMILY_LABELS = {
     "climb": "arrampicata",
     "paddle": "paddle",
     "sail": "vela",
-    "soccer": "calcio",
+    "soccer": "calcetto",
+    "beach_volleyball": "beach volley",
+    "calisthenics": "calisthenics",
 }
 
 # Everyday movement from steps, per kg per step (about 0.04 kcal a step at 70 kg).

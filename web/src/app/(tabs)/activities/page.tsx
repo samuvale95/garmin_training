@@ -25,7 +25,7 @@ type View = (typeof VIEWS)[number][0];
 
 const FAMILY_COLOR: Record<string, string> = { run: "var(--sport-run)", ride: "var(--sport-bike)", swim: "var(--sport-easy)", strength: "var(--sport-strength)", hike: "var(--sport-long)", walk: "var(--sport-rest)" };
 
-const SOURCE_LABEL: Record<StoredActivity["source"], string> = { garmin: "Garmin", strava: "Strava", stima: "Valori stimati" };
+const SOURCE_LABEL: Record<StoredActivity["source"], string> = { garmin: "Garmin", strava: "Strava", stima: "Valori stimati", manual: "Manuale (senza orologio)" };
 
 /** Attività: what was done and how it is going. One place for the history, the
  * analyses (formerly behind "Coach" and "Tecnica") and the weekly reports. */

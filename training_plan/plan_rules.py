@@ -43,6 +43,7 @@ KIND_QUALITY = "qualità"
 KIND_STRENGTH = "forza"
 KIND_OTHER = "altro"
 HARD_KINDS = (KIND_LONG, KIND_QUALITY)
+STRENGTH_KINDS = (KIND_STRENGTH, "calisthenics")
 
 EVIDENCE_RESEARCH = "ricerca"
 EVIDENCE_CONSENSUS = "consenso"
@@ -79,6 +80,7 @@ RULES: dict[str, Rule] = {
         Rule("acwr_high", EVIDENCE_RESEARCH, True, (1.35, 1.35, 1.35)),
         Rule("acwr_excessive", EVIDENCE_RESEARCH, True, (1.50, 1.50, 1.50)),
         Rule("strength_before_hard", EVIDENCE_CONSENSUS, True, (0, 0, 1)),
+        Rule("strength_in_a_row", EVIDENCE_CONSENSUS, True, (0, 0, 0)),
     )
 }
 
@@ -545,6 +547,59 @@ def _strength_before_hard(planned: list[_Planned], ctx: RuleContext) -> list[Vio
     return out
 
 
+def _strength_in_a_row(planned: list[_Planned], ctx: RuleContext) -> list[Violation]:
+    level = ctx.effective_level
+    limit = RULES["strength_in_a_row"].limit(level)
+    by_day: dict[date_type, list[_Planned]] = {}
+    for item in planned:
+        by_day.setdefault(item.session.date, []).append(item)
+
+    out = []
+    strength_days = sorted([d for d, items in by_day.items() if any(it.kind in STRENGTH_KINDS for it in items)])
+    count = 0
+    seen_pairs: set[tuple[date_type, date_type]] = set()
+    for s_day in strength_days:
+        same_day_strength = [it for it in by_day[s_day] if it.kind in STRENGTH_KINDS]
+        if len(same_day_strength) > 1:
+            count += 1
+            if count > limit:
+                out.append(
+                    _v(
+                        "strength_in_a_row",
+                        level,
+                        f"Più sedute di forza o calisthenics nello stesso giorno ({_fmt_day(s_day)}): "
+                        "accumulare più sessioni di forza nella stessa giornata aumenta il rischio di sovraccarico neuromuscolare e tendineo.",
+                        count,
+                        limit,
+                        same_day_strength,
+                    )
+                )
+
+        next_day = s_day + timedelta(days=1)
+        if next_day in strength_days and (s_day, next_day) not in seen_pairs:
+            seen_pairs.add((s_day, next_day))
+            count += 1
+            if count > limit:
+                involved = [it for it in by_day[s_day] if it.kind in STRENGTH_KINDS] + [
+                    it for it in by_day[next_day] if it.kind in STRENGTH_KINDS
+                ]
+                first_kind = "calisthenics" if any(it.kind == "calisthenics" for it in by_day[s_day]) else "forza"
+                second_kind = "calisthenics" if any(it.kind == "calisthenics" for it in by_day[next_day]) else "forza"
+                label = "di calisthenics" if first_kind == second_kind == "calisthenics" else "di forza o calisthenics"
+                out.append(
+                    _v(
+                        "strength_in_a_row",
+                        level,
+                        f"Due sedute {label} consecutive ({_fmt_day(s_day)} e {_fmt_day(next_day)}): "
+                        "muscoli e articolazioni necessitano di almeno 48 ore di recupero per assorbire lo stimolo ed evitare sovraccarichi.",
+                        count,
+                        limit,
+                        involved,
+                    )
+                )
+    return out
+
+
 # ---- the whole thing ---------------------------------------------------------------------
 
 
@@ -580,6 +635,7 @@ def validate(
         *_deload(weeks, context, start, end),
         *_acwr_limits(planned, context),
         *_strength_before_hard(planned, context),
+        *_strength_in_a_row(planned, context),
     ]
     if only_move_warnings:
         violations = [v for v in violations if v.warn_on_move]

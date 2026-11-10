@@ -278,6 +278,45 @@ async def check_move(payload: schemas.MoveCheckRequest, user_id: str = Depends(c
     return await run_in_threadpool(run)
 
 
+@router.post("/plan/check-session", response_model=schemas.MoveCheckResponse)
+async def check_session_schedule(
+    payload: schemas.CheckSessionRequest, user_id: str = Depends(current_user_id)
+) -> schemas.MoveCheckResponse:
+    """Evaluate whether candidate or edited session creates risks or rule violations."""
+
+    def run() -> schemas.MoveCheckResponse:
+        today = date.today()
+        context, days = plan_rules.gather_context(user_id, today, threshold_available=_zones(user_id) is not None)
+        candidate = plan_generator.session_from_dict({
+            "date": payload.date.isoformat(),
+            "sport": payload.sport,
+            "title": payload.title or "Allenamento",
+            "steps": payload.steps,
+            "priority": payload.priority,
+        })
+        warnings = move_check.check_candidate_session(
+            candidate=candidate,
+            session_id=str(payload.session_id) if payload.session_id else None,
+            stored=plan_store.list_sessions(user_id),
+            days=days,
+            checkins=checkin.get_range(user_id, payload.date - timedelta(days=move_check.PAIN_DAYS), payload.date),
+            context=context,
+            today=today,
+            confirmed=move_check.confirmed_fingerprints(user_id),
+        )
+        return schemas.MoveCheckResponse(
+            warnings=[
+                schemas.MoveWarningOut(
+                    key=w.key, message=w.message, evidence=w.evidence, dates=w.dates, fingerprint=w.fingerprint
+                )
+                for w in warnings
+            ],
+            adapted=None,
+        )
+
+    return await run_in_threadpool(run)
+
+
 @router.post("/plan/move-decisions", response_model=schemas.DeletePlanResponse)
 async def record_move_decision(
     payload: schemas.MoveDecisionRequest, user_id: str = Depends(current_user_id)

@@ -9,6 +9,7 @@ import { ChevronLeft, ChevronRight, PlusIcon, WatchIcon } from "@/components/Ico
 import { EmptyState, Notice } from "@/components/ui";
 import { DraggableWeekCard, RestCard, type DayCardData } from "@/components/WeekCards";
 import { OffPlanCard, matchPlannedActivities } from "@/components/OffPlanCard";
+import { ManualActivityModal } from "@/components/ManualActivityModal";
 import { useMotionEnabled } from "@/lib/motion";
 import { useMoveSession } from "@/lib/moveWarnings";
 import { PullToRefresh } from "@/components/PullToRefresh";
@@ -63,6 +64,7 @@ export function WeekPageContent() {
   const offset = Number.isFinite(rawOffset) ? rawOffset : 0;
   // -1 / +1: which side the day list should enter from after a week change.
   const [direction, setDirection] = useState(0);
+  const [showManualModal, setShowManualModal] = useState(false);
   const liveMode = !access.plan && access.garminConnected;
   const todayKey = toDateKey(new Date());
 
@@ -352,7 +354,16 @@ export function WeekPageContent() {
               Resoconto della settimana
             </Link>
           )}
-          <span className="calendar-view-switch subnav" role="group" aria-label="Vista calendario" style={{ margin: "0 0 0 auto" }}>
+          <button
+            type="button"
+            className="btn"
+            data-size="sm"
+            onClick={() => setShowManualModal(true)}
+            style={{ fontSize: 12, padding: "4px 10px", borderRadius: "var(--radius-pill)", margin: "0 8px 0 auto", background: "var(--crema, #FFF)", border: "1px solid var(--sabbia-bordo, #DDD)" }}
+          >
+            + Senza orologio
+          </button>
+          <span className="calendar-view-switch subnav" role="group" aria-label="Vista calendario">
             <button type="button" aria-pressed={calendarView === "columns"} data-track="week.columns" onClick={() => router.replace(`/week?date=${focusDate ?? todayKey}&view=columns`, { scroll: false })}>Colonne</button>
             <button type="button" aria-pressed={calendarView === "list"} data-track="week.list" onClick={() => router.replace(`/week?date=${focusDate ?? todayKey}&view=list`, { scroll: false })}>Elenco</button>
           </span>
@@ -454,6 +465,7 @@ export function WeekPageContent() {
             </div>
           )}
         </div>
+        <ManualActivityModal isOpen={showManualModal} onClose={() => setShowManualModal(false)} />
       </div>
     </PullToRefresh>
   );

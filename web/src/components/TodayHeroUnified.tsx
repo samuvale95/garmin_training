@@ -181,7 +181,7 @@ export function TodayHeroUnified({
                     {stepGroupLine(heroMainGroup)}
                   </p>
                 )}
-                {heroSession.short_variant && (
+                {'id' in heroSession && typeof (heroSession as { id?: string }).id === "string" && !heroMatch?.matched && (
                   <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
                     <div
                       style={{
@@ -194,34 +194,32 @@ export function TodayHeroUnified({
                       }}
                     >
                       <span style={{ fontSize: 12, fontWeight: 700, color: heroSession.is_short_active ? "var(--corallo-testo)" : "var(--inchiostro-70)" }}>
-                        {heroSession.is_short_active ? "⚡ Salva-tempo attiva" : "⚡ Poco tempo? Disponibile variante corta"}
+                        {heroSession.is_short_active ? "⚡ Salva-tempo attiva" : "⚡ Poco tempo?"}
                       </span>
                     </div>
 
-                    {'id' in heroSession && typeof (heroSession as { id?: string }).id === "string" && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const sid = (heroSession as { id?: string }).id;
-                          if (sid) toggleShort(sid);
-                        }}
-                        className="press-soft"
-                        style={{
-                          background: heroSession.is_short_active ? "var(--corallo)" : "var(--inchiostro)",
-                          color: heroSession.is_short_active ? "var(--corallo-testo)" : "var(--crema)",
-                          border: "none",
-                          borderRadius: "var(--radius-pill)",
-                          padding: "2px 8px",
-                          fontSize: 12,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                        }}
-                      >
-                        {heroSession.is_short_active ? "Torna normale" : "Attiva subito"}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const sid = (heroSession as { id?: string }).id;
+                        if (sid) toggleShort(sid);
+                      }}
+                      className="press-soft"
+                      style={{
+                        background: heroSession.is_short_active ? "var(--corallo)" : "var(--inchiostro)",
+                        color: heroSession.is_short_active ? "var(--corallo-testo)" : "var(--crema)",
+                        border: "none",
+                        borderRadius: "var(--radius-pill)",
+                        padding: "2px 8px",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {heroSession.is_short_active ? "Torna normale" : "Riduci seduta"}
+                    </button>
                   </div>
                 )}
                 {heroMatch?.matched && heroMatch.distance_km != null && (

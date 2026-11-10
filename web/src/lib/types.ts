@@ -1166,7 +1166,26 @@ export interface StoredActivity {
   minutes: number;
   distance_km: number | null;
   kcal: number;
-  source: "garmin" | "strava" | "stima";
+  source: "garmin" | "strava" | "stima" | "manual";
+}
+
+export interface ManualActivityIn {
+  day: string;
+  sport: string;
+  title: string;
+  duration_min: number;
+  distance_km?: number | null;
+  rpe?: number;
+  notes?: string | null;
+}
+
+export interface CheckSessionRequest {
+  session_id?: string | null;
+  date: string;
+  sport: string;
+  title?: string;
+  steps?: SessionStep[];
+  priority?: "key" | "normal" | "flexible" | "optional" | null;
 }
 
 export interface DayEnergy {

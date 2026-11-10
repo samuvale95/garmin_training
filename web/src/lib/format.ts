@@ -349,8 +349,10 @@ export function stepGroupParts(group: StepGroup): { label: string; detail: strin
     const rest = extra.map((s) => `${stepTypeLabel(s.type).toLowerCase()} ${stepDurationLabel(s)}${s.note ? ` (${s.note})` : ""}`);
     const name = stepName(step);
     const label = name ? `${times}${name}` : `${times}${stepDurationLabel(step)}`;
-    // An exercise's repetitions belong in the detail ("6 ripetizioni · pausa 1,5 min").
-    const amount = step.exercise ? stepDurationLabel(step) : "";
+    // When the label is a name (an exercise or the step's note) the amount goes in the
+    // detail ("6 ripetizioni · pausa 1,5 min", "100 m · recupero 1 min"): otherwise a
+    // noted step like "Allungo: 100 m in progressione" would lose its distance.
+    const amount = name ? stepDurationLabel(step) : "";
     return {
       label,
       detail: [amount, pace, rec, ...rest].filter(Boolean).join(" · "),

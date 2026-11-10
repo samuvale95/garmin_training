@@ -91,3 +91,62 @@ def test_strength_training_does_trigger_strength_before_hard():
     rule_keys = [v.key for v in violations]
     # Strength training before hard intervals DOES trigger strength_before_hard
     assert "strength_before_hard" in rule_keys
+
+
+def test_consecutive_calisthenics_triggers_strength_in_a_row():
+    # Monday: calisthenics (pull/push)
+    # Tuesday: calisthenics (core/legs/skills)
+    sess1 = TrainingSession(
+        date=date(2026, 11, 2),
+        sport="calisthenics",
+        title="Parco: Trazioni e Dip",
+        steps=[Step(type="interval", duration_type="time", duration_value=40)],
+    )
+    sess2 = TrainingSession(
+        date=date(2026, 11, 3),
+        sport="calisthenics",
+        title="Skills e Core a corpo libero",
+        steps=[Step(type="interval", duration_type="time", duration_value=35)],
+    )
+
+    ctx = RuleContext(
+        effective_level=1,
+        recent_weekly_minutes=150.0,
+        recent_longest_run=60.0,
+        today=date(2026, 11, 2),
+    )
+
+    violations = validate([sess1, sess2], ctx)
+    rule_keys = [v.key for v in violations]
+    assert "strength_in_a_row" in rule_keys
+    v = next(v for v in violations if v.key == "strength_in_a_row")
+    assert "calisthenics consecutive" in v.message or "forza" in v.message
+
+
+def test_calisthenics_separated_by_day_does_not_trigger():
+    # Monday: calisthenics
+    # Wednesday: calisthenics (48h recovery gap)
+    sess1 = TrainingSession(
+        date=date(2026, 11, 2),
+        sport="calisthenics",
+        title="Parco: Trazioni e Dip",
+        steps=[Step(type="interval", duration_type="time", duration_value=40)],
+    )
+    sess2 = TrainingSession(
+        date=date(2026, 11, 4),
+        sport="calisthenics",
+        title="Skills e Core a corpo libero",
+        steps=[Step(type="interval", duration_type="time", duration_value=35)],
+    )
+
+    ctx = RuleContext(
+        effective_level=1,
+        recent_weekly_minutes=150.0,
+        recent_longest_run=60.0,
+        today=date(2026, 11, 2),
+    )
+
+    violations = validate([sess1, sess2], ctx)
+    rule_keys = [v.key for v in violations]
+    assert "strength_in_a_row" not in rule_keys
+

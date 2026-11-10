@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ContextLink } from "@/components/ContextLink";
 import { WorkspaceHeading } from "@/components/Workspace";
 import { Illustration } from "@/components/Illustration";
 import { CheckInCard } from "@/components/CheckInCard";
+import { ManualActivityModal } from "@/components/ManualActivityModal";
 import { AdaptationCard } from "@/components/AdaptationCard";
 import { NowMealCard } from "@/components/NowMealCard";
 import { BigEffortCard, bigEffort } from "@/components/BigEffortCard";
@@ -81,6 +82,7 @@ export function TodayView() {
   const stravaMatches = useStravaActivityMatches(planSessionsThisWeek, stravaEnabled);
 
   const avvisamiSeIlCorpoNonRegge = usePassoStore((s) => s.prefs.avvisamiSeIlCorpoNonRegge);
+  const [showManualModal, setShowManualModal] = useState(false);
   const { goal } = useRaceGoal(access.plan, access.ready);
   const watchSync = useWatchSyncStatus();
 
@@ -235,6 +237,17 @@ export function TodayView() {
               />
               {effort && <BigEffortCard activity={effort} dayLabel={effort.date === todayKey ? "oggi" : "ieri"} animate={false} />}
               {hasPlan && <AdaptationCard animate={animate} delayMs={0} />}
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  data-size="sm"
+                  onClick={() => setShowManualModal(true)}
+                  style={{ fontSize: 12, borderRadius: "var(--radius-pill)", background: "var(--crema, #FFF)", border: "1px solid var(--sabbia-bordo, #DDD)" }}
+                >
+                  + Calcetto / Altro senza orologio
+                </button>
+              </div>
             </div>
 
             {otherToday.length > 0 && (
@@ -354,6 +367,7 @@ export function TodayView() {
             )}
           </aside>
         </div>
+        <ManualActivityModal isOpen={showManualModal} onClose={() => setShowManualModal(false)} />
       </div>
     </PullToRefresh>
   );

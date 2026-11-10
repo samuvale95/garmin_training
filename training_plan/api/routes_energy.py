@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import asdict
 from datetime import date, datetime, timedelta
 
@@ -77,6 +78,68 @@ async def list_activities(
                 for row in rows
             ]
         )
+
+    return await run_in_threadpool(run)
+
+
+@router.post("/activities/manual", response_model=schemas.ManualActivityResponse)
+async def create_manual_activity(
+    payload: schemas.ManualActivityIn, user_id: str = Depends(current_user_id)
+) -> schemas.ManualActivityResponse:
+    """Record an unclocked / manual workout (e.g. soccer, beach volley, gym) to give context."""
+
+    def run() -> schemas.ManualActivityResponse:
+        weight = _weight(user_id)
+        activity_id = int(time.time() * 1000000) % 9000000000000000
+        family = history.sport_family(payload.sport)
+        base_rate = energy.KCAL_PER_KG_PER_HOUR.get(family, energy.DEFAULT_KCAL_PER_KG_PER_HOUR)
+        rpe_mult = max(0.5, min(1.5, 0.6 + 0.08 * (payload.rpe or 6)))
+        kcal = round(base_rate * rpe_mult * weight * (payload.duration_min / 60.0))
+        start_time = datetime.combine(payload.day, datetime.min.time().replace(hour=18))
+
+        row_values = {
+            "sport": payload.sport,
+            "title": payload.title.strip() or energy.FAMILY_LABELS.get(family, family).capitalize(),
+            "distance_km": payload.distance_km,
+            "duration_min": payload.duration_min,
+            "calories": kcal,
+            "calories_source": "manual",
+            "start_time": start_time,
+            "summary": {"rpe": payload.rpe, "notes": payload.notes, "manual": True},
+        }
+
+        history.save_activity(user_id, "manual", activity_id, payload.day, row_values)
+        saved_row = {"activity_id": activity_id, "day": payload.day, **row_values}
+        act_energy = energy.activity_energy(saved_row, weight)
+        out = schemas.StoredActivityOut(
+            activity_id=activity_id,
+            day=payload.day,
+            title=act_energy.title,
+            sport=act_energy.sport,
+            family=act_energy.family,
+            label=act_energy.label,
+            start_time=act_energy.start_time,
+            minutes=act_energy.minutes,
+            distance_km=act_energy.distance_km,
+            kcal=act_energy.kcal,
+            source="manual",
+        )
+        return schemas.ManualActivityResponse(activity=out)
+
+    return await run_in_threadpool(run)
+
+
+@router.delete("/activities/manual/{activity_id}", response_model=schemas.DeletePlanResponse)
+async def delete_manual_activity_endpoint(
+    activity_id: int, user_id: str = Depends(current_user_id)
+) -> schemas.DeletePlanResponse:
+    """Delete a manually entered activity."""
+
+    def run() -> schemas.DeletePlanResponse:
+        deleted = history.delete_manual_activity(user_id, activity_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Attività manuale non trovata")
+        return schemas.DeletePlanResponse(deleted=True)
 
     return await run_in_threadpool(run)
 

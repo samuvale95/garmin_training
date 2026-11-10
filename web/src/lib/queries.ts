@@ -35,6 +35,7 @@ import type {
   GeneratePlanResult,
   GoalFit,
   LoadSnapshot,
+  ManualActivityIn,
   Narrative,
   PersonalCorrelationsData,
   PlanDiff,
@@ -1398,6 +1399,34 @@ export function useDayEnergy(date: string, enabled = true) {
     queryFn: ({ signal }) => apiGet<DayEnergy>("/energy/day", { day: date }, signal),
     enabled,
     staleTime: LIVE_STALE_TIME,
+  });
+}
+
+export function useCreateManualActivity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ManualActivityIn) =>
+      apiPost<{ activity: StoredActivity }>("/activities/manual", payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      queryClient.invalidateQueries({ queryKey: ["energy"] });
+      queryClient.invalidateQueries({ queryKey: ["coach"] });
+      queryClient.invalidateQueries({ queryKey: ["plan"] });
+    },
+  });
+}
+
+export function useDeleteManualActivity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (activityId: number) =>
+      apiDelete<{ deleted: boolean }>(`/activities/manual/${activityId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      queryClient.invalidateQueries({ queryKey: ["energy"] });
+      queryClient.invalidateQueries({ queryKey: ["coach"] });
+      queryClient.invalidateQueries({ queryKey: ["plan"] });
+    },
   });
 }
 

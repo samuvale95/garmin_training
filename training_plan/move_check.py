@@ -230,6 +230,52 @@ def check_move(
     return MoveCheck(warnings, adapted)
 
 
+def check_candidate_session(
+    *,
+    candidate: TrainingSession,
+    session_id: str | None = None,
+    stored: Sequence[dict],
+    days: Sequence["DayTraining"],
+    checkins: Sequence[CheckIn],
+    context: RuleContext,
+    today: date_type,
+    confirmed: set[str] = frozenset(),
+) -> list[Warning]:
+    """Check whether placing/updating `candidate` on its date adds rule warnings."""
+    ref_id = session_id or "candidate"
+    target_date = candidate.date
+    if target_date < today:
+        return []
+
+    filtered_stored = [s for s in stored if str(s.get("id")) != str(session_id)] if session_id else list(stored)
+
+    start = target_date - timedelta(days=SPAN_DAYS)
+    start -= timedelta(days=start.weekday())
+    end = target_date + timedelta(days=SPAN_DAYS)
+    end += timedelta(days=6 - end.weekday())
+
+    before_sessions, before_refs = _sequence(filtered_stored, days, today, start, end)
+    before = {w.problem for w in _rule_warnings(before_sessions, before_refs, ref_id, context, start, end)}
+
+    after_sessions = list(before_sessions) + [candidate]
+    after_refs = list(before_refs) + [ref_id]
+
+    # Re-sort after_sessions and after_refs by session date
+    paired = sorted(zip(after_sessions, after_refs), key=lambda pair: pair[0].date)
+    sorted_sessions = [p[0] for p in paired]
+    sorted_refs = [p[1] for p in paired]
+
+    warnings = [
+        w
+        for w in _rule_warnings(sorted_sessions, sorted_refs, ref_id, context, start, end)
+        if ref_id in w.sessions and w.problem not in before
+    ]
+    pain = _pain_warning(candidate, ref_id, checkins)
+    if pain:
+        warnings.append(pain)
+    return [w for w in warnings if w.fingerprint not in confirmed]
+
+
 # ---- decisions ------------------------------------------------------------------------------
 
 DECISION_SCHEMA = """
