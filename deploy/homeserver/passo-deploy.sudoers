@@ -1,0 +1,2 @@
+# Lets the deploy script (user samu) restart only the Passo services, nothing else.
+samu ALL=(root) NOPASSWD: /usr/bin/systemctl restart passo-api passo-web

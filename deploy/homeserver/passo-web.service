@@ -1,0 +1,15 @@
+[Unit]
+Description=Passo web (Next.js PWA)
+After=network-online.target passo-api.service
+Wants=network-online.target
+
+[Service]
+User=samu
+WorkingDirectory=/opt/passo/current/web
+Environment=NODE_ENV=production
+ExecStart=/opt/passo/current/web/node_modules/.bin/next start -H 127.0.0.1 -p 3000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

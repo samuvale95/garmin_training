@@ -1,0 +1,15 @@
+[Unit]
+Description=Passo API (FastAPI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=samu
+WorkingDirectory=/opt/passo/current
+EnvironmentFile=/opt/passo/api.env
+ExecStart=/opt/passo/current/.venv/bin/uvicorn training_plan.api:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

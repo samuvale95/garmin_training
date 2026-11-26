@@ -8,3 +8,6 @@ __pycache__/
 
 # Local prod credentials (Render API key, read-only DB URL)
 prod.env
+
+# Home-server secrets (copied to /opt/passo on the server)
+deploy/homeserver/*.env

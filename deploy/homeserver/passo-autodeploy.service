@@ -1,0 +1,11 @@
+[Unit]
+Description=Passo: deploy origin/development if it changed
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=samu
+Environment=PATH=/home/samu/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/passo/repo/deploy/homeserver/autodeploy.sh
+Nice=10
