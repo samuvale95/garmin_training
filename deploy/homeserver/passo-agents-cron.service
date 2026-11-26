@@ -1,0 +1,8 @@
+[Unit]
+Description=Passo: trigger due agents
+After=passo-api.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/passo/api.env
+ExecStart=/bin/sh -c 'curl --fail-with-body -sS --retry 4 --retry-delay 20 --retry-all-errors --max-time 120 -X POST http://127.0.0.1:8000/agents/cron -H "x-cron-secret: $AGENTS_CRON_SECRET"'
